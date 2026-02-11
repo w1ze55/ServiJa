@@ -1,0 +1,82 @@
+package com.servija.servija.model;
+
+import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.experimental.SuperBuilder;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+
+import java.time.LocalDateTime;
+
+@Entity
+@Table(name = "users")
+@Data
+@SuperBuilder
+@NoArgsConstructor
+@AllArgsConstructor
+@Inheritance(strategy = InheritanceType.JOINED)
+public class User {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(nullable = false, length = 255)
+    private String name;
+
+    @Column(nullable = false, unique = true, length = 256)
+    private String email;
+
+    @Column(nullable = false, unique = true, length = 14)
+    private String cpf;
+
+    @Column(nullable = false, length = 20)
+    private String phone;
+
+    @Column(nullable = false, length = 256)
+    private String password;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private UserType userType;
+
+    @Column(nullable = false)
+    @lombok.Builder.Default
+    private Boolean emailVerified = false;
+
+    @Column(length = 6)
+    private String verificationCode;
+
+    @Column
+    private LocalDateTime verificationCodeExpiry;
+
+    @Column(length = 100)
+    private String resetPasswordToken;
+
+    @Column
+    private LocalDateTime resetPasswordTokenExpiry;
+
+    @Lob
+    @Column(columnDefinition = "MEDIUMTEXT")
+    private String avatarUrl; // Armazena base64 da imagem
+
+    @Column(nullable = false)
+    @lombok.Builder.Default
+    private Boolean active = true;
+
+    @CreationTimestamp
+    @Column(nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+
+    @UpdateTimestamp
+    @Column(nullable = false)
+    private LocalDateTime updatedAt;
+
+    public enum UserType {
+        CONTRACTOR,
+        FREELANCER
+    }
+}
+
