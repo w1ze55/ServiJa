@@ -12,7 +12,7 @@ services:
     volumes:
       - mysql_data:/var/lib/mysql
     networks:
-      - servija_network
+      - frontend_network
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       timeout: 5s
@@ -42,11 +42,11 @@ services:
     ports:
       - "8080:8080"
     networks:
-      - servija_network
+      - frontend_network
 
   frontend:
     build:
-      context: ./servija
+      context: ./frontend
       dockerfile: Dockerfile
     container_name: servija_frontend
     depends_on:
@@ -54,10 +54,10 @@ services:
     ports:
       - "5173:5173"
     volumes:
-      - ./servija:/app
+      - ./frontend:/app
       - /app/node_modules
     networks:
-      - servija_network
+      - frontend_network
     environment:
       - VITE_API_URL=${VITE_API_URL:-http://localhost:8080}
 
@@ -65,5 +65,5 @@ volumes:
   mysql_data:
 
 networks:
-  servija_network:
+  frontend_network:
     driver: bridge
