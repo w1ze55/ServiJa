@@ -1,0 +1,209 @@
+/* SignupAccountType.vue Styles */
+
+.signup-account-type-container {
+  min-height: 100vh;
+  background: linear-gradient(to bottom right, rgb(239, 246, 255), rgb(238, 242, 255));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.signup-account-type-card {
+  width: 100%;
+  max-width: 64rem;
+  background-color: white;
+  border-radius: 0.5rem;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  padding: 2rem;
+}
+
+.signup-account-type-back-button {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: rgb(75, 85, 99);
+  background: none;
+  border: none;
+  cursor: pointer;
+  margin-bottom: 1.5rem;
+  transition: color 0.2s;
+}
+
+.signup-account-type-back-button:hover {
+  color: rgb(17, 24, 39);
+}
+
+.signup-account-type-header {
+  margin-bottom: 2rem;
+}
+
+.signup-account-type-progress-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.signup-account-type-title {
+  color: rgb(17, 24, 39);
+}
+
+.signup-account-type-step {
+  font-size: 0.875rem;
+  color: rgb(107, 114, 128);
+}
+
+.signup-account-type-intro {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.signup-account-type-intro-title {
+  color: rgb(17, 24, 39);
+  margin-bottom: 0.5rem;
+}
+
+.signup-account-type-intro-text {
+  color: rgb(75, 85, 99);
+}
+
+.signup-account-type-grid {
+  display: grid;
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+@media (min-width: 768px) {
+  .signup-account-type-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.signup-account-type-button {
+  position: relative;
+  padding: 1.5rem;
+  border-radius: 0.5rem;
+  border: 2px solid rgb(229, 231, 235);
+  transition: all 0.2s;
+  text-align: left;
+  background: white;
+  cursor: pointer;
+}
+
+.signup-account-type-button:hover:not(.selected) {
+  border-color: rgb(209, 213, 219);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+.signup-account-type-button.selected {
+  border-color: rgb(37, 99, 235);
+  background-color: rgb(239, 246, 255);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+.signup-account-type-check {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  width: 1.5rem;
+  height: 1.5rem;
+  background-color: rgb(37, 99, 235);
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.signup-account-type-check svg {
+  height: 1rem;
+  width: 1rem;
+  color: white;
+}
+
+.signup-account-type-icon {
+  display: inline-flex;
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  margin-bottom: 1rem;
+  background-color: rgb(243, 244, 246);
+}
+
+.signup-account-type-icon.selected {
+  background-color: rgb(37, 99, 235);
+}
+
+.signup-account-type-icon svg {
+  height: 1.5rem;
+  width: 1.5rem;
+  color: rgb(75, 85, 99);
+}
+
+.signup-account-type-icon svg.selected {
+  color: white;
+}
+
+.signup-account-type-button-title {
+  color: rgb(17, 24, 39);
+  margin-bottom: 0.5rem;
+}
+
+.signup-account-type-button-description {
+  color: rgb(75, 85, 99);
+  font-size: 0.875rem;
+  margin-bottom: 1rem;
+}
+
+.signup-account-type-features {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.signup-account-type-feature {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: rgb(55, 65, 81);
+}
+
+.signup-account-type-feature svg {
+  height: 1rem;
+  width: 1rem;
+  margin-top: 0.125rem;
+  flex-shrink: 0;
+  color: rgb(156, 163, 175);
+}
+
+.signup-account-type-feature svg.selected {
+  color: rgb(37, 99, 235);
+}
+
+.signup-account-type-submit-button {
+  width: 100%;
+}
+
+.signup-account-type-back-wrapper {
+  margin-top: 1rem;
+  text-align: center;
+}
+
+.signup-account-type-back-link {
+  font-size: 0.875rem;
+  color: rgb(107, 114, 128);
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  margin: 0 auto;
+  transition: color 0.2s;
+}
+
+.signup-account-type-back-link:hover {
+  color: rgb(55, 65, 81);
+}
+
