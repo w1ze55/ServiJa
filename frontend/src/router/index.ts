@@ -8,19 +8,19 @@ import Dashboard from '@/pages/Dashboard/index.vue';
 import FreelancerDashboard from '@/pages/FreelancerDashboard/index.vue';
 import ClienteDashboard from '@/pages/ClienteDashboard/index.vue';
 import FreelancerProfileSettings from '@/pages/FreelancerProfileSettings/index.vue';
-import FreelancerProfessionalProfile from '@/pages/FreelancerProfessionalProfile/index.vue';
-import FreelancerPortfolio from '@/pages/FreelancerPortfolio/index.vue';
+//import FreelancerProfessionalProfile from '@/pages/FreelancerProfessionalProfile/index.vue';
+//import FreelancerPortfolio from '@/pages/FreelancerPortfolio/index.vue';
 import ClienteProfileSettings from '@/pages/ClienteProfileSettings/index.vue';
-import MapPage from '@/pages/Map/index.vue';
-import SettingsPage from '@/pages/Settings/index.vue';
-import FreelancerServicesPage from '@/pages/FreelancerServices/index.vue';
-import FreelancerProposalsPage from '@/pages/FreelancerProposals/index.vue';
-import FreelancerDeliveriesPage from '@/pages/FreelancerDeliveries/index.vue';
-import FreelancerWalletPage from '@/pages/FreelancerWallet/index.vue';
-import FreelancerInvoicesPage from '@/pages/FreelancerInvoices/index.vue';
-import FreelancerSchedulePage from '@/pages/FreelancerSchedule/index.vue';
-import MessagesPage from '@/pages/Messages/index.vue';
-import NotificationsPage from '@/pages/Notifications/index.vue';
+//import MapPage from '@/pages/Map/index.vue';
+//import SettingsPage from '@/pages/Settings/index.vue';
+//import FreelancerServicesPage from '@/pages/FreelancerServices/index.vue';
+//import FreelancerProposalsPage from '@/pages/FreelancerProposals/index.vue';
+//import FreelancerDeliveriesPage from '@/pages/FreelancerDeliveries/index.vue';
+//import FreelancerWalletPage from '@/pages/FreelancerWallet/index.vue';
+//import FreelancerInvoicesPage from '@/pages/FreelancerInvoices/index.vue';
+//import FreelancerSchedulePage from '@/pages/FreelancerSchedule/index.vue';
+//import MessagesPage from '@/pages/Messages/index.vue';
+//import NotificationsPage from '@/pages/Notifications/index.vue';
 //import ExplorePage from '@/pages/Explore/index.vue';
 //import SearchPage from '@/pages/Search/index.vue';
 //import MyRequestsPage from '@/pages/MyRequests/index.vue';
@@ -81,12 +81,12 @@ const routes: RouteRecordRaw[] = [
     component: FreelancerProfileSettings,
     meta: { requiresAuth: true, userType: 'provider' },
   },
-  {
+  /*{
     path: '/freelancer-professional-profile',
     name: 'freelancer-professional-profile',
     component: FreelancerProfessionalProfile,
     meta: { requiresAuth: true, userType: 'provider' },
-  },
+  },*/
   {
     path: '/cliente-profile-settings',
     name: 'cliente-profile-settings',
@@ -95,7 +95,7 @@ const routes: RouteRecordRaw[] = [
   },
 
   // ============ MAPA ============
-  {
+  /*{
     path: '/map',
     name: 'map',
     component: MapPage,
@@ -184,7 +184,7 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true },
   },
 
-  /* Explore (Cliente)
+   Explore (Cliente)
   {
     path: '/explore',
     name: 'explore',
