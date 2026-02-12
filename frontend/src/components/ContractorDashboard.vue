@@ -232,7 +232,7 @@ const filteredQuotes = computed(() =>
       <Card class="p-6">
         <h2 class="text-gray-900 mb-6">Minhas Solicitações</h2>
 
-        <Tabs :model-value="activeTab" @update:model-value="(val) => (activeTab = val as string)">
+        <Tabs :model-value="activeTab" @update:model-value="(val: string) => (activeTab = val)">
           <TabsList class="mb-6">
             <TabsTrigger value="all"> Todos ({{ mockQuotes.length }}) </TabsTrigger>
             <TabsTrigger value="pending">
