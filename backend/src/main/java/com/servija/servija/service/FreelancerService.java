@@ -20,7 +20,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.servija.servija.dto.ServiceCityResponse;
-import com.servija.servija.model.ServiceCity;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
