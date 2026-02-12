@@ -106,11 +106,11 @@ const handleLogout = () => {
 </script>
 
 <template>
-  <MainLayout 
+  <MainLayout
     v-if="user"
-    :user="user" 
-    current-page="settings" 
-    :on-navigate="handleNavigate" 
+    :user="user"
+    current-page="settings"
+    :on-navigate="handleNavigate"
     :on-logout="handleLogout"
   >
     <div class="max-w-4xl mx-auto space-y-6">

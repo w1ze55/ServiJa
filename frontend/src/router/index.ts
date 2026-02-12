@@ -13,7 +13,7 @@ import FreelancerPortfolio from '@/pages/FreelancerPortfolio/index.vue';
 import ClienteProfileSettings from '@/pages/ClienteProfileSettings/index.vue';
 import MapPage from '@/pages/Map/index.vue';
 import SettingsPage from '@/pages/Settings/index.vue';
-//import FreelancerServicesPage from '@/pages/FreelancerServices/index.vue';
+import FreelancerServicesPage from '@/pages/FreelancerServices/index.vue';
 //import FreelancerProposalsPage from '@/pages/FreelancerProposals/index.vue';
 //import FreelancerDeliveriesPage from '@/pages/FreelancerDeliveries/index.vue';
 //import FreelancerWalletPage from '@/pages/FreelancerWallet/index.vue';
@@ -103,12 +103,12 @@ const routes: RouteRecordRaw[] = [
   },
 
   // ============ FREELANCER SERVICES ============
-  /*{
+  {
     path: '/freelancer-services',
     name: 'freelancer-services',
     component: FreelancerServicesPage,
     meta: { requiresAuth: true, userType: 'provider' },
-  },*/
+  },
 
   // ============ FREELANCER PROPOSALS ============
   /*{
