@@ -1,0 +1,26 @@
+package com.servija.servija.dto;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.math.BigDecimal;
+import java.util.List;
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class ServiceRequest {
+    private String title;
+    private String category;
+    private String description;
+    private BigDecimal price;
+    private String priceType; // FIXED, HOURLY, DAILY
+    private Integer deliveryTime;
+    private String deliveryUnit; // DAYS, WEEKS
+    private List<String> tags;
+    private List<String> images;
+    private Boolean isActive;
+}
