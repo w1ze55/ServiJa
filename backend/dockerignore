@@ -1,0 +1,14 @@
+# .dockerignore
+target/
+.git/
+.gitignore
+.idea/
+*.iml
+.DS_Store
+README.md
+API_TESTS.md
+setup.sh
+docker-compose.yml
+Dockerfile
+
+

@@ -1,0 +1,14 @@
+/* Auth Components Styles */
+
+@import './auth-card.css';
+@import './login-page.css';
+@import './signup-account-type.css';
+@import './signup-personal-data.css';
+@import './signup-confirmation.css';
+@import './email-verification.css';
+@import './forgot-password.css';
+@import './reset-password.css';
+
+
+
+

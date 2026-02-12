@@ -1,0 +1,200 @@
+/* SignupPersonalData.vue Styles */
+
+.signup-personal-data-container {
+  min-height: 100vh;
+  background: linear-gradient(to bottom right, rgb(239, 246, 255), rgb(238, 242, 255));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.signup-personal-data-container.inline {
+  min-height: auto;
+  background: transparent;
+  padding: 0;
+}
+
+.signup-personal-data-card {
+  width: 100%;
+  max-width: 42rem;
+  background-color: white;
+  border-radius: 0.5rem;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  padding: 2rem;
+}
+
+.signup-personal-data-card.inline {
+  max-width: none;
+  box-shadow: none;
+  padding: 0;
+}
+
+.signup-personal-data-back-button {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: rgb(75, 85, 99);
+  background: none;
+  border: none;
+  cursor: pointer;
+  margin-bottom: 1.5rem;
+  transition: color 0.2s;
+}
+
+.signup-personal-data-back-button:hover {
+  color: rgb(17, 24, 39);
+}
+
+.signup-personal-data-header {
+  margin-bottom: 2rem;
+}
+
+.signup-personal-data-progress-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.signup-personal-data-progress-step {
+  font-size: 0.875rem;
+  color: rgb(107, 114, 128);
+}
+
+.signup-personal-data-title {
+  color: rgb(17, 24, 39);
+  margin-bottom: 0.5rem;
+}
+
+.signup-personal-data-subtitle {
+  color: rgb(75, 85, 99);
+}
+
+.signup-personal-data-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.signup-personal-data-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.signup-personal-data-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+@media (min-width: 768px) {
+  .signup-personal-data-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.signup-personal-data-input-error {
+  border-color: rgb(239, 68, 68);
+}
+
+.signup-personal-data-error-message {
+  font-size: 0.875rem;
+  color: rgb(239, 68, 68);
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.signup-personal-data-password-wrapper {
+  position: relative;
+}
+
+.signup-personal-data-password-input {
+  padding-right: 2.5rem;
+}
+
+.signup-personal-data-password-toggle {
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: rgb(107, 114, 128);
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: color 0.2s;
+  outline: none;
+}
+
+.signup-personal-data-password-toggle:hover {
+  color: rgb(55, 65, 81);
+}
+
+.signup-personal-data-password-requirements {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  background-color: rgb(249, 250, 251);
+  border-radius: 0.375rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.signup-personal-data-requirements-title {
+  font-size: 0.875rem;
+  color: rgb(55, 65, 81);
+}
+
+.signup-personal-data-requirement {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+}
+
+.signup-personal-data-requirement.met {
+  color: rgb(22, 163, 74);
+}
+
+.signup-personal-data-requirement.unmet {
+  color: rgb(107, 114, 128);
+}
+
+.signup-personal-data-terms-wrapper {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding-top: 1rem;
+}
+
+.signup-personal-data-terms-checkbox-error {
+  border-color: rgb(239, 68, 68);
+}
+
+.signup-personal-data-terms-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.signup-personal-data-terms-label {
+  cursor: pointer;
+}
+
+.signup-personal-data-terms-link {
+  color: rgb(37, 99, 235);
+  text-decoration: none;
+}
+
+.signup-personal-data-terms-link:hover {
+  text-decoration: underline;
+}
+
+.signup-personal-data-submit-button {
+  width: 100%;
+}
+
+
+
+

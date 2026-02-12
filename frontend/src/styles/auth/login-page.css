@@ -1,0 +1,159 @@
+/* LoginPage.vue Styles */
+
+.login-page-container {
+  min-height: 100vh;
+  background: linear-gradient(to bottom right, rgb(239, 246, 255), rgb(238, 242, 255));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.login-page-card {
+  width: 100%;
+  max-width: 28rem;
+  background-color: white;
+  border-radius: 0.5rem;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  padding: 2rem;
+}
+
+.login-page-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.login-page-logo {
+  color: rgb(37, 99, 235);
+  margin-bottom: 0.5rem;
+}
+
+.login-page-title {
+  color: rgb(55, 65, 81);
+}
+
+.login-page-subtitle {
+  color: rgb(107, 114, 128);
+  margin-top: 0.5rem;
+}
+
+.login-page-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.login-page-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.login-page-password-wrapper {
+  position: relative;
+}
+
+.login-page-password-toggle {
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: rgb(107, 114, 128);
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.login-page-password-toggle:hover {
+  color: rgb(55, 65, 81);
+}
+
+.login-page-error {
+  font-size: 0.875rem;
+  color: rgb(239, 68, 68);
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.login-page-input-error {
+  border-color: rgb(239, 68, 68);
+}
+
+.login-page-input-error:focus-visible {
+  ring-color: rgb(239, 68, 68);
+}
+
+.login-page-forgot-password-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.login-page-forgot-password {
+  font-size: 0.875rem;
+  color: rgb(37, 99, 235);
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.login-page-forgot-password:hover {
+  color: rgb(29, 78, 216);
+  text-decoration: underline;
+}
+
+.login-page-submit-button {
+  width: 100%;
+}
+
+.login-page-signup-wrapper {
+  margin-top: 1.5rem;
+  text-align: center;
+}
+
+.login-page-signup-text {
+  color: rgb(75, 85, 99);
+}
+
+.login-page-signup-button {
+  color: rgb(37, 99, 235);
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.login-page-signup-button:hover {
+  color: rgb(29, 78, 216);
+  text-decoration: underline;
+}
+
+.login-page-back-wrapper {
+  margin-top: 1rem;
+  text-align: center;
+}
+
+.login-page-back-button {
+  font-size: 0.875rem;
+  color: rgb(107, 114, 128);
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  margin: 0 auto;
+  transition: color 0.2s;
+}
+
+.login-page-back-button:hover {
+  color: rgb(55, 65, 81);
+}
+
+
+
+
