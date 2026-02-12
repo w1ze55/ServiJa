@@ -13,7 +13,6 @@ onMounted(() => {
   const userData = localStorage.getItem('user');
   if (userData) {
     user.value = JSON.parse(userData);
-    
     // Verificar se é realmente um cliente
     if (user.value.type !== 'contractor') {
       router.push('/freelancer-profile-settings');
@@ -45,9 +44,9 @@ const handleSearch = (query: string) => {
     :on-logout="handleLogout"
     :on-search="handleSearch"
   >
-    <ClienteAccountSettings 
-      :on-navigate="handleNavigate" 
-      :on-logout="handleLogout" 
+    <ClienteAccountSettings
+      :on-navigate="handleNavigate"
+      :on-logout="handleLogout"
     />
   </MainLayout>
 </template>
