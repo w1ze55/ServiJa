@@ -13,7 +13,6 @@ onMounted(() => {
   const userData = localStorage.getItem('user');
   if (userData) {
     user.value = JSON.parse(userData);
-    
     // Verificar se é realmente um freelancer
     if (user.value.type !== 'provider') {
       router.push('/cliente-profile-settings');
