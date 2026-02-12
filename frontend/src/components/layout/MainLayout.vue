@@ -78,24 +78,18 @@ const loadUserAddresses = async () => {
   try {
     const response = await api.get('/addresses');
     userAddresses.value = response.data || [];
-    
-    // Encontrar endereço padrão
     defaultAddress.value = userAddresses.value.find(addr => addr.isDefault) || userAddresses.value[0] || null;
-    
     if (defaultAddress.value) {
       userLocation.value = `${defaultAddress.value.city}, ${defaultAddress.value.state}`;
     } else {
-      // Tentar obter localização via GPS
       getUserLocationFromGPS();
     }
   } catch (error) {
     console.error('Erro ao carregar endereços:', error);
-    // Fallback para GPS
     getUserLocationFromGPS();
   }
 };
 
-// Obter localização via GPS
 const getUserLocationFromGPS = () => {
   if ('geolocation' in navigator) {
     navigator.geolocation.getCurrentPosition(
@@ -106,10 +100,10 @@ const getUserLocationFromGPS = () => {
             `https://nominatim.openstreetmap.org/reverse?lat=${position.coords.latitude}&lon=${position.coords.longitude}&format=json`
           );
           const data = await response.json();
-          
+
           const city = data.address?.city || data.address?.town || data.address?.village || '';
           const state = data.address?.state ? getStateAbbreviation(data.address.state) : '';
-          
+
           if (city && state) {
             userLocation.value = `${city}, ${state}`;
           } else {
@@ -205,7 +199,7 @@ const getInitials = (name: string) => {
       @mouseenter="sidebarExpanded = true"
       @mouseleave="sidebarExpanded = false"
       :class="`
-        fixed top-0 left-0 h-full bg-[#263238] text-white z-[60] 
+        fixed top-0 left-0 h-full bg-[#263238] text-white z-[60]
         transition-all duration-300 ease-in-out
         hidden lg:block
         ${sidebarExpanded ? 'w-64' : 'w-20'}
@@ -316,7 +310,7 @@ const getInitials = (name: string) => {
     <!-- Sidebar - Mobile -->
     <aside
       :class="`
-        fixed top-0 left-0 h-full w-64 bg-[#263238] text-white z-[60] 
+        fixed top-0 left-0 h-full w-64 bg-[#263238] text-white z-[60]
         transform transition-transform duration-300 ease-in-out
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
         lg:hidden

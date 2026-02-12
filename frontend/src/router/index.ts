@@ -8,7 +8,7 @@ import Dashboard from '@/pages/Dashboard/index.vue';
 import FreelancerDashboard from '@/pages/FreelancerDashboard/index.vue';
 import ClienteDashboard from '@/pages/ClienteDashboard/index.vue';
 import FreelancerProfileSettings from '@/pages/FreelancerProfileSettings/index.vue';
-//import FreelancerProfessionalProfile from '@/pages/FreelancerProfessionalProfile/index.vue';
+import FreelancerProfessionalProfile from '@/pages/FreelancerProfessionalProfile/index.vue';
 //import FreelancerPortfolio from '@/pages/FreelancerPortfolio/index.vue';
 import ClienteProfileSettings from '@/pages/ClienteProfileSettings/index.vue';
 //import MapPage from '@/pages/Map/index.vue';
@@ -81,12 +81,12 @@ const routes: RouteRecordRaw[] = [
     component: FreelancerProfileSettings,
     meta: { requiresAuth: true, userType: 'provider' },
   },
-  /*{
+  {
     path: '/freelancer-professional-profile',
     name: 'freelancer-professional-profile',
     component: FreelancerProfessionalProfile,
     meta: { requiresAuth: true, userType: 'provider' },
-  },*/
+  },
   {
     path: '/cliente-profile-settings',
     name: 'cliente-profile-settings',
