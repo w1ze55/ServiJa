@@ -9,7 +9,7 @@ import FreelancerDashboard from '@/pages/FreelancerDashboard/index.vue';
 import ClienteDashboard from '@/pages/ClienteDashboard/index.vue';
 import FreelancerProfileSettings from '@/pages/FreelancerProfileSettings/index.vue';
 import FreelancerProfessionalProfile from '@/pages/FreelancerProfessionalProfile/index.vue';
-//import FreelancerPortfolio from '@/pages/FreelancerPortfolio/index.vue';
+import FreelancerPortfolio from '@/pages/FreelancerPortfolio/index.vue';
 import ClienteProfileSettings from '@/pages/ClienteProfileSettings/index.vue';
 //import MapPage from '@/pages/Map/index.vue';
 //import SettingsPage from '@/pages/Settings/index.vue';
@@ -100,55 +100,55 @@ const routes: RouteRecordRaw[] = [
     name: 'map',
     component: MapPage,
     meta: { requiresAuth: true },
-  },
+  },*/
 
   // ============ FREELANCER SERVICES ============
-  {
+  /*{
     path: '/freelancer-services',
     name: 'freelancer-services',
     component: FreelancerServicesPage,
     meta: { requiresAuth: true, userType: 'provider' },
-  },
+  },*/
 
   // ============ FREELANCER PROPOSALS ============
-  {
+  /*{
     path: '/freelancer-proposals',
     name: 'freelancer-proposals',
     component: FreelancerProposalsPage,
     meta: { requiresAuth: true, userType: 'provider' },
-  },
+  },*/
 
   // ============ FREELANCER DELIVERIES ============
-  {
+  /*{
     path: '/freelancer-deliveries',
     name: 'freelancer-deliveries',
     component: FreelancerDeliveriesPage,
     meta: { requiresAuth: true, userType: 'provider' },
-  },
+  },*/
 
   // ============ FREELANCER WALLET ============
-  {
+  /*{
     path: '/freelancer-wallet',
     name: 'freelancer-wallet',
     component: FreelancerWalletPage,
     meta: { requiresAuth: true, userType: 'provider' },
-  },
+  },*/
 
   // ============ FREELANCER INVOICES ============
-  {
+  /*{
     path: '/freelancer-invoices',
     name: 'freelancer-invoices',
     component: FreelancerInvoicesPage,
     meta: { requiresAuth: true, userType: 'provider' },
-  },
+  },*/
 
   // ============ FREELANCER SCHEDULE ============
-  {
+  /*{
     path: '/freelancer-schedule',
     name: 'freelancer-schedule',
     component: FreelancerSchedulePage,
     meta: { requiresAuth: true, userType: 'provider' },
-  },
+  },*/
 
   // ============ FREELANCER PORTFOLIO/GALLERY ============
   {
@@ -159,81 +159,81 @@ const routes: RouteRecordRaw[] = [
   },
 
   // ============ MESSAGES ============
-  {
+  /*{
     path: '/messages',
     name: 'messages',
     component: MessagesPage,
     meta: { requiresAuth: true },
-  },
+  },*/
 
   // ============ CONFIGURAÇÕES ============
-  {
+  /*{
     path: '/settings',
     name: 'settings',
     component: SettingsPage,
     meta: { requiresAuth: true },
-  },
+  },*/
 
   // ============ ROTAS ADICIONAIS ============
 
   // Notifications
-  {
+  /*{
     path: '/notifications',
     name: 'notifications',
     component: NotificationsPage,
     meta: { requiresAuth: true },
-  },
+  },*/
 
-   Explore (Cliente)
-  {
+  // Explore (Cliente)
+  /*{
     path: '/explore',
     name: 'explore',
     component: ExplorePage,
     meta: { requiresAuth: true, userType: 'contractor' },
-  },
+  },*/
 
   // Search
-  {
+  /*{
     path: '/search',
     name: 'search',
     component: SearchPage,
     meta: { requiresAuth: false },
-  },
+  },*/
 
   // My Requests (Cliente)
-  {
+  /*{
     path: '/my-requests',
     name: 'my-requests',
     component: MyRequestsPage,
     meta: { requiresAuth: true, userType: 'contractor' },
-  },
+  },*/
 
   // Favorites (Cliente)
-  {
+  /*{
     path: '/favorites',
     name: 'favorites',
     component: FavoritesPage,
     meta: { requiresAuth: true, userType: 'contractor' },
-  },
+  },*/
 
   // Contracts (Cliente)
-  {
+  /*{
     path: '/contracts',
     name: 'contracts',
     component: ContractsPage,
     meta: { requiresAuth: true, userType: 'contractor' },
-  },
+  },*/
 
   // Freelancer KYC
-  {
+  /*{
     path: '/freelancer-kyc',
     name: 'freelancer-kyc',
     component: FreelancerKYCPage,
     meta: { requiresAuth: true, userType: 'provider' },
-  },
+  },*/
 
   // Freelancer Account Settings
-  {
+  /*{
     path: '/freelancer-account-settings',
     name: 'freelancer-account-settings',
     component: FreelancerAccountSettingsPage,

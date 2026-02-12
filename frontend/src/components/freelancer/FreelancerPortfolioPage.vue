@@ -622,7 +622,7 @@ const handleTagKeyPress = (e: KeyboardEvent) => {
     </div>
 
     <!-- Add/Edit Project Dialog -->
-    <Dialog :open="showAddDialog" @update:open="(val) => showAddDialog = val">
+    <Dialog :open="showAddDialog" @update:open="(val: boolean) => (showAddDialog = val)">
       <DialogContent class="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{{ editingProject ? 'Editar Projeto' : 'Adicionar Novo Projeto' }}</DialogTitle>
@@ -825,7 +825,7 @@ const handleTagKeyPress = (e: KeyboardEvent) => {
     </Dialog>
 
     <!-- View Project Dialog -->
-    <Dialog :open="showViewDialog" @update:open="(val) => showViewDialog = val">
+    <Dialog :open="showViewDialog" @update:open="(val: boolean) => showViewDialog = val">
       <DialogContent class="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
         <template v-if="viewingProject">
           <DialogHeader>
@@ -944,7 +944,7 @@ const handleTagKeyPress = (e: KeyboardEvent) => {
     </Dialog>
 
     <!-- Delete Confirmation -->
-    <AlertDialog :open="showDeleteDialog" @update:open="(val) => showDeleteDialog = val">
+    <AlertDialog :open="showDeleteDialog" @update:open="(val: boolean) => showDeleteDialog = val">
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Excluir Projeto</AlertDialogTitle>
