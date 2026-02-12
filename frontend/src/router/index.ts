@@ -12,7 +12,7 @@ import FreelancerProfessionalProfile from '@/pages/FreelancerProfessionalProfile
 import FreelancerPortfolio from '@/pages/FreelancerPortfolio/index.vue';
 import ClienteProfileSettings from '@/pages/ClienteProfileSettings/index.vue';
 import MapPage from '@/pages/Map/index.vue';
-//import SettingsPage from '@/pages/Settings/index.vue';
+import SettingsPage from '@/pages/Settings/index.vue';
 //import FreelancerServicesPage from '@/pages/FreelancerServices/index.vue';
 //import FreelancerProposalsPage from '@/pages/FreelancerProposals/index.vue';
 //import FreelancerDeliveriesPage from '@/pages/FreelancerDeliveries/index.vue';
@@ -167,12 +167,12 @@ const routes: RouteRecordRaw[] = [
   },*/
 
   // ============ CONFIGURAÇÕES ============
-  /*{
+  {
     path: '/settings',
     name: 'settings',
     component: SettingsPage,
     meta: { requiresAuth: true },
-  },*/
+  },
 
   // ============ ROTAS ADICIONAIS ============
 
