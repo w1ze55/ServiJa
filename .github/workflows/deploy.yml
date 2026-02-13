@@ -1,4 +1,4 @@
-name: Deploy Servija to EC2
+name: Deploy Servija Docker
 
 on:
   push:
@@ -12,21 +12,17 @@ jobs:
       - name: Checkout do código
         uses: actions/checkout@v4
 
-      - name: Executar Deploy via SSH
+      - name: Deploy via SSH no EC2
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ec2-user
           key: ${{ secrets.EC2_SSH_KEY }}
+          port: 22
           script: |
             cd /var/www/Servija
+            
             git pull origin main
             
-            # Comandos Docker que você usa
             docker compose down
             docker compose -f docker-compose.prod.yml up --build -d
-            
-            # Limpeza para não encher o disco da EC2
-            docker image prune -f
-            
-            echo "Deploy finalizado com sucesso!"
