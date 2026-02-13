@@ -48,18 +48,15 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8080}
     container_name: servija_frontend
     depends_on:
       - backend
     ports:
-      - "5173:5173"
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
+      - "80:80"
     networks:
       - frontend_network
-    environment:
-      - VITE_API_URL=${VITE_API_URL:-http://localhost:8080}
 
 volumes:
   mysql_data:
