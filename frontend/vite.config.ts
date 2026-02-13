@@ -15,4 +15,20 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url))
     },
   },
+  publicDir: 'public', // Garante que arquivos da pasta public sejam copiados
+  build: {
+    assetsInlineLimit: 0, // Não fazer inline de assets pequenos
+    rollupOptions: {
+      output: {
+        assetFileNames: (assetInfo) => {
+          // Manter favicon.ico na raiz do dist
+          if (assetInfo.name === 'favicon.ico') {
+            return '[name][extname]'
+          }
+          return 'assets/[name]-[hash][extname]'
+        }
+      }
+    }
+  }
 })
+
