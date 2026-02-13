@@ -19,24 +19,14 @@ jobs:
           username: ec2-user
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            # Entra na pasta raiz do projeto
             cd /var/www/Servija
-            
-            # Atualiza o código de ambas as pastas
             git pull origin main
             
-            # --- Atualização do Backend ---
-            echo "Atualizando Backend..."
-            cd backend
-            # Exemplo: se for Node.js use 'npm install' e 'pm2 restart'
-            # npm install
-            # pm2 restart all 
+            # Comandos Docker que você usa
+            docker compose down
+            docker compose -f docker-compose.prod.yml up --build -d
             
-            # --- Atualização do Frontend ---
-            echo "Atualizando Frontend..."
-            cd ../frontend
-            # Exemplo: se for React/Vue, você precisa dar build
-            # npm install
-            # npm run build
+            # Limpeza para não encher o disco da EC2
+            docker image prune -f
             
             echo "Deploy finalizado com sucesso!"
