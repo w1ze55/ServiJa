@@ -29,9 +29,10 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        # Para usar reverse proxy, configure como: http://3.131.85.191/api
-        # Para usar backend direto, configure como: http://3.131.85.191:8080
-        VITE_API_URL: ${VITE_API_URL:-http://3.131.85.191/api}
+        # URL base SEM /api no final (o código adiciona /api automaticamente)
+        # Para usar reverse proxy: http://3.131.85.191
+        # Para usar backend direto: http://3.131.85.191:8080
+        VITE_API_URL: ${VITE_API_URL:-http://3.131.85.191}
     container_name: servija_frontend
     depends_on:
       - backend

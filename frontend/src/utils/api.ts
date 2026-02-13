@@ -1,7 +1,13 @@
 import { toast } from './toast'
 
 // Configuração da API
-export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
+// VITE_API_URL deve ser a URL base SEM /api no final
+// Exemplo: http://3.131.85.191 (não http://3.131.85.191/api)
+// O código abaixo adiciona /api automaticamente
+const rawAPIBaseURL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
+
+// Remove /api do final se existir para evitar duplicação (tanto /api quanto /api/)
+export const API_BASE_URL = rawAPIBaseURL.replace(/\/api\/?$/, '')
 
 // Endpoints da API
 export const API_ENDPOINTS = {
