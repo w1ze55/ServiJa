@@ -22,6 +22,8 @@ jobs:
           script: |
             cd /var/www/ServiJa/app
 
+            git checkout main
+
             git pull origin main
 
             docker compose -f docker-compose.prod.yml down
