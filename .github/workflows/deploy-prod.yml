@@ -1,4 +1,4 @@
-name: Deploy Servija Prod
+name: Deploy Servija AWS
 
 on:
   push:
