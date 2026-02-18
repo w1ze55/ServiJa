@@ -29,6 +29,8 @@ services:
       args:
         VITE_API_URL: ${VITE_API_URL}
     container_name: servija_frontend
+    environment:
+      BACKEND_URL: http://backend:8080
     depends_on:
       - backend
     ports:

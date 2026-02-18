@@ -1,4 +1,4 @@
-name: Deploy ServiJá
+name: Deploy Servija Render
 
 on:
   push:
