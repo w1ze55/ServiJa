@@ -5,19 +5,17 @@ services:
       dockerfile: Dockerfile
     container_name: servija_backend
     environment:
-      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
-      # URL do banco de dados na AWS (RDS)
-      # Formato: jdbc:mysql://seu-endpoint-rds.region.rds.amazonaws.com:3306/nome_do_banco?useSSL=true&requireSSL=false&serverTimezone=America/Sao_Paulo
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE}
       SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL}
       SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME}
       SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD}
       JWT_SECRET: ${JWT_SECRET}
-      JWT_EXPIRATION: ${JWT_EXPIRATION:-86400000}
-      MAIL_HOST: ${MAIL_HOST:-smtp.gmail.com}
-      MAIL_PORT: ${MAIL_PORT:-587}
-      MAIL_USERNAME: ${MAIL_USERNAME:-noreply@servija.com}
-      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
-      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://3.131.85.191}
+      JWT_EXPIRATION: ${JWT_EXPIRATION}
+      MAIL_HOST: ${MAIL_HOST}
+      MAIL_PORT: ${MAIL_PORT}
+      MAIL_USERNAME: ${MAIL_USERNAME}
+      MAIL_PASSWORD: ${MAIL_PASSWORD}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
     ports:
       - "8080:8080"
     networks:
@@ -29,11 +27,10 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        # URL base SEM /api no final (o código adiciona /api automaticamente)
-        # Para usar reverse proxy: http://3.131.85.191
-        # Para usar backend direto: http://3.131.85.191:8080
-        VITE_API_URL: ${VITE_API_URL:-http://3.131.85.191}
+        VITE_API_URL: ${VITE_API_URL}
     container_name: servija_frontend
+    environment:
+      BACKEND_URL: http://backend:8080
     depends_on:
       - backend
     ports:

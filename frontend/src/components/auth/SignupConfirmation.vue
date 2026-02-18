@@ -157,16 +157,6 @@
 
       <!-- ACEITE DOS TERMOS -->
       <div class="border-t pt-6">
-        <div class="flex items-start gap-3 mb-6">
-          <Checkbox
-            :checked="confirmTerms"
-            @update:checked="(val) => confirmTerms = val"
-            id="confirm-terms"
-            :disabled="isLoading"
-            :class="error ? 'border-red-500' : ''"
-          />
-        </div>
-
         <Button
           class="w-full"
           size="lg"
@@ -183,8 +173,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import Button from '../ui/button.vue'
-import Checkbox from '../ui/checkbox.vue'
-import Label from '../ui/label.vue'
+
 import Alert from '../ui/alert.vue'
 import AlertDescription from '../ui/alert-description.vue'
 import Progress from '../ui/progress.vue'
@@ -216,17 +205,10 @@ interface Props {
 }
 
 const props = defineProps<Props>()
-
-const confirmTerms = ref(false)
 const isLoading = ref(false)
 const error = ref('')
 
 const handleConfirm = async () => {
-  if (!confirmTerms.value) {
-    error.value = 'Você deve concordar com os termos e condições para criar sua conta'
-    return
-  }
-
   error.value = ''
   isLoading.value = true
 
