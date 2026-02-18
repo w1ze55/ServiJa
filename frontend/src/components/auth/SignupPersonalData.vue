@@ -366,7 +366,7 @@ const handleSubmit = (e: Event) => {
             id="terms"
             :checked="formData.acceptTerms"
             @update:checked="(checked) => handleChange('acceptTerms', checked as boolean)"
-            :class="errors.acceptTerms ? 'signup-personal-data-terms-checkbox-error' : ''"
+            :class="errors.acceptTerms ? 'signup-personal-data-terms-checkbox-error' : 'signup-personal-data-terms-checkbox'"
             :disabled="isLoading"
           />
           <div class="signup-personal-data-terms-content">
@@ -569,6 +569,10 @@ const handleSubmit = (e: Event) => {
 
 .signup-personal-data-terms-checkbox-error {
   border-color: rgb(239, 68, 68);
+}
+
+.signup-personal-data-terms-checkbox {
+  border-color: rgba(0, 0, 0, 0.5);
 }
 
 .signup-personal-data-terms-content {
