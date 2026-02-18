@@ -487,7 +487,7 @@ const handleSubmit = (e: Event) => {
   gap: 1rem;
 }
 
-@media (min-width: 768px) {
+@media (min-width: 1024px) {
   .signup-personal-data-grid {
     grid-template-columns: repeat(2, 1fr);
   }

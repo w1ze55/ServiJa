@@ -54,7 +54,7 @@ const notifications = ref<Notification[]>([
     type: 'financial',
     title: 'Pagamento Aprovado',
     message: 'Seu pagamento de R$ 3.200,00 para João Silva foi aprovado com sucesso.',
-    timestamp: '2025-11-11T10:30:00',
+    timestamp: '2026-11-11T10:30:00',
     isRead: false,
     actionLink: {
       page: 'service-timeline',
@@ -66,7 +66,7 @@ const notifications = ref<Notification[]>([
     type: 'message',
     title: 'Nova Mensagem',
     message: 'Maria Santos enviou uma mensagem sobre o projeto de design.',
-    timestamp: '2025-11-11T09:15:00',
+    timestamp: '2026-11-11T09:15:00',
     isRead: false,
     actionLink: {
       page: 'chat',
@@ -78,7 +78,7 @@ const notifications = ref<Notification[]>([
     type: 'system',
     title: 'Proposta Recebida',
     message: 'Pedro Oliveira enviou uma proposta de R$ 450,00 para seu pedido de encanamento.',
-    timestamp: '2025-11-10T16:45:00',
+    timestamp: '2026-11-10T16:45:00',
     isRead: false,
     actionLink: {
       page: 'quote-detail',
@@ -90,7 +90,7 @@ const notifications = ref<Notification[]>([
     type: 'system',
     title: 'Serviço Concluído',
     message: 'João Silva marcou o serviço de instalação elétrica como concluído. Aprove a entrega.',
-    timestamp: '2025-11-10T14:20:00',
+    timestamp: '2026-11-10T14:20:00',
     isRead: true,
     actionLink: {
       page: 'delivery-approval',
@@ -102,7 +102,7 @@ const notifications = ref<Notification[]>([
     type: 'financial',
     title: 'Recibo Disponível',
     message: 'O recibo da contratação #1234 está disponível para download.',
-    timestamp: '2025-11-09T11:00:00',
+    timestamp: '2026-11-09T11:00:00',
     isRead: true,
     actionLink: {
       page: 'contracts',
@@ -113,7 +113,7 @@ const notifications = ref<Notification[]>([
     type: 'message',
     title: 'Nova Mensagem',
     message: 'Ana Costa respondeu sua dúvida sobre o desenvolvimento do website.',
-    timestamp: '2025-11-09T08:30:00',
+    timestamp: '2026-11-09T08:30:00',
     isRead: true,
     actionLink: {
       page: 'chat',
@@ -125,7 +125,7 @@ const notifications = ref<Notification[]>([
     type: 'system',
     title: 'Avaliação Pendente',
     message: 'Não se esqueça de avaliar o trabalho de Carlos Mendes.',
-    timestamp: '2025-11-08T17:00:00',
+    timestamp: '2026-11-08T17:00:00',
     isRead: true,
     actionLink: {
       page: 'rate-freelancer',

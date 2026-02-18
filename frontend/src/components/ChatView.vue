@@ -119,7 +119,7 @@ const mockQuotes: Quote[] = props.quote
         status: 'pending',
         price: 'R$ 500',
         description: 'Preciso de instalação elétrica completa',
-        date: '2025-01-20',
+        date: '2026-01-20',
         messages: 2,
       },
     ];
@@ -160,7 +160,7 @@ const messages = ref<Message[]>([
     senderName: props.user.name,
     senderAvatar: props.user.avatar || '',
     content: 'Olá! Gostaria de solicitar um orçamento para o serviço.',
-    timestamp: '2025-01-20T10:00:00',
+    timestamp: '2026-01-20T10:00:00',
     isOwn: true,
   },
   {
@@ -175,7 +175,7 @@ const messages = ref<Message[]>([
         ? provider.value?.avatar || ''
         : 'https://api.dicebear.com/7.x/avataaars/svg?seed=client',
     content: 'Olá! Claro, vou precisar de algumas informações. Pode me descrever melhor o trabalho?',
-    timestamp: '2025-01-20T10:15:00',
+    timestamp: '2026-01-20T10:15:00',
     isOwn: false,
   },
 ]);
