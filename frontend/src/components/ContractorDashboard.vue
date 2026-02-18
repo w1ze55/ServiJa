@@ -90,7 +90,7 @@ const mockQuotes: Quote[] = props.quotes || [
     status: 'pending',
     price: 'R$ 500',
     description: 'Preciso de instalação elétrica completa',
-    date: '2025-01-20',
+    date: '2026-01-20',
     messages: 2,
   },
   {
@@ -102,7 +102,7 @@ const mockQuotes: Quote[] = props.quotes || [
     status: 'accepted',
     price: 'R$ 300',
     description: 'Vazamento no banheiro',
-    date: '2025-01-19',
+    date: '2026-01-19',
     messages: 5,
   },
 ];

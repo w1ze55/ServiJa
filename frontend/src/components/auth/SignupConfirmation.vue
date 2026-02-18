@@ -24,7 +24,7 @@
         <p class="text-gray-600">Revise as informações antes de criar sua conta</p>
       </div>
 
-      <div class="grid md:grid-cols-2 gap-8 mb-8">
+      <div class="grid lg:grid-cols-2 gap-8 mb-8">
         <!-- COLUNA 1 -->
         <div class="space-y-6">
           <div>
