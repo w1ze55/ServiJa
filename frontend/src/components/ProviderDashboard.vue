@@ -104,7 +104,7 @@ const mockQuotes: Quote[] = props.quotes || [
     status: 'pending',
     price: 'R$ 450,00',
     description: 'Instalação de 3 ventiladores de teto com acabamento e teste completo.',
-    date: '2025-01-20',
+    date: '2026-01-20',
     messages: 2,
   },
   {
@@ -118,7 +118,7 @@ const mockQuotes: Quote[] = props.quotes || [
     status: 'accepted',
     price: 'R$ 2.500,00',
     description: 'Criação de logo, cartão de visitas, papelaria e manual de marca.',
-    date: '2025-01-18',
+    date: '2026-01-18',
     messages: 8,
   },
   {
@@ -132,7 +132,7 @@ const mockQuotes: Quote[] = props.quotes || [
     status: 'completed',
     price: 'R$ 280,00',
     description: 'Identificação e reparo de vazamento no banheiro.',
-    date: '2025-01-15',
+    date: '2026-01-15',
     messages: 3,
   },
 ];

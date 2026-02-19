@@ -374,7 +374,7 @@ defineProps<Props>();
         </div>
 
         <div class="footer-bottom">
-          <p>&copy; 2025 Servi Já. Todos os direitos reservados.</p>
+          <p>&copy; 2026 Servi Já. Todos os direitos reservados.</p>
         </div>
       </div>
     </footer>

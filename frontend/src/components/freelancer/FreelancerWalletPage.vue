@@ -108,7 +108,7 @@ const transactions = ref<Transaction[]>([
     amount: 2500,
     status: 'completed',
     description: 'Pagamento recebido',
-    date: '2025-11-10 14:30',
+    date: '2026-11-10 14:30',
     serviceName: 'Instalação Elétrica Residencial',
   },
   {
@@ -117,7 +117,7 @@ const transactions = ref<Transaction[]>([
     amount: 1500,
     status: 'completed',
     description: 'Saque realizado',
-    date: '2025-11-08 10:15',
+    date: '2026-11-08 10:15',
     bankAccount: 'Banco do Brasil - Ag. 1234',
   },
   {
@@ -126,7 +126,7 @@ const transactions = ref<Transaction[]>([
     amount: 800,
     status: 'completed',
     description: 'Pagamento recebido',
-    date: '2025-11-05 16:45',
+    date: '2026-11-05 16:45',
     serviceName: 'Manutenção Preventiva',
   },
   {
@@ -135,7 +135,7 @@ const transactions = ref<Transaction[]>([
     amount: 1000,
     status: 'processing',
     description: 'Saque em processamento',
-    date: '2025-11-11 09:00',
+    date: '2026-11-11 09:00',
     bankAccount: 'Banco do Brasil - Ag. 1234',
   },
   {
@@ -144,7 +144,7 @@ const transactions = ref<Transaction[]>([
     amount: 1500,
     status: 'pending',
     description: 'Aguardando liberação',
-    date: '2025-11-09 11:20',
+    date: '2026-11-09 11:20',
     serviceName: 'Automação Residencial',
   },
   {
@@ -153,7 +153,7 @@ const transactions = ref<Transaction[]>([
     amount: 500,
     status: 'failed',
     description: 'Saque falhou - dados bancários incorretos',
-    date: '2025-11-03 15:10',
+    date: '2026-11-03 15:10',
     bankAccount: 'Banco do Brasil - Ag. 1234',
   },
 ]);

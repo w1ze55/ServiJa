@@ -101,11 +101,11 @@ const request = ref({
     avatar: 'https://i.pravatar.cc/150?img=12',
     location: 'São Paulo, SP',
   },
-  createdAt: '2025-11-05T10:30:00',
+  createdAt: '2026-11-05T10:30:00',
   description:
     'Preciso de um eletricista qualificado para fazer a instalação elétrica completa de uma residência de 120m². O trabalho inclui:\n\n- Instalação de quadro de distribuição\n- Instalação de pontos de luz em todos os cômodos\n- Instalação de tomadas (padrão brasileiro)\n- Aterramento\n- Disjuntores e proteção\n\nA casa tem 3 quartos, 2 banheiros, sala, cozinha e área de serviço. Gostaria de receber propostas com valores e prazos.',
   address: 'Rua das Flores, 123 - Jardim Paulista, São Paulo - SP',
-  desiredDate: '2025-11-20',
+  desiredDate: '2026-11-20',
   budget: 'R$ 3.000 - R$ 5.000',
   urgency: 'Média',
   attachments: [
@@ -154,7 +154,7 @@ const messages = ref<Message[]>([
     sender: 'client',
     senderName: 'João Silva',
     message: 'Olá, gostaria de mais informações sobre a disponibilidade para início do trabalho.',
-    timestamp: '2025-11-05T14:20:00',
+    timestamp: '2026-11-05T14:20:00',
   },
 ]);
 const newMessage = ref('');
@@ -166,21 +166,21 @@ const auditLog = ref<AuditLog[]>([
     id: '1',
     action: 'Solicitação criada',
     user: 'João Silva (Cliente)',
-    timestamp: '2025-11-05T10:30:00',
+    timestamp: '2026-11-05T10:30:00',
     details: 'Cliente criou a solicitação de orçamento',
   },
   {
     id: '2',
     action: 'Anexo adicionado',
     user: 'João Silva (Cliente)',
-    timestamp: '2025-11-05T10:35:00',
+    timestamp: '2026-11-05T10:35:00',
     details: 'planta-casa.pdf',
   },
   {
     id: '3',
     action: 'Mensagem enviada',
     user: 'João Silva (Cliente)',
-    timestamp: '2025-11-05T14:20:00',
+    timestamp: '2026-11-05T14:20:00',
     details: 'Cliente enviou uma mensagem',
   },
 ]);

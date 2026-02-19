@@ -97,7 +97,7 @@
             class="auth-card-signup-section"
             :class="[!isSignUp ? 'hidden-mobile' : 'visible']"
           >
-            <div class="max-w-xl mx-auto w-full">
+            <div class="w-full max-w-full md:max-w-2xl mx-auto my-auto">
               <div v-if="isSignUp" class="mb-6">
                 <div class="auth-card-progress-header">
                   <h2 class="text-gray-900 text-center md:text-left">Criar conta</h2>

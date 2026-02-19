@@ -186,7 +186,7 @@ public class EmailService {
                         
                         <div class="footer">
                             <p>Este é um e-mail automático, por favor não responda.</p>
-                            <p>&copy; 2025 ServiJá. Todos os direitos reservados.</p>
+                            <p>&copy; 2026 ServiJá. Todos os direitos reservados.</p>
                         </div>
                     </div>
                 </body>
@@ -288,7 +288,7 @@ public class EmailService {
                         
                         <div class="footer">
                             <p>Este é um e-mail automático, por favor não responda.</p>
-                            <p>&copy; 2025 ServiJá. Todos os direitos reservados.</p>
+                            <p>&copy; 2026 ServiJá. Todos os direitos reservados.</p>
                         </div>
                     </div>
                 </body>

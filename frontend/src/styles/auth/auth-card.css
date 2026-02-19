@@ -59,21 +59,9 @@
   transition: opacity 0.3s;
 }
 
-@media (min-width: 768px) {
-  .auth-card-form-section {
-    padding: 3rem;
-  }
-}
-
-.auth-card-form-section.hidden-mobile {
-  opacity: 0;
-  pointer-events: none;
-}
-
-@media (min-width: 768px) {
+@media (max-width: 767px) {
   .auth-card-form-section.hidden-mobile {
-    opacity: 1;
-    pointer-events: auto;
+    display: none;
   }
 }
 
@@ -85,10 +73,16 @@
   padding: 2rem;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start;
   transition: opacity 0.3s;
   overflow-y: auto;
   max-height: 650px;
+}
+
+@media (max-width: 767px) {
+  .auth-card-signup-section.hidden-mobile {
+    display: none;
+  }
 }
 
 @media (min-width: 768px) {
@@ -324,7 +318,3 @@
   opacity: 0;
   transform: translateY(-20px);
 }
-
-
-
-
