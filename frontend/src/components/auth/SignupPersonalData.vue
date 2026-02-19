@@ -9,6 +9,7 @@ import AlertDescription from '../ui/alert-description.vue';
 import Progress from '../ui/progress.vue';
 import { AlertCircle, Eye, EyeOff, Check, X, ArrowLeft } from 'lucide-vue-next';
 import { formatCPF, formatPhone, validateCPF, validatePhone } from '@/utils/masks';
+import api from '@/api/config/axios';
 
 export interface PersonalData {
   name: string;
@@ -45,6 +46,8 @@ const showPassword = ref(false);
 const touched = ref<Record<string, boolean>>({});
 const errors = ref<Record<string, string>>({});
 const isLoading = ref(false);
+const cpfCheckStatus = ref<'idle' | 'checking' | 'available' | 'taken'>('idle');
+let cpfDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
 // Validação de senha em tempo real
 const passwordRequirements = computed(() => ({
@@ -81,6 +84,7 @@ const validateField = (name: string, value: string): string | null => {
     case 'cpf':
       if (!value) return 'CPF é obrigatório';
       if (!validateCPF(value)) return 'CPF inválido';
+      if (cpfCheckStatus.value === 'taken') return 'CPF já cadastrado';
       return null;
 
     case 'password':
@@ -106,11 +110,37 @@ const handleBlur = (field: string) => {
   }
 };
 
+const checkCpfAvailability = (cpf: string) => {
+  if (cpfDebounceTimer) clearTimeout(cpfDebounceTimer);
+
+  const cleanCpf = cpf.replace(/\D/g, '');
+  if (cleanCpf.length !== 11 || !validateCPF(cpf)) {
+    cpfCheckStatus.value = 'idle';
+    return;
+  }
+
+  cpfCheckStatus.value = 'checking';
+  cpfDebounceTimer = setTimeout(async () => {
+    try {
+      await api.get(`/auth/check-cpf?cpf=${cleanCpf}`);
+      cpfCheckStatus.value = 'available';
+      const newErrors = { ...errors.value };
+      delete newErrors.cpf;
+      errors.value = newErrors;
+    } catch {
+      cpfCheckStatus.value = 'taken';
+      errors.value = { ...errors.value, cpf: 'CPF já cadastrado' };
+      touched.value = { ...touched.value, cpf: true };
+    }
+  }, 600);
+};
+
 const handleChange = (field: keyof PersonalData, value: string | boolean) => {
   let processedValue = value;
 
   if (field === 'cpf' && typeof value === 'string') {
     processedValue = formatCPF(value);
+    checkCpfAvailability(processedValue as string);
   } else if (field === 'phone' && typeof value === 'string') {
     processedValue = formatPhone(value);
   }
@@ -268,6 +298,12 @@ const handleSubmit = (e: Event) => {
           <p v-if="errors.cpf && touched.cpf" class="signup-personal-data-error-message">
             <AlertCircle class="h-3 w-3" />
             {{ errors.cpf }}
+          </p>
+          <p v-else-if="cpfCheckStatus === 'checking'" class="signup-personal-data-hint-message">
+            Verificando CPF...
+          </p>
+          <p v-else-if="cpfCheckStatus === 'available'" class="signup-personal-data-success-message">
+            <Check class="h-3 w-3" /> CPF disponível
           </p>
         </div>
 

@@ -1107,8 +1107,8 @@ const getInitials = (name: string) => {
 
         <AlertDialogFooter>
           <AlertDialogCancel @click="closeAddressDialog">Cancelar</AlertDialogCancel>
-          <AlertDialogAction 
-            @click="handleSaveAddress" 
+          <AlertDialogAction
+            @click="handleSaveAddress"
             class="bg-[#286AD8] hover:bg-[#435574]"
             :disabled="isSavingAddress"
           >
