@@ -41,7 +41,7 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(error, HttpStatus.NOT_FOUND);
     }
 
-    @ExceptionHandler({InvalidCredentialsException.class, BadCredentialsException.class})
+    @ExceptionHandler({ InvalidCredentialsException.class, BadCredentialsException.class })
     public ResponseEntity<ErrorResponse> handleInvalidCredentials(Exception ex) {
         ErrorResponse error = ErrorResponse.builder()
                 .timestamp(LocalDateTime.now())
@@ -50,6 +50,19 @@ public class GlobalExceptionHandler {
                 .message("Credenciais inválidas")
                 .build();
         return new ResponseEntity<>(error, HttpStatus.UNAUTHORIZED);
+    }
+
+    @ExceptionHandler(TooManyAttemptsException.class)
+    public ResponseEntity<ErrorResponse> handleTooManyAttempts(TooManyAttemptsException ex) {
+        ErrorResponse error = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.TOO_MANY_REQUESTS.value())
+                .error("Too Many Requests")
+                .message(ex.getMessage())
+                .remainingAttempts(ex.getRemainingAttempts())
+                .lockUntil(ex.getLockUntil())
+                .build();
+        return new ResponseEntity<>(error, HttpStatus.TOO_MANY_REQUESTS);
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
@@ -114,6 +127,8 @@ public class GlobalExceptionHandler {
         private Integer status;
         private String error;
         private String message;
+        private Integer remainingAttempts;
+        private LocalDateTime lockUntil;
     }
 
     @Data
@@ -128,5 +143,3 @@ public class GlobalExceptionHandler {
         private Map<String, String> errors;
     }
 }
-
-

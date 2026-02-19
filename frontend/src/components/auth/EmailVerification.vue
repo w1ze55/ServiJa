@@ -11,8 +11,18 @@
         <p class="text-gray-900 mt-1">{{ maskedEmail }}</p>
       </div>
 
+      <!-- Alerta de lockout -->
+      <div v-if="isLocked" class="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg text-center">
+        <Clock class="h-6 w-6 text-amber-600 mx-auto mb-2" />
+        <p class="text-amber-800 font-medium mb-1">Muitas tentativas</p>
+        <p class="text-amber-700 text-sm mb-3">Aguarde para tentar novamente</p>
+        <div class="text-2xl font-mono font-bold text-amber-900 tabular-nums">
+          {{ lockTimeFormatted }}
+        </div>
+      </div>
+
       <!-- Alertas -->
-      <Alert v-if="error" variant="destructive" class="mb-6">
+      <Alert v-if="error && !isLocked" variant="destructive" class="mb-6">
         <AlertCircle class="h-4 w-4" />
         <AlertDescription>{{ error }}</AlertDescription>
       </Alert>
@@ -39,7 +49,7 @@
             :value="digit"
             @input="(e) => handleChange(index, (e.target as HTMLInputElement).value)"
             @keydown="(e) => handleKeyDown(index, e as KeyboardEvent)"
-            :disabled="isVerifying || success"
+            :disabled="isVerifying || success || isLocked"
             class="w-12 h-14 text-center border-2 rounded-lg transition-all
                    focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent
                    disabled:opacity-50 disabled:cursor-not-allowed"
@@ -72,11 +82,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import Button from '../ui/button.vue'
 import Alert from '../ui/alert.vue'
 import AlertDescription from '../ui/alert-description.vue'
-import { AlertCircle, CheckCircle, Mail } from 'lucide-vue-next'
+import { AlertCircle, CheckCircle, Mail, Clock } from 'lucide-vue-next'
 import { API_ENDPOINTS } from '../../utils/api'
 
 interface EmailVerificationProps {
@@ -92,7 +102,51 @@ const isVerifying = ref(false)
 const canResend = ref(false)
 const timeLeft = ref(60)
 
+const remainingAttempts = ref(5)
+const isLocked = ref(false)
+const lockEndTime = ref<Date | null>(null)
+const lockTimeRemaining = ref(0)
+let lockInterval: ReturnType<typeof setInterval> | null = null
+
 const inputRefs = ref<HTMLInputElement[]>([])
+
+const lockTimeFormatted = computed(() => {
+  const totalSeconds = lockTimeRemaining.value
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+})
+
+function startLockoutTimer(lockUntil: string) {
+  isLocked.value = true
+  lockEndTime.value = new Date(lockUntil)
+
+  function updateTimer() {
+    if (!lockEndTime.value) return
+    const now = new Date()
+    const diff = Math.max(0, Math.floor((lockEndTime.value.getTime() - now.getTime()) / 1000))
+    lockTimeRemaining.value = diff
+
+    if (diff <= 0) {
+      isLocked.value = false
+      lockEndTime.value = null
+      remainingAttempts.value = 5
+      error.value = ''
+      if (lockInterval) {
+        clearInterval(lockInterval)
+        lockInterval = null
+      }
+    }
+  }
+
+  updateTimer()
+  if (lockInterval) clearInterval(lockInterval)
+  lockInterval = setInterval(updateTimer, 1000)
+}
+
+onUnmounted(() => {
+  if (lockInterval) clearInterval(lockInterval)
+})
 
 // foca no primeiro input ao montar
 onMounted(() => {
@@ -142,6 +196,8 @@ function handlePaste(e: ClipboardEvent) {
 }
 
 async function verifyCode(fullCode: string) {
+  if (isLocked.value) return
+
   isVerifying.value = true
   error.value = ''
 
@@ -160,15 +216,31 @@ async function verifyCode(fullCode: string) {
     if (response.ok) {
       const data = await response.json()
       success.value = true
-      
-      // Extrair token e dados do usuário da resposta
+      remainingAttempts.value = 5
+
       const token = data.token
       const userData = data.user
-      
+
       setTimeout(() => props.onVerified(token, userData), 1500)
+    } else if (response.status === 429) {
+      const data = await response.json()
+      remainingAttempts.value = 0
+      error.value = data.message || 'Muitas tentativas. Aguarde para tentar novamente.'
+      code.value = ['', '', '', '', '', '']
+
+      if (data.lockUntil) {
+        startLockoutTimer(data.lockUntil)
+      }
     } else {
       const data = await response.json()
       error.value = data.message || 'Código inválido. Tente novamente.'
+
+      // Parse remaining attempts from message like "4 tentativas restantes"
+      const match = data.message?.match(/^(\d+)\s+tentativa/)
+      if (match) {
+        remainingAttempts.value = parseInt(match[1])
+      }
+
       code.value = ['', '', '', '', '', '']
       inputRefs.value[0]?.focus()
     }
@@ -187,6 +259,14 @@ async function handleResend() {
   timeLeft.value = 60
   code.value = ['', '', '', '', '', '']
   error.value = ''
+  remainingAttempts.value = 5
+  isLocked.value = false
+  lockEndTime.value = null
+  lockTimeRemaining.value = 0
+  if (lockInterval) {
+    clearInterval(lockInterval)
+    lockInterval = null
+  }
 
   try {
     const response = await fetch(`${API_ENDPOINTS.RESEND_VERIFICATION}?email=${encodeURIComponent(props.email)}`, {
@@ -197,7 +277,6 @@ async function handleResend() {
     })
 
     if (response.ok) {
-      // Mostra mensagem de sucesso (opcional)
       console.log('Código de verificação reenviado com sucesso')
     } else {
       const data = await response.json()
