@@ -8,6 +8,8 @@ import Alert from '../ui/alert.vue';
 import AlertDescription from '../ui/alert-description.vue';
 import Progress from '../ui/progress.vue';
 import { AlertCircle, Eye, EyeOff, Check, X, ArrowLeft } from 'lucide-vue-next';
+import { formatCPF, formatPhone, validateCPF, validatePhone } from '@/utils/masks';
+import api from '@/api/config/axios';
 
 export interface PersonalData {
   name: string;
@@ -44,6 +46,8 @@ const showPassword = ref(false);
 const touched = ref<Record<string, boolean>>({});
 const errors = ref<Record<string, string>>({});
 const isLoading = ref(false);
+const cpfCheckStatus = ref<'idle' | 'checking' | 'available' | 'taken'>('idle');
+let cpfDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
 // Validação de senha em tempo real
 const passwordRequirements = computed(() => ({
@@ -54,30 +58,9 @@ const passwordRequirements = computed(() => ({
   hasSpecial: /[!@#$%^&*(),.?":{}|<>]/.test(formData.value.password),
 }));
 
-const isPasswordValid = computed(() => 
+const isPasswordValid = computed(() =>
   Object.values(passwordRequirements.value).every(Boolean)
 );
-
-const formatCPF = (value: string) => {
-  const numbers = value.replace(/\D/g, '');
-  if (numbers.length <= 11) {
-    return numbers
-      .replace(/(\d{3})(\d)/, '$1.$2')
-      .replace(/(\d{3})(\d)/, '$1.$2')
-      .replace(/(\d{3})(\d{1,2})$/, '$1-$2');
-  }
-  return value;
-};
-
-const formatPhone = (value: string) => {
-  const numbers = value.replace(/\D/g, '');
-  if (numbers.length <= 11) {
-    return numbers
-      .replace(/(\d{2})(\d)/, '($1) $2')
-      .replace(/(\d{5})(\d)/, '$1-$2');
-  }
-  return value;
-};
 
 const validateField = (name: string, value: string): string | null => {
   switch (name) {
@@ -95,14 +78,13 @@ const validateField = (name: string, value: string): string | null => {
 
     case 'phone':
       if (!value) return 'Telefone é obrigatório';
-      const phoneNumbers = value.replace(/\D/g, '');
-      if (phoneNumbers.length < 10) return 'Telefone inválido';
+      if (!validatePhone(value)) return 'Telefone inválido';
       return null;
 
     case 'cpf':
       if (!value) return 'CPF é obrigatório';
-      const cpfNumbers = value.replace(/\D/g, '');
-      if (cpfNumbers.length !== 11) return 'CPF inválido';
+      if (!validateCPF(value)) return 'CPF inválido';
+      if (cpfCheckStatus.value === 'taken') return 'CPF já cadastrado';
       return null;
 
     case 'password':
@@ -128,11 +110,37 @@ const handleBlur = (field: string) => {
   }
 };
 
+const checkCpfAvailability = (cpf: string) => {
+  if (cpfDebounceTimer) clearTimeout(cpfDebounceTimer);
+
+  const cleanCpf = cpf.replace(/\D/g, '');
+  if (cleanCpf.length !== 11 || !validateCPF(cpf)) {
+    cpfCheckStatus.value = 'idle';
+    return;
+  }
+
+  cpfCheckStatus.value = 'checking';
+  cpfDebounceTimer = setTimeout(async () => {
+    try {
+      await api.get(`/auth/check-cpf?cpf=${cleanCpf}`);
+      cpfCheckStatus.value = 'available';
+      const newErrors = { ...errors.value };
+      delete newErrors.cpf;
+      errors.value = newErrors;
+    } catch {
+      cpfCheckStatus.value = 'taken';
+      errors.value = { ...errors.value, cpf: 'CPF já cadastrado' };
+      touched.value = { ...touched.value, cpf: true };
+    }
+  }, 600);
+};
+
 const handleChange = (field: keyof PersonalData, value: string | boolean) => {
   let processedValue = value;
 
   if (field === 'cpf' && typeof value === 'string') {
     processedValue = formatCPF(value);
+    checkCpfAvailability(processedValue as string);
   } else if (field === 'phone' && typeof value === 'string') {
     processedValue = formatPhone(value);
   }
@@ -264,6 +272,7 @@ const handleSubmit = (e: Event) => {
               @input="(e: Event) => handleChange('phone', (e.target as HTMLInputElement).value)"
               @blur="handleBlur('phone')"
               :class="errors.phone && touched.phone ? 'signup-personal-data-input-error' : ''"
+              maxlength="15"
               :disabled="isLoading"
             />
             <p v-if="errors.phone && touched.phone" class="signup-personal-data-error-message">
@@ -283,11 +292,18 @@ const handleSubmit = (e: Event) => {
             @input="(e: Event) => handleChange('cpf', (e.target as HTMLInputElement).value)"
             @blur="handleBlur('cpf')"
             :class="errors.cpf && touched.cpf ? 'signup-personal-data-input-error' : ''"
+            maxlength="14"
             :disabled="isLoading"
           />
           <p v-if="errors.cpf && touched.cpf" class="signup-personal-data-error-message">
             <AlertCircle class="h-3 w-3" />
             {{ errors.cpf }}
+          </p>
+          <p v-else-if="cpfCheckStatus === 'checking'" class="signup-personal-data-hint-message">
+            Verificando CPF...
+          </p>
+          <p v-else-if="cpfCheckStatus === 'available'" class="signup-personal-data-success-message">
+            <Check class="h-3 w-3" /> CPF disponível
           </p>
         </div>
 

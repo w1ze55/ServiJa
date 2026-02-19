@@ -30,6 +30,7 @@ import Avatar from '../ui/avatar.vue';
 import AvatarImage from '../ui/avatar-image.vue';
 import AvatarFallback from '../ui/avatar-fallback.vue';
 import { toast } from '../../utils/toast';
+import { formatCPF, formatPhone } from '@/utils/masks';
 
 interface OnboardingData {
   name: string;
@@ -128,18 +129,6 @@ const newPortfolioItem = ref({
 
 const progress = computed(() => (currentStep.value / steps.length) * 100);
 
-const formatPhone = (value: string) => {
-  const numbers = value.replace(/\D/g, '');
-  if (numbers.length <= 10) {
-    return numbers.replace(/(\d{2})(\d{4})(\d{0,4})/, '($1) $2-$3');
-  }
-  return numbers.replace(/(\d{2})(\d{5})(\d{0,4})/, '($1) $2-$3');
-};
-
-const formatCPF = (value: string) => {
-  const numbers = value.replace(/\D/g, '');
-  return numbers.replace(/(\d{3})(\d{3})(\d{3})(\d{0,2})/, '$1.$2.$3-$4');
-};
 
 const handleAddSkill = (skill: string) => {
   if (skill && !data.value.skills.includes(skill)) {

@@ -106,6 +106,19 @@
   gap: 0.25rem;
 }
 
+.signup-personal-data-hint-message {
+  font-size: 0.875rem;
+  color: rgb(107, 114, 128);
+}
+
+.signup-personal-data-success-message {
+  font-size: 0.875rem;
+  color: rgb(22, 163, 74);
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
 .signup-personal-data-password-wrapper {
   position: relative;
 }
