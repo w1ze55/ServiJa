@@ -3,7 +3,7 @@ name: Deploy Servija AWS (Homolog)
 on:
   push:
     branches:
-      - main
+      - homolog
 
 jobs:
   deploy:
