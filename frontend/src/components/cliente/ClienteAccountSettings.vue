@@ -31,6 +31,7 @@ import AlertDialogHeader from '../ui/alert-dialog-header.vue'
 import AlertDialogTitle from '../ui/alert-dialog-title.vue'
 import api from '@/api/config/axios'
 import { toast } from '@/utils/toast'
+import { formatCPF, formatPhone } from '@/utils/masks'
 
 interface Address {
   id: string
@@ -187,18 +188,6 @@ const loadUserData = async () => {
   }
 }
 
-const formatPhone = (value: string) => {
-  const numbers = value.replace(/\D/g, '')
-  if (numbers.length <= 10) {
-    return numbers.replace(/(\d{2})(\d{4})(\d{0,4})/, '($1) $2-$3')
-  }
-  return numbers.replace(/(\d{2})(\d{5})(\d{0,4})/, '($1) $2-$3')
-}
-
-const formatCPF = (value: string) => {
-  const numbers = value.replace(/\D/g, '')
-  return numbers.replace(/(\d{3})(\d{3})(\d{3})(\d{0,2})/, '$1.$2.$3-$4')
-}
 
 const handleSavePersonalData = async () => {
   // Validações
@@ -730,7 +719,7 @@ const getInitials = (name: string) => {
 
             <div class="space-y-2">
               <Label for="cpf">CPF</Label>
-              <Input id="cpf" :model-value="editedPersonalData.cpf" disabled class="bg-gray-50" />
+              <Input id="cpf" :model-value="editedPersonalData.cpf" disabled maxlength="14" class="bg-gray-50" />
               <p class="text-xs text-[#435574]">CPF não pode ser alterado</p>
             </div>
           </div>
