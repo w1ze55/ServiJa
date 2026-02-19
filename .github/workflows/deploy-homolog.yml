@@ -1,105 +1,21 @@
-name: Deploy HOMOLOGAÇÃO
+name: Deploy Servija Render
 
 on:
   push:
     branches:
       - homolog
-    paths-ignore:
-      - '**.md'
-      - '.github/**'
-      - 'docker-compose.prod.yml'
-      - '.env.prod'
-  workflow_dispatch:
-    inputs:
-      force_deploy:
-        description: 'Force deploy mesmo sem mudanças'
-        required: false
-        default: 'false'
 
 jobs:
-  deploy-homolog:
-    name: Deploy para Homologação (homolog.servija.app)
+  deploy-backend:
+    name: Deploy Backend
     runs-on: ubuntu-latest
-    environment:
-      name: homolog
-      url: https://homolog.servija.app
-    
     steps:
-      - name: 📥 Checkout code
-        uses: actions/checkout@v4
+      - name: Trigger Render Deploy
+        run: curl -s "${{ secrets.RENDER_BACKEND_HOOK_URL }}"
 
-      - name: 🚀 Deploy to EC2 Homologação
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          port: 22
-          script: |
-            set -e
-            
-            echo "🔍 Navegando para o diretório do projeto..."
-            cd ${{ secrets.PROJECT_PATH }}
-            
-            echo "📥 Atualizando código da branch homolog..."
-            git fetch origin
-            git checkout homolog
-            git pull origin homolog
-            
-            echo "🛑 Parando containers de HOMOLOGAÇÃO..."
-            docker-compose -f docker-compose.homolog.yml down
-            
-            echo "🏗️ Buildando novas imagens de HOMOLOGAÇÃO..."
-            docker-compose -f docker-compose.homolog.yml build --no-cache
-            
-            echo "🚀 Iniciando containers de HOMOLOGAÇÃO..."
-            docker-compose -f docker-compose.homolog.yml up -d
-            
-            echo "⏳ Aguardando containers iniciarem..."
-            sleep 10
-            
-            echo "✅ Verificando status dos containers..."
-            docker-compose -f docker-compose.homolog.yml ps
-            
-            echo "🧹 Limpando imagens antigas..."
-            docker image prune -f
-            
-            echo "✅ Deploy de HOMOLOGAÇÃO concluído!"
-
-      - name: 🔍 Health Check
-        run: |
-          echo "Aguardando 20 segundos para aplicação inicializar..."
-          sleep 20
-          
-          # Tentar acessar a aplicação
-          max_attempts=5
-          attempt=1
-          
-          while [ $attempt -le $max_attempts ]; do
-            echo "Tentativa $attempt de $max_attempts..."
-            
-            if curl -f -s -o /dev/null https://homolog.servija.app; then
-              echo "✅ Aplicação respondendo com sucesso!"
-              exit 0
-            fi
-            
-            echo "⏳ Aguardando mais 10 segundos..."
-            sleep 10
-            attempt=$((attempt + 1))
-          done
-          
-          echo "⚠️ Aviso: Aplicação não respondeu no tempo esperado"
-          echo "Verifique manualmente: https://homolog.servija.app"
-          exit 1
-
-      - name: 📢 Notify on Success
-        if: success()
-        run: |
-          echo "✅ Deploy de HOMOLOGAÇÃO realizado com sucesso!"
-          echo "🌐 URL: https://homolog.servija.app"
-
-      - name: 📢 Notify on Failure
-        if: failure()
-        run: |
-          echo "❌ Falha no deploy de HOMOLOGAÇÃO!"
-          echo "Verifique os logs acima para detalhes"
+  deploy-frontend:
+    name: Deploy Frontend
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Render Deploy
+        run: curl -s "${{ secrets.RENDER_FRONTEND_HOOK_URL }}"
