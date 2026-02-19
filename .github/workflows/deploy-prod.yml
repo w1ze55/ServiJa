@@ -1,30 +1,115 @@
-name: Deploy Servija AWS
+name: Deploy PRODUÇÃO
 
 on:
   push:
     branches:
       - main
+    paths-ignore:
+      - '**.md'
+      - '.github/**'
+      - 'docker-compose.homolog.yml'
+      - '.env.homolog'
+  workflow_dispatch:
+    inputs:
+      force_deploy:
+        description: 'Force deploy mesmo sem mudanças'
+        required: false
+        default: 'false'
 
 jobs:
-  deploy:
+  deploy-production:
+    name: Deploy para Produção (servija.app)
     runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://servija.app
+    
     steps:
-      - name: Checkout do código
+      - name: 📥 Checkout code
         uses: actions/checkout@v4
 
-      - name: Deploy via SSH no EC2 (Prod)
-        uses: appleboy/ssh-action@v1.0.3
+      - name: 🔐 Configure SSH
+        uses: webfactory/ssh-agent@v0.9.0
         with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ec2-user
-          key: ${{ secrets.EC2_SSH_KEY }}
-          port: 22
-          script: |
-            cd /var/www/ServiJa/app
+          ssh-private-key: ${{ secrets.EC2_SSH_KEY }}
 
+      - name: 📝 Add EC2 to known hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+
+      - name: 🚀 Deploy to EC2 Production
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+          PROJECT_PATH: ${{ secrets.PROJECT_PATH }}
+        run: |
+          ssh $EC2_USER@$EC2_HOST << 'ENDSSH'
+            set -e
+            
+            echo "🔍 Navegando para o diretório do projeto..."
+            cd $PROJECT_PATH
+            
+            echo "📥 Atualizando código da branch main..."
+            git fetch origin
             git checkout main
-
             git pull origin main
+            
+            echo "🛑 Parando containers de PRODUÇÃO..."
+            docker-compose -f docker-compose.prod.yml down
+            
+            echo "🏗️ Buildando novas imagens de PRODUÇÃO..."
+            docker-compose -f docker-compose.prod.yml build --no-cache
+            
+            echo "🚀 Iniciando containers de PRODUÇÃO..."
+            docker-compose -f docker-compose.prod.yml up -d
+            
+            echo "⏳ Aguardando containers iniciarem..."
+            sleep 10
+            
+            echo "✅ Verificando status dos containers..."
+            docker-compose -f docker-compose.prod.yml ps
+            
+            echo "🧹 Limpando imagens antigas..."
+            docker image prune -f
+            
+            echo "✅ Deploy de PRODUÇÃO concluído!"
+          ENDSSH
 
-            docker compose -f docker-compose.prod.yml down
-            docker compose -f docker-compose.prod.yml up --build -d
+      - name: 🔍 Health Check
+        run: |
+          echo "Aguardando 20 segundos para aplicação inicializar..."
+          sleep 20
+          
+          # Tentar acessar a aplicação
+          max_attempts=5
+          attempt=1
+          
+          while [ $attempt -le $max_attempts ]; do
+            echo "Tentativa $attempt de $max_attempts..."
+            
+            if curl -f -s -o /dev/null https://servija.app; then
+              echo "✅ Aplicação respondendo com sucesso!"
+              exit 0
+            fi
+            
+            echo "⏳ Aguardando mais 10 segundos..."
+            sleep 10
+            attempt=$((attempt + 1))
+          done
+          
+          echo "⚠️ Aviso: Aplicação não respondeu no tempo esperado"
+          echo "Verifique manualmente: https://servija.app"
+          exit 1
+
+      - name: 📢 Notify on Success
+        if: success()
+        run: |
+          echo "✅ Deploy de PRODUÇÃO realizado com sucesso!"
+          echo "🌐 URL: https://servija.app"
+
+      - name: 📢 Notify on Failure
+        if: failure()
+        run: |
+          echo "❌ Falha no deploy de PRODUÇÃO!"
+          echo "Verifique os logs acima para detalhes"
