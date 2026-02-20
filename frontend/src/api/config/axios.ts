@@ -3,7 +3,7 @@ import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 // VITE_API_URL deve ser a URL base SEM /api no final
 // Exemplo: http://3.131.85.191 (não http://3.131.85.191/api)
 // O código abaixo adiciona /api automaticamente
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+const API_BASE_URL = import.meta.env.VITE_API_URL;
 
 // Remove /api ou /api/ do final se existir para evitar duplicação
 const cleanBaseURL = API_BASE_URL.replace(/\/api\/?$/, '');
