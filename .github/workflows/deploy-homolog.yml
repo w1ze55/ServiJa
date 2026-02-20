@@ -1,4 +1,4 @@
-name: Deploy Servija Render
+name: Deploy Servija AWS (Homolog)
 
 on:
   push:
@@ -6,16 +6,25 @@ on:
       - homolog
 
 jobs:
-  deploy-backend:
-    name: Deploy Backend
+  deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Trigger Render Deploy
-        run: curl -s "${{ secrets.RENDER_BACKEND_HOOK_URL }}"
+      - name: Checkout do código
+        uses: actions/checkout@v4
 
-  deploy-frontend:
-    name: Deploy Frontend
-    runs-on: ubuntu-latest
-    steps:
-      - name: Trigger Render Deploy
-        run: curl -s "${{ secrets.RENDER_FRONTEND_HOOK_URL }}"
+      - name: Deploy via SSH no EC2 (Homolog)
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ec2-user
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: 22
+          script: |
+            cd /var/www/ServiJa/app
+
+            git checkout homolog
+
+            git pull origin homolog
+
+            docker compose -f docker-compose.homolog.yml down
+            docker compose -f docker-compose.homolog.yml up --build -d

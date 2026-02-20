@@ -185,6 +185,54 @@
   color: rgb(21, 128, 61);
 }
 
+/* Lockout / Rate Limit Styles */
+.email-verification-lockout {
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background-color: rgb(255, 251, 235);
+  border: 1px solid rgb(253, 230, 138);
+  border-radius: 0.5rem;
+  text-align: center;
+}
 
+.email-verification-lockout-icon {
+  height: 1.5rem;
+  width: 1.5rem;
+  color: rgb(217, 119, 6);
+  margin: 0 auto 0.5rem;
+}
 
+.email-verification-lockout-title {
+  color: rgb(146, 64, 14);
+  font-weight: 500;
+  margin-bottom: 0.25rem;
+}
 
+.email-verification-lockout-text {
+  color: rgb(180, 83, 9);
+  font-size: 0.875rem;
+  margin-bottom: 0.75rem;
+}
+
+.email-verification-lockout-timer {
+  font-size: 1.5rem;
+  font-family: ui-monospace, monospace;
+  font-weight: 700;
+  color: rgb(120, 53, 15);
+  font-variant-numeric: tabular-nums;
+}
+
+.email-verification-attempts-warning {
+  font-size: 0.875rem;
+  text-align: center;
+  margin-top: 0.75rem;
+  font-weight: 500;
+}
+
+.email-verification-attempts-warning.caution {
+  color: rgb(217, 119, 6);
+}
+
+.email-verification-attempts-warning.danger {
+  color: rgb(220, 38, 38);
+}

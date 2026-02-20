@@ -52,6 +52,13 @@ public class User {
     @Column
     private LocalDateTime verificationCodeExpiry;
 
+    @Column(nullable = false)
+    @lombok.Builder.Default
+    private Integer verificationAttempts = 0;
+
+    @Column
+    private LocalDateTime verificationLockUntil;
+
     @Column(length = 100)
     private String resetPasswordToken;
 
@@ -79,4 +86,3 @@ public class User {
         FREELANCER
     }
 }
-

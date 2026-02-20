@@ -6,6 +6,7 @@ import com.servija.servija.dto.RegisterRequest;
 import com.servija.servija.exception.DuplicateResourceException;
 import com.servija.servija.exception.InvalidCredentialsException;
 import com.servija.servija.exception.ResourceNotFoundException;
+import com.servija.servija.exception.TooManyAttemptsException;
 import com.servija.servija.model.Contractor;
 import com.servija.servija.model.Freelancer;
 import com.servija.servija.model.User;
@@ -83,9 +84,7 @@ public class AuthService {
         authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(
                         request.getEmail(),
-                        request.getPassword()
-                )
-        );
+                        request.getPassword()));
 
         // Buscar usuário
         User user = userRepository.findByEmail(request.getEmail())
@@ -103,7 +102,10 @@ public class AuthService {
         return buildAuthResponse(user, token);
     }
 
-    @Transactional
+    private static final int MAX_VERIFICATION_ATTEMPTS = 5;
+    private static final int LOCKOUT_MINUTES = 30;
+
+    @Transactional(noRollbackFor = { IllegalArgumentException.class, TooManyAttemptsException.class })
     public AuthResponse verifyEmail(String email, String code) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
@@ -112,20 +114,52 @@ public class AuthService {
             throw new IllegalStateException("E-mail já verificado");
         }
 
+        // Verificar se está em lockout
+        if (user.getVerificationLockUntil() != null && user.getVerificationLockUntil().isAfter(LocalDateTime.now())) {
+            throw new TooManyAttemptsException(
+                    "Muitas tentativas. Aguarde para tentar novamente.",
+                    0,
+                    user.getVerificationLockUntil());
+        }
+
+        // Se o lockout expirou, resetar tentativas
+        if (user.getVerificationLockUntil() != null && user.getVerificationLockUntil().isBefore(LocalDateTime.now())) {
+            user.setVerificationAttempts(0);
+            user.setVerificationLockUntil(null);
+        }
+
+        // Verificar código
         if (user.getVerificationCode() == null || !user.getVerificationCode().equals(code)) {
-            throw new IllegalArgumentException("Código de verificação inválido");
+            int attempts = user.getVerificationAttempts() + 1;
+            user.setVerificationAttempts(attempts);
+
+            if (attempts >= MAX_VERIFICATION_ATTEMPTS) {
+                user.setVerificationLockUntil(LocalDateTime.now().plusMinutes(LOCKOUT_MINUTES));
+                userRepository.save(user);
+                throw new TooManyAttemptsException(
+                        "Muitas tentativas. Aguarde para tentar novamente.",
+                        0,
+                        user.getVerificationLockUntil());
+            }
+
+            userRepository.save(user);
+            int remaining = MAX_VERIFICATION_ATTEMPTS - attempts;
+            throw new IllegalArgumentException(
+                    remaining + " tentativa" + (remaining != 1 ? "s" : "") + " restante" + (remaining != 1 ? "s" : ""));
         }
 
         if (user.getVerificationCodeExpiry().isBefore(LocalDateTime.now())) {
             throw new IllegalArgumentException("Código de verificação expirado");
         }
 
+        // Sucesso: resetar tudo
         user.setEmailVerified(true);
         user.setVerificationCode(null);
         user.setVerificationCodeExpiry(null);
+        user.setVerificationAttempts(0);
+        user.setVerificationLockUntil(null);
         userRepository.save(user);
 
-        // Gerar token JWT após verificação bem-sucedida
         UserDetails userDetails = userDetailsService.loadUserByUsername(user.getEmail());
         String token = jwtService.generateToken(userDetails);
 
@@ -144,9 +178,10 @@ public class AuthService {
         String verificationCode = generateVerificationCode();
         user.setVerificationCode(verificationCode);
         user.setVerificationCodeExpiry(LocalDateTime.now().plusHours(24));
+        user.setVerificationAttempts(0);
+        user.setVerificationLockUntil(null);
         userRepository.save(user);
 
-        // Enviar email de verificação
         emailService.sendVerificationEmail(user.getEmail(), user.getName(), verificationCode);
     }
 
@@ -181,8 +216,8 @@ public class AuthService {
         }
 
         // Verificar expiração
-        if (user.getResetPasswordTokenExpiry() == null || 
-            user.getResetPasswordTokenExpiry().isBefore(LocalDateTime.now())) {
+        if (user.getResetPasswordTokenExpiry() == null ||
+                user.getResetPasswordTokenExpiry().isBefore(LocalDateTime.now())) {
             throw new IllegalArgumentException("Código de recuperação expirado. Solicite um novo.");
         }
 
@@ -194,9 +229,8 @@ public class AuthService {
         // Validar força da senha
         if (!isValidPassword(newPassword)) {
             throw new IllegalArgumentException(
-                "A senha deve ter no mínimo 8 caracteres e conter pelo menos: " +
-                "1 letra maiúscula, 1 letra minúscula, 1 número e 1 caractere especial"
-            );
+                    "A senha deve ter no mínimo 8 caracteres e conter pelo menos: " +
+                            "1 letra maiúscula, 1 letra minúscula, 1 número e 1 caractere especial");
         }
 
         // Atualizar senha
@@ -289,5 +323,3 @@ public class AuthService {
                 .build();
     }
 }
-
-
