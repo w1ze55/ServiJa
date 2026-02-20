@@ -27,4 +27,4 @@ jobs:
             git pull origin main
 
             docker compose -f docker-compose.prod.yml down
-            docker compose -f docker-compose.prod.yml up --build -d
+            docker compose --env-file .env.prod -f docker-compose.prod.yml up --build -d
