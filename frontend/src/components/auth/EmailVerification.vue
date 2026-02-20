@@ -170,14 +170,14 @@ onMounted(() => {
 });
 
 // timer de reenvio
-watch([timeLeft, canResend], ([t, c]) => {
+watch([timeLeft, canResend], ([t, c], _, onCleanup) => {
   if (t > 0 && !c) {
-    const timer = setTimeout(() => (timeLeft.value -= 1), 1000);
-    return () => clearTimeout(timer);
+    const timer = setTimeout(() => (timeLeft.value -= 1), 1000)
+    onCleanup(() => clearTimeout(timer))
   } else if (t === 0) {
-    canResend.value = true;
+    canResend.value = true
   }
-});
+}, { immediate: true });
 
 function handleChange(index: number, value: string) {
   if (!/^\d*$/.test(value)) return;
