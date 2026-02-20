@@ -1,0 +1,23 @@
+services:
+  nginx-proxy:
+    image: nginx:alpine
+    container_name: servija_nginx_proxy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx-proxy.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - prod_network
+      - homolog_network
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+networks:
+  prod_network:
+    external: true
+    name: servija_prod_network
+  homolog_network:
+    external: true
+    name: servija_homolog_network
