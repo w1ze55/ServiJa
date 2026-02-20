@@ -214,6 +214,15 @@ const handleSavePersonalData = async () => {
     })
     
     personalData.value = { ...editedPersonalData.value }
+    
+    // Atualizar localStorage para refletir as mudanças no header
+    const storedUser = localStorage.getItem('user')
+    if (storedUser) {
+      const user = JSON.parse(storedUser)
+      user.name = personalData.value.name
+      localStorage.setItem('user', JSON.stringify(user))
+    }
+    
     isEditingPersonal.value = false
     toast.success('Dados atualizados com sucesso!')
   } catch (error: any) {
@@ -339,6 +348,15 @@ const handleFileUpload = async (event: Event) => {
         
         personalData.value.avatarUrl = base64
         editedPersonalData.value.avatarUrl = base64
+        
+        // Atualizar localStorage para refletir as mudanças no header
+        const storedUser = localStorage.getItem('user')
+        if (storedUser) {
+          const user = JSON.parse(storedUser)
+          user.avatar = base64
+          localStorage.setItem('user', JSON.stringify(user))
+        }
+        
         toast.success('Foto atualizada com sucesso!')
       } catch (error: any) {
         const errorMessage = error.response?.data?.message || 'Erro ao atualizar foto'
