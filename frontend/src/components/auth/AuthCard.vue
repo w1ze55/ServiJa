@@ -19,7 +19,7 @@
           >
             <div class="auth-card-form-container">
               <h2 class="auth-card-form-title">Entrar</h2>
-              <p class="auth-card-form-subtitle">Bem-vindo de volta ao Servi Já</p>
+              <p class="auth-card-form-subtitle">Bem-vindo de volta ao Servi Já TESTEEEE</p>
 
               <form @submit.prevent="handleLoginSubmit" class="space-y-4">
                 <Alert v-if="loginError" variant="destructive">
