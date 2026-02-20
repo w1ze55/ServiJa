@@ -20,11 +20,11 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           port: 22
           script: |
-            cd /var/www/ServiJa/app
+            cd /var/www/ServiJa
 
             git checkout homolog
 
             git pull origin homolog
 
             docker compose -f docker-compose.homolog.yml down
-            docker compose -f docker-compose.homolog.yml up --build -d
+            docker compose --env-file .env.homolog -f docker-compose.homolog.yml up --build -d

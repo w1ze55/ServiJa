@@ -127,10 +127,15 @@ const checkCpfAvailability = (cpf: string) => {
       const newErrors = { ...errors.value };
       delete newErrors.cpf;
       errors.value = newErrors;
-    } catch {
-      cpfCheckStatus.value = 'taken';
-      errors.value = { ...errors.value, cpf: 'CPF já cadastrado' };
-      touched.value = { ...touched.value, cpf: true };
+    } catch (error: any) {
+      if (error.response?.status === 409) {
+        cpfCheckStatus.value = 'taken';
+        errors.value = { ...errors.value, cpf: 'CPF já cadastrado' };
+        touched.value = { ...touched.value, cpf: true };
+      } else {
+        cpfCheckStatus.value = 'idle';
+        console.error('Erro ao verificar CPF:', error);
+      }
     }
   }, 600);
 };
