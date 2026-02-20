@@ -35,10 +35,11 @@ services:
       - .env.homolog
     environment:
       BACKEND_URL: http://backend-homolog:8080
+      SERVER_NAME: ${SERVER_NAME:-homolog.servija.app}
     depends_on:
       - backend-homolog
     ports:
-      - "81:80"
+      - "8081:80"
     networks:
       - homolog_network
     restart: unless-stopped
