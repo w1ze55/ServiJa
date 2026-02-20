@@ -18,7 +18,6 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/upload")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*", allowedHeaders = "*")
 @Tag(name = "File Upload", description = "Endpoints para upload de arquivos")
 public class FileUploadController {
 

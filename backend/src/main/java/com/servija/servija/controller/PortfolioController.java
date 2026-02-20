@@ -25,7 +25,6 @@ import java.util.List;
 @RequestMapping("/api/freelancer/portfolio")
 @RequiredArgsConstructor
 @Slf4j
-@CrossOrigin(origins = "*", allowedHeaders = "*")
 @Tag(name = "Portfolio", description = "Endpoints para gerenciamento do portfólio de projetos do freelancer")
 @SecurityRequirement(name = "bearerAuth")
 public class PortfolioController {

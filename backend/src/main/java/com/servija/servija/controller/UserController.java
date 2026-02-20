@@ -25,7 +25,6 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/users")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
 @Tag(name = "Usuários", description = "Endpoints para gerenciamento de perfil do usuário autenticado")
 @SecurityRequirement(name = "bearerAuth")
 public class UserController {
