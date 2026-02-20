@@ -1,5 +1,7 @@
 <template>
-  <div class="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+  <div
+    class="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4"
+  >
     <div class="w-full max-w-md bg-white rounded-lg shadow-xl p-8">
       <!-- Cabeçalho -->
       <div class="text-center mb-8">
@@ -12,7 +14,10 @@
       </div>
 
       <!-- Alerta de lockout -->
-      <div v-if="isLocked" class="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg text-center">
+      <div
+        v-if="isLocked"
+        class="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg text-center"
+      >
         <Clock class="h-6 w-6 text-amber-600 mx-auto mb-2" />
         <p class="text-amber-800 font-medium mb-1">Muitas tentativas</p>
         <p class="text-amber-700 text-sm mb-3">Aguarde para tentar novamente</p>
@@ -36,7 +41,9 @@
 
       <!-- Inputs de código -->
       <div class="mb-6">
-        <p class="text-sm text-gray-600 text-center mb-4">Digite o código de verificação</p>
+        <p class="text-sm text-gray-600 text-center mb-4">
+          Digite o código de verificação
+        </p>
 
         <div class="flex gap-2 justify-center" @paste="handlePaste">
           <input
@@ -47,21 +54,23 @@
             inputmode="numeric"
             maxlength="1"
             :value="digit"
-            @input="(e) => handleChange(index, (e.target as HTMLInputElement).value)"
+            @input="
+              (e) => handleChange(index, (e.target as HTMLInputElement).value)
+            "
             @keydown="(e) => handleKeyDown(index, e as KeyboardEvent)"
             :disabled="isVerifying || success || isLocked"
-            class="w-12 h-14 text-center border-2 rounded-lg transition-all
-                   focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent
-                   disabled:opacity-50 disabled:cursor-not-allowed"
+            class="w-12 h-14 text-center border-2 rounded-lg transition-all focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
             :class="[
               digit ? 'border-blue-600' : 'border-gray-300',
               error ? 'border-red-500' : '',
-              success ? 'border-green-500 bg-green-50' : ''
+              success ? 'border-green-500 bg-green-50' : '',
             ]"
           />
         </div>
 
-        <p class="text-xs text-gray-500 text-center mt-4">O código expira em 10 minutos</p>
+        <p class="text-xs text-gray-500 text-center mt-4">
+          O código expira em 10 minutos
+        </p>
       </div>
 
       <!-- Reenvio -->
@@ -75,224 +84,237 @@
         >
           Reenviar código
         </Button>
-        <p v-else class="text-sm text-gray-500">Reenviar código em {{ timeLeft }} s</p>
+        <p v-else class="text-sm text-gray-500">
+          Reenviar código em {{ timeLeft }} s
+        </p>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
-import Button from '../ui/button.vue'
-import Alert from '../ui/alert.vue'
-import AlertDescription from '../ui/alert-description.vue'
-import { AlertCircle, CheckCircle, Mail, Clock } from 'lucide-vue-next'
-import { API_ENDPOINTS } from '../../utils/api'
+import { ref, computed, onMounted, onUnmounted, watch } from "vue";
+import Button from "../ui/button.vue";
+import Alert from "../ui/alert.vue";
+import AlertDescription from "../ui/alert-description.vue";
+import { AlertCircle, CheckCircle, Mail, Clock } from "lucide-vue-next";
+import { API_ENDPOINTS } from "../../utils/api";
 
 interface EmailVerificationProps {
-  email: string
-  onVerified: (token: string, userData: any) => void
+  email: string;
+  onVerified: (token: string, userData: any) => void;
 }
-const props = defineProps<EmailVerificationProps>()
+const props = defineProps<EmailVerificationProps>();
 
-const code = ref<string[]>(['', '', '', '', '', ''])
-const error = ref('')
-const success = ref(false)
-const isVerifying = ref(false)
-const canResend = ref(false)
-const timeLeft = ref(60)
+const code = ref<string[]>(["", "", "", "", "", ""]);
+const error = ref("");
+const success = ref(false);
+const isVerifying = ref(false);
+const canResend = ref(false);
+const timeLeft = ref(60);
 
-const remainingAttempts = ref(5)
-const isLocked = ref(false)
-const lockEndTime = ref<Date | null>(null)
-const lockTimeRemaining = ref(0)
-let lockInterval: ReturnType<typeof setInterval> | null = null
+const remainingAttempts = ref(5);
+const isLocked = ref(false);
+const lockEndTime = ref<Date | null>(null);
+const lockTimeRemaining = ref(0);
+let lockInterval: ReturnType<typeof setInterval> | null = null;
 
-const inputRefs = ref<HTMLInputElement[]>([])
+const inputRefs = ref<HTMLInputElement[]>([]);
 
 const lockTimeFormatted = computed(() => {
-  const totalSeconds = lockTimeRemaining.value
-  const minutes = Math.floor(totalSeconds / 60)
-  const seconds = totalSeconds % 60
-  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
-})
+  const totalSeconds = lockTimeRemaining.value;
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+});
 
 function startLockoutTimer(lockUntil: string) {
-  isLocked.value = true
-  lockEndTime.value = new Date(lockUntil)
+  isLocked.value = true;
+  lockEndTime.value = new Date(
+    lockUntil.endsWith("Z") ? lockUntil : lockUntil + "Z",
+  );
 
   function updateTimer() {
-    if (!lockEndTime.value) return
-    const now = new Date()
-    const diff = Math.max(0, Math.floor((lockEndTime.value.getTime() - now.getTime()) / 1000))
-    lockTimeRemaining.value = diff
+    if (!lockEndTime.value) return;
+    const now = new Date();
+    const diff = Math.max(
+      0,
+      Math.floor((lockEndTime.value.getTime() - now.getTime()) / 1000),
+    );
+    lockTimeRemaining.value = diff;
 
     if (diff <= 0) {
-      isLocked.value = false
-      lockEndTime.value = null
-      remainingAttempts.value = 5
-      error.value = ''
+      isLocked.value = false;
+      lockEndTime.value = null;
+      remainingAttempts.value = 5;
+      error.value = "";
       if (lockInterval) {
-        clearInterval(lockInterval)
-        lockInterval = null
+        clearInterval(lockInterval);
+        lockInterval = null;
       }
     }
   }
 
-  updateTimer()
-  if (lockInterval) clearInterval(lockInterval)
-  lockInterval = setInterval(updateTimer, 1000)
+  updateTimer();
+  if (lockInterval) clearInterval(lockInterval);
+  lockInterval = setInterval(updateTimer, 1000);
 }
 
 onUnmounted(() => {
-  if (lockInterval) clearInterval(lockInterval)
-})
+  if (lockInterval) clearInterval(lockInterval);
+});
 
 // foca no primeiro input ao montar
 onMounted(() => {
-  inputRefs.value[0]?.focus()
-})
+  inputRefs.value[0]?.focus();
+});
 
 // timer de reenvio
 watch([timeLeft, canResend], ([t, c]) => {
   if (t > 0 && !c) {
-    const timer = setTimeout(() => (timeLeft.value -= 1), 1000)
-    return () => clearTimeout(timer)
+    const timer = setTimeout(() => (timeLeft.value -= 1), 1000);
+    return () => clearTimeout(timer);
   } else if (t === 0) {
-    canResend.value = true
+    canResend.value = true;
   }
-})
+});
 
 function handleChange(index: number, value: string) {
-  if (!/^\d*$/.test(value)) return
-  const newCode = [...code.value]
-  newCode[index] = value.slice(-1)
-  code.value = newCode
-  error.value = ''
+  if (!/^\d*$/.test(value)) return;
+  const newCode = [...code.value];
+  newCode[index] = value.slice(-1);
+  code.value = newCode;
+  error.value = "";
 
-  if (value && index < 5) inputRefs.value[index + 1]?.focus()
+  if (value && index < 5) inputRefs.value[index + 1]?.focus();
 
   if (index === 5 && value) {
-    const fullCode = [...newCode.slice(0, 5), value].join('')
-    verifyCode(fullCode)
+    const fullCode = [...newCode.slice(0, 5), value].join("");
+    verifyCode(fullCode);
   }
 }
 
 function handleKeyDown(index: number, e: KeyboardEvent) {
-  if (e.key === 'Backspace' && !code.value[index] && index > 0) {
-    inputRefs.value[index - 1]?.focus()
+  if (e.key === "Backspace" && !code.value[index] && index > 0) {
+    inputRefs.value[index - 1]?.focus();
   }
 }
 
 function handlePaste(e: ClipboardEvent) {
-  e.preventDefault()
-  const pastedData = e.clipboardData?.getData('text')?.replace(/\D/g, '').slice(0, 6) || ''
-  const newCode = [...code.value]
-  for (let i = 0; i < pastedData.length; i++) newCode[i] = pastedData[i]
-  code.value = newCode
+  e.preventDefault();
+  const pastedData =
+    e.clipboardData?.getData("text")?.replace(/\D/g, "").slice(0, 6) || "";
+  const newCode = [...code.value];
+  for (let i = 0; i < pastedData.length; i++) newCode[i] = pastedData[i];
+  code.value = newCode;
 
-  if (pastedData.length === 6) verifyCode(pastedData)
-  else if (pastedData.length > 0) inputRefs.value[Math.min(pastedData.length, 5)]?.focus()
+  if (pastedData.length === 6) verifyCode(pastedData);
+  else if (pastedData.length > 0)
+    inputRefs.value[Math.min(pastedData.length, 5)]?.focus();
 }
 
 async function verifyCode(fullCode: string) {
-  if (isLocked.value) return
+  if (isLocked.value) return;
 
-  isVerifying.value = true
-  error.value = ''
+  isVerifying.value = true;
+  error.value = "";
 
   try {
     const response = await fetch(API_ENDPOINTS.VERIFY_EMAIL, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
         email: props.email,
-        code: fullCode
-      })
-    })
+        code: fullCode,
+      }),
+    });
 
     if (response.ok) {
-      const data = await response.json()
-      success.value = true
-      remainingAttempts.value = 5
+      const data = await response.json();
+      success.value = true;
+      remainingAttempts.value = 5;
 
-      const token = data.token
-      const userData = data.user
+      const token = data.token;
+      const userData = data.user;
 
-      setTimeout(() => props.onVerified(token, userData), 1500)
+      setTimeout(() => props.onVerified(token, userData), 1500);
     } else if (response.status === 429) {
-      const data = await response.json()
-      remainingAttempts.value = 0
-      error.value = data.message || 'Muitas tentativas. Aguarde para tentar novamente.'
-      code.value = ['', '', '', '', '', '']
+      const data = await response.json();
+      remainingAttempts.value = 0;
+      error.value =
+        data.message || "Muitas tentativas. Aguarde para tentar novamente.";
+      code.value = ["", "", "", "", "", ""];
 
       if (data.lockUntil) {
-        startLockoutTimer(data.lockUntil)
+        startLockoutTimer(data.lockUntil);
       }
     } else {
-      const data = await response.json()
-      error.value = data.message || 'Código inválido. Tente novamente.'
+      const data = await response.json();
+      error.value = data.message || "Código inválido. Tente novamente.";
 
       // Parse remaining attempts from message like "4 tentativas restantes"
-      const match = data.message?.match(/^(\d+)\s+tentativa/)
+      const match = data.message?.match(/^(\d+)\s+tentativa/);
       if (match) {
-        remainingAttempts.value = parseInt(match[1])
+        remainingAttempts.value = parseInt(match[1]);
       }
 
-      code.value = ['', '', '', '', '', '']
-      inputRefs.value[0]?.focus()
+      code.value = ["", "", "", "", "", ""];
+      inputRefs.value[0]?.focus();
     }
   } catch (err) {
-    console.error('Erro ao verificar código:', err)
-    error.value = 'Erro ao verificar código. Tente novamente.'
-    code.value = ['', '', '', '', '', '']
-    inputRefs.value[0]?.focus()
+    console.error("Erro ao verificar código:", err);
+    error.value = "Erro ao verificar código. Tente novamente.";
+    code.value = ["", "", "", "", "", ""];
+    inputRefs.value[0]?.focus();
   } finally {
-    isVerifying.value = false
+    isVerifying.value = false;
   }
 }
 
 async function handleResend() {
-  canResend.value = false
-  timeLeft.value = 60
-  code.value = ['', '', '', '', '', '']
-  error.value = ''
-  remainingAttempts.value = 5
-  isLocked.value = false
-  lockEndTime.value = null
-  lockTimeRemaining.value = 0
+  canResend.value = false;
+  timeLeft.value = 60;
+  code.value = ["", "", "", "", "", ""];
+  error.value = "";
+  remainingAttempts.value = 5;
+  isLocked.value = false;
+  lockEndTime.value = null;
+  lockTimeRemaining.value = 0;
   if (lockInterval) {
-    clearInterval(lockInterval)
-    lockInterval = null
+    clearInterval(lockInterval);
+    lockInterval = null;
   }
 
   try {
-    const response = await fetch(`${API_ENDPOINTS.RESEND_VERIFICATION}?email=${encodeURIComponent(props.email)}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      }
-    })
+    const response = await fetch(
+      `${API_ENDPOINTS.RESEND_VERIFICATION}?email=${encodeURIComponent(props.email)}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      },
+    );
 
     if (response.ok) {
-      console.log('Código de verificação reenviado com sucesso')
+      console.log("Código de verificação reenviado com sucesso");
     } else {
-      const data = await response.json()
-      error.value = data.message || 'Erro ao reenviar código.'
+      const data = await response.json();
+      error.value = data.message || "Erro ao reenviar código.";
     }
   } catch (err) {
-    console.error('Erro ao reenviar código:', err)
-    error.value = 'Erro ao reenviar código. Tente novamente.'
+    console.error("Erro ao reenviar código:", err);
+    error.value = "Erro ao reenviar código. Tente novamente.";
   }
 
-  inputRefs.value[0]?.focus()
+  inputRefs.value[0]?.focus();
 }
 
 const maskedEmail = computed(() => {
-  const [username, domain] = props.email.split('@')
-  if (username.length <= 3) return props.email
-  return `${username.slice(0, 3)}***@${domain}`
-})
+  const [username, domain] = props.email.split("@");
+  if (username.length <= 3) return props.email;
+  return `${username.slice(0, 3)}***@${domain}`;
+});
 </script>

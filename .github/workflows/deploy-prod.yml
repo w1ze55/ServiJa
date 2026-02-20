@@ -1,4 +1,4 @@
-name: Deploy Servija AWS
+name: Deploy Servija AWS (Prod)
 
 on:
   push:
@@ -23,8 +23,13 @@ jobs:
             cd /var/www/ServiJa
 
             git checkout main
-
             git pull origin main
 
+            # Para apenas os containers de produção (não afeta homolog)
             docker compose -f docker-compose.prod.yml down
+
+            # Rebuild e start produção
             docker compose --env-file .env.prod -f docker-compose.prod.yml up --build -d
+
+            # Reinicia o proxy para reconhecer as mudanças (se existir)
+            docker compose -f docker-compose.proxy.yml up -d --force-recreate
