@@ -19,7 +19,6 @@ import java.nio.file.Path;
 @RestController
 @RequestMapping("/api/files")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*", allowedHeaders = "*")
 @Tag(name = "Files", description = "Endpoints para servir arquivos estáticos")
 public class FileController {
 

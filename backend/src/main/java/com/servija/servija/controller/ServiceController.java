@@ -21,7 +21,6 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/services")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*", allowedHeaders = "*")
 @Tag(name = "Serviços", description = "Endpoints para gerenciamento de serviços oferecidos pelos freelancers")
 public class ServiceController {
 
