@@ -19,7 +19,7 @@
           >
             <div class="auth-card-form-container">
               <h2 class="auth-card-form-title">Entrar</h2>
-              <p class="auth-card-form-subtitle">Bem-vindo de volta ao Servi Já TESTEEEE</p>
+              <p class="auth-card-form-subtitle">Bem-vindo de volta ao Servi Já</p>
 
               <form @submit.prevent="handleLoginSubmit" class="space-y-4">
                 <Alert v-if="loginError" variant="destructive">
@@ -108,7 +108,7 @@
 
               <!-- Signup Steps -->
               <template v-if="signupStep === 'type'">
-                <p class="text-gray-600 mb-6 text-center md:text-left">Escolha como deseja usar o Servi Já TESTE</p>
+                <p class="text-gray-600 mb-6 text-center md:text-left">Escolha como deseja usar o Servi Já</p>
 
                 <form @submit.prevent="handleAccountTypeSelect" class="space-y-4">
                   <div class="space-y-3">
