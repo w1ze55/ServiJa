@@ -1,4 +1,5 @@
 import { useRouter } from 'vue-router';
+import { useUserStore } from '@/stores/userStore';
 
 // Mapa de rotas para freelancers
 export const freelancerRoutes: Record<string, string> = {
@@ -48,7 +49,7 @@ export function getRoute(page: string, userType?: 'provider' | 'contractor'): st
   } else if (userType === 'contractor') {
     return clientRoutes[page] || `/${page}`;
   }
-  
+
   // Fallback: tenta encontrar em qualquer um dos mapas
   return freelancerRoutes[page] || clientRoutes[page] || `/${page}`;
 }
@@ -59,7 +60,7 @@ export function useNavigation() {
 
   const navigate = (page: string, userType?: 'provider' | 'contractor', params?: Record<string, any>) => {
     const route = getRoute(page, userType);
-    
+
     if (params) {
       router.push({ path: route, query: params });
     } else {
@@ -68,8 +69,8 @@ export function useNavigation() {
   };
 
   const logout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    const userStore = useUserStore();
+    userStore.clearUser();
     router.push('/login');
   };
 
