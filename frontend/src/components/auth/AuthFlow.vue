@@ -41,6 +41,10 @@ const recoveryEmail = ref('')
 // Armazena o callback de erro para comunicação com AuthCard
 let loginErrorCallback: ((error: string) => void) | null = null
 
+import { useUserStore } from '@/stores/userStore'
+
+const userStore = useUserStore()
+
 async function handleLogin(email: string, password: string) {
   try {
     const response = await api.post('/auth/login', { email, password })
@@ -62,6 +66,9 @@ async function handleLogin(email: string, password: string) {
       type: userType,
       avatar: userData.user?.avatarUrl || undefined,
     }
+    
+    // Atualizar store global
+    userStore.setUser(user)
     
     props.onLogin(user)
   } catch (error: any) {
@@ -105,6 +112,9 @@ function handleEmailVerified(token: string, userData: any) {
     type: userType,
     avatar: userData.avatarUrl || undefined,
   }
+  
+  // Atualizar store global
+  userStore.setUser(user)
   
   props.onLogin(user)
 }
