@@ -912,6 +912,9 @@ defineProps<Props>();
   overflow: hidden;
   background: linear-gradient(135deg, #286ad8 0%, #143774 100%);
   padding: 3rem;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
 .cta-card-glow {
