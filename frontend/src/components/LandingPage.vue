@@ -134,18 +134,16 @@ defineProps<Props>();
                 </div>
               </div>
 
-              <div class="benefit-items">
-                <div class="benefit-item">
-                  <div class="benefit-icon benefit-icon-blue">
-                    <ListChecks :size="24" />
-                  </div>
-                  <div class="benefit-content">
-                    <h3 class="benefit-title">Sistema de Avaliações por Serviço</h3>
-                    <p class="benefit-description">
-                      Cada serviço possui seu próprio sistema de avaliações, permitindo que você veja as avaliações de
-                      cada serviço antes de contratar.
-                    </p>
-                  </div>
+              <div class="benefit-item">
+                <div class="benefit-icon benefit-icon-blue">
+                  <ListChecks :size="24" />
+                </div>
+                <div class="benefit-content">
+                  <h3 class="benefit-title">Sistema de Avaliações por Serviço</h3>
+                  <p class="benefit-description">
+                    Cada serviço possui seu próprio sistema de avaliações, permitindo que você veja as avaliações de
+                    cada serviço antes de contratar.
+                  </p>
                 </div>
               </div>
 
@@ -218,68 +216,29 @@ defineProps<Props>();
         <div class="benefits-grid">
           <div class="benefits-list">
             <span class="section-badge">Para Contratantes</span>
-            <div id="prestadores" class="cta-card">
-              <div class="cta-card-glow"></div>
-              <div class="cta-card-content">
-                <div class="cta-badge">
-                  <Sparkles :size="16" />
-                  <span>Seja um Contratante</span>
-                </div>
-
-                <h3 class="cta-title">Encontre o profissional ideal</h3>
-                <p class="cta-description">
-                  Encontre o melhor profissional para o seu serviço antes de contratar.
-                </p>
-
-                <ul class="cta-benefits">
-                  <li class="cta-benefit">
-                    <CheckCircle :size="20" />
-                    <span>Busque por categoria, localização ou palavra-chave</span>
-                  </li>
-                  <li class="cta-benefit">
-                    <CheckCircle :size="20" />
-                    <span>Compare perfis, avaliações e histórico de cada prestador</span>
-                  </li>
-                  <li class="cta-benefit">
-                    <CheckCircle :size="20" />
-                    <span>Peça orçamentos, negocie e contrate de forma direta e segura</span>
-                  </li>
-                </ul>
-
-                <Button variant="secondary" class="cta-button" @click="$props.onSignup">
-                  Cadastre-se como Contratante
-                </Button>
-              </div>
-            </div>
-          </div>
-
-          <div class="benefits-list">
-            <h2 class="benefits-title">Por que escolher o Servi Já?</h2>
-
+            <h2 class="benefits-title">Facilidade para quem contrata</h2>
             <div class="benefit-items">
               <div class="benefit-item">
                 <div class="benefit-icon benefit-icon-blue">
                   <Search :size="24" />
                 </div>
                 <div class="benefit-content">
-                  <h3 class="benefit-title">Busque por categoria, localização ou palavra-chave</h3>
+                  <h3 class="benefit-title">Busque por categoria e localização</h3>
                   <p class="benefit-description">
-                    Encontre o melhor profissional para o seu serviço antes de contratar.
+                    Encontre o melhor profissional para o seu serviço com filtros inteligentes.
                   </p>
                 </div>
               </div>
 
-              <div class="benefit-items">
-                <div class="benefit-item">
-                  <div class="benefit-icon benefit-icon-blue">
-                    <ListChecks :size="24" />
-                  </div>
-                  <div class="benefit-content">
-                    <h3 class="benefit-title">Compare perfis, avaliações e histórico de cada prestador</h3>
-                    <p class="benefit-description">
-                      Encontre o melhor profissional para o seu serviço antes de contratar.
-                    </p>
-                  </div>
+              <div class="benefit-item">
+                <div class="benefit-icon benefit-icon-blue">
+                  <ListChecks :size="24" />
+                </div>
+                <div class="benefit-content">
+                  <h3 class="benefit-title">Compare perfis e avaliações</h3>
+                  <p class="benefit-description">
+                    Veja o histórico e a reputação de cada prestador antes de decidir.
+                  </p>
                 </div>
               </div>
 
@@ -288,26 +247,50 @@ defineProps<Props>();
                   <MessageSquare :size="24" />
                 </div>
                 <div class="benefit-content">
-                  <h3 class="benefit-title">Peça orçamentos, negocie e contrate de forma direta e segura</h3>
+                  <h3 class="benefit-title">Negocie com segurança</h3>
                   <p class="benefit-description">
-                    Encontre o melhor profissional para o seu serviço antes de contratar.
-                  </p>
-                </div>
-              </div>
-
-              <div class="benefit-item">
-                <div class="benefit-icon benefit-icon-green">
-                  <ShieldCheck :size="24" />
-                </div>
-                <div class="benefit-content">
-                  <h3 class="benefit-title">Encontre o melhor profissional para o seu serviço antes de contratar.</h3>
-                  <p class="benefit-description">
-                    Encontre o melhor profissional para o seu serviço antes de contratar.
+                    Peça orçamentos e contrate de forma direta pela plataforma.
                   </p>
                 </div>
               </div>
             </div>
           </div>
+
+          <div id="contratantes-cta" class="cta-card">
+            <div class="cta-card-glow"></div>
+            <div class="cta-card-content">
+              <div class="cta-badge">
+                <Sparkles :size="16" />
+                <span>Seja um Contratante</span>
+              </div>
+
+              <h3 class="cta-title">Encontre o profissional ideal</h3>
+              <p class="cta-description">
+                O melhor profissional para o seu serviço a apenas alguns cliques de distância.
+              </p>
+
+              <ul class="cta-benefits">
+                <li class="cta-benefit">
+                  <CheckCircle :size="20" />
+                  <span>Busca simplificada por categoria</span>
+                </li>
+                <li class="cta-benefit">
+                  <CheckCircle :size="20" />
+                  <span>Histórico e avaliações reais</span>
+                </li>
+                <li class="cta-benefit">
+                  <CheckCircle :size="20" />
+                  <span>Contratação direta e segura</span>
+                </li>
+              </ul>
+
+              <Button variant="secondary" class="cta-button" @click="$props.onSignup">
+                Cadastre-se como Contratante
+              </Button>
+            </div>
+          </div>
+
+
         </div>
       </div>
     </section>
@@ -911,7 +894,18 @@ defineProps<Props>();
   border-radius: 2rem;
   overflow: hidden;
   background: linear-gradient(135deg, #286ad8 0%, #143774 100%);
-  padding: 3rem;
+  padding: 2rem;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+}
+
+@media (min-width: 768px) {
+  .cta-card {
+    padding: 3rem;
+    text-align: left;
+  }
 }
 
 .cta-card-glow {
@@ -979,6 +973,13 @@ defineProps<Props>();
   flex-direction: column;
   gap: 1rem;
   margin-bottom: 2rem;
+  align-items: center;
+}
+
+@media (min-width: 768px) {
+  .cta-benefits {
+    align-items: flex-start;
+  }
 }
 
 .cta-benefit {

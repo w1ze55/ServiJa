@@ -36,8 +36,10 @@ import DropdownMenuSeparator from '../ui/dropdown-menu-separator.vue';
 import DropdownMenuTrigger from '../ui/dropdown-menu-trigger.vue';
 import logo from '@/assets/favicon-32x32.png';
 import api from '@/api/config/axios';
+import { useUserStore } from '@/stores/userStore';
 
 const router = useRouter();
+const userStore = useUserStore();
 
 interface User {
   id: string;
@@ -64,6 +66,9 @@ interface Props {
 }
 
 const props = defineProps<Props>();
+
+// Usar o usuário da store se disponível, caso contrário usar das props
+const currentUser = computed(() => userStore.user || props.user);
 
 const sidebarOpen = ref(false);
 const sidebarExpanded = ref(false);
@@ -149,7 +154,7 @@ onMounted(() => {
 
 // Menu items based on user type
 const menuItems = computed(() =>
-  props.user.type === 'contractor'
+  currentUser.value.type === 'contractor'
     ? [
         // Menu para Clientes
         { id: 'home', label: 'Início', icon: Home },
@@ -287,9 +292,9 @@ const getInitials = (name: string) => {
         >
           <div :class="`flex items-center gap-3 ${sidebarExpanded ? '' : 'justify-center'}`">
             <Avatar class="h-10 w-10 flex-shrink-0">
-              <AvatarImage :src="user.avatar" :alt="user.name" />
+              <AvatarImage :src="currentUser.avatar" :alt="currentUser.name" />
               <AvatarFallback class="bg-[#286AD8] text-white">
-                {{ getInitials(user.name) }}
+                {{ getInitials(currentUser.name) }}
               </AvatarFallback>
             </Avatar>
             <div
@@ -297,9 +302,9 @@ const getInitials = (name: string) => {
                 sidebarExpanded ? 'opacity-100' : 'opacity-0 w-0'
               }`"
             >
-              <p class="text-sm truncate text-white">{{ user.name }}</p>
+              <p class="text-sm truncate text-white">{{ currentUser.name }}</p>
               <p class="text-xs text-white/50">
-                {{ user.type === 'contractor' ? 'Contratante' : 'Prestador' }}
+                {{ currentUser.type === 'contractor' ? 'Contratante' : 'Prestador' }}
               </p>
             </div>
           </div>
@@ -372,15 +377,15 @@ const getInitials = (name: string) => {
         <div class="p-4 border-t border-white/10">
           <div class="flex items-center gap-3">
             <Avatar class="h-10 w-10">
-              <AvatarImage :src="user.avatar" :alt="user.name" />
+              <AvatarImage :src="currentUser.avatar" :alt="currentUser.name" />
               <AvatarFallback class="bg-[#286AD8] text-white">
-                {{ getInitials(user.name) }}
+                {{ getInitials(currentUser.name) }}
               </AvatarFallback>
             </Avatar>
             <div class="flex-1 min-w-0">
-              <p class="text-sm truncate text-white">{{ user.name }}</p>
+              <p class="text-sm truncate text-white">{{ currentUser.name }}</p>
               <p class="text-xs text-white/50">
-                {{ user.type === 'contractor' ? 'Contratante' : 'Prestador' }}
+                {{ currentUser.type === 'contractor' ? 'Contratante' : 'Prestador' }}
               </p>
             </div>
           </div>
@@ -427,9 +432,9 @@ const getInitials = (name: string) => {
               <DropdownMenuTrigger>
                 <button class="flex items-center gap-2 hover:opacity-80 transition-opacity">
                   <Avatar class="h-10 w-10 border-2 border-[#286AD8]">
-                    <AvatarImage :src="user.avatar" :alt="user.name" />
+                    <AvatarImage :src="currentUser.avatar" :alt="currentUser.name" />
                     <AvatarFallback class="bg-[#286AD8] text-white">
-                      {{ getInitials(user.name) }}
+                      {{ getInitials(currentUser.name) }}
                     </AvatarFallback>
                   </Avatar>
                 </button>
@@ -440,7 +445,7 @@ const getInitials = (name: string) => {
                 <DropdownMenuItem
                   @click="
                     props.onNavigate(
-                      user.type === 'contractor'
+                      currentUser.type === 'contractor'
                         ? 'profile'
                         : 'freelancer-profile-settings'
                     )
@@ -454,7 +459,7 @@ const getInitials = (name: string) => {
                   <span>Notificações</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                  v-if="user.type === 'contractor'"
+                  v-if="currentUser.type === 'contractor'"
                   @click="props.onNavigate('contracts')"
                 >
                   <Clock class="mr-2 h-4 w-4" />
@@ -489,4 +494,29 @@ const getInitials = (name: string) => {
     </div>
   </div>
 </template>
+<style scoped>
+/* Estilo personalizado para a scrollbar da sidebar */
+nav::-webkit-scrollbar {
+  width: 5px;
+}
+
+nav::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+nav::-webkit-scrollbar-thumb {
+  background: #435574;
+  border-radius: 10px;
+}
+
+nav::-webkit-scrollbar-thumb:hover {
+  background: #286AD8;
+}
+
+/* Para garantir que a scrollbar não empurre o conteúdo */
+nav {
+  scrollbar-width: thin;
+  scrollbar-color: #435574 transparent;
+}
+</style>
 

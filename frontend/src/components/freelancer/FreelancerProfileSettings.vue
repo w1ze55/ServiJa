@@ -32,6 +32,9 @@ import AlertDialogTitle from '../ui/alert-dialog-title.vue'
 import api from '@/api/config/axios'
 import { toast } from '@/utils/toast'
 import { formatCPF, formatPhone } from '@/utils/masks'
+import { useUserStore } from '@/stores/userStore'
+
+const userStore = useUserStore()
 
 interface Props {
   onNavigate: (page: string, params?: any) => void;
@@ -214,6 +217,10 @@ const handleSavePersonalData = async () => {
     })
     
     personalData.value = { ...editedPersonalData.value }
+    
+    // Atualizar store global para refletir as mudanças no header imediatamente
+    userStore.updateUser({ name: personalData.value.name })
+    
     isEditingPersonal.value = false
     toast.success('Dados atualizados com sucesso!')
   } catch (error: any) {
@@ -339,6 +346,10 @@ const handleFileUpload = async (event: Event) => {
         
         personalData.value.avatarUrl = base64
         editedPersonalData.value.avatarUrl = base64
+        
+        // Atualizar store global para refletir as mudanças no header imediatamente
+        userStore.updateUser({ avatar: base64 })
+        
         toast.success('Foto atualizada com sucesso!')
       } catch (error: any) {
         const errorMessage = error.response?.data?.message || 'Erro ao atualizar foto'

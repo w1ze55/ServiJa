@@ -60,7 +60,7 @@ public class AuthService {
         // Gerar código de verificação
         String verificationCode = generateVerificationCode();
         user.setVerificationCode(verificationCode);
-        user.setVerificationCodeExpiry(LocalDateTime.now().plusHours(24));
+        user.setVerificationCodeExpiry(LocalDateTime.now().plusMinutes(10));
 
         // Salvar usuário
         if (user instanceof Contractor) {
@@ -149,7 +149,7 @@ public class AuthService {
         }
 
         if (user.getVerificationCodeExpiry().isBefore(LocalDateTime.now())) {
-            throw new IllegalArgumentException("Código de verificação expirado");
+            throw new IllegalArgumentException("Código de verificação expirado, solicite um novo");
         }
 
         // Sucesso: resetar tudo
@@ -177,7 +177,7 @@ public class AuthService {
 
         String verificationCode = generateVerificationCode();
         user.setVerificationCode(verificationCode);
-        user.setVerificationCodeExpiry(LocalDateTime.now().plusHours(24));
+        user.setVerificationCodeExpiry(LocalDateTime.now().plusMinutes(10));
         user.setVerificationAttempts(0);
         user.setVerificationLockUntil(null);
         userRepository.save(user);

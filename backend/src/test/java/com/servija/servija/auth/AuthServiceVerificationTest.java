@@ -127,7 +127,7 @@ class AuthServiceVerificationTest {
 
             assertThatThrownBy(() -> authService.verifyEmail("joao@email.com", "123456"))
                     .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessage("Código de verificação expirado");
+                    .hasMessage("Código de verificação expirado, solicite um novo");
         }
 
         @Test

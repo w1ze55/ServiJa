@@ -25,7 +25,6 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/addresses")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
 @Tag(name = "Endereços", description = "Endpoints para gerenciamento de endereços do usuário")
 @SecurityRequirement(name = "bearerAuth")
 public class AddressController {

@@ -108,7 +108,7 @@
 
               <!-- Signup Steps -->
               <template v-if="signupStep === 'type'">
-                <p class="text-gray-600 mb-6 text-center md:text-left">Escolha como deseja usar o Servi Já TESTE</p>
+                <p class="text-gray-600 mb-6 text-center md:text-left">Escolha como deseja usar o Servi Já</p>
 
                 <form @submit.prevent="handleAccountTypeSelect" class="space-y-4">
                   <div class="space-y-3">
