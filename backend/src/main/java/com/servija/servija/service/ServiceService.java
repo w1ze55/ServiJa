@@ -86,7 +86,8 @@ public class ServiceService {
                 .price(request.getPrice())
                 .priceType(parseEnum(Service.PriceType.class, request.getPriceType(), Service.PriceType.FIXED))
                 .deliveryTime(request.getDeliveryTime())
-                .deliveryUnit(parseEnum(Service.DeliveryUnit.class, request.getDeliveryUnit(), Service.DeliveryUnit.DAYS))
+                .deliveryUnit(
+                        parseEnum(Service.DeliveryUnit.class, request.getDeliveryUnit(), Service.DeliveryUnit.DAYS))
                 .tags(toJson(request.getTags()))
                 .images(toJson(request.getImages()))
                 .isActive(request.getIsActive() != null ? request.getIsActive() : true)
@@ -104,7 +105,7 @@ public class ServiceService {
     @Transactional
     public ServiceResponse updateService(Long id, ServiceRequest request) {
         Freelancer freelancer = getCurrentFreelancer();
-        
+
         Service service = serviceRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Serviço não encontrado"));
 
@@ -133,7 +134,8 @@ public class ServiceService {
             service.setDeliveryTime(request.getDeliveryTime());
         }
         if (request.getDeliveryUnit() != null) {
-            service.setDeliveryUnit(parseEnum(Service.DeliveryUnit.class, request.getDeliveryUnit(), service.getDeliveryUnit()));
+            service.setDeliveryUnit(
+                    parseEnum(Service.DeliveryUnit.class, request.getDeliveryUnit(), service.getDeliveryUnit()));
         }
         if (request.getTags() != null) {
             service.setTags(toJson(request.getTags()));
@@ -157,7 +159,7 @@ public class ServiceService {
     @Transactional
     public void deleteService(Long id) {
         Freelancer freelancer = getCurrentFreelancer();
-        
+
         Service service = serviceRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Serviço não encontrado"));
 
@@ -176,7 +178,7 @@ public class ServiceService {
     @Transactional
     public ServiceResponse toggleServiceStatus(Long id) {
         Freelancer freelancer = getCurrentFreelancer();
-        
+
         Service service = serviceRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Serviço não encontrado"));
 
@@ -190,6 +192,15 @@ public class ServiceService {
         log.info("Status do serviço {} alterado para: {}", id, service.getIsActive());
 
         return toResponse(service);
+    }
+
+    /**
+     * Listar todos os serviços ativos
+     */
+    @Transactional(readOnly = true)
+    public List<ServiceResponse> getAllActiveServices() {
+        List<Service> services = serviceRepository.findByIsActiveOrderByCreatedAtDesc(true);
+        return services.stream().map(this::toResponse).collect(Collectors.toList());
     }
 
     /**
@@ -266,7 +277,8 @@ public class ServiceService {
             return new ArrayList<>();
         }
         try {
-            return objectMapper.readValue(json, new TypeReference<List<String>>() {});
+            return objectMapper.readValue(json, new TypeReference<List<String>>() {
+            });
         } catch (JsonProcessingException e) {
             log.error("Erro ao converter JSON para lista", e);
             return new ArrayList<>();
