@@ -176,14 +176,6 @@ const selectedImage = ref(0);
               :alt="service.title"
               class="w-full h-full object-cover"
             />
-            
-            <!-- Botão Fechar -->
-            <button
-              @click="onClose"
-              class="absolute top-4 right-4 w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-lg hover:bg-gray-100 transition-colors z-10"
-            >
-              <X class="h-5 w-5 text-gray-600" />
-            </button>
 
             <!-- Status Badge -->
             <div class="absolute top-4 left-4">

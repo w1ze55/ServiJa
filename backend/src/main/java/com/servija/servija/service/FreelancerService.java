@@ -20,6 +20,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.servija.servija.dto.ServiceCityResponse;
+import com.servija.servija.dto.ProfessionalLinkResponse;
+import com.servija.servija.model.ServiceCity;
+import com.servija.servija.model.ProfessionalLink;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -71,11 +74,47 @@ public class FreelancerService {
         if (request.getServiceType() != null) {
             freelancer.setServiceType(request.getServiceType());
         }
+        if (request.getWorkModel() != null) {
+            freelancer.setWorkModel(Freelancer.WorkModel.valueOf(request.getWorkModel().toUpperCase()));
+        }
         if (request.getCities() != null) {
             try {
                 freelancer.setCities(objectMapper.writeValueAsString(request.getCities()));
             } catch (JsonProcessingException e) {
                 log.error("Erro ao serializar cidades", e);
+            }
+        }
+
+        // Atualizar serviceCities (formato novo - entidades)
+        if (request.getServiceCities() != null) {
+            // Remover todas as cidades antigas
+            freelancer.getServiceCities().clear();
+            
+            // Adicionar as novas cidades
+            for (ServiceCityResponse cityDto : request.getServiceCities()) {
+                ServiceCity serviceCity = ServiceCity.builder()
+                        .freelancer(freelancer)
+                        .city(cityDto.getCity())
+                        .state(cityDto.getState())
+                        .build();
+                freelancer.getServiceCities().add(serviceCity);
+            }
+        }
+
+        // Atualizar professionalLinks (formato novo - entidades)
+        if (request.getProfessionalLinks() != null) {
+            // Remover todos os links antigos
+            freelancer.getProfessionalLinks().clear();
+            
+            // Adicionar os novos links
+            for (ProfessionalLinkResponse linkDto : request.getProfessionalLinks()) {
+                ProfessionalLink professionalLink = ProfessionalLink.builder()
+                        .freelancer(freelancer)
+                        .type(ProfessionalLink.LinkType.valueOf(linkDto.getType().toUpperCase()))
+                        .url(linkDto.getUrl())
+                        .label(linkDto.getLabel())
+                        .build();
+                freelancer.getProfessionalLinks().add(professionalLink);
             }
         }
 
@@ -103,9 +142,14 @@ public class FreelancerService {
             throw new RuntimeException("Usuário não é um freelancer");
         }
 
-        // Usar o método com JOIN FETCH para carregar serviceCities
-        return freelancerRepository.findByIdWithServiceCities(user.getId())
+        // Carregar serviceCities primeiro
+        Freelancer freelancer = freelancerRepository.findByIdWithServiceCities(user.getId())
                 .orElseThrow(() -> new RuntimeException("Perfil de freelancer não encontrado"));
+        
+        // Carregar professionalLinks em seguida (já com serviceCities carregados)
+        freelancerRepository.findByIdWithProfessionalLinks(user.getId());
+        
+        return freelancer;
     }
 
     private FreelancerProfileResponse mapToResponse(Freelancer freelancer) {
@@ -142,6 +186,19 @@ public class FreelancerService {
                     .collect(Collectors.toList());
         }
 
+        // Mapear professionalLinks (formato novo - entidades)
+        List<ProfessionalLinkResponse> professionalLinkResponses = new ArrayList<>();
+        if (freelancer.getProfessionalLinks() != null && !freelancer.getProfessionalLinks().isEmpty()) {
+            professionalLinkResponses = freelancer.getProfessionalLinks().stream()
+                    .map(pl -> ProfessionalLinkResponse.builder()
+                            .id(pl.getId())
+                            .type(pl.getType().name().toLowerCase())
+                            .url(pl.getUrl())
+                            .label(pl.getLabel())
+                            .build())
+                    .collect(Collectors.toList());
+        }
+
         // Buscar localização do endereço cadastrado (prioriza o padrão)
         String location = null;
         List<Address> addresses = addressRepository.findByUserIdOrderByIsDefaultDescCreatedAtDesc(freelancer.getId());
@@ -160,9 +217,11 @@ public class FreelancerService {
                 .hourlyRate(freelancer.getHourlyRate() != null ? freelancer.getHourlyRate().doubleValue() : null)
                 .profilePhoto(freelancer.getAvatarUrl())
                 .serviceType(freelancer.getServiceType())
+                .workModel(freelancer.getWorkModel() != null ? freelancer.getWorkModel().name().toLowerCase() : null)
                 .location(location)
                 .cities(cities)
                 .serviceCities(serviceCityResponses)
+                .professionalLinks(professionalLinkResponses)
                 .socialLinks(socialLinks)
                 .rating(freelancer.getRating())
                 .totalReviews(freelancer.getTotalReviews())

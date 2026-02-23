@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import {
   ArrowLeft,
   Calendar,
@@ -15,11 +15,16 @@ import {
   CheckCircle,
   User,
   MessageSquare,
-  Milestone,
+  Milestone as MilestoneIcon,
   Upload,
   X,
   Eye,
   Paperclip,
+  XCircle,
+  Phone,
+  Mail,
+  Play,
+  Check,
 } from 'lucide-vue-next';
 import Button from '../ui/button.vue';
 import Input from '../ui/input.vue';
@@ -45,40 +50,11 @@ import Tabs from '../ui/tabs.vue';
 import TabsContent from '../ui/tabs-content.vue';
 import TabsList from '../ui/tabs-list.vue';
 import TabsTrigger from '../ui/tabs-trigger.vue';
-import { toast } from '../../utils/toast';
-
-interface RequestAttachment {
-  id: string;
-  name: string;
-  size: string;
-  url: string;
-  type: string;
-}
-
-interface Milestone {
-  id: string;
-  title: string;
-  description: string;
-  deadline: string;
-  value: string;
-}
-
-interface Message {
-  id: string;
-  sender: 'freelancer' | 'client';
-  senderName: string;
-  message: string;
-  timestamp: string;
-  attachments?: RequestAttachment[];
-}
-
-interface AuditLog {
-  id: string;
-  action: string;
-  user: string;
-  timestamp: string;
-  details?: string;
-}
+import Avatar from '../ui/avatar.vue';
+import AvatarFallback from '../ui/avatar-fallback.vue';
+import AvatarImage from '../ui/avatar-image.vue';
+import { useProposalStore, type Proposal, type Milestone } from '@/stores/proposalStore';
+import { toast } from '@/utils/toast';
 
 interface Props {
   onNavigate: (page: string, params?: any) => void;
@@ -86,48 +62,18 @@ interface Props {
 }
 
 const props = defineProps<Props>();
+const proposalStore = useProposalStore();
 
 const activeTab = ref('details');
 const showSendProposalDialog = ref(false);
 const showConfirmDialog = ref(false);
+const showRejectDialog = ref(false);
+const showCompleteDialog = ref(false);
+const rejectReason = ref('');
+const isLoading = ref(false);
 
-// Mock request data
-const request = ref({
-  id: props.requestId || '1',
-  serviceTitle: 'Instalação Elétrica Residencial',
-  category: 'Instalação Elétrica',
-  client: {
-    name: 'João Silva',
-    avatar: 'https://i.pravatar.cc/150?img=12',
-    location: 'São Paulo, SP',
-  },
-  createdAt: '2026-11-05T10:30:00',
-  description:
-    'Preciso de um eletricista qualificado para fazer a instalação elétrica completa de uma residência de 120m². O trabalho inclui:\n\n- Instalação de quadro de distribuição\n- Instalação de pontos de luz em todos os cômodos\n- Instalação de tomadas (padrão brasileiro)\n- Aterramento\n- Disjuntores e proteção\n\nA casa tem 3 quartos, 2 banheiros, sala, cozinha e área de serviço. Gostaria de receber propostas com valores e prazos.',
-  address: 'Rua das Flores, 123 - Jardim Paulista, São Paulo - SP',
-  desiredDate: '2026-11-20',
-  budget: 'R$ 3.000 - R$ 5.000',
-  urgency: 'Média',
-  attachments: [
-    {
-      id: 'att1',
-      name: 'planta-casa.pdf',
-      size: '2.4 MB',
-      url: '#',
-      type: 'application/pdf',
-    },
-    {
-      id: 'att2',
-      name: 'foto-quadro.jpg',
-      size: '1.2 MB',
-      url: '#',
-      type: 'image/jpeg',
-    },
-  ],
-  status: 'pending',
-});
+const proposal = ref<Proposal | null>(null);
 
-// Proposal form
 const proposalForm = ref({
   value: '',
   executionDays: '',
@@ -137,8 +83,7 @@ const proposalForm = ref({
   attachmentUrls: [] as string[],
 });
 
-// Milestones
-const milestones = ref<Milestone[]>([]);
+const milestones = ref<Array<Omit<Milestone, 'status'> & { status?: Milestone['status'] }>>([]);
 const milestoneForm = ref({
   title: '',
   description: '',
@@ -147,49 +92,78 @@ const milestoneForm = ref({
 });
 const showAddMilestone = ref(false);
 
-// Messages
-const messages = ref<Message[]>([
-  {
-    id: '1',
-    sender: 'client',
-    senderName: 'João Silva',
-    message: 'Olá, gostaria de mais informações sobre a disponibilidade para início do trabalho.',
-    timestamp: '2026-11-05T14:20:00',
-  },
-]);
 const newMessage = ref('');
 const messageAttachments = ref<File[]>([]);
 
-// Audit log
-const auditLog = ref<AuditLog[]>([
-  {
-    id: '1',
-    action: 'Solicitação criada',
-    user: 'João Silva (Cliente)',
-    timestamp: '2026-11-05T10:30:00',
-    details: 'Cliente criou a solicitação de orçamento',
-  },
-  {
-    id: '2',
-    action: 'Anexo adicionado',
-    user: 'João Silva (Cliente)',
-    timestamp: '2026-11-05T10:35:00',
-    details: 'planta-casa.pdf',
-  },
-  {
-    id: '3',
-    action: 'Mensagem enviada',
-    user: 'João Silva (Cliente)',
-    timestamp: '2026-11-05T14:20:00',
-    details: 'Cliente enviou uma mensagem',
-  },
-]);
+const messageAttachmentInput = ref<HTMLInputElement | null>(null);
+const proposalAttachmentInput = ref<HTMLInputElement | null>(null);
+
+onMounted(async () => {
+  if (proposalStore.proposals.length === 0) {
+    await proposalStore.loadProposals();
+  }
+  
+  if (props.requestId) {
+    proposal.value = proposalStore.getProposalById(props.requestId) || null;
+    if (proposal.value) {
+      proposalStore.markAsViewed(props.requestId);
+    }
+  }
+});
+
+watch(() => props.requestId, async (newId) => {
+  if (newId) {
+    if (proposalStore.proposals.length === 0) {
+      await proposalStore.loadProposals();
+    }
+    proposal.value = proposalStore.getProposalById(newId) || null;
+    if (proposal.value) {
+      proposalStore.markAsViewed(newId);
+    }
+  }
+});
 
 const clientMessagesCount = computed(() =>
-  messages.value.filter((m) => m.sender === 'client').length
+  proposal.value?.messages?.filter((m) => m.sender === 'client').length || 0
 );
 
-// Validation
+const getInitials = (name: string) => {
+  return name
+    .split(' ')
+    .map((n) => n[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
+};
+
+const formatCurrency = (value: string | number) => {
+  if (typeof value === 'number') {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    }).format(value);
+  }
+  const numbers = value.replace(/\D/g, '');
+  const formatted = (parseFloat(numbers) / 100).toLocaleString('pt-BR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+  return `R$ ${formatted}`;
+};
+
+const handleCurrencyInput = (value: string) => {
+  const numbers = value.replace(/\D/g, '');
+  if (numbers) {
+    return formatCurrency(numbers);
+  }
+  return '';
+};
+
+const parseCurrencyValue = (value: string): number => {
+  const numbers = value.replace(/[^\d,]/g, '').replace(',', '.');
+  return parseFloat(numbers) || 0;
+};
+
 const validateProposal = () => {
   const errors: string[] = [];
 
@@ -197,7 +171,7 @@ const validateProposal = () => {
   if (!proposalForm.value.executionDays) errors.push('Prazo de execução é obrigatório');
   if (!proposalForm.value.scope) errors.push('Escopo do trabalho é obrigatório');
 
-  const value = parseFloat(proposalForm.value.value.replace(/[^\d,]/g, '').replace(',', '.'));
+  const value = parseCurrencyValue(proposalForm.value.value);
   if (isNaN(value) || value <= 0) {
     errors.push('Valor da proposta deve ser um número válido maior que zero');
   }
@@ -207,10 +181,9 @@ const validateProposal = () => {
     errors.push('Prazo de execução deve ser um número válido maior que zero');
   }
 
-  // Validate milestone values sum
   if (milestones.value.length > 0) {
     const milestonesTotal = milestones.value.reduce((sum, m) => {
-      const mValue = parseFloat(m.value.replace(/[^\d,]/g, '').replace(',', '.'));
+      const mValue = parseCurrencyValue(String(m.value));
       return sum + (isNaN(mValue) ? 0 : mValue);
     }, 0);
 
@@ -228,9 +201,13 @@ const handleAddMilestone = () => {
     return;
   }
 
-  const newMilestone: Milestone = {
+  const newMilestone = {
     id: Date.now().toString(),
-    ...milestoneForm.value,
+    title: milestoneForm.value.title,
+    description: milestoneForm.value.description,
+    deadline: milestoneForm.value.deadline,
+    value: parseCurrencyValue(milestoneForm.value.value),
+    status: 'pending' as const,
   };
 
   milestones.value = [...milestones.value, newMilestone];
@@ -249,7 +226,7 @@ const handleAttachmentUpload = (e: Event) => {
   if (!target.files) return;
 
   const validFiles: File[] = [];
-  const maxSize = 10 * 1024 * 1024; // 10MB
+  const maxSize = 10 * 1024 * 1024;
   const allowedTypes = [
     'application/pdf',
     'image/jpeg',
@@ -290,31 +267,28 @@ const handleRemoveAttachment = (index: number) => {
   };
 };
 
-const handleSendMessage = () => {
+const handleSendMessage = async () => {
   if (!newMessage.value.trim() && messageAttachments.value.length === 0) {
     toast.error('Digite uma mensagem ou adicione um anexo');
     return;
   }
 
-  const message: Message = {
-    id: Date.now().toString(),
-    sender: 'freelancer',
-    senderName: 'Você',
-    message: newMessage.value,
-    timestamp: new Date().toISOString(),
-    attachments: messageAttachments.value.map((file, idx) => ({
-      id: `msg-att-${Date.now()}-${idx}`,
-      name: file.name,
-      size: `${(file.size / 1024).toFixed(1)} KB`,
-      url: URL.createObjectURL(file),
-      type: file.type,
-    })),
-  };
+  if (!proposal.value) return;
 
-  messages.value = [...messages.value, message];
-  newMessage.value = '';
-  messageAttachments.value = [];
-  toast.success('Mensagem enviada');
+  const success = await proposalStore.sendMessage(
+    proposal.value.id,
+    newMessage.value,
+    messageAttachments.value.length > 0 ? messageAttachments.value : undefined
+  );
+
+  if (success) {
+    newMessage.value = '';
+    messageAttachments.value = [];
+    proposal.value = proposalStore.getProposalById(proposal.value.id) || null;
+    toast.success('Mensagem enviada');
+  } else {
+    toast.error('Erro ao enviar mensagem');
+  }
 };
 
 const handlePrepareProposal = () => {
@@ -329,43 +303,102 @@ const handlePrepareProposal = () => {
   showConfirmDialog.value = true;
 };
 
-const handleConfirmSendProposal = () => {
-  toast.success('Proposta enviada com sucesso!');
-  showConfirmDialog.value = false;
-  showSendProposalDialog.value = false;
+const handleConfirmSendProposal = async () => {
+  if (!proposal.value) return;
 
-  // Reset form
-  proposalForm.value = {
-    value: '',
-    executionDays: '',
-    scope: '',
-    notes: '',
-    attachments: [],
-    attachmentUrls: [],
+  isLoading.value = true;
+  
+  const responseData = {
+    value: parseCurrencyValue(proposalForm.value.value),
+    executionDays: parseInt(proposalForm.value.executionDays),
+    scope: proposalForm.value.scope,
+    notes: proposalForm.value.notes || undefined,
+    milestones: milestones.value.length > 0 
+      ? milestones.value.map(m => ({
+          ...m,
+          status: 'pending' as const,
+        }))
+      : undefined,
   };
-  milestones.value = [];
 
-  // Navigate back
-  setTimeout(() => {
-    props.onNavigate('freelancer-proposals');
-  }, 1500);
-};
+  const success = await proposalStore.sendResponse(proposal.value.id, responseData);
+  
+  isLoading.value = false;
 
-const formatCurrency = (value: string) => {
-  const numbers = value.replace(/\D/g, '');
-  const formatted = (parseFloat(numbers) / 100).toLocaleString('pt-BR', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-  return `R$ ${formatted}`;
-};
-
-const handleCurrencyInput = (value: string) => {
-  const numbers = value.replace(/\D/g, '');
-  if (numbers) {
-    return formatCurrency(numbers);
+  if (success) {
+    toast.success('Proposta enviada com sucesso!');
+    showConfirmDialog.value = false;
+    showSendProposalDialog.value = false;
+    
+    proposalForm.value = {
+      value: '',
+      executionDays: '',
+      scope: '',
+      notes: '',
+      attachments: [],
+      attachmentUrls: [],
+    };
+    milestones.value = [];
+    
+    proposal.value = proposalStore.getProposalById(proposal.value.id) || null;
+  } else {
+    toast.error('Erro ao enviar proposta');
   }
-  return '';
+};
+
+const handleOpenRejectDialog = () => {
+  rejectReason.value = '';
+  showRejectDialog.value = true;
+};
+
+const handleRejectProposal = async () => {
+  if (!proposal.value) return;
+
+  if (!rejectReason.value.trim()) {
+    toast.error('Por favor, informe o motivo da recusa');
+    return;
+  }
+
+  isLoading.value = true;
+  const success = await proposalStore.rejectProposal(proposal.value.id, rejectReason.value);
+  isLoading.value = false;
+
+  if (success) {
+    toast.success('Solicitação recusada');
+    showRejectDialog.value = false;
+    proposal.value = proposalStore.getProposalById(proposal.value.id) || null;
+  } else {
+    toast.error('Erro ao recusar solicitação');
+  }
+};
+
+const handleCompleteProposal = async () => {
+  if (!proposal.value) return;
+
+  isLoading.value = true;
+  const success = await proposalStore.completeProposal(proposal.value.id);
+  isLoading.value = false;
+
+  if (success) {
+    toast.success('Serviço marcado como concluído!');
+    showCompleteDialog.value = false;
+    proposal.value = proposalStore.getProposalById(proposal.value.id) || null;
+  } else {
+    toast.error('Erro ao marcar como concluído');
+  }
+};
+
+const handleUpdateMilestoneStatus = async (milestoneId: string, status: 'pending' | 'in_progress' | 'completed') => {
+  if (!proposal.value) return;
+
+  const success = await proposalStore.updateMilestoneStatus(proposal.value.id, milestoneId, status);
+  
+  if (success) {
+    toast.success('Marco atualizado');
+    proposal.value = proposalStore.getProposalById(proposal.value.id) || null;
+  } else {
+    toast.error('Erro ao atualizar marco');
+  }
 };
 
 const handleMessageAttachmentChange = (e: Event) => {
@@ -380,305 +413,478 @@ const getUrgencyVariant = (urgency: string) => {
   if (urgency === 'Média') return 'default';
   return 'secondary';
 };
+
+const getStatusBadge = (status: string) => {
+  const badges: Record<string, { class: string; label: string; icon: any }> = {
+    pending: { class: 'bg-blue-100 text-blue-700', label: 'Pendente', icon: Clock },
+    negotiating: { class: 'bg-purple-100 text-purple-700', label: 'Negociando', icon: MessageSquare },
+    accepted: { class: 'bg-green-100 text-green-700', label: 'Aceita', icon: CheckCircle },
+    rejected: { class: 'bg-red-100 text-red-700', label: 'Recusada', icon: XCircle },
+    completed: { class: 'bg-green-100 text-green-700', label: 'Concluída', icon: CheckCircle },
+    archived: { class: 'bg-gray-100 text-gray-700', label: 'Arquivada', icon: FileText },
+  };
+  return badges[status] || badges.pending;
+};
 </script>
 
 <template>
   <div class="max-w-7xl mx-auto space-y-6">
-    <!-- Header -->
-    <div class="flex items-center justify-between">
-      <div class="flex items-center gap-4">
-        <Button
-          @click="props.onNavigate('freelancer-proposals')"
-          variant="ghost"
-          size="icon"
-        >
-          <ArrowLeft class="h-5 w-5" />
-        </Button>
-        <div>
-          <h1 class="text-[#263238] mb-1">{{ request.serviceTitle }}</h1>
-          <div class="flex items-center gap-3 text-sm text-[#435574]">
-            <Badge variant="secondary">{{ request.category }}</Badge>
-            <span class="flex items-center gap-1">
-              <Calendar class="h-4 w-4" />
-              Criado em {{ new Date(request.createdAt).toLocaleDateString('pt-BR') }}
-            </span>
-          </div>
-        </div>
-      </div>
-      <Button
-        @click="showSendProposalDialog = true"
-        class="bg-[#286AD8] hover:bg-[#435574]"
-      >
-        <Send class="h-4 w-4 mr-2" />
-        Enviar Proposta
+    <!-- Not Found State -->
+    <Card v-if="!proposal" class="p-12 text-center">
+      <AlertCircle class="h-12 w-12 text-gray-400 mx-auto mb-4" />
+      <h3 class="text-lg font-semibold text-[#263238] mb-2">Solicitação não encontrada</h3>
+      <p class="text-[#435574] mb-6">A solicitação que você está procurando não existe ou foi removida.</p>
+      <Button @click="props.onNavigate('freelancer-proposals')" class="bg-[#286AD8] hover:bg-[#435574]">
+        <ArrowLeft class="h-4 w-4 mr-2" />
+        Voltar para Solicitações
       </Button>
-    </div>
+    </Card>
 
-    <!-- Client Info -->
-    <Card class="p-6">
+    <template v-else>
+      <!-- Header -->
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-4">
-          <img
-            :src="request.client.avatar"
-            :alt="request.client.name"
-            class="w-16 h-16 rounded-full"
-          />
+          <Button
+            @click="props.onNavigate('freelancer-proposals')"
+            variant="ghost"
+            size="icon"
+          >
+            <ArrowLeft class="h-5 w-5" />
+          </Button>
           <div>
-            <h3 class="text-[#263238] mb-1">{{ request.client.name }}</h3>
-            <div class="flex items-center gap-4 text-sm text-[#435574]">
+            <div class="flex items-center gap-3 mb-1">
+              <h1 class="text-2xl font-bold text-[#263238]">{{ proposal.service }}</h1>
+              <Badge :class="`${getStatusBadge(proposal.status).class} hover:${getStatusBadge(proposal.status).class}`">
+                <component :is="getStatusBadge(proposal.status).icon" class="h-3 w-3 mr-1" />
+                {{ getStatusBadge(proposal.status).label }}
+              </Badge>
+            </div>
+            <div class="flex items-center gap-3 text-sm text-[#435574]">
+              <Badge variant="secondary">{{ proposal.category }}</Badge>
               <span class="flex items-center gap-1">
-                <MapPin class="h-4 w-4" />
-                {{ request.client.location }}
+                <Calendar class="h-4 w-4" />
+                Recebido em {{ new Date(proposal.receivedAt).toLocaleDateString('pt-BR') }}
               </span>
             </div>
           </div>
         </div>
-        <Button variant="outline" @click="activeTab = 'messages'">
-          <MessageSquare class="h-4 w-4 mr-2" />
-          Enviar Mensagem
-        </Button>
+        <div class="flex items-center gap-2">
+          <Button
+            v-if="proposal.status === 'pending'"
+            @click="handleOpenRejectDialog"
+            variant="outline"
+            class="text-red-600 border-red-200 hover:bg-red-50"
+          >
+            <XCircle class="h-4 w-4 mr-2" />
+            Recusar
+          </Button>
+          <Button
+            v-if="proposal.status === 'pending' || proposal.status === 'negotiating'"
+            @click="showSendProposalDialog = true"
+            class="bg-[#286AD8] hover:bg-[#435574]"
+          >
+            <Send class="h-4 w-4 mr-2" />
+            {{ proposal.freelancerResponse ? 'Atualizar Proposta' : 'Enviar Proposta' }}
+          </Button>
+          <Button
+            v-if="proposal.status === 'accepted'"
+            @click="showCompleteDialog = true"
+            class="bg-green-600 hover:bg-green-700"
+          >
+            <CheckCircle class="h-4 w-4 mr-2" />
+            Marcar Concluído
+          </Button>
+        </div>
       </div>
-    </Card>
 
-    <!-- Tabs -->
-    <Tabs :model-value="activeTab" @update:model-value="(val) => activeTab = val as string">
-      <TabsList class="grid w-full grid-cols-4">
-        <TabsTrigger value="details">Detalhes</TabsTrigger>
-        <TabsTrigger value="messages">
-          Mensagens
-          <Badge v-if="clientMessagesCount > 0" class="ml-2 bg-red-500">
-            {{ clientMessagesCount }}
-          </Badge>
-        </TabsTrigger>
-        <TabsTrigger value="attachments">
-          Anexos ({{ request.attachments.length }})
-        </TabsTrigger>
-        <TabsTrigger value="history">Histórico</TabsTrigger>
-      </TabsList>
-
-      <!-- Details Tab -->
-      <TabsContent value="details" class="space-y-6">
-        <!-- Request Info -->
-        <Card class="p-6">
-          <h3 class="text-[#263238] mb-4">Informações da Solicitação</h3>
-
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <!-- Client Info -->
+      <Card class="p-6">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-4">
+            <Avatar class="h-16 w-16">
+              <AvatarImage :src="proposal.clientAvatar" :alt="proposal.clientName" />
+              <AvatarFallback class="bg-[#286AD8] text-white text-lg">
+                {{ getInitials(proposal.clientName) }}
+              </AvatarFallback>
+            </Avatar>
             <div>
-              <Label class="text-sm text-[#435574]">Data Desejada</Label>
-              <p class="text-[#263238] mt-1">
-                {{ new Date(request.desiredDate).toLocaleDateString('pt-BR') }}
-              </p>
-            </div>
-            <div>
-              <Label class="text-sm text-[#435574]">Orçamento Estimado</Label>
-              <p class="text-[#263238] mt-1">{{ request.budget }}</p>
-            </div>
-            <div>
-              <Label class="text-sm text-[#435574]">Urgência</Label>
-              <p class="text-[#263238] mt-1">
-                <Badge :variant="getUrgencyVariant(request.urgency)">
-                  {{ request.urgency }}
-                </Badge>
-              </p>
+              <h3 class="text-lg font-semibold text-[#263238] mb-1">{{ proposal.clientName }}</h3>
+              <div class="flex items-center gap-4 text-sm text-[#435574]">
+                <span class="flex items-center gap-1">
+                  <MapPin class="h-4 w-4" />
+                  {{ proposal.clientLocation }}
+                </span>
+                <span v-if="proposal.clientEmail" class="flex items-center gap-1">
+                  <Mail class="h-4 w-4" />
+                  {{ proposal.clientEmail }}
+                </span>
+                <span v-if="proposal.clientPhone" class="flex items-center gap-1">
+                  <Phone class="h-4 w-4" />
+                  {{ proposal.clientPhone }}
+                </span>
+              </div>
             </div>
           </div>
+          <Button variant="outline" @click="activeTab = 'messages'">
+            <MessageSquare class="h-4 w-4 mr-2" />
+            Enviar Mensagem
+          </Button>
+        </div>
+      </Card>
 
-          <div class="mb-6">
-            <Label class="text-sm text-[#435574]">Endereço do Serviço</Label>
-            <p class="text-[#263238] mt-1 flex items-start gap-2">
-              <MapPin class="h-4 w-4 mt-1 flex-shrink-0" />
-              {{ request.address }}
+      <!-- My Proposal (if sent) -->
+      <Card v-if="proposal.freelancerResponse" class="p-6 border-l-4 border-l-[#286AD8]">
+        <h3 class="text-lg font-semibold text-[#263238] mb-4">Sua Proposta Enviada</h3>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+          <div>
+            <p class="text-sm text-[#435574]">Valor Proposto</p>
+            <p class="text-xl font-bold text-green-600">
+              {{ formatCurrency(proposal.freelancerResponse.value) }}
             </p>
           </div>
-
           <div>
-            <Label class="text-sm text-[#435574] mb-2 block">
-              Descrição Detalhada
-            </Label>
-            <div class="bg-gray-50 rounded-lg p-4 whitespace-pre-wrap text-[#263238]">
-              {{ request.description }}
-            </div>
+            <p class="text-sm text-[#435574]">Prazo de Execução</p>
+            <p class="text-xl font-bold text-[#263238]">
+              {{ proposal.freelancerResponse.executionDays }} dias
+            </p>
           </div>
-        </Card>
-      </TabsContent>
-
-      <!-- Messages Tab -->
-      <TabsContent value="messages" class="space-y-4">
-        <Card class="p-6">
-          <div class="space-y-4 mb-6 max-h-[500px] overflow-y-auto">
-            <div
-              v-for="msg in messages"
-              :key="msg.id"
-              :class="`flex gap-3 ${msg.sender === 'freelancer' ? 'flex-row-reverse' : ''}`"
+          <div>
+            <p class="text-sm text-[#435574]">Enviada em</p>
+            <p class="text-[#263238]">
+              {{ new Date(proposal.freelancerResponse.sentAt).toLocaleDateString('pt-BR', {
+                day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
+              }) }}
+            </p>
+          </div>
+        </div>
+        <div class="mb-4">
+          <p class="text-sm text-[#435574] mb-1">Escopo do Trabalho</p>
+          <p class="text-[#263238] whitespace-pre-wrap">{{ proposal.freelancerResponse.scope }}</p>
+        </div>
+        <div v-if="proposal.freelancerResponse.notes">
+          <p class="text-sm text-[#435574] mb-1">Observações</p>
+          <p class="text-[#263238]">{{ proposal.freelancerResponse.notes }}</p>
+        </div>
+        
+        <!-- Milestones -->
+        <div v-if="proposal.freelancerResponse.milestones && proposal.freelancerResponse.milestones.length > 0" class="mt-6">
+          <h4 class="font-semibold text-[#263238] mb-3">Marcos de Entrega</h4>
+          <div class="space-y-3">
+            <Card
+              v-for="milestone in proposal.freelancerResponse.milestones"
+              :key="milestone.id"
+              class="p-4 bg-gray-50"
             >
-              <div :class="`flex-1 ${msg.sender === 'freelancer' ? 'text-right' : ''}`">
-                <div
-                  :class="`inline-block max-w-[70%] ${
-                    msg.sender === 'freelancer'
-                      ? 'bg-[#286AD8] text-white'
-                      : 'bg-gray-100 text-[#263238]'
-                  } rounded-lg p-4`"
-                >
-                  <p class="mb-1">{{ msg.message }}</p>
-                  <div v-if="msg.attachments && msg.attachments.length > 0" class="mt-3 space-y-2">
-                    <div
-                      v-for="att in msg.attachments"
-                      :key="att.id"
-                      :class="`flex items-center gap-2 p-2 rounded ${
-                        msg.sender === 'freelancer' ? 'bg-[#435574]' : 'bg-white'
-                      }`"
+              <div class="flex items-start justify-between">
+                <div class="flex-1">
+                  <div class="flex items-center gap-2 mb-1">
+                    <MilestoneIcon class="h-4 w-4 text-[#286AD8]" />
+                    <h5 class="font-medium text-[#263238]">{{ milestone.title }}</h5>
+                    <Badge
+                      :class="
+                        milestone.status === 'completed' ? 'bg-green-100 text-green-700' :
+                        milestone.status === 'in_progress' ? 'bg-blue-100 text-blue-700' :
+                        'bg-gray-100 text-gray-700'
+                      "
                     >
-                      <Paperclip class="h-4 w-4" />
-                      <span class="text-sm flex-1">{{ att.name }}</span>
-                      <span class="text-xs opacity-70">{{ att.size }}</span>
-                    </div>
+                      {{ milestone.status === 'completed' ? 'Concluído' :
+                         milestone.status === 'in_progress' ? 'Em andamento' : 'Pendente' }}
+                    </Badge>
+                  </div>
+                  <p v-if="milestone.description" class="text-sm text-[#435574] mb-2">
+                    {{ milestone.description }}
+                  </p>
+                  <div class="flex items-center gap-4 text-sm text-[#435574]">
+                    <span class="flex items-center gap-1">
+                      <Calendar class="h-4 w-4" />
+                      {{ new Date(milestone.deadline).toLocaleDateString('pt-BR') }}
+                    </span>
+                    <span class="flex items-center gap-1">
+                      <DollarSign class="h-4 w-4" />
+                      {{ formatCurrency(milestone.value) }}
+                    </span>
                   </div>
                 </div>
-                <p class="text-xs text-[#435574] mt-1">
-                  {{ msg.senderName }} •
-                  {{ new Date(msg.timestamp).toLocaleString('pt-BR', {
-                    day: '2-digit',
-                    month: '2-digit',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  }) }}
+                <div v-if="proposal.status === 'accepted'" class="flex gap-2">
+                  <Button
+                    v-if="milestone.status === 'pending'"
+                    @click="handleUpdateMilestoneStatus(milestone.id, 'in_progress')"
+                    size="sm"
+                    variant="outline"
+                  >
+                    <Play class="h-3 w-3 mr-1" />
+                    Iniciar
+                  </Button>
+                  <Button
+                    v-if="milestone.status === 'in_progress'"
+                    @click="handleUpdateMilestoneStatus(milestone.id, 'completed')"
+                    size="sm"
+                    class="bg-green-600 hover:bg-green-700"
+                  >
+                    <Check class="h-3 w-3 mr-1" />
+                    Concluir
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          </div>
+        </div>
+      </Card>
+
+      <!-- Tabs -->
+      <Tabs :model-value="activeTab" @update:model-value="(val: string) => activeTab = val">
+        <TabsList class="grid w-full grid-cols-4">
+          <TabsTrigger value="details">Detalhes</TabsTrigger>
+          <TabsTrigger value="messages">
+            Mensagens
+            <Badge v-if="clientMessagesCount > 0" class="ml-2 bg-red-500 text-white">
+              {{ clientMessagesCount }}
+            </Badge>
+          </TabsTrigger>
+          <TabsTrigger value="attachments">
+            Anexos ({{ proposal.attachments?.length || 0 }})
+          </TabsTrigger>
+          <TabsTrigger value="history">Histórico</TabsTrigger>
+        </TabsList>
+
+        <!-- Details Tab -->
+        <TabsContent value="details" class="space-y-6">
+          <Card class="p-6">
+            <h3 class="text-lg font-semibold text-[#263238] mb-4">Informações da Solicitação</h3>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              <div>
+                <Label class="text-sm text-[#435574]">Data Desejada</Label>
+                <p class="text-[#263238] mt-1">
+                  {{ proposal.desiredDate ? new Date(proposal.desiredDate).toLocaleDateString('pt-BR') : 'Não informada' }}
+                </p>
+              </div>
+              <div>
+                <Label class="text-sm text-[#435574]">Orçamento Estimado</Label>
+                <p class="text-[#263238] mt-1 font-semibold">{{ formatCurrency(proposal.budget) }}</p>
+              </div>
+              <div>
+                <Label class="text-sm text-[#435574]">Urgência</Label>
+                <p class="text-[#263238] mt-1">
+                  <Badge :variant="getUrgencyVariant(proposal.urgency || 'Média')">
+                    {{ proposal.urgency || 'Média' }}
+                  </Badge>
                 </p>
               </div>
             </div>
-          </div>
 
-          <!-- Message Input -->
-          <div class="space-y-3 border-t pt-4">
-            <div v-if="messageAttachments.length > 0" class="flex flex-wrap gap-2">
-              <Badge
-                v-for="(file, idx) in messageAttachments"
-                :key="idx"
-                variant="secondary"
-                class="pl-3 pr-1"
-              >
-                {{ file.name }}
-                <button
-                  @click="messageAttachments = messageAttachments.filter((_, i) => i !== idx)"
-                  class="ml-2 hover:bg-gray-300 rounded-full p-0.5"
-                >
-                  <X class="h-3 w-3" />
-                </button>
-              </Badge>
+            <div v-if="proposal.address" class="mb-6">
+              <Label class="text-sm text-[#435574]">Endereço do Serviço</Label>
+              <p class="text-[#263238] mt-1 flex items-start gap-2">
+                <MapPin class="h-4 w-4 mt-1 flex-shrink-0" />
+                {{ proposal.address }}
+              </p>
             </div>
 
-            <div class="flex gap-2">
-              <Textarea
-                :model-value="newMessage"
-                @update:model-value="(val) => newMessage = val as string"
-                placeholder="Digite sua mensagem..."
-                :rows="3"
-                class="flex-1"
-              />
-            </div>
-
-            <div class="flex gap-2">
-              <input
-                type="file"
-                multiple
-                id="message-attachment"
-                class="hidden"
-                @change="handleMessageAttachmentChange"
-              />
-              <Button
-                @click="document.getElementById('message-attachment')?.click()"
-                variant="outline"
-              >
-                <Paperclip class="h-4 w-4 mr-2" />
-                Anexar
-              </Button>
-              <Button
-                @click="handleSendMessage"
-                class="bg-[#286AD8] hover:bg-[#435574] flex-1"
-              >
-                <Send class="h-4 w-4 mr-2" />
-                Enviar Mensagem
-              </Button>
-            </div>
-          </div>
-        </Card>
-      </TabsContent>
-
-      <!-- Attachments Tab -->
-      <TabsContent value="attachments" class="space-y-4">
-        <Card class="p-6">
-          <h3 class="text-[#263238] mb-4">Anexos do Cliente</h3>
-          <div class="space-y-3">
-            <div
-              v-for="att in request.attachments"
-              :key="att.id"
-              class="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
-            >
-              <div class="flex items-center gap-3">
-                <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                  <FileText class="h-5 w-5 text-blue-600" />
-                </div>
-                <div>
-                  <p class="text-[#263238]">{{ att.name }}</p>
-                  <p class="text-sm text-[#435574]">{{ att.size }}</p>
-                </div>
-              </div>
-              <div class="flex gap-2">
-                <Button size="sm" variant="outline">
-                  <Eye class="h-4 w-4 mr-2" />
-                  Visualizar
-                </Button>
-                <Button size="sm" variant="outline">
-                  <Download class="h-4 w-4 mr-2" />
-                  Baixar
-                </Button>
+            <div>
+              <Label class="text-sm text-[#435574] mb-2 block">Descrição Detalhada</Label>
+              <div class="bg-gray-50 rounded-lg p-4 whitespace-pre-wrap text-[#263238]">
+                {{ proposal.description }}
               </div>
             </div>
-          </div>
-        </Card>
-      </TabsContent>
+          </Card>
+        </TabsContent>
 
-      <!-- History Tab -->
-      <TabsContent value="history" class="space-y-4">
-        <Card class="p-6">
-          <h3 class="text-[#263238] mb-4">Histórico de Ações</h3>
-          <div class="space-y-4">
-            <div v-for="(log, index) in auditLog" :key="log.id" class="flex gap-4">
-              <div class="flex flex-col items-center">
-                <div class="w-3 h-3 bg-[#286AD8] rounded-full" />
-                <div
-                  v-if="index < auditLog.length - 1"
-                  class="w-0.5 h-full bg-gray-300 my-1"
-                />
+        <!-- Messages Tab -->
+        <TabsContent value="messages" class="space-y-4">
+          <Card class="p-6">
+            <div class="space-y-4 mb-6 max-h-[500px] overflow-y-auto">
+              <div v-if="!proposal.messages || proposal.messages.length === 0" class="text-center py-8">
+                <MessageSquare class="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                <p class="text-[#435574]">Nenhuma mensagem ainda</p>
               </div>
-              <div class="flex-1 pb-6">
-                <div class="flex items-start justify-between mb-1">
-                  <p class="text-[#263238]">{{ log.action }}</p>
-                  <span class="text-xs text-[#435574]">
-                    {{ new Date(log.timestamp).toLocaleString('pt-BR', {
+              <div
+                v-for="msg in proposal.messages"
+                :key="msg.id"
+                :class="`flex gap-3 ${msg.sender === 'freelancer' ? 'flex-row-reverse' : ''}`"
+              >
+                <Avatar class="h-8 w-8 flex-shrink-0">
+                  <AvatarFallback :class="msg.sender === 'freelancer' ? 'bg-[#286AD8] text-white' : 'bg-gray-300'">
+                    {{ getInitials(msg.senderName) }}
+                  </AvatarFallback>
+                </Avatar>
+                <div :class="`flex-1 ${msg.sender === 'freelancer' ? 'text-right' : ''}`">
+                  <div
+                    :class="`inline-block max-w-[70%] ${
+                      msg.sender === 'freelancer'
+                        ? 'bg-[#286AD8] text-white'
+                        : 'bg-gray-100 text-[#263238]'
+                    } rounded-lg p-4`"
+                  >
+                    <p class="mb-1">{{ msg.message }}</p>
+                    <div v-if="msg.attachments && msg.attachments.length > 0" class="mt-3 space-y-2">
+                      <div
+                        v-for="att in msg.attachments"
+                        :key="att.id"
+                        :class="`flex items-center gap-2 p-2 rounded ${
+                          msg.sender === 'freelancer' ? 'bg-[#435574]' : 'bg-white'
+                        }`"
+                      >
+                        <Paperclip class="h-4 w-4" />
+                        <span class="text-sm flex-1">{{ att.name }}</span>
+                        <span class="text-xs opacity-70">{{ att.size }}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <p class="text-xs text-[#435574] mt-1">
+                    {{ msg.senderName }} •
+                    {{ new Date(msg.timestamp).toLocaleString('pt-BR', {
                       day: '2-digit',
                       month: '2-digit',
-                      year: 'numeric',
                       hour: '2-digit',
                       minute: '2-digit',
                     }) }}
-                  </span>
+                  </p>
                 </div>
-                <p class="text-sm text-[#435574]">{{ log.user }}</p>
-                <p v-if="log.details" class="text-sm text-[#435574] mt-1">
-                  {{ log.details }}
-                </p>
               </div>
             </div>
-          </div>
-        </Card>
-      </TabsContent>
-    </Tabs>
+
+            <!-- Message Input -->
+            <div class="space-y-3 border-t pt-4">
+              <div v-if="messageAttachments.length > 0" class="flex flex-wrap gap-2">
+                <Badge
+                  v-for="(file, idx) in messageAttachments"
+                  :key="idx"
+                  variant="secondary"
+                  class="pl-3 pr-1"
+                >
+                  {{ file.name }}
+                  <button
+                    @click="messageAttachments = messageAttachments.filter((_, i) => i !== idx)"
+                    class="ml-2 hover:bg-gray-300 rounded-full p-0.5"
+                  >
+                    <X class="h-3 w-3" />
+                  </button>
+                </Badge>
+              </div>
+
+              <div class="flex gap-2">
+                <Textarea
+                  :model-value="newMessage"
+                  @update:model-value="(val) => newMessage = val as string"
+                  placeholder="Digite sua mensagem..."
+                  :rows="3"
+                  class="flex-1"
+                />
+              </div>
+
+              <div class="flex gap-2">
+                <input
+                  ref="messageAttachmentInput"
+                  type="file"
+                  multiple
+                  class="hidden"
+                  @change="handleMessageAttachmentChange"
+                />
+                <Button
+                  @click="messageAttachmentInput?.click()"
+                  variant="outline"
+                >
+                  <Paperclip class="h-4 w-4 mr-2" />
+                  Anexar
+                </Button>
+                <Button
+                  @click="handleSendMessage"
+                  class="bg-[#286AD8] hover:bg-[#435574] flex-1"
+                >
+                  <Send class="h-4 w-4 mr-2" />
+                  Enviar Mensagem
+                </Button>
+              </div>
+            </div>
+          </Card>
+        </TabsContent>
+
+        <!-- Attachments Tab -->
+        <TabsContent value="attachments" class="space-y-4">
+          <Card class="p-6">
+            <h3 class="text-lg font-semibold text-[#263238] mb-4">Anexos do Cliente</h3>
+            <div v-if="!proposal.attachments || proposal.attachments.length === 0" class="text-center py-8">
+              <FileText class="h-12 w-12 text-gray-300 mx-auto mb-3" />
+              <p class="text-[#435574]">Nenhum anexo enviado pelo cliente</p>
+            </div>
+            <div v-else class="space-y-3">
+              <div
+                v-for="att in proposal.attachments"
+                :key="att.id"
+                class="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+              >
+                <div class="flex items-center gap-3">
+                  <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                    <FileText class="h-5 w-5 text-blue-600" />
+                  </div>
+                  <div>
+                    <p class="font-medium text-[#263238]">{{ att.name }}</p>
+                    <p class="text-sm text-[#435574]">{{ att.size }}</p>
+                  </div>
+                </div>
+                <div class="flex gap-2">
+                  <Button size="sm" variant="outline">
+                    <Eye class="h-4 w-4 mr-2" />
+                    Visualizar
+                  </Button>
+                  <Button size="sm" variant="outline">
+                    <Download class="h-4 w-4 mr-2" />
+                    Baixar
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </Card>
+        </TabsContent>
+
+        <!-- History Tab -->
+        <TabsContent value="history" class="space-y-4">
+          <Card class="p-6">
+            <h3 class="text-lg font-semibold text-[#263238] mb-4">Histórico de Ações</h3>
+            <div v-if="!proposal.auditLog || proposal.auditLog.length === 0" class="text-center py-8">
+              <Clock class="h-12 w-12 text-gray-300 mx-auto mb-3" />
+              <p class="text-[#435574]">Nenhuma ação registrada</p>
+            </div>
+            <div v-else class="space-y-4">
+              <div v-for="(log, index) in proposal.auditLog" :key="log.id" class="flex gap-4">
+                <div class="flex flex-col items-center">
+                  <div class="w-3 h-3 bg-[#286AD8] rounded-full" />
+                  <div
+                    v-if="index < proposal.auditLog.length - 1"
+                    class="w-0.5 h-full bg-gray-300 my-1"
+                  />
+                </div>
+                <div class="flex-1 pb-6">
+                  <div class="flex items-start justify-between mb-1">
+                    <p class="font-medium text-[#263238]">{{ log.action }}</p>
+                    <span class="text-xs text-[#435574]">
+                      {{ new Date(log.timestamp).toLocaleString('pt-BR', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      }) }}
+                    </span>
+                  </div>
+                  <p class="text-sm text-[#435574]">{{ log.user }}</p>
+                  <p v-if="log.details" class="text-sm text-[#435574] mt-1">
+                    {{ log.details }}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </template>
 
     <!-- Send Proposal Dialog -->
     <Dialog :open="showSendProposalDialog" @update:open="(val) => showSendProposalDialog = val">
       <DialogContent class="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Enviar Proposta</DialogTitle>
+          <DialogTitle>{{ proposal?.freelancerResponse ? 'Atualizar Proposta' : 'Enviar Proposta' }}</DialogTitle>
           <DialogDescription>
             Preencha os detalhes da sua proposta para este serviço
           </DialogDescription>
@@ -784,8 +990,8 @@ const getUrgencyVariant = (urgency: string) => {
                 <div class="flex items-start justify-between">
                   <div class="flex-1">
                     <div class="flex items-center gap-2 mb-1">
-                      <Milestone class="h-4 w-4 text-[#286AD8]" />
-                      <h4 class="text-[#263238]">
+                      <MilestoneIcon class="h-4 w-4 text-[#286AD8]" />
+                      <h4 class="font-medium text-[#263238]">
                         {{ index + 1 }}. {{ milestone.title }}
                       </h4>
                     </div>
@@ -799,7 +1005,7 @@ const getUrgencyVariant = (urgency: string) => {
                       </span>
                       <span class="flex items-center gap-1">
                         <DollarSign class="h-4 w-4" />
-                        {{ milestone.value }}
+                        {{ formatCurrency(milestone.value) }}
                       </span>
                     </div>
                   </div>
@@ -840,15 +1046,15 @@ const getUrgencyVariant = (urgency: string) => {
                 PDF, JPG, PNG, DOC até 10MB cada
               </p>
               <input
+                ref="proposalAttachmentInput"
                 type="file"
                 multiple
                 accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
                 @change="handleAttachmentUpload"
                 class="hidden"
-                id="proposal-attachment"
               />
               <Button
-                @click="document.getElementById('proposal-attachment')?.click()"
+                @click="proposalAttachmentInput?.click()"
                 size="sm"
                 variant="outline"
               >
@@ -913,16 +1119,72 @@ const getUrgencyVariant = (urgency: string) => {
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Revisar</AlertDialogCancel>
+          <AlertDialogCancel @click="showConfirmDialog = false">Revisar</AlertDialogCancel>
           <AlertDialogAction
             @click="handleConfirmSendProposal"
             class="bg-[#286AD8] hover:bg-[#435574]"
+            :disabled="isLoading"
           >
-            Confirmar Envio
+            {{ isLoading ? 'Enviando...' : 'Confirmar Envio' }}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+
+    <!-- Reject Dialog -->
+    <Dialog :open="showRejectDialog" @update:open="(val) => showRejectDialog = val">
+      <DialogContent class="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Recusar Solicitação</DialogTitle>
+          <DialogDescription>
+            Informe o motivo da recusa para "{{ proposal?.service }}"
+          </DialogDescription>
+        </DialogHeader>
+        <div class="space-y-4">
+          <div class="space-y-2">
+            <Label for="reject-reason">Motivo da recusa *</Label>
+            <Textarea
+              id="reject-reason"
+              :model-value="rejectReason"
+              @update:model-value="(val) => rejectReason = val as string"
+              placeholder="Ex: Não trabalho com esse tipo de serviço, agenda indisponível, etc."
+              :rows="4"
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button @click="showRejectDialog = false" variant="outline">
+            Cancelar
+          </Button>
+          <Button @click="handleRejectProposal" class="bg-red-600 hover:bg-red-700" :disabled="isLoading">
+            {{ isLoading ? 'Recusando...' : 'Confirmar Recusa' }}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    <!-- Complete Dialog -->
+    <AlertDialog :open="showCompleteDialog" @update:open="(val) => showCompleteDialog = val">
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Marcar como Concluído</AlertDialogTitle>
+          <AlertDialogDescription>
+            Tem certeza que deseja marcar o serviço "{{ proposal?.service }}" como concluído?
+            <br /><br />
+            Esta ação indica que o trabalho foi finalizado com sucesso.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel @click="showCompleteDialog = false">Cancelar</AlertDialogCancel>
+          <AlertDialogAction
+            @click="handleCompleteProposal"
+            class="bg-green-600 hover:bg-green-700"
+            :disabled="isLoading"
+          >
+            {{ isLoading ? 'Processando...' : 'Confirmar Conclusão' }}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
   </div>
 </template>
-

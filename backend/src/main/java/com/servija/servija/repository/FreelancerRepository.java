@@ -26,6 +26,10 @@ public interface FreelancerRepository extends JpaRepository<Freelancer, Long> {
     // Buscar freelancer por ID com serviceCities carregados
     @Query("SELECT f FROM Freelancer f LEFT JOIN FETCH f.serviceCities WHERE f.id = :id")
     java.util.Optional<Freelancer> findByIdWithServiceCities(@Param("id") Long id);
+    
+    // Buscar freelancer por ID com professionalLinks carregados
+    @Query("SELECT f FROM Freelancer f LEFT JOIN FETCH f.professionalLinks WHERE f.id = :id")
+    java.util.Optional<Freelancer> findByIdWithProfessionalLinks(@Param("id") Long id);
 }
 
 

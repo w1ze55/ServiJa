@@ -1,9 +1,8 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import {
   FileText,
   Search,
-  Filter,
   Clock,
   DollarSign,
   MapPin,
@@ -14,6 +13,9 @@ import {
   XCircle,
   Archive,
   AlertCircle,
+  Trash2,
+  MoreVertical,
+  RefreshCw,
 } from 'lucide-vue-next';
 import Button from '../ui/button.vue';
 import Input from '../ui/input.vue';
@@ -31,29 +33,36 @@ import Tabs from '../ui/tabs.vue';
 import TabsContent from '../ui/tabs-content.vue';
 import TabsList from '../ui/tabs-list.vue';
 import TabsTrigger from '../ui/tabs-trigger.vue';
-
-interface Proposal {
-  id: string;
-  clientName: string;
-  clientAvatar?: string;
-  clientLocation: string;
-  service: string;
-  category: string;
-  description: string;
-  budget: number;
-  deadline: string;
-  priority: 'low' | 'medium' | 'high';
-  status: 'pending' | 'negotiating' | 'accepted' | 'rejected' | 'completed' | 'archived';
-  receivedAt: string;
-  attachments?: number;
-  viewed: boolean;
-}
+import DropdownMenu from '../ui/dropdown-menu.vue';
+import DropdownMenuContent from '../ui/dropdown-menu-content.vue';
+import DropdownMenuItem from '../ui/dropdown-menu-item.vue';
+import DropdownMenuSeparator from '../ui/dropdown-menu-separator.vue';
+import DropdownMenuTrigger from '../ui/dropdown-menu-trigger.vue';
+import AlertDialog from '../ui/alert-dialog.vue';
+import AlertDialogAction from '../ui/alert-dialog-action.vue';
+import AlertDialogCancel from '../ui/alert-dialog-cancel.vue';
+import AlertDialogContent from '../ui/alert-dialog-content.vue';
+import AlertDialogDescription from '../ui/alert-dialog-description.vue';
+import AlertDialogFooter from '../ui/alert-dialog-footer.vue';
+import AlertDialogHeader from '../ui/alert-dialog-header.vue';
+import AlertDialogTitle from '../ui/alert-dialog-title.vue';
+import Dialog from '../ui/dialog.vue';
+import DialogContent from '../ui/dialog-content.vue';
+import DialogDescription from '../ui/dialog-description.vue';
+import DialogFooter from '../ui/dialog-footer.vue';
+import DialogHeader from '../ui/dialog-header.vue';
+import DialogTitle from '../ui/dialog-title.vue';
+import Textarea from '../ui/textarea.vue';
+import Label from '../ui/label.vue';
+import { useProposalStore, type Proposal } from '@/stores/proposalStore';
+import { toast } from '@/utils/toast';
 
 interface Props {
   onNavigate: (page: string, params?: any) => void;
 }
 
 const props = defineProps<Props>();
+const proposalStore = useProposalStore();
 
 const searchQuery = ref('');
 const categoryFilter = ref('all');
@@ -62,115 +71,19 @@ const currentTab = ref('pending');
 const currentPage = ref(1);
 const itemsPerPage = 6;
 
-// Mock data
-const proposals = ref<Proposal[]>([
-  {
-    id: '1',
-    clientName: 'Maria Silva',
-    clientAvatar: undefined,
-    clientLocation: 'São Paulo, SP',
-    service: 'Instalação Elétrica Residencial',
-    category: 'Eletricista',
-    description:
-      'Preciso de instalação completa do sistema elétrico em um apartamento de 80m². Inclui pontos de luz, tomadas e quadro de distribuição.',
-    budget: 2500,
-    deadline: '15 dias',
-    priority: 'high',
-    status: 'pending',
-    receivedAt: '2026-11-10 14:30',
-    attachments: 3,
-    viewed: false,
-  },
-  {
-    id: '2',
-    clientName: 'Carlos Mendes',
-    clientAvatar: undefined,
-    clientLocation: 'Guarulhos, SP',
-    service: 'Manutenção Preventiva',
-    category: 'Eletricista',
-    description:
-      'Necessito de revisão completa do sistema elétrico de uma casa com 150m². Verificação de disjuntores e fiação.',
-    budget: 800,
-    deadline: '7 dias',
-    priority: 'medium',
-    status: 'pending',
-    receivedAt: '2026-11-10 10:15',
-    attachments: 1,
-    viewed: true,
-  },
-  {
-    id: '3',
-    clientName: 'Ana Costa',
-    clientAvatar: undefined,
-    clientLocation: 'Osasco, SP',
-    service: 'Automação Residencial',
-    category: 'Eletricista',
-    description:
-      'Instalação de sistema de automação residencial completo, incluindo iluminação inteligente, controle de temperatura e segurança.',
-    budget: 5000,
-    deadline: '30 dias',
-    priority: 'medium',
-    status: 'negotiating',
-    receivedAt: '2026-11-09 16:45',
-    attachments: 5,
-    viewed: true,
-  },
-  {
-    id: '4',
-    clientName: 'Roberto Lima',
-    clientAvatar: undefined,
-    clientLocation: 'São Paulo, SP',
-    service: 'Reparo de Circuitos',
-    category: 'Eletricista',
-    description: 'Preciso de reparo urgente em curto-circuito. Disjuntor caindo constantemente.',
-    budget: 350,
-    deadline: '2 dias',
-    priority: 'high',
-    status: 'accepted',
-    receivedAt: '2026-11-08 09:00',
-    attachments: 0,
-    viewed: true,
-  },
-  {
-    id: '5',
-    clientName: 'Julia Fernandes',
-    clientAvatar: undefined,
-    clientLocation: 'Campinas, SP',
-    service: 'Instalação de Painéis Solares',
-    category: 'Eletricista',
-    description:
-      'Instalação de sistema de energia solar fotovoltaica residencial. Casa de 120m² com consumo médio de 450kWh/mês.',
-    budget: 18000,
-    deadline: '45 dias',
-    priority: 'low',
-    status: 'rejected',
-    receivedAt: '2026-11-07 11:20',
-    attachments: 8,
-    viewed: true,
-  },
-  {
-    id: '6',
-    clientName: 'Pedro Oliveira',
-    clientAvatar: undefined,
-    clientLocation: 'São Paulo, SP',
-    service: 'Instalação de Chuveiro Elétrico',
-    category: 'Eletricista',
-    description: 'Instalação de chuveiro elétrico 220V com fiação adequada.',
-    budget: 250,
-    deadline: '3 dias',
-    priority: 'medium',
-    status: 'completed',
-    receivedAt: '2026-11-01 15:10',
-    attachments: 0,
-    viewed: true,
-  },
-]);
+const showRejectDialog = ref(false);
+const showArchiveDialog = ref(false);
+const selectedProposal = ref<Proposal | null>(null);
+const rejectReason = ref('');
 
-const categories = ['Eletricista', 'Encanador', 'Pintor', 'Designer', 'Desenvolvedor'];
+const categories = ['Eletricista', 'Encanador', 'Pintor', 'Pedreiro', 'Designer', 'Desenvolvedor'];
 
-// Filter proposals
+onMounted(() => {
+  proposalStore.loadProposals();
+});
+
 const filteredProposals = computed(() => {
-  let filtered = proposals.value.filter((proposal) => {
+  let filtered = proposalStore.proposals.filter((proposal) => {
     const matchesSearch =
       proposal.clientName.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
       proposal.service.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
@@ -181,12 +94,12 @@ const filteredProposals = computed(() => {
       (currentTab.value === 'pending' && proposal.status === 'pending') ||
       (currentTab.value === 'negotiating' && proposal.status === 'negotiating') ||
       (currentTab.value === 'accepted' && proposal.status === 'accepted') ||
+      (currentTab.value === 'rejected' && proposal.status === 'rejected') ||
       (currentTab.value === 'completed' && (proposal.status === 'completed' || proposal.status === 'archived'));
 
     return matchesSearch && matchesCategory && matchesTab;
   });
 
-  // Sort proposals
   if (sortBy.value === 'recent') {
     filtered.sort((a, b) => new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime());
   } else if (sortBy.value === 'budget-high') {
@@ -201,25 +114,28 @@ const filteredProposals = computed(() => {
   return filtered;
 });
 
-// Pagination
 const totalPages = computed(() => Math.ceil(filteredProposals.value.length / itemsPerPage));
 const startIndex = computed(() => (currentPage.value - 1) * itemsPerPage);
 const currentProposals = computed(() =>
   filteredProposals.value.slice(startIndex.value, startIndex.value + itemsPerPage)
 );
 
-const stats = computed(() => ({
-  pending: proposals.value.filter((p) => p.status === 'pending').length,
-  negotiating: proposals.value.filter((p) => p.status === 'negotiating').length,
-  accepted: proposals.value.filter((p) => p.status === 'accepted').length,
-  completed: proposals.value.filter((p) => p.status === 'completed' || p.status === 'archived').length,
-}));
-
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
     currency: 'BRL',
   }).format(value);
+};
+
+const formatDate = (dateString: string) => {
+  const date = new Date(dateString);
+  return date.toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 };
 
 const getInitials = (name: string) => {
@@ -231,20 +147,81 @@ const getInitials = (name: string) => {
     .slice(0, 2);
 };
 
-// Status and Priority badges removed - using templates directly
-
 const handleSearchChange = (value: string) => {
   searchQuery.value = value;
   currentPage.value = 1;
 };
+
+const handleViewDetails = (proposal: Proposal) => {
+  proposalStore.markAsViewed(proposal.id);
+  props.onNavigate('freelancer-proposal-detail', { requestId: proposal.id });
+};
+
+const handleOpenRejectDialog = (proposal: Proposal) => {
+  selectedProposal.value = proposal;
+  rejectReason.value = '';
+  showRejectDialog.value = true;
+};
+
+const handleRejectProposal = async () => {
+  if (!selectedProposal.value) return;
+  
+  if (!rejectReason.value.trim()) {
+    toast.error('Por favor, informe o motivo da recusa');
+    return;
+  }
+
+  const success = await proposalStore.rejectProposal(selectedProposal.value.id, rejectReason.value);
+  if (success) {
+    toast.success('Solicitação recusada com sucesso');
+    showRejectDialog.value = false;
+    selectedProposal.value = null;
+    rejectReason.value = '';
+  } else {
+    toast.error('Erro ao recusar solicitação');
+  }
+};
+
+const handleOpenArchiveDialog = (proposal: Proposal) => {
+  selectedProposal.value = proposal;
+  showArchiveDialog.value = true;
+};
+
+const handleArchiveProposal = async () => {
+  if (!selectedProposal.value) return;
+
+  const success = await proposalStore.archiveProposal(selectedProposal.value.id);
+  if (success) {
+    toast.success('Solicitação arquivada com sucesso');
+    showArchiveDialog.value = false;
+    selectedProposal.value = null;
+  } else {
+    toast.error('Erro ao arquivar solicitação');
+  }
+};
+
+const handleRefresh = () => {
+  proposalStore.loadProposals();
+  toast.info('Atualizando solicitações...');
+};
+
+watch(currentTab, () => {
+  currentPage.value = 1;
+});
 </script>
 
 <template>
   <div class="max-w-7xl mx-auto space-y-6">
     <!-- Header -->
-    <div>
-      <h1 class="text-[#263238] mb-2">Solicitações Recebidas</h1>
-      <p class="text-[#435574]">Gerencie as propostas enviadas pelos clientes</p>
+    <div class="flex items-start justify-between">
+      <div>
+        <h1 class="text-2xl font-bold text-[#263238] mb-2">Solicitações Recebidas</h1>
+        <p class="text-[#435574]">Gerencie as propostas enviadas pelos clientes</p>
+      </div>
+      <Button @click="handleRefresh" variant="outline" :disabled="proposalStore.isLoading">
+        <RefreshCw :class="`h-4 w-4 mr-2 ${proposalStore.isLoading ? 'animate-spin' : ''}`" />
+        Atualizar
+      </Button>
     </div>
 
     <!-- Stats Cards -->
@@ -259,7 +236,7 @@ const handleSearchChange = (value: string) => {
           </div>
           <div>
             <p class="text-sm text-[#435574]">Pendentes</p>
-            <p class="text-xl text-[#263238]">{{ stats.pending }}</p>
+            <p class="text-xl font-bold text-[#263238]">{{ proposalStore.stats.pending }}</p>
           </div>
         </div>
       </Card>
@@ -274,7 +251,7 @@ const handleSearchChange = (value: string) => {
           </div>
           <div>
             <p class="text-sm text-[#435574]">Negociando</p>
-            <p class="text-xl text-[#263238]">{{ stats.negotiating }}</p>
+            <p class="text-xl font-bold text-[#263238]">{{ proposalStore.stats.negotiating }}</p>
           </div>
         </div>
       </Card>
@@ -289,7 +266,7 @@ const handleSearchChange = (value: string) => {
           </div>
           <div>
             <p class="text-sm text-[#435574]">Aceitas</p>
-            <p class="text-xl text-[#263238]">{{ stats.accepted }}</p>
+            <p class="text-xl font-bold text-[#263238]">{{ proposalStore.stats.accepted }}</p>
           </div>
         </div>
       </Card>
@@ -304,7 +281,7 @@ const handleSearchChange = (value: string) => {
           </div>
           <div>
             <p class="text-sm text-[#435574]">Concluídas</p>
-            <p class="text-xl text-[#263238]">{{ stats.completed }}</p>
+            <p class="text-xl font-bold text-[#263238]">{{ proposalStore.stats.completed }}</p>
           </div>
         </div>
       </Card>
@@ -350,40 +327,47 @@ const handleSearchChange = (value: string) => {
     </Card>
 
     <!-- Tabs -->
-    <Tabs :model-value="currentTab" @update:model-value="(val: string) => { currentTab = val; currentPage = 1; }">
-      <TabsList class="grid w-full grid-cols-5">
+    <Tabs :model-value="currentTab" @update:model-value="(val: string) => currentTab = val">
+      <TabsList class="grid w-full grid-cols-6">
         <TabsTrigger value="all">Todas</TabsTrigger>
         <TabsTrigger value="pending">
-          Pendentes {{ stats.pending > 0 ? `(${stats.pending})` : '' }}
+          Pendentes {{ proposalStore.stats.pending > 0 ? `(${proposalStore.stats.pending})` : '' }}
         </TabsTrigger>
         <TabsTrigger value="negotiating">Negociando</TabsTrigger>
         <TabsTrigger value="accepted">Aceitas</TabsTrigger>
+        <TabsTrigger value="rejected">Recusadas</TabsTrigger>
         <TabsTrigger value="completed">Concluídas</TabsTrigger>
       </TabsList>
 
       <TabsContent :value="currentTab" class="mt-6">
-        <Card v-if="currentProposals.length === 0" class="p-12 text-center">
+        <!-- Loading State -->
+        <div v-if="proposalStore.isLoading" class="flex justify-center py-12">
+          <div class="animate-spin h-8 w-8 border-4 border-[#286AD8] border-t-transparent rounded-full"></div>
+        </div>
+
+        <!-- Empty State -->
+        <Card v-else-if="currentProposals.length === 0" class="p-12 text-center">
           <FileText class="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <h3 class="text-[#263238] mb-2">Nenhuma solicitação encontrada</h3>
+          <h3 class="text-lg font-semibold text-[#263238] mb-2">Nenhuma solicitação encontrada</h3>
           <p class="text-[#435574]">
             {{ searchQuery || categoryFilter !== 'all'
               ? 'Tente ajustar os filtros'
               : 'Você receberá notificações quando novos clientes enviarem propostas' }}
           </p>
         </Card>
+
         <template v-else>
           <!-- Proposals List -->
           <div class="grid grid-cols-1 gap-4">
             <Card
               v-for="proposal in currentProposals"
               :key="proposal.id"
-              :class="`p-6 hover:shadow-md transition-all cursor-pointer ${
+              :class="`p-6 hover:shadow-md transition-all ${
                 !proposal.viewed ? 'border-l-4 border-l-[#286AD8] bg-blue-50/30' : ''
               }`"
-              @click="props.onNavigate('freelancer-proposal-detail', { proposalId: proposal.id })"
             >
               <div class="flex items-start gap-4">
-                <Avatar class="h-12 w-12">
+                <Avatar class="h-12 w-12 cursor-pointer" @click="handleViewDetails(proposal)">
                   <AvatarImage :src="proposal.clientAvatar" :alt="proposal.clientName" />
                   <AvatarFallback class="bg-[#286AD8] text-white">
                     {{ getInitials(proposal.clientName) }}
@@ -392,9 +376,9 @@ const handleSearchChange = (value: string) => {
 
                 <div class="flex-1 min-w-0">
                   <div class="flex items-start justify-between mb-2">
-                    <div class="flex-1">
+                    <div class="flex-1 cursor-pointer" @click="handleViewDetails(proposal)">
                       <div class="flex items-center gap-2 mb-1">
-                        <h3 class="text-[#263238]">{{ proposal.service }}</h3>
+                        <h3 class="font-semibold text-[#263238] hover:text-[#286AD8]">{{ proposal.service }}</h3>
                         <Badge v-if="!proposal.viewed" class="bg-[#286AD8] hover:bg-[#286AD8] text-xs">
                           Novo
                         </Badge>
@@ -414,64 +398,97 @@ const handleSearchChange = (value: string) => {
                         </span>
                         <span class="flex items-center gap-1">
                           <Calendar class="h-3 w-3" />
-                          {{ proposal.receivedAt }}
+                          {{ formatDate(proposal.receivedAt) }}
                         </span>
                       </div>
                     </div>
-                    <div class="flex flex-col items-end gap-2">
-                      <!-- Status Badge -->
-                      <template v-if="proposal.status === 'pending'">
-                        <Badge class="bg-blue-100 text-blue-700 hover:bg-blue-100">
-                          <Clock class="h-3 w-3 mr-1" />
-                          Pendente
-                        </Badge>
-                      </template>
-                      <template v-else-if="proposal.status === 'negotiating'">
-                        <Badge class="bg-purple-100 text-purple-700 hover:bg-purple-100">
-                          <MessageSquare class="h-3 w-3 mr-1" />
-                          Negociando
-                        </Badge>
-                      </template>
-                      <template v-else-if="proposal.status === 'accepted'">
-                        <Badge class="bg-green-100 text-green-700 hover:bg-green-100">
-                          <CheckCircle class="h-3 w-3 mr-1" />
-                          Aceita
-                        </Badge>
-                      </template>
-                      <template v-else-if="proposal.status === 'rejected'">
-                        <Badge class="bg-gray-100 text-gray-700 hover:bg-gray-100">
-                          <XCircle class="h-3 w-3 mr-1" />
-                          Recusada
-                        </Badge>
-                      </template>
-                      <template v-else-if="proposal.status === 'completed'">
-                        <Badge class="bg-green-100 text-green-700 hover:bg-green-100">
-                          <CheckCircle class="h-3 w-3 mr-1" />
-                          Concluída
-                        </Badge>
-                      </template>
-                      <template v-else-if="proposal.status === 'archived'">
-                        <Badge variant="secondary">
-                          <Archive class="h-3 w-3 mr-1" />
-                          Arquivada
-                        </Badge>
-                      </template>
+                    <div class="flex items-center gap-2">
+                      <div class="flex flex-col items-end gap-2">
+                        <!-- Status Badge -->
+                        <template v-if="proposal.status === 'pending'">
+                          <Badge class="bg-blue-100 text-blue-700 hover:bg-blue-100">
+                            <Clock class="h-3 w-3 mr-1" />
+                            Pendente
+                          </Badge>
+                        </template>
+                        <template v-else-if="proposal.status === 'negotiating'">
+                          <Badge class="bg-purple-100 text-purple-700 hover:bg-purple-100">
+                            <MessageSquare class="h-3 w-3 mr-1" />
+                            Negociando
+                          </Badge>
+                        </template>
+                        <template v-else-if="proposal.status === 'accepted'">
+                          <Badge class="bg-green-100 text-green-700 hover:bg-green-100">
+                            <CheckCircle class="h-3 w-3 mr-1" />
+                            Aceita
+                          </Badge>
+                        </template>
+                        <template v-else-if="proposal.status === 'rejected'">
+                          <Badge class="bg-red-100 text-red-700 hover:bg-red-100">
+                            <XCircle class="h-3 w-3 mr-1" />
+                            Recusada
+                          </Badge>
+                        </template>
+                        <template v-else-if="proposal.status === 'completed'">
+                          <Badge class="bg-green-100 text-green-700 hover:bg-green-100">
+                            <CheckCircle class="h-3 w-3 mr-1" />
+                            Concluída
+                          </Badge>
+                        </template>
+                        <template v-else-if="proposal.status === 'archived'">
+                          <Badge variant="secondary">
+                            <Archive class="h-3 w-3 mr-1" />
+                            Arquivada
+                          </Badge>
+                        </template>
 
-                      <!-- Priority Badge -->
-                      <template v-if="proposal.priority === 'high'">
-                        <Badge class="bg-red-100 text-red-700 hover:bg-red-100">
-                          <AlertCircle class="h-3 w-3 mr-1" />
-                          Alta
-                        </Badge>
-                      </template>
-                      <template v-else-if="proposal.priority === 'medium'">
-                        <Badge class="bg-yellow-100 text-yellow-700 hover:bg-yellow-100">
-                          Média
-                        </Badge>
-                      </template>
-                      <template v-else-if="proposal.priority === 'low'">
-                        <Badge variant="secondary">Baixa</Badge>
-                      </template>
+                        <!-- Priority Badge -->
+                        <template v-if="proposal.priority === 'high'">
+                          <Badge class="bg-red-100 text-red-700 hover:bg-red-100">
+                            <AlertCircle class="h-3 w-3 mr-1" />
+                            Alta
+                          </Badge>
+                        </template>
+                        <template v-else-if="proposal.priority === 'medium'">
+                          <Badge class="bg-yellow-100 text-yellow-700 hover:bg-yellow-100">
+                            Média
+                          </Badge>
+                        </template>
+                        <template v-else-if="proposal.priority === 'low'">
+                          <Badge variant="secondary">Baixa</Badge>
+                        </template>
+                      </div>
+
+                      <!-- Actions Menu -->
+                      <DropdownMenu>
+                        <DropdownMenuTrigger as-child>
+                          <Button variant="ghost" size="icon">
+                            <MoreVertical class="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem @click="handleViewDetails(proposal)">
+                            <Eye class="h-4 w-4 mr-2" />
+                            Ver Detalhes
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            v-if="proposal.status === 'pending'"
+                            @click="handleOpenRejectDialog(proposal)"
+                            class="text-red-600"
+                          >
+                            <XCircle class="h-4 w-4 mr-2" />
+                            Recusar
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            v-if="proposal.status === 'completed' || proposal.status === 'rejected'"
+                            @click="handleOpenArchiveDialog(proposal)"
+                          >
+                            <Archive class="h-4 w-4 mr-2" />
+                            Arquivar
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                   </div>
 
@@ -481,7 +498,7 @@ const handleSearchChange = (value: string) => {
 
                   <div class="flex items-center justify-between">
                     <div class="flex items-center gap-4 text-sm">
-                      <span class="flex items-center gap-1 text-[#263238]">
+                      <span class="flex items-center gap-1 font-medium text-[#263238]">
                         <DollarSign class="h-4 w-4 text-green-600" />
                         {{ formatCurrency(proposal.budget) }}
                       </span>
@@ -490,17 +507,16 @@ const handleSearchChange = (value: string) => {
                         Prazo: {{ proposal.deadline }}
                       </span>
                       <span
-                        v-if="proposal.attachments && proposal.attachments > 0"
+                        v-if="proposal.attachments && proposal.attachments.length > 0"
                         class="flex items-center gap-1 text-[#435574]"
                       >
                         <FileText class="h-4 w-4" />
-                        {{ proposal.attachments }} anexo{{ proposal.attachments > 1 ? 's' : '' }}
+                        {{ proposal.attachments.length }} anexo{{ proposal.attachments.length > 1 ? 's' : '' }}
                       </span>
                     </div>
 
                     <Button
-                      v-if="proposal.status === 'pending'"
-                      @click.stop="props.onNavigate('freelancer-proposal-detail', { requestId: proposal.id })"
+                      @click="handleViewDetails(proposal)"
                       variant="outline"
                       size="sm"
                     >
@@ -552,6 +568,56 @@ const handleSearchChange = (value: string) => {
         </template>
       </TabsContent>
     </Tabs>
+
+    <!-- Reject Dialog -->
+    <Dialog :open="showRejectDialog" @update:open="(val) => showRejectDialog = val">
+      <DialogContent class="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Recusar Solicitação</DialogTitle>
+          <DialogDescription>
+            Informe o motivo da recusa para "{{ selectedProposal?.service }}"
+          </DialogDescription>
+        </DialogHeader>
+        <div class="space-y-4">
+          <div class="space-y-2">
+            <Label for="reject-reason">Motivo da recusa *</Label>
+            <Textarea
+              id="reject-reason"
+              :model-value="rejectReason"
+              @update:model-value="(val) => rejectReason = val as string"
+              placeholder="Ex: Não trabalho com esse tipo de serviço, agenda indisponível, etc."
+              :rows="4"
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button @click="showRejectDialog = false" variant="outline">
+            Cancelar
+          </Button>
+          <Button @click="handleRejectProposal" class="bg-red-600 hover:bg-red-700">
+            Confirmar Recusa
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    <!-- Archive Dialog -->
+    <AlertDialog :open="showArchiveDialog" @update:open="(val) => showArchiveDialog = val">
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Arquivar Solicitação</AlertDialogTitle>
+          <AlertDialogDescription>
+            Tem certeza que deseja arquivar a solicitação "{{ selectedProposal?.service }}"?
+            Ela será movida para a aba de concluídas/arquivadas.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel @click="showArchiveDialog = false">Cancelar</AlertDialogCancel>
+          <AlertDialogAction @click="handleArchiveProposal" class="bg-[#286AD8] hover:bg-[#435574]">
+            Arquivar
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   </div>
 </template>
-
