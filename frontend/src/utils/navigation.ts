@@ -36,6 +36,8 @@ export const clientRoutes: Record<string, string> = {
   'explore': '/explore',
   'search': '/search',
   'requests': '/my-requests',
+  'my-requests': '/my-requests',
+  'cliente-request-detail': '/cliente-request-detail',
   'favorites': '/favorites',
   'contracts': '/contracts',
   'messages': '/messages',

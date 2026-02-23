@@ -11,6 +11,7 @@ import FreelancerProfileSettings from '@/pages/FreelancerProfileSettings/index.v
 import FreelancerProfessionalProfile from '@/pages/FreelancerProfessionalProfile/index.vue';
 import FreelancerPortfolio from '@/pages/FreelancerPortfolio/index.vue';
 import ClienteProfileSettings from '@/pages/ClienteProfileSettings/index.vue';
+import ClienteRequestDetailPage from '@/pages/ClienteRequestDetail/index.vue';
 import MapPage from '@/pages/Map/index.vue';
 import SettingsPage from '@/pages/Settings/index.vue';
 import FreelancerServicesPage from '@/pages/FreelancerServices/index.vue';
@@ -100,6 +101,12 @@ const routes: RouteRecordRaw[] = [
     path: '/cliente-profile-settings',
     name: 'cliente-profile-settings',
     component: ClienteProfileSettings,
+    meta: { requiresAuth: true, userType: 'contractor' },
+  },
+  {
+    path: '/cliente-request-detail',
+    name: 'cliente-request-detail',
+    component: ClienteRequestDetailPage,
     meta: { requiresAuth: true, userType: 'contractor' },
   },
 
