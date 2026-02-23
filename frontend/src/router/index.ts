@@ -15,6 +15,7 @@ import MapPage from '@/pages/Map/index.vue';
 import SettingsPage from '@/pages/Settings/index.vue';
 import FreelancerServicesPage from '@/pages/FreelancerServices/index.vue';
 import FreelancerProposalsPage from '@/pages/FreelancerProposals/index.vue';
+import FreelancerRequestDetailPage from '@/pages/FreelancerRequestDetail/index.vue';
 import FreelancerDeliveriesPage from '@/pages/FreelancerDeliveries/index.vue';
 import FreelancerWalletPage from '@/pages/FreelancerWallet/index.vue';
 import FreelancerInvoicesPage from '@/pages/FreelancerInvoices/index.vue';
@@ -123,6 +124,12 @@ const routes: RouteRecordRaw[] = [
     path: '/freelancer-proposals',
     name: 'freelancer-proposals',
     component: FreelancerProposalsPage,
+    meta: { requiresAuth: true, userType: 'provider' },
+  },
+  {
+    path: '/freelancer-proposal-detail',
+    name: 'freelancer-proposal-detail',
+    component: FreelancerRequestDetailPage,
     meta: { requiresAuth: true, userType: 'provider' },
   },
 

@@ -11,6 +11,7 @@ export const freelancerRoutes: Record<string, string> = {
   'freelancer-professional-profile': '/freelancer-professional-profile',
   'freelancer-services': '/freelancer-services',
   'freelancer-proposals': '/freelancer-proposals',
+  'freelancer-proposal-detail': '/freelancer-proposal-detail',
   'freelancer-deliveries': '/freelancer-deliveries',
   'freelancer-wallet': '/freelancer-wallet',
   'freelancer-invoices': '/freelancer-invoices',
