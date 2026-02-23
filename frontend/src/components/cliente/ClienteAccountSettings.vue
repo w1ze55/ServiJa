@@ -859,9 +859,9 @@ const getInitials = (name: string) => {
 
       <!-- Addresses Section -->
       <Card class="p-6">
-        <div class="flex items-center justify-between mb-4">
+        <div class="address-header flex items-center justify-between mb-4">
           <h3 class="text-lg font-semibold text-[#263238]">Endereços</h3>
-          <Button @click="openAddAddressDialog" variant="outline" size="sm">
+          <Button @click="openAddAddressDialog" variant="outline" size="sm" class="add-address-btn">
             <Plus class="h-4 w-4 mr-2" />
             Adicionar Endereço
           </Button>
@@ -1303,6 +1303,20 @@ const getInitials = (name: string) => {
 
   :deep(.h-24.w-24 .text-2xl) {
     font-size: 1.5rem !important;
+  }
+}
+
+@media (max-width: 375px) {
+  /* Botão Adicionar Endereço abaixo do título */
+  .address-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 0.75rem;
+  }
+
+  .add-address-btn {
+    width: 100%;
+    justify-content: center;
   }
 }
 </style>
