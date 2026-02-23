@@ -33,12 +33,6 @@ const routes: RouteRecordRaw[] = [
   // ============ ROTAS PÚBLICAS ============
   {
     path: '/',
-    name: 'landing',
-    component: LandingPage,
-    meta: { requiresAuth: false },
-  },
-  {
-    path: '/login',
     name: 'login',
     component: Login,
     meta: { requiresAuth: false },
@@ -242,7 +236,7 @@ const routes: RouteRecordRaw[] = [
 ];
 
 const router = createRouter({
-  history: createWebHistory(import.meta.env.BASE_URL),
+  history: createWebHistory('/app/'),
   routes,
 });
 

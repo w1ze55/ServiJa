@@ -44,6 +44,17 @@ services:
       - prod_network
     restart: unless-stopped
 
+  landingpage-prod:
+    build:
+      context: ./landingpage
+      dockerfile: Dockerfile
+    container_name: servija_landingpage_prod
+    ports:
+      - "8081:80"
+    networks:
+      - prod_network
+    restart: unless-stopped
+
 networks:
   prod_network:
     name: servija_prod_network
