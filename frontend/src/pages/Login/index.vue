@@ -10,7 +10,7 @@ const handleLogin = (userData: any) => {
 };
 
 const handleBackToLanding = () => {
-  router.push('/');
+  window.location.href = 'https://servija.app';
 };
 </script>
 

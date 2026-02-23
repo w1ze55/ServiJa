@@ -1,7 +1,6 @@
 import { createRouter, createWebHistory, RouteRecordRaw } from 'vue-router';
 
 // Importar as páginas
-import LandingPage from '@/pages/LandingPage/index.vue';
 import Login from '@/pages/Login/index.vue';
 import Perfil from '@/pages/Perfil/index.vue';
 import Dashboard from '@/pages/Dashboard/index.vue';
@@ -33,6 +32,11 @@ const routes: RouteRecordRaw[] = [
   // ============ ROTAS PÚBLICAS ============
   {
     path: '/',
+    name: 'home',
+    redirect: '/login',
+  },
+  {
+    path: '/login',
     name: 'login',
     component: Login,
     meta: { requiresAuth: false },
@@ -236,7 +240,7 @@ const routes: RouteRecordRaw[] = [
 ];
 
 const router = createRouter({
-  history: createWebHistory('/app/'),
+  history: createWebHistory(import.meta.env.BASE_URL),
   routes,
 });
 
