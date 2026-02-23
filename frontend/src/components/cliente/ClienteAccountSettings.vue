@@ -673,6 +673,7 @@ const getInitials = (name: string) => {
             <Button 
               variant="outline" 
               size="sm" 
+              class="avatar-upload-btn"
               @click="handleAvatarClick"
               :disabled="isUploadingAvatar"
             >
@@ -1208,3 +1209,100 @@ const getInitials = (name: string) => {
     </AlertDialog>
   </div>
 </template>
+
+<style scoped>
+/* Responsividade para Avatar Section */
+@media (max-width: 768px) {
+  .max-w-4xl {
+    padding: 1rem !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .max-w-4xl {
+    padding: 0.75rem !important;
+  }
+
+  /* Avatar Section - empilhar verticalmente */
+  :deep(.p-6) .flex.items-center.gap-6 {
+    flex-direction: column;
+    text-align: center;
+    gap: 1rem !important;
+  }
+
+  /* Centralizar avatar */
+  :deep(.p-6) .flex.items-center.gap-6 > div:first-child {
+    margin: 0 auto;
+  }
+
+  /* Container de texto e botão */
+  :deep(.p-6) .flex-1 {
+    width: 100%;
+  }
+
+  /* Quebrar email com word-break */
+  :deep(.p-6) .flex-1 p {
+    word-break: break-all;
+    overflow-wrap: break-word;
+    font-size: 0.875rem;
+  }
+
+  /* Título menor */
+  :deep(.p-6) .flex-1 h2 {
+    font-size: 1.125rem;
+    word-break: break-word;
+  }
+
+  /* Botão Alterar Foto responsivo */
+  :deep(.avatar-upload-btn) {
+    width: 100%;
+    max-width: 250px;
+    margin: 0 auto;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 0.875rem;
+    padding: 0.625rem 1rem;
+  }
+
+  :deep(.avatar-upload-btn svg) {
+    width: 1rem;
+    height: 1rem;
+  }
+}
+
+@media (max-width: 408px) {
+  /* Ajustes específicos para 408px e abaixo */
+  :deep(.p-6) .flex-1 h2 {
+    font-size: 1rem;
+  }
+
+  :deep(.p-6) .flex-1 p {
+    font-size: 0.8125rem;
+    margin-bottom: 0.75rem !important;
+  }
+
+  /* Botão menor em telas muito pequenas */
+  :deep(.avatar-upload-btn) {
+    max-width: 200px;
+    font-size: 0.8125rem;
+    padding: 0.5rem 0.875rem;
+  }
+
+  :deep(.avatar-upload-btn svg) {
+    width: 0.875rem;
+    height: 0.875rem;
+    margin-right: 0.375rem;
+  }
+
+  /* Reduzir tamanho do avatar */
+  :deep(.h-24.w-24) {
+    height: 5rem !important;
+    width: 5rem !important;
+  }
+
+  :deep(.h-24.w-24 .text-2xl) {
+    font-size: 1.5rem !important;
+  }
+}
+</style>
