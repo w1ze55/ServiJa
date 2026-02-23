@@ -35,22 +35,11 @@ services:
       - .env.prod
     environment:
       BACKEND_URL: http://backend-prod:8080
-      SERVER_NAME: ${SERVER_NAME:-app.servija.app}
+      SERVER_NAME: ${SERVER_NAME:-servija.app}
     depends_on:
       - backend-prod
     ports:
       - "8080:80"
-    networks:
-      - prod_network
-    restart: unless-stopped
-
-  landingpage-prod:
-    build:
-      context: ./landingpage
-      dockerfile: Dockerfile
-    container_name: servija_landingpage_prod
-    ports:
-      - "8081:80"
     networks:
       - prod_network
     restart: unless-stopped
