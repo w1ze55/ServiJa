@@ -28,6 +28,8 @@ import FavoritesPage from '@/pages/Favorites/index.vue';
 import ContractsPage from '@/pages/Contracts/index.vue';
 import FreelancerKYCPage from '@/pages/FreelancerKYC/index.vue';
 import FreelancerAccountSettingsPage from '@/pages/FreelancerAccountSettings/index.vue';
+import NotFoundPage from '@/pages/NotFound/index.vue';
+import RegisterPage from '@/pages/Register/index.vue';
 
 const routes: RouteRecordRaw[] = [
   // ============ ROTAS PÚBLICAS ============
@@ -41,6 +43,12 @@ const routes: RouteRecordRaw[] = [
     path: '/login',
     name: 'login',
     component: Login,
+    meta: { requiresAuth: false },
+  },
+  {
+    path: '/cadastro',
+    name: 'cadastro',
+    component: RegisterPage,
     meta: { requiresAuth: false },
   },
 
@@ -238,6 +246,14 @@ const routes: RouteRecordRaw[] = [
     name: 'freelancer-account-settings',
     component: FreelancerAccountSettingsPage,
     meta: { requiresAuth: true, userType: 'provider' },
+  },
+
+  // ============ PÁGINA 404 - DEVE SER A ÚLTIMA ROTA ============
+  {
+    path: '/:pathMatch(.*)*',
+    name: 'not-found',
+    component: NotFoundPage,
+    meta: { requiresAuth: false },
   },
 ];
 
