@@ -15,13 +15,13 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url))
     },
   },
-  publicDir: 'public', // Garante que arquivos da pasta public sejam copiados
+  publicDir: 'public',
+  assetsInclude: ['**/*.lottie'],
   build: {
-    assetsInlineLimit: 0, // Não fazer inline de assets pequenos
+    assetsInlineLimit: 0,
     rollupOptions: {
       output: {
         assetFileNames: (assetInfo) => {
-          // Manter favicon.ico na raiz do dist
           if (assetInfo.name === 'favicon.ico') {
             return '[name][extname]'
           }
