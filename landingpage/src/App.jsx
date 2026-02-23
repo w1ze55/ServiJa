@@ -5,11 +5,11 @@ import logo from '/favicon-32x32.png'
 
 function App() {
   const handleLogin = () => {
-    window.location.href = '/app/login'
+    window.location.href = 'https://app.servija.app/login'
   }
 
   const handleSignup = () => {
-    window.location.href = '/app/cadastro'
+    window.location.href = 'https://app.servija.app/login'
   }
 
   return (

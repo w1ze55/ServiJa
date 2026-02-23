@@ -35,7 +35,7 @@ services:
       - .env.prod
     environment:
       BACKEND_URL: http://backend-prod:8080
-      SERVER_NAME: ${SERVER_NAME:-servija.app}
+      SERVER_NAME: ${SERVER_NAME:-app.servija.app}
     depends_on:
       - backend-prod
     ports:
