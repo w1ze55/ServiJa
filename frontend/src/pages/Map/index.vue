@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { ref, onMounted, watch, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { MapPin, Navigation, ArrowLeft, Star, MessageSquare, Phone, Filter, Search } from 'lucide-vue-next'
@@ -53,7 +53,7 @@ const userLocation = ref<UserLocation>({
   latitude: -27.5954,
   longitude: -48.5480,
   address: '',
-  city: 'Florianópolis',
+  city: 'FlorianÃ³polis',
   state: 'SC'
 })
 
@@ -64,7 +64,7 @@ const showFilters = ref(false)
 const selectedCategory = ref('')
 const onlyAvailable = ref(false)
 
-// Categorias disponíveis
+// Categorias disponÃ­veis
 const categories = [
   'Eletricista',
   'Encanador',
@@ -103,7 +103,7 @@ const filteredProviders = computed(() => {
   return result
 })
 
-// Ícones customizados
+// Ãcones customizados
 const createUserIcon = () => {
   return L.divIcon({
     className: 'custom-marker',
@@ -132,7 +132,7 @@ const createProviderIcon = (available: boolean, rating: number) => {
     html: `
       <div class="relative group cursor-pointer">
         <div class="w-10 h-10 ${bgColor} rounded-full border-2 ${borderColor} shadow-lg flex items-center justify-center text-white font-bold text-sm transition-transform hover:scale-110">
-          ${rating > 0 ? rating.toFixed(1) : '★'}
+          ${rating > 0 ? rating.toFixed(1) : 'â˜…'}
         </div>
         <div class="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-8 border-l-transparent border-r-transparent ${available ? 'border-t-green-500' : 'border-t-gray-400'}"></div>
       </div>
@@ -159,7 +159,7 @@ const initMap = () => {
   }).addTo(map.value as L.Map)
 }
 
-// Buscar endereço do perfil
+// Buscar endereÃ§o do perfil
 const loadUserAddressFromProfile = async () => {
   isLocating.value = true
   
@@ -198,8 +198,8 @@ const loadUserAddressFromProfile = async () => {
       }
     }
   } catch (error) {
-    console.error('Erro ao carregar endereço:', error)
-    // Usar localização padrão e carregar profissionais
+    console.error('Erro ao carregar endereÃ§o:', error)
+    // Usar localizaÃ§Ã£o padrÃ£o e carregar profissionais
     updateUserMarker()
     await loadNearbyProviders()
   } finally {
@@ -207,7 +207,7 @@ const loadUserAddressFromProfile = async () => {
   }
 }
 
-// Carregar profissionais próximos
+// Carregar profissionais prÃ³ximos
 const loadNearbyProviders = async () => {
   isLoading.value = true
   nearbyProviders.value = []
@@ -266,7 +266,7 @@ const fitMapToBounds = () => {
   map.value.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 })
 }
 
-// Atualizar marcador do usuário
+// Atualizar marcador do usuÃ¡rio
 const updateUserMarker = () => {
   if (!map.value) return
   
@@ -278,7 +278,7 @@ const updateUserMarker = () => {
       { icon: createUserIcon() }
     ).addTo(map.value as L.Map)
     
-    userMarker.value.bindPopup('<strong>Sua localização</strong>')
+    userMarker.value.bindPopup('<strong>Sua localizaÃ§Ã£o</strong>')
   }
 }
 
@@ -300,7 +300,7 @@ const updateProviderMarkers = () => {
         <strong class="text-lg">${provider.name}</strong>
         <p class="text-gray-600">${provider.professionalTitle}</p>
         <div class="flex items-center gap-1 mt-1">
-          <span class="text-yellow-500">★</span>
+          <span class="text-yellow-500">â˜…</span>
           <span>${provider.rating.toFixed(1)}</span>
           <span class="text-gray-400">(${provider.totalReviews})</span>
         </div>
@@ -326,7 +326,7 @@ const centerOnProvider = (provider: Provider) => {
 
 // Contatar profissional
 const contactProvider = (provider: Provider) => {
-  // TODO: Implementar navegação para chat ou perfil
+  // TODO: Implementar navegaÃ§Ã£o para chat ou perfil
   toast.info(`Contatando ${provider.name}...`)
 }
 
@@ -335,7 +335,7 @@ const goBack = () => {
   router.back()
 }
 
-// Utilitários
+// UtilitÃ¡rios
 const getInitials = (name: string) => {
   return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
 }
@@ -360,7 +360,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="h-screen w-full flex flex-col bg-gray-100">
+  <div class="map-container w-full flex flex-col bg-gray-100">
     <!-- Header -->
     <header class="bg-white shadow-sm z-10">
       <div class="flex items-center justify-between px-4 py-3">
@@ -369,7 +369,7 @@ onMounted(async () => {
             <ArrowLeft class="h-5 w-5" />
           </Button>
           <div>
-            <h1 class="text-lg font-semibold text-[#263238]">Profissionais Próximos</h1>
+            <h1 class="text-lg font-semibold text-[#263238]">Profissionais PrÃ³ximos</h1>
             <p class="text-sm text-[#435574]">{{ userLocation.city }}, {{ userLocation.state }}</p>
           </div>
         </div>
@@ -393,7 +393,7 @@ onMounted(async () => {
           <Search class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input 
             v-model="searchQuery"
-            placeholder="Buscar por nome ou profissão..."
+            placeholder="Buscar por nome ou profissÃ£o..."
             class="pl-10"
           />
         </div>
@@ -421,13 +421,13 @@ onMounted(async () => {
           
           <label class="flex items-center gap-2 px-3 py-1.5 text-sm border rounded-lg bg-white cursor-pointer">
             <input type="checkbox" v-model="onlyAvailable" class="rounded" />
-            Apenas disponíveis
+            Apenas disponÃ­veis
           </label>
         </div>
       </div>
     </header>
 
-    <!-- Conteúdo principal -->
+    <!-- ConteÃºdo principal -->
     <div class="flex-1 flex">
       <!-- Lista de profissionais (sidebar) -->
       <aside class="w-96 bg-white shadow-lg overflow-hidden flex flex-col hidden lg:flex">
@@ -505,7 +505,7 @@ onMounted(async () => {
                     :class="provider.available ? 'text-green-600 bg-green-50' : 'text-gray-500 bg-gray-100'"
                     class="text-xs px-2 py-0.5 rounded-full whitespace-nowrap"
                   >
-                    {{ provider.available ? 'Disponível' : 'Ocupado' }}
+                    {{ provider.available ? 'DisponÃ­vel' : 'Ocupado' }}
                   </span>
                 </div>
                 
@@ -549,20 +549,20 @@ onMounted(async () => {
       <div class="flex-1 relative">
         <div ref="mapContainer" class="h-full w-full" />
         
-        <!-- Botão de atualizar localização -->
+        <!-- BotÃ£o de atualizar localizaÃ§Ã£o -->
         <Button
           @click="loadUserAddressFromProfile"
           :disabled="isLocating"
           class="absolute bottom-24 right-4 z-[1000] bg-white text-[#263238] hover:bg-gray-100 shadow-lg"
           size="icon"
-          title="Atualizar localização"
+          title="Atualizar localizaÃ§Ã£o"
         >
           <Navigation v-if="!isLocating" class="h-5 w-5" />
           <div v-else class="animate-spin h-5 w-5 border-2 border-blue-500 border-t-transparent rounded-full" />
         </Button>
         
         <!-- Lista mobile (bottom sheet) -->
-        <div class="lg:hidden absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-lg max-h-[50vh] overflow-hidden">
+        <div class="lg:hidden absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-lg mobile-list-container overflow-hidden">
           <div class="p-4 border-b">
             <div class="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-3" />
             <div class="flex items-center justify-between">
@@ -575,7 +575,7 @@ onMounted(async () => {
             </div>
           </div>
           
-          <div class="overflow-y-auto max-h-[calc(50vh-80px)]">
+          <div class="mobile-list-scroll overflow-y-auto">
             <div v-if="isLoading" class="p-8 text-center">
               <div class="animate-spin h-6 w-6 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-2" />
               <p class="text-[#435574] text-sm">Buscando...</p>
@@ -645,5 +645,34 @@ onMounted(async () => {
 
 .leaflet-popup-content {
   margin: 8px 12px;
+}
+
+/* Usar dvh para altura dinÃ¢mica do viewport */
+.map-container {
+  height: 100dvh;
+}
+
+/* Lista mobile com altura baseada em dvh */
+.mobile-list-container {
+  max-height: 50dvh;
+}
+
+.mobile-list-scroll {
+  max-height: calc(50dvh - 80px);
+}
+
+/* Fallback para navegadores que nÃ£o suportam dvh */
+@supports not (height: 100dvh) {
+  .map-container {
+    height: 100vh;
+  }
+  
+  .mobile-list-container {
+    max-height: 50vh;
+  }
+  
+  .mobile-list-scroll {
+    max-height: calc(50vh - 80px);
+  }
 }
 </style>
