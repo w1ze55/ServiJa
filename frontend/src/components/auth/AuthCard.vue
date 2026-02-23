@@ -32,7 +32,7 @@
                   <Input
                     id="login-email"
                     type="email"
-                    placeholder="your@email.com"
+                    placeholder="seu@email.com"
                     v-model="loginEmail"
                     :disabled="isLoggingIn"
                   />

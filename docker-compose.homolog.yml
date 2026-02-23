@@ -39,7 +39,18 @@ services:
     depends_on:
       - backend-homolog
     ports:
-      - "8081:80"
+      - "8082:80"
+    networks:
+      - homolog_network
+    restart: unless-stopped
+
+  landingpage-homolog:
+    build:
+      context: ./landingpage
+      dockerfile: Dockerfile
+    container_name: servija_landingpage_homolog
+    ports:
+      - "8083:80"
     networks:
       - homolog_network
     restart: unless-stopped
