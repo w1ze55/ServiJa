@@ -29,6 +29,35 @@ public class FreelancerController {
 
     private final FreelancerService freelancerService;
 
+    @GetMapping("/{id}/profile")
+    @Operation(
+        summary = "Obter perfil público do freelancer",
+        description = "Retorna o perfil público de um freelancer por ID (não requer autenticação)"
+    )
+    @ApiResponses(value = {
+        @ApiResponse(
+            responseCode = "200",
+            description = "Perfil retornado com sucesso",
+            content = @Content(schema = @Schema(implementation = FreelancerProfileResponse.class))
+        ),
+        @ApiResponse(
+            responseCode = "404",
+            description = "Freelancer não encontrado"
+        ),
+        @ApiResponse(
+            responseCode = "500",
+            description = "Erro interno do servidor"
+        )
+    })
+    public ResponseEntity<FreelancerProfileResponse> getFreelancerPublicProfile(@PathVariable Long id) {
+        try {
+            FreelancerProfileResponse profile = freelancerService.getPublicProfile(id);
+            return ResponseEntity.ok(profile);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
     @GetMapping("/profile")
     @Operation(
         summary = "Obter perfil do freelancer",

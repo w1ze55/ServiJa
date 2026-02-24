@@ -46,6 +46,21 @@ public class FreelancerService {
         return mapToResponse(freelancer);
     }
 
+    /**
+     * Obter perfil público de um freelancer por ID (não requer autenticação)
+     */
+    @Transactional(readOnly = true)
+    public FreelancerProfileResponse getPublicProfile(Long freelancerId) {
+        // Carregar freelancer com suas cidades e links
+        Freelancer freelancer = freelancerRepository.findByIdWithServiceCities(freelancerId)
+                .orElseThrow(() -> new RuntimeException("Freelancer não encontrado"));
+        
+        // Carregar links profissionais
+        freelancerRepository.findByIdWithProfessionalLinks(freelancerId);
+        
+        return mapToResponse(freelancer);
+    }
+
     @Transactional
     public FreelancerProfileResponse updateProfile(FreelancerProfileRequest request) {
         Freelancer freelancer = getCurrentFreelancer();
