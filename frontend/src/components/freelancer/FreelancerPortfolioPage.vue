@@ -202,9 +202,17 @@ const handleImageUploadClick = () => {
 const handleImageUpload = async (e: Event) => {
   const target = e.target as HTMLInputElement;
   if (target.files && target.files.length > 0) {
+    // Validar tamanho dos arquivos (5MB max)
+    const files = Array.from(target.files);
+    const oversizedFiles = files.filter((file) => file.size > 5 * 1024 * 1024);
+    if (oversizedFiles.length > 0) {
+      toast.error('Cada imagem deve ter no máximo 5MB');
+      target.value = ''; // Limpar input
+      return;
+    }
+
     isUploading.value = true;
     try {
-      const files = Array.from(target.files);
       const uploadedUrls = await uploadImages(files);
       projectForm.value = {
         ...projectForm.value,
