@@ -94,6 +94,32 @@ const cancelReason = ref('');
 
 const categories = ['Eletricista', 'Encanador', 'Pintor', 'Pedreiro', 'Designer', 'Desenvolvedor'];
 
+// Mapeamento de valores de ordenação para português
+const sortOptions = {
+  recent: 'Mais recentes',
+  priority: 'Prioridade',
+  'budget-high': 'Maior orçamento',
+  'budget-low': 'Menor orçamento'
+};
+
+const getSortLabel = (value: string) => {
+  return sortOptions[value as keyof typeof sortOptions] || value;
+};
+
+// Obter mensagem de estado vazio baseada na tab atual
+const getEmptyMessage = () => {
+  const messages = {
+    all: 'Você ainda não criou nenhuma solicitação',
+    pending: 'Não há solicitações pendentes no momento',
+    negotiating: 'Não há solicitações em negociação',
+    accepted: 'Não há solicitações aceitas',
+    completed: 'Não há solicitações concluídas',
+    cancelled: 'Não há solicitações canceladas'
+  };
+  
+  return messages[currentTab.value as keyof typeof messages] || 'Nenhuma solicitação encontrada';
+};
+
 onMounted(() => {
   store.loadRequests();
 });
@@ -402,7 +428,7 @@ const getStatusLabel = (status: string) => {
 
         <Select :model-value="sortBy" @update:model-value="(val: string) => sortBy = val">
           <SelectTrigger>
-            <SelectValue placeholder="Ordenar por" />
+            <SelectValue :placeholder="getSortLabel(sortBy)" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="recent">Mais recentes</SelectItem>
@@ -436,14 +462,16 @@ const getStatusLabel = (status: string) => {
         <!-- Empty State -->
         <Card v-else-if="currentRequests.length === 0" class="p-12 text-center">
           <FileText class="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <h3 class="text-lg font-semibold text-[#263238] mb-2">Nenhuma solicitação encontrada</h3>
+          <h3 class="text-lg font-semibold text-[#263238] mb-2">
+            {{ searchQuery || categoryFilter !== 'all' ? 'Nenhuma solicitação encontrada' : getEmptyMessage() }}
+          </h3>
           <p class="text-[#435574] mb-4">
             {{ searchQuery || categoryFilter !== 'all'
-              ? 'Tente ajustar os filtros'
+              ? 'Tente ajustar os filtros de busca'
               : 'Crie sua primeira solicitação de orçamento para encontrar o profissional ideal' }}
           </p>
           <Button
-            v-if="!searchQuery && categoryFilter === 'all'"
+            v-if="!searchQuery && categoryFilter === 'all' && currentTab === 'all'"
             @click="handleOpenCreateDialog"
             class="bg-[#286AD8] hover:bg-[#435574]"
           >
