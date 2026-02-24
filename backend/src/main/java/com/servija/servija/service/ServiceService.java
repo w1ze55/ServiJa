@@ -30,6 +30,7 @@ public class ServiceService {
     private final ServiceRepository serviceRepository;
     private final FreelancerRepository freelancerRepository;
     private final UserRepository userRepository;
+    private final FileStorageService fileStorageService;
     private final ObjectMapper objectMapper;
 
     /**
@@ -141,7 +142,23 @@ public class ServiceService {
             service.setTags(toJson(request.getTags()));
         }
         if (request.getImages() != null) {
-            service.setImages(toJson(request.getImages()));
+            // Coletar URLs das imagens antigas para deletar do S3
+            List<String> oldImagesUrls = fromJson(service.getImages());
+            List<String> newImagesUrls = request.getImages();
+
+            service.setImages(toJson(newImagesUrls));
+
+            // Deletar as imagens que não estão mais na lista e são URLs do S3
+            for (String oldUrl : oldImagesUrls) {
+                if (!newImagesUrls.contains(oldUrl) && isS3Url(oldUrl)) {
+                    try {
+                        fileStorageService.deleteFile(oldUrl);
+                    } catch (Exception e) {
+                        log.warn("Falha ao deletar imagem de serviço antiga do S3: {}. Erro: {}", oldUrl,
+                                e.getMessage());
+                    }
+                }
+            }
         }
         if (request.getIsActive() != null) {
             service.setIsActive(request.getIsActive());
@@ -168,8 +185,26 @@ public class ServiceService {
             throw new RuntimeException("Você não tem permissão para excluir este serviço");
         }
 
+        // Coletar URLs das imagens para deletar do S3
+        List<String> imageUrls = fromJson(service.getImages());
+
         serviceRepository.delete(service);
         log.info("Serviço excluído: {}", id);
+
+        // Deletar imagens do S3
+        for (String url : imageUrls) {
+            if (isS3Url(url)) {
+                try {
+                    fileStorageService.deleteFile(url);
+                } catch (Exception e) {
+                    log.warn("Falha ao deletar imagem de serviço do S3 ao excluir: {}. Erro: {}", url, e.getMessage());
+                }
+            }
+        }
+    }
+
+    private boolean isS3Url(String url) {
+        return url != null && url.contains(".s3.") && url.contains("amazonaws.com");
     }
 
     /**

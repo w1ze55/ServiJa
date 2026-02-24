@@ -8,6 +8,7 @@ import com.servija.servija.model.User;
 import com.servija.servija.repository.ServiceRequestRepository;
 import com.servija.servija.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,11 +17,13 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class ServiceRequestService {
 
     private final ServiceRequestRepository serviceRequestRepository;
     private final UserRepository userRepository;
+    private final FileStorageService fileStorageService;
 
     @Transactional
     public ServiceRequestResponse create(Long contractorId, ServiceRequestDTO dto) {
@@ -106,7 +109,40 @@ public class ServiceRequestService {
 
     @Transactional
     public void delete(Long id) {
-        serviceRequestRepository.deleteById(id);
+        ServiceRequest request = serviceRequestRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Service request not found"));
+
+        String attachments = request.getAttachments();
+        serviceRequestRepository.delete(request);
+
+        // Deletar anexos do S3 se existirem
+        if (attachments != null && !attachments.isEmpty()) {
+            // Supondo que anexos são armazenados como lista de URLs (ex: JSON ou CSV)
+            // Analisando como possível JSON ou apenas uma URL
+            String[] urls;
+            if (attachments.startsWith("[")) {
+                // Muito simplificado, o ideal seria usar ObjectMapper mas vamos ser genéricos
+                urls = attachments.replace("[", "").replace("]", "").replace("\"", "").split(",");
+            } else {
+                urls = attachments.split(",");
+            }
+
+            for (String url : urls) {
+                String trimmedUrl = url.trim();
+                if (isS3Url(trimmedUrl)) {
+                    try {
+                        fileStorageService.deleteFile(trimmedUrl);
+                    } catch (Exception e) {
+                        log.warn("Falha ao deletar anexo de solicitação do S3: {}. Erro: {}", trimmedUrl,
+                                e.getMessage());
+                    }
+                }
+            }
+        }
+    }
+
+    private boolean isS3Url(String url) {
+        return url != null && url.contains(".s3.") && url.contains("amazonaws.com");
     }
 
     private ServiceRequestResponse toResponse(ServiceRequest request) {

@@ -33,6 +33,7 @@ import api from '@/api/config/axios'
 import { toast } from '@/utils/toast'
 import { formatCPF, formatPhone } from '@/utils/masks'
 import { useUserStore } from '@/stores/userStore'
+import { uploadAvatar } from '@/api/uploadService'
 
 const userStore = useUserStore()
 
@@ -329,32 +330,19 @@ const handleFileUpload = async (event: Event) => {
 
   isUploadingAvatar.value = true
   try {
-    const reader = new FileReader()
-    reader.onload = async (e) => {
-      const base64 = e.target?.result as string
-      
-      try {
-        await api.put('/users/me/avatar', {
-          avatarBase64: base64,
-        })
-        
-        personalData.value.avatarUrl = base64
-        editedPersonalData.value.avatarUrl = base64
-        
-        // Atualizar store global para refletir as mudanças no header imediatamente
-        userStore.updateUser({ avatar: base64 })
-        
-        toast.success('Foto atualizada com sucesso!')
-      } catch (error: any) {
-        const errorMessage = error.response?.data?.message || 'Erro ao atualizar foto'
-        toast.error(errorMessage)
-      } finally {
-        isUploadingAvatar.value = false
-      }
-    }
-    reader.readAsDataURL(file)
-  } catch (error) {
-    toast.error('Erro ao processar imagem')
+    const url = await uploadAvatar(file)
+    
+    personalData.value.avatarUrl = url
+    editedPersonalData.value.avatarUrl = url
+    
+    // Atualizar store global para refletir as mudanças no header imediatamente
+    userStore.updateUser({ avatar: url })
+    
+    toast.success('Foto atualizada com sucesso!')
+  } catch (error: any) {
+    const errorMessage = error.response?.data?.message || 'Erro ao atualizar foto'
+    toast.error(errorMessage)
+  } finally {
     isUploadingAvatar.value = false
   }
 }
