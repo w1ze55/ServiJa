@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, inject, ref, watch } from 'vue';
 import { cn } from './utils';
 
 interface Props {
@@ -8,6 +8,9 @@ interface Props {
 }
 
 const props = defineProps<Props>();
+
+// Inject avatar image state from parent Avatar component
+const hasImage = inject<Ref<boolean>>('hasAvatarImage', ref(false));
 
 const classes = computed(() =>
   cn(
@@ -19,6 +22,7 @@ const classes = computed(() =>
 
 <template>
   <div
+    v-if="!hasImage"
     data-slot="avatar-fallback"
     :class="classes"
     v-bind="$attrs"

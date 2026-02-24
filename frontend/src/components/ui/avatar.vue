@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, provide, ref } from 'vue';
 import { cn } from './utils';
 
 interface Props {
@@ -8,6 +8,15 @@ interface Props {
 }
 
 const props = defineProps<Props>();
+
+// State to track if avatar has a valid image
+const hasImage = ref(false);
+
+// Provide state and setter to child components
+provide('hasAvatarImage', hasImage);
+provide('setHasAvatarImage', (value: boolean) => {
+  hasImage.value = value;
+});
 
 const classes = computed(() =>
   cn(
