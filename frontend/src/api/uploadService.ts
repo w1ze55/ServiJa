@@ -51,8 +51,25 @@ export const deleteImage = async (url: string): Promise<void> => {
   });
 };
 
+/**
+ * Upload de avatar do usuário atual
+ */
+export const uploadAvatar = async (file: File): Promise<string> => {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const response = await api.put<UploadResponse>('/users/me/avatar/upload', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+
+  return response.data.url;
+};
+
 export default {
   uploadImage,
   uploadImages,
   deleteImage,
+  uploadAvatar,
 };
