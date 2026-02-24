@@ -67,7 +67,7 @@ const proposalStore = useProposalStore();
 const searchQuery = ref('');
 const categoryFilter = ref('all');
 const sortBy = ref('recent');
-const currentTab = ref('pending');
+const currentTab = ref('all');
 const currentPage = ref(1);
 const itemsPerPage = 6;
 
@@ -77,6 +77,32 @@ const selectedProposal = ref<Proposal | null>(null);
 const rejectReason = ref('');
 
 const categories = ['Eletricista', 'Encanador', 'Pintor', 'Pedreiro', 'Designer', 'Desenvolvedor'];
+
+// Mapeamento de valores de ordenação para português
+const sortOptions = {
+  recent: 'Mais recentes',
+  priority: 'Prioridade',
+  'budget-high': 'Maior orçamento',
+  'budget-low': 'Menor orçamento'
+};
+
+const getSortLabel = (value: string) => {
+  return sortOptions[value as keyof typeof sortOptions] || value;
+};
+
+// Obter mensagem de estado vazio baseada na tab atual
+const getEmptyMessage = () => {
+  const messages = {
+    all: 'Você ainda não recebeu nenhuma solicitação',
+    pending: 'Não há solicitações pendentes no momento',
+    negotiating: 'Não há solicitações em negociação',
+    accepted: 'Não há solicitações aceitas',
+    rejected: 'Não há solicitações recusadas',
+    completed: 'Não há solicitações concluídas'
+  };
+  
+  return messages[currentTab.value as keyof typeof messages] || 'Nenhuma solicitação encontrada';
+};
 
 onMounted(() => {
   proposalStore.loadProposals();
@@ -314,7 +340,7 @@ watch(currentTab, () => {
 
         <Select :model-value="sortBy" @update:model-value="(val: string) => sortBy = val">
           <SelectTrigger>
-            <SelectValue placeholder="Ordenar por" />
+            <SelectValue :placeholder="getSortLabel(sortBy)" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="recent">Mais recentes</SelectItem>
@@ -348,11 +374,13 @@ watch(currentTab, () => {
         <!-- Empty State -->
         <Card v-else-if="currentProposals.length === 0" class="p-12 text-center">
           <FileText class="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <h3 class="text-lg font-semibold text-[#263238] mb-2">Nenhuma solicitação encontrada</h3>
+          <h3 class="text-lg font-semibold text-[#263238] mb-2">
+            {{ searchQuery || categoryFilter !== 'all' ? 'Nenhuma solicitação encontrada' : getEmptyMessage() }}
+          </h3>
           <p class="text-[#435574]">
             {{ searchQuery || categoryFilter !== 'all'
-              ? 'Tente ajustar os filtros'
-              : 'Você receberá notificações quando novos clientes enviarem propostas' }}
+              ? 'Tente ajustar os filtros de busca'
+              : 'Você receberá notificações quando novos clientes enviarem solicitações' }}
           </p>
         </Card>
 
