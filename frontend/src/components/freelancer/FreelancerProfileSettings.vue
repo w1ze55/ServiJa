@@ -338,6 +338,8 @@ const handleFileUpload = async (event: Event) => {
   try {
     const url = await uploadAvatar(file)
     
+    console.log('Avatar uploaded, URL:', url)
+    
     personalData.value.avatarUrl = url
     editedPersonalData.value.avatarUrl = url
     
