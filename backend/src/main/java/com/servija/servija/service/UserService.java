@@ -90,9 +90,9 @@ public class UserService {
                 base64 = base64.substring(base64.indexOf(",") + 1);
             }
 
-            // Validar tamanho (limite de 2MB em base64 = ~1.5MB original)
-            if (base64.length() > 2_800_000) { // ~2MB em base64
-                throw new IllegalArgumentException("Imagem muito grande. Tamanho máximo: 2MB");
+            // Validar tamanho (limite de 5MB em base64 = ~3.75MB original)
+            if (base64.length() > 6_700_000) { // ~5MB em base64
+                throw new IllegalArgumentException("Imagem muito grande. Tamanho máximo: 5MB");
             }
 
             // Adicionar prefixo data:image/jpeg para facilitar exibição no frontend

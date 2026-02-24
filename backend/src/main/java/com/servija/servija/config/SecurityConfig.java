@@ -46,6 +46,7 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/api/auth/**",
                                 "/api/freelancer/nearby",
+                                "/api/freelancer/*/profile",
                                 "/api/services/public/**",
                                 "/api/files/**",
                                 "/error",

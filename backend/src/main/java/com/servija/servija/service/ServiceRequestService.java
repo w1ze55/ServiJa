@@ -26,8 +26,8 @@ public class ServiceRequestService {
     private final FileStorageService fileStorageService;
 
     @Transactional
-    public ServiceRequestResponse create(Long contractorId, ServiceRequestDTO dto) {
-        User contractor = userRepository.findById(contractorId)
+    public ServiceRequestResponse create(String contractorEmail, ServiceRequestDTO dto) {
+        User contractor = userRepository.findByEmail(contractorEmail)
                 .orElseThrow(() -> new RuntimeException("Contractor not found"));
 
         User freelancer = null;
@@ -51,18 +51,25 @@ public class ServiceRequestService {
                 .build();
 
         ServiceRequest saved = serviceRequestRepository.save(request);
+        log.info("Service request created: {} for freelancer: {}", saved.getId(), freelancer != null ? freelancer.getId() : "any");
         return toResponse(saved);
     }
 
-    public List<ServiceRequestResponse> getByContractor(Long contractorId) {
-        return serviceRequestRepository.findByContractorIdOrderByCreatedAtDesc(contractorId)
+    public List<ServiceRequestResponse> getByContractorEmail(String email) {
+        User contractor = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Contractor not found"));
+        
+        return serviceRequestRepository.findByContractorIdOrderByCreatedAtDesc(contractor.getId())
                 .stream()
                 .map(this::toResponse)
                 .toList();
     }
 
-    public List<ServiceRequestResponse> getByFreelancer(Long freelancerId) {
-        return serviceRequestRepository.findByFreelancerIdOrderByCreatedAtDesc(freelancerId)
+    public List<ServiceRequestResponse> getByFreelancerEmail(String email) {
+        User freelancer = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Freelancer not found"));
+        
+        return serviceRequestRepository.findByFreelancerIdOrderByCreatedAtDesc(freelancer.getId())
                 .stream()
                 .map(this::toResponse)
                 .toList();
@@ -150,8 +157,10 @@ public class ServiceRequestService {
                 .id(request.getId())
                 .contractorId(request.getContractor().getId())
                 .contractorName(request.getContractor().getName())
+                .contractorAvatar(request.getContractor().getAvatarUrl())
                 .freelancerId(request.getFreelancer() != null ? request.getFreelancer().getId() : null)
                 .freelancerName(request.getFreelancer() != null ? request.getFreelancer().getName() : null)
+                .freelancerAvatar(request.getFreelancer() != null ? request.getFreelancer().getAvatarUrl() : null)
                 .serviceName(request.getServiceName())
                 .category(request.getCategory())
                 .description(request.getDescription())

@@ -227,9 +227,16 @@ const handleImageUpload = async (e: Event) => {
       return;
     }
 
+    // Validar tamanho dos arquivos (5MB max)
+    const fileArray = Array.from(files);
+    const oversizedFiles = fileArray.filter((file) => file.size > 5 * 1024 * 1024);
+    if (oversizedFiles.length > 0) {
+      toast.error('Cada imagem deve ter no máximo 5MB');
+      return;
+    }
+
     isUploading.value = true;
     try {
-      const fileArray = Array.from(files);
       const uploadedUrls = await uploadImages(fileArray);
       handleInputChange('images', [...formData.value.images, ...uploadedUrls]);
       toast.success(`${files.length} imagem(ns) enviada(s) com sucesso`);

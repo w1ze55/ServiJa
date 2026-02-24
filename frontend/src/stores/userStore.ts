@@ -38,6 +38,7 @@ export const useUserStore = defineStore('user', () => {
         if (user.value) {
             user.value = { ...user.value, ...data }
             localStorage.setItem('user', JSON.stringify(user.value))
+            console.log('User updated in store:', user.value)
         }
     }
 

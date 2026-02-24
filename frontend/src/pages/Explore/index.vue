@@ -33,6 +33,12 @@ const currentUser = computed(() => {
 });
 
 const handleNavigate = (page: string, params?: Record<string, any>) => {
+  // Caso especial para provider-profile que usa parâmetro de rota
+  if (page === 'provider-profile' && params?.providerId) {
+    router.push({ name: 'provider-profile', params: { providerId: params.providerId } });
+    return;
+  }
+  
   const route = getRoute(page, currentUser.value.type);
   if (params) {
     router.push({ path: route, query: params });

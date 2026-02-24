@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import {
   Home,
@@ -69,6 +69,11 @@ const props = defineProps<Props>();
 
 // Usar o usuário da store se disponível, caso contrário usar das props
 const currentUser = computed(() => userStore.user || props.user);
+
+// Watch para debug
+watch(() => currentUser.value.avatar, (newAvatar, oldAvatar) => {
+  console.log('Avatar changed in MainLayout:', { old: oldAvatar, new: newAvatar })
+})
 
 const sidebarOpen = ref(false);
 const sidebarExpanded = ref(false);
@@ -292,7 +297,7 @@ const getInitials = (name: string) => {
         >
           <div :class="`flex items-center gap-3 ${sidebarExpanded ? '' : 'justify-center'}`">
             <Avatar class="h-10 w-10 flex-shrink-0">
-              <AvatarImage :src="currentUser.avatar" :alt="currentUser.name" />
+              <AvatarImage :key="currentUser.avatar" :src="currentUser.avatar" :alt="currentUser.name" />
               <AvatarFallback class="bg-[#286AD8] text-white">
                 {{ getInitials(currentUser.name) }}
               </AvatarFallback>
@@ -377,7 +382,7 @@ const getInitials = (name: string) => {
         <div class="p-4 border-t border-white/10">
           <div class="flex items-center gap-3">
             <Avatar class="h-10 w-10">
-              <AvatarImage :src="currentUser.avatar" :alt="currentUser.name" />
+              <AvatarImage :key="currentUser.avatar" :src="currentUser.avatar" :alt="currentUser.name" />
               <AvatarFallback class="bg-[#286AD8] text-white">
                 {{ getInitials(currentUser.name) }}
               </AvatarFallback>
@@ -432,7 +437,7 @@ const getInitials = (name: string) => {
               <DropdownMenuTrigger>
                 <button class="flex items-center gap-2 hover:opacity-80 transition-opacity">
                   <Avatar class="h-10 w-10 border-2 border-[#286AD8]">
-                    <AvatarImage :src="currentUser.avatar" :alt="currentUser.name" />
+                    <AvatarImage :key="currentUser.avatar" :src="currentUser.avatar" :alt="currentUser.name" />
                     <AvatarFallback class="bg-[#286AD8] text-white">
                       {{ getInitials(currentUser.name) }}
                     </AvatarFallback>

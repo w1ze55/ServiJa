@@ -329,14 +329,16 @@ const handleFileUpload = async (event: Event) => {
     return
   }
 
-  if (file.size > 2 * 1024 * 1024) {
-    toast.error('A imagem deve ter no máximo 2MB')
+  if (file.size > 5 * 1024 * 1024) {
+    toast.error('A imagem deve ter no máximo 5MB')
     return
   }
 
   isUploadingAvatar.value = true
   try {
     const url = await uploadAvatar(file)
+    
+    console.log('Avatar uploaded, URL:', url)
     
     personalData.value.avatarUrl = url
     editedPersonalData.value.avatarUrl = url

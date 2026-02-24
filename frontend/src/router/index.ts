@@ -30,6 +30,7 @@ import FavoritesPage from '@/pages/Favorites/index.vue';
 import ContractsPage from '@/pages/Contracts/index.vue';
 import FreelancerKYCPage from '@/pages/FreelancerKYC/index.vue';
 import FreelancerAccountSettingsPage from '@/pages/FreelancerAccountSettings/index.vue';
+import ProviderProfilePage from '@/pages/ProviderProfile/index.vue';
 import NotFoundPage from '@/pages/NotFound/index.vue';
 import RegisterPage from '@/pages/Register/index.vue';
 
@@ -260,6 +261,15 @@ const routes: RouteRecordRaw[] = [
     name: 'freelancer-account-settings',
     component: FreelancerAccountSettingsPage,
     meta: { requiresAuth: true, userType: 'provider' },
+  },
+
+  // Provider Profile (público)
+  {
+    path: '/provider-profile/:providerId',
+    name: 'provider-profile',
+    component: ProviderProfilePage,
+    meta: { requiresAuth: true },
+    props: true,
   },
 
   // ============ PÁGINA 404 - DEVE SER A ÚLTIMA ROTA ============
