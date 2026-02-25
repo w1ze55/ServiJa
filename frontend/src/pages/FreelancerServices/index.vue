@@ -171,13 +171,13 @@ const filteredServices = computed(() => {
   });
 
   // Ordenar
-  if (sortBy.value === 'recent') {
+  if (sortBy.value === 'Mais recentes') {
     filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  } else if (sortBy.value === 'price-asc') {
+  } else if (sortBy.value === 'Menor preço') {
     filtered.sort((a, b) => a.price - b.price);
-  } else if (sortBy.value === 'price-desc') {
+  } else if (sortBy.value === 'Maior preço') {
     filtered.sort((a, b) => b.price - a.price);
-  } else if (sortBy.value === 'title') {
+  } else if (sortBy.value === 'Nome (A-Z)') {
     filtered.sort((a, b) => a.title.localeCompare(b.title));
   }
 
