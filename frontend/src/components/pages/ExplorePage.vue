@@ -79,6 +79,13 @@ const categories = [
   { value: 'Beleza', label: '💅 Beleza' },
 ];
 
+const sortOptions = [
+  { value: 'recent', label: 'Mais recentes' },
+  { value: 'price-asc', label: 'Menor preço' },
+  { value: 'price-desc', label: 'Maior preço' },
+  { value: 'name-asc', label: 'Nome (A-Z)' },
+];
+
 const loadServices = async () => {
   isLoading.value = true;
   error.value = '';
@@ -240,7 +247,7 @@ onMounted(() => {
         <div class="w-full md:w-56">
           <Select :model-value="selectedCategory" @update:model-value="(val) => selectedCategory = val as string">
             <SelectTrigger>
-              <SelectValue placeholder="Categoria" />
+              <SelectValue :label="categories.find(c => c.value === selectedCategory)?.label" placeholder="Categoria" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem v-for="cat in categories" :key="cat.value" :value="cat.value">
@@ -254,7 +261,7 @@ onMounted(() => {
         <div class="w-full md:w-48">
           <Select :model-value="sortBy" @update:model-value="(val) => sortBy = val as string">
             <SelectTrigger>
-              <SelectValue />
+              <SelectValue :label="sortOptions.find(o => o.value === sortBy)?.label" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="recent">Mais recentes</SelectItem>
