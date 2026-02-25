@@ -25,6 +25,9 @@ import SelectContent from '../ui/select-content.vue';
 import SelectItem from '../ui/select-item.vue';
 import SelectTrigger from '../ui/select-trigger.vue';
 import SelectValue from '../ui/select-value.vue';
+import Tabs from '../ui/tabs.vue';
+import TabsList from '../ui/tabs-list.vue';
+import TabsTrigger from '../ui/tabs-trigger.vue';
 import api from '@/api/config/axios';
 import { toast } from '@/utils/toast';
 
@@ -58,6 +61,7 @@ const error = ref('');
 const searchQuery = ref('');
 const selectedCategory = ref('all');
 const sortBy = ref('recent');
+const searchMode = ref<'services' | 'professionals'>('services');
 const viewMode = ref<'grid' | 'list'>('grid');
 const favoriteIds = ref<Set<number>>(new Set());
 
@@ -209,7 +213,7 @@ onMounted(() => {
     <!-- Header -->
     <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
       <div>
-        <h1 class="text-2xl font-bold text-[#263238] mb-2">Explorar Profissionais</h1>
+        <h1 class="text-2xl font-bold text-[#263238] mb-2">Explorar</h1>
         <p class="text-[#435574]">
           Encontre profissionais qualificados com serviços cadastrados na plataforma
         </p>
@@ -219,6 +223,20 @@ onMounted(() => {
         Atualizar
       </Button>
     </div>
+
+    <!-- Mode Toggle -->
+    <Tabs v-model="searchMode" class="w-full">
+      <TabsList class="grid w-full grid-cols-2 max-w-[400px]">
+        <TabsTrigger value="services" class="flex items-center gap-2">
+          <Briefcase class="h-4 w-4" />
+          Serviços
+        </TabsTrigger>
+        <TabsTrigger value="professionals" class="flex items-center gap-2">
+          <SlidersHorizontal class="h-4 w-4" />
+          Profissionais
+        </TabsTrigger>
+      </TabsList>
+    </Tabs>
 
     <!-- Search & Filters Bar -->
     <Card class="p-4">
@@ -315,25 +333,14 @@ onMounted(() => {
       </div>
     </Card>
 
-    <!-- Results Count -->
-    <div class="flex items-center justify-between text-sm">
-      <p class="text-[#435574]">
-        <span class="font-semibold text-[#263238]">{{ filteredServices.length }}</span>
-        {{ filteredServices.length === 1 ? 'serviço' : 'serviços' }} de
-        <span class="font-semibold text-[#263238]">{{ totalFreelancers }}</span>
-        {{ totalFreelancers === 1 ? 'profissional' : 'profissionais' }}
-      </p>
-    </div>
-
-    <!-- Loading State -->
+    <!-- Results Content -->
     <div v-if="isLoading" class="flex items-center justify-center py-20">
       <div class="text-center">
         <Loader2 class="h-10 w-10 text-[#286AD8] animate-spin mx-auto mb-4" />
-        <p class="text-[#435574]">Carregando profissionais...</p>
+        <p class="text-[#435574]">Carregando resultados...</p>
       </div>
     </div>
 
-    <!-- Error State -->
     <div v-else-if="error" class="text-center py-16">
       <AlertCircle class="h-12 w-12 text-red-400 mx-auto mb-4" />
       <h3 class="text-lg font-semibold text-[#263238] mb-2">Ops, algo deu errado</h3>
@@ -343,22 +350,89 @@ onMounted(() => {
       </Button>
     </div>
 
-    <!-- Empty State -->
-    <div v-else-if="filteredServices.length === 0" class="text-center py-16">
-      <div class="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-        <Search class="h-10 w-10 text-[#435574]" />
+    <template v-else-if="searchMode === 'professionals'">
+      <div class="flex items-center justify-between text-sm mb-4">
+        <p class="text-[#435574]">
+          <span class="font-semibold text-[#263238]">{{ totalFreelancers }}</span>
+          {{ totalFreelancers === 1 ? 'profissional encontrado' : 'profissionais encontrados' }}
+        </p>
       </div>
-      <h3 class="text-lg font-semibold text-[#263238] mb-2">Nenhum profissional encontrado</h3>
-      <p class="text-[#435574] mb-6">
-        Tente ajustar seus filtros ou buscar por outro termo
-      </p>
-      <Button @click="clearFilters" variant="outline" class="border-[#286AD8] text-[#286AD8]">
-        Limpar filtros
-      </Button>
-    </div>
 
-    <!-- Grid View -->
-    <div v-else-if="viewMode === 'grid'" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+      <div v-if="freelancerGroups.length === 0" class="text-center py-16">
+        <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <Search class="h-8 w-8 text-[#435574]" />
+        </div>
+        <h3 class="text-[#263238] mb-2">Nenhum profissional encontrado</h3>
+        <p class="text-[#435574] mb-6">Tente ajustar seus filtros ou fazer uma nova busca</p>
+        <Button @click="clearFilters" variant="outline" class="border-[#286AD8] text-[#286AD8]">
+          Limpar filtros
+        </Button>
+      </div>
+
+      <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <Card
+          v-for="group in freelancerGroups"
+          :key="group.freelancerId"
+          class="p-6 hover:shadow-lg transition-all border border-gray-100 group cursor-pointer"
+          @click="props.onNavigate('provider-profile', { providerId: group.freelancerId })"
+        >
+          <div class="flex items-center gap-4 mb-4">
+            <div class="w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center text-xl font-bold text-[#286AD8] border border-blue-100">
+              {{ getInitials(group.freelancerName) }}
+            </div>
+            <div>
+              <h3 class="font-bold text-[#263238] group-hover:text-[#286AD8] transition-colors">
+                {{ group.freelancerName }}
+              </h3>
+              <p class="text-xs text-[#435574]">
+                {{ group.services.length }} {{ group.services.length === 1 ? 'serviço cadastrado' : 'serviços cadastrados' }}
+              </p>
+            </div>
+          </div>
+
+          <div class="space-y-3">
+            <p class="text-xs text-[#435574] line-clamp-1">
+              Atua em: <span class="font-semibold text-[#263238]">{{ Array.from(new Set(group.services.map(s => s.category))).join(', ') }}</span>
+            </p>
+            
+            <div class="flex flex-wrap gap-2 py-1">
+              <Badge v-for="svc in group.services.slice(0, 2)" :key="svc.id" variant="outline" class="text-[10px] bg-blue-50/30 text-[#286AD8] border-none">
+                {{ svc.title }}
+              </Badge>
+              <span v-if="group.services.length > 2" class="text-[10px] text-gray-400 self-center">
+                +{{ group.services.length - 2 }} mais
+              </span>
+            </div>
+
+            <Button class="w-full bg-white text-[#286AD8] border-[#286AD8] hover:bg-blue-50 hover:text-[#286AD8]" variant="outline">
+              Ver Perfil Completo
+            </Button>
+          </div>
+        </Card>
+      </div>
+    </template>
+
+    <template v-else>
+      <div class="flex items-center justify-between text-sm mb-4">
+        <p class="text-[#435574]">
+          <span class="font-semibold text-[#263238]">{{ filteredServices.length }}</span>
+          {{ filteredServices.length === 1 ? 'serviço encontrado' : 'serviços encontrados' }}
+        </p>
+      </div>
+
+      <div v-if="filteredServices.length === 0" class="text-center py-16">
+        <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <Search class="h-8 w-8 text-[#435574]" />
+        </div>
+        <h3 class="text-[#263238] mb-2">Nenhum serviço encontrado</h3>
+        <p class="text-[#435574] mb-6">Tente ajustar seus filtros ou fazer uma nova busca</p>
+        <Button @click="clearFilters" variant="outline" class="border-[#286AD8] text-[#286AD8]">
+          Limpar filtros
+        </Button>
+      </div>
+
+      <!-- Grid View -->
+      <div v-else-if="viewMode === 'grid'" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
       <Card
         v-for="service in filteredServices"
         :key="service.id"
@@ -512,5 +586,6 @@ onMounted(() => {
         </div>
       </Card>
     </div>
+    </template>
   </div>
 </template>
