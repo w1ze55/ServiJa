@@ -230,6 +230,15 @@ public class ServiceService {
     }
 
     /**
+     * Listar todos os serviços ativos de um freelancer específico (público)
+     */
+    @Transactional(readOnly = true)
+    public List<ServiceResponse> getPublicServicesByFreelancer(Long freelancerId) {
+        List<Service> services = serviceRepository.findByFreelancerIdAndIsActiveOrderByCreatedAtDesc(freelancerId, true);
+        return services.stream().map(this::toResponse).collect(Collectors.toList());
+    }
+
+    /**
      * Listar todos os serviços ativos
      */
     @Transactional(readOnly = true)
