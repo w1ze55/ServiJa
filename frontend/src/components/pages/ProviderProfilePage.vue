@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, watch } from 'vue';
+import { ref, onMounted, computed, watch, nextTick } from 'vue';
 import { useRoute } from 'vue-router';
 import {
   ArrowLeft,
@@ -135,7 +135,11 @@ const error = ref('');
 const quoteMessage = ref('');
 const quoteCategory = ref('');
 const quoteBudget = ref('');
+const formattedQuoteBudget = ref('');
 const quoteDeadline = ref('');
+const quoteDeadlineDate = ref('');
+const quoteDeadlineType = ref<'estimated' | 'decided'>('estimated');
+const quotePriority = ref('Media');
 const showQuoteDialog = ref(false);
 const activeTab = ref('services');
 const isSendingQuote = ref(false);
@@ -221,14 +225,121 @@ const getInitials = (name: string) => {
 };
 
 const formatPrice = (price: number, priceType: string) => {
-  const formatted = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(price);
+  const formatted = new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(price);
   const suffix = priceType === 'HOURLY' ? '/hora' : priceType === 'DAILY' ? '/dia' : '';
   return `${formatted}${suffix}`;
 };
 
-const formatDelivery = (time: number, unit: string) => {
+const formatPriceDisplay = (value: number): string => {
+  if (!value) return '';
+  const formatted = new Intl.NumberFormat('pt-BR', {
+    style: 'decimal',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(value);
+  return formatted;
+};
+
+const handleQuoteBudgetInput = (val: string) => {
+  // Remove tudo que não é dígito
+  let digits = val.replace(/\D/g, '');
+  
+  if (!digits) {
+    formattedQuoteBudget.value = '';
+    quoteBudget.value = '';
+    return;
+  }
+  
+  // Converter para centavos: últimos 2 dígitos são decimais
+  let numValue = parseInt(digits) / 100;
+  
+  // Limite de 1 milhão (R$ 1.000.000,00)
+  if (numValue > 1000000) {
+    numValue = 1000000;
+  }
+  
+  // Formatar para exibição
+  formattedQuoteBudget.value = formatPriceDisplay(numValue);
+  quoteBudget.value = numValue.toString();
+};
+
+const getDetailedApproximation = (totalDays: number) => {
+  // Garantir máximo de 365 dias
+  const d = Math.min(totalDays, 365);
+  if (d <= 0) return '';
+  
+  if (d === 365) return '1 ano';
+  
+  if (d >= 30) {
+    const months = Math.floor(d / 30);
+    const rem = d % 30;
+    let str = `${months} ${months === 1 ? 'mês' : 'meses'}`;
+    if (rem > 0) str += ` e ${rem} ${rem === 1 ? 'dia' : 'dias'}`;
+    return str;
+  }
+  
+  if (d >= 7) {
+    const weeks = Math.floor(d / 7);
+    const rem = d % 7;
+    let str = `${weeks} ${weeks === 1 ? 'semana' : 'semanas'}`;
+    if (rem > 0) str += ` e ${rem} ${rem === 1 ? 'dia' : 'dias'}`;
+    return str;
+  }
+  
+  return '';
+};
+
+const formatDelivery = (time: number, unit: string, showApproximation: boolean = true) => {
+  // Garantir máximo de 365 dias se a unidade for dias
+  const effectiveTime = unit === 'DAYS' && time > 365 ? 365 : time;
+  
   const unitLabel = unit === 'HOURS' ? 'hora(s)' : unit === 'DAYS' ? 'dia(s)' : 'semana(s)';
-  return `${time} ${unitLabel}`;
+  
+  let approximation = '';
+  if (showApproximation && unit === 'DAYS') {
+    const detailed = getDetailedApproximation(effectiveTime);
+    if (detailed) {
+      approximation = ` =~ ${detailed}`;
+    }
+  }
+  
+  return `${effectiveTime} ${unitLabel}${approximation}`;
+};
+
+const getDeadlineApproximation = (days: string) => {
+  const d = parseInt(days);
+  if (isNaN(d) || d <= 0) return '';
+  
+  const detailed = getDetailedApproximation(d);
+  return detailed ? `~ ${detailed}` : '';
+};
+
+const handleDeadlineInput = (val: string) => {
+  // Apenas dígitos
+  let digits = val.replace(/\D/g, '');
+  
+  if (digits) {
+    const d = parseInt(digits);
+    if (d > 365) {
+      if (quoteDeadline.value === '365') {
+        // Truque para forçar o Vue a atualizar o DOM mesmo quando o valor reativo não muda
+        quoteDeadline.value = '';
+        nextTick(() => {
+          quoteDeadline.value = '365';
+        });
+      } else {
+        quoteDeadline.value = '365';
+      }
+      return;
+    }
+  }
+  
+  quoteDeadline.value = digits;
 };
 
 const handleViewProject = (project: PortfolioProject) => {
@@ -264,8 +375,16 @@ const handleSendQuote = async () => {
     return;
   }
 
-  if (!quoteDeadline.value) {
-    toast.error('Por favor, informe um prazo');
+  const deadline = quoteDeadlineType.value === 'decided' 
+    ? quoteDeadlineDate.value 
+    : `${quoteDeadline.value} dias`;
+  
+  if (!quoteDeadline.value && quoteDeadlineType.value === 'estimated') {
+    toast.error('Por favor, informe a quantidade de dias');
+    return;
+  }
+  if (!quoteDeadlineDate.value && quoteDeadlineType.value === 'decided') {
+    toast.error('Por favor, selecione uma data');
     return;
   }
 
@@ -276,8 +395,8 @@ const handleSendQuote = async () => {
       category: quoteCategory.value,
       description: quoteMessage.value,
       budget: Number(quoteBudget.value),
-      deadline: quoteDeadline.value,
-      priority: 'MEDIUM',
+      deadline: deadline,
+      priority: quotePriority.value,
       address: '',
       urgency: 'normal',
       freelancerId: Number(props.providerId),
@@ -312,6 +431,9 @@ const handleServiceClick = (service: ServiceItem) => {
 
 const handleRequestService = (service: ServiceItem) => {
   quoteCategory.value = service.category;
+  quoteDeadlineType.value = 'estimated';
+  quoteDeadlineDate.value = '';
+  quoteDeadline.value = ''; // Clear previous estimate
   selectedServiceModal.value = null;
   showQuoteDialog.value = true;
 };
@@ -457,26 +579,93 @@ onMounted(() => {
 
                       <div>
                         <Label class="text-[#435574] mb-2 block text-sm">
-                          Orçamento estimado (R$) <span class="text-red-500">*</span>
+                          Orçamento estimado <span class="text-red-500">*</span>
                         </Label>
-                        <Input
-                          type="number"
-                          placeholder="Ex: 500"
-                          v-model="quoteBudget"
-                          min="0"
-                          step="0.01"
-                        />
+                        <div class="relative">
+                          <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">
+                            R$
+                          </span>
+                          <Input
+                            type="text"
+                            inputmode="numeric"
+                            placeholder="0,00"
+                            :model-value="formattedQuoteBudget"
+                            @update:model-value="(val: string) => handleQuoteBudgetInput(val)"
+                            class="pl-10"
+                          />
+                        </div>
+                      </div>
+
+                      <div class="space-y-3">
+                        <Label class="text-[#435574] mb-2 block text-sm">
+                          Prazo desejado <span class="text-red-500">*</span>
+                        </Label>
+                        
+                        <div class="flex p-1 bg-gray-100 rounded-lg mb-2">
+                          <button
+                            type="button"
+                            @click="quoteDeadlineType = 'estimated'"
+                            :class="[
+                              'flex-1 py-1.5 text-xs font-bold rounded-md transition-all',
+                              quoteDeadlineType === 'estimated' ? 'bg-white text-[#286AD8] shadow-sm' : 'text-[#435574] hover:text-[#263238]'
+                            ]"
+                          >
+                            Prazo estimado
+                          </button>
+                          <button
+                            type="button"
+                            @click="quoteDeadlineType = 'decided'"
+                            :class="[
+                              'flex-1 py-1.5 text-xs font-bold rounded-md transition-all',
+                              quoteDeadlineType === 'decided' ? 'bg-white text-[#286AD8] shadow-sm' : 'text-[#435574] hover:text-[#263238]'
+                            ]"
+                          >
+                            Prazo decidido
+                          </button>
+                        </div>
+
+                        <div v-if="quoteDeadlineType === 'estimated'">
+                          <div class="relative">
+                            <Input
+                              type="text"
+                              inputmode="numeric"
+                              placeholder="Quantidade de dias"
+                              :model-value="quoteDeadline"
+                              @update:model-value="handleDeadlineInput"
+                              class="pr-24"
+                            />
+                            <div class="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2 pointer-events-none">
+                              <span class="text-xs text-gray-400 font-medium">dia(s)</span>
+                              <Badge v-if="getDeadlineApproximation(quoteDeadline)" variant="secondary" class="bg-blue-50 text-[#286AD8] border-[#286AD8]/20 px-2 h-6 text-[10px]">
+                                {{ getDeadlineApproximation(quoteDeadline) }}
+                              </Badge>
+                            </div>
+                          </div>
+                        </div>
+                        <div v-else>
+                          <Input
+                            type="date"
+                            v-model="quoteDeadlineDate"
+                            class="w-full"
+                          />
+                        </div>
                       </div>
 
                       <div>
                         <Label class="text-[#435574] mb-2 block text-sm">
-                          Prazo desejado <span class="text-red-500">*</span>
+                          Prioridade <span class="text-red-500">*</span>
                         </Label>
-                        <Input
-                          type="text"
-                          placeholder="Ex: 7 dias, 2 semanas, urgente"
-                          v-model="quoteDeadline"
-                        />
+                        <Select v-model="quotePriority">
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione a prioridade" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Baixa">Baixa</SelectItem>
+                            <SelectItem value="Media">Média</SelectItem>
+                            <SelectItem value="Alta">Alta</SelectItem>
+                            <SelectItem value="Urgente">Urgente</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
 
                       <div>
@@ -1044,7 +1233,7 @@ onMounted(() => {
                 <div>
                   <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Tempo estimado</span>
                   <p class="text-2xl font-black text-[#263238]">
-                    {{ formatDelivery(selectedServiceModal.deliveryTime, selectedServiceModal.deliveryUnit) }}
+                    {{ formatDelivery(selectedServiceModal.deliveryTime, selectedServiceModal.deliveryUnit, false) }}
                   </p>
                 </div>
               </div>
