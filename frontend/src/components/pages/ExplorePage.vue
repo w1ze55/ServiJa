@@ -437,7 +437,7 @@ onMounted(() => {
         v-for="service in filteredServices"
         :key="service.id"
         class="group hover:shadow-lg hover:border-[#286AD8]/30 transition-all duration-200 overflow-hidden cursor-pointer"
-        @click="props.onNavigate('provider-profile', { providerId: service.freelancerId })"
+        @click="props.onNavigate('provider-profile', { providerId: service.freelancerId, serviceId: service.id })"
       >
         <!-- Service Image -->
         <div class="relative h-40 bg-gradient-to-br from-[#286AD8]/10 to-[#435574]/10 overflow-hidden">
@@ -516,7 +516,7 @@ onMounted(() => {
         v-for="service in filteredServices"
         :key="service.id"
         class="p-5 hover:shadow-md hover:border-[#286AD8]/30 transition-all cursor-pointer group"
-        @click="props.onNavigate('provider-profile', { providerId: service.freelancerId })"
+        @click="props.onNavigate('provider-profile', { providerId: service.freelancerId, serviceId: service.id })"
       >
         <div class="flex gap-4">
           <!-- Image -->

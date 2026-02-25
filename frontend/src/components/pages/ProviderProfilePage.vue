@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, watch } from 'vue';
+import { useRoute } from 'vue-router';
 import {
   ArrowLeft,
   Star,
@@ -28,6 +29,8 @@ import {
   Youtube,
   Globe,
   Link2,
+  CheckCircle,
+  MessageCircle,
 } from 'lucide-vue-next';
 import Button from '../ui/button.vue';
 import Card from '../ui/card.vue';
@@ -139,6 +142,10 @@ const isSendingQuote = ref(false);
 const selectedProject = ref<PortfolioProject | null>(null);
 const selectedImageIndex = ref(0);
 
+const route = useRoute();
+const selectedServiceModal = ref<ServiceItem | null>(null);
+const selectedServiceImageIndex = ref(0);
+
 const categories = [
   'Eletricista',
   'Encanador',
@@ -180,8 +187,29 @@ const loadFreelancerData = async () => {
     toast.error('Erro ao carregar perfil');
   } finally {
     isLoading.value = false;
+
+    // Check for serviceId in URL query to auto-open modal
+    const serviceId = route.query.serviceId;
+    if (serviceId && services.value.length > 0) {
+      const service = services.value.find(s => s.id === Number(serviceId));
+      if (service) {
+        selectedServiceModal.value = service;
+        selectedServiceImageIndex.value = 0;
+      }
+    }
   }
 };
+
+// Watch for serviceId in query to open modal (handles navigation within the same profile)
+watch(() => route.query.serviceId, (newId) => {
+  if (newId && services.value.length > 0) {
+    const service = services.value.find(s => s.id === Number(newId));
+    if (service) {
+      selectedServiceModal.value = service;
+      selectedServiceImageIndex.value = 0;
+    }
+  }
+});
 
 const getInitials = (name: string) => {
   return name
@@ -277,9 +305,15 @@ const handleSendQuote = async () => {
   }
 };
 
-const handleServiceClick = (serviceId: number) => {
-  // Aqui você pode navegar para uma página de detalhes do serviço se desejar
-  console.log('Service clicked:', serviceId);
+const handleServiceClick = (service: ServiceItem) => {
+  selectedServiceModal.value = service;
+  selectedServiceImageIndex.value = 0;
+};
+
+const handleRequestService = (service: ServiceItem) => {
+  quoteCategory.value = service.category;
+  selectedServiceModal.value = null;
+  showQuoteDialog.value = true;
 };
 
 const handleShare = () => {
@@ -503,7 +537,7 @@ onMounted(() => {
                     v-for="service in services"
                     :key="service.id"
                     class="overflow-hidden hover:shadow-lg hover:border-[#286AD8]/30 transition-all cursor-pointer group"
-                    @click="handleServiceClick(service.id)"
+                    @click="handleServiceClick(service)"
                   >
                     <!-- Service Image -->
                     <div class="relative h-40 bg-gradient-to-br from-[#286AD8]/10 to-[#435574]/10">
@@ -885,6 +919,202 @@ onMounted(() => {
                   </Button>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+
+    <!-- Service Details Modal (Deep Link / Direct Action) -->
+    <Dialog :open="selectedServiceModal !== null" @update:open="(val) => !val && (selectedServiceModal = null)">
+      <DialogContent class="max-w-4xl max-h-[90vh] p-0 border-none bg-transparent">
+        <div v-if="selectedServiceModal" class="relative bg-white rounded-xl overflow-hidden shadow-2xl h-[85vh] flex flex-col">
+          <!-- Gallery / Cover Image -->
+          <div class="relative h-80 bg-gray-900 overflow-hidden shrink-0">
+            <img
+              v-if="selectedServiceModal.images && selectedServiceModal.images.length > 0"
+              :src="selectedServiceModal.images[selectedServiceImageIndex]"
+              :alt="selectedServiceModal.title"
+              class="w-full h-full object-cover"
+            />
+            <div v-else class="w-full h-full flex flex-col items-center justify-center text-white/30 bg-gray-800">
+              <Briefcase class="h-16 w-16 mb-4" />
+              <span>Nenhuma imagem disponível</span>
+            </div>
+
+            <!-- Carousel Controls -->
+            <template v-if="selectedServiceModal.images && selectedServiceModal.images.length > 1">
+              <button
+                @click.stop="selectedServiceImageIndex = (selectedServiceImageIndex - 1 + selectedServiceModal.images.length) % selectedServiceModal.images.length"
+                class="absolute left-4 top-1/2 -translate-y-1/2 p-2 bg-black/40 hover:bg-black/60 text-white rounded-full transition-colors flex items-center justify-center"
+              >
+                <ChevronLeft class="h-6 w-6" />
+              </button>
+              <button
+                @click.stop="selectedServiceImageIndex = (selectedServiceImageIndex + 1) % selectedServiceModal.images.length"
+                class="absolute right-4 top-1/2 -translate-y-1/2 p-2 bg-black/40 hover:bg-black/60 text-white rounded-full transition-colors flex items-center justify-center"
+              >
+                <ChevronRight class="h-6 w-6" />
+              </button>
+
+              <!-- Thumbnails / Indicators -->
+              <div class="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
+                <button
+                  v-for="(img, index) in selectedServiceModal.images"
+                  :key="index"
+                  @click.stop="selectedServiceImageIndex = index"
+                  :class="[
+                    'w-12 h-12 rounded-lg overflow-hidden border-2 transition-all',
+                    selectedServiceImageIndex === index ? 'border-[#286AD8] scale-110' : 'border-transparent opacity-70 hover:opacity-100'
+                  ]"
+                >
+                  <img :src="img" class="w-full h-full object-cover" />
+                </button>
+              </div>
+            </template>
+            
+            <button 
+              @click="selectedServiceModal = null" 
+              class="absolute top-4 right-4 p-2 bg-black/20 hover:bg-black/40 backdrop-blur-md rounded-full text-white transition-all z-10"
+            >
+              <CloseIcon class="h-5 w-5" />
+            </button>
+          </div>
+
+          <div class="p-8 overflow-y-auto">
+            <!-- Freelancer Mini Profile -->
+            <div class="flex items-center gap-4 mb-8 pb-8 border-b border-gray-100">
+              <Avatar class="h-14 w-14 border-2 border-white shadow-sm">
+                <AvatarImage :src="freelancer?.profilePhoto" :alt="freelancer?.name" />
+                <AvatarFallback class="bg-[#286AD8] text-white">{{ freelancer?.name ? getInitials(freelancer.name) : '?' }}</AvatarFallback>
+              </Avatar>
+              <div class="flex-1">
+                <h3 class="font-bold text-[#263238] text-lg">{{ freelancer?.name }}</h3>
+                <div class="flex items-center gap-3 text-sm text-[#435574]">
+                  <div class="flex items-center gap-1">
+                    <Star class="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                    <span class="font-bold">{{ freelancer?.rating?.toFixed(1) || '0.0' }}</span>
+                    <span class="text-gray-400">({{ freelancer?.totalReviews || 0 }})</span>
+                  </div>
+                  <span class="text-gray-300">•</span>
+                  <div class="flex items-center gap-1">
+                    <MapPin class="h-4 w-4 text-gray-400" />
+                    <span>{{ freelancer?.location || 'Localização não informada' }}</span>
+                  </div>
+                </div>
+              </div>
+              <div class="hidden sm:flex gap-2">
+                <Button variant="outline" size="icon" class="rounded-full text-gray-400 border-gray-200">
+                  <Heart class="h-5 w-5" />
+                </Button>
+                <Button variant="outline" size="icon" class="rounded-full text-gray-400 border-gray-200">
+                  <Share2 class="h-5 w-5" />
+                </Button>
+              </div>
+            </div>
+
+            <!-- Title & Category -->
+            <div class="mb-8">
+              <div class="flex items-center gap-2 mb-3">
+                <Badge class="bg-blue-50 text-[#286AD8] border-none font-bold uppercase tracking-wider text-[10px] px-3">
+                  {{ selectedServiceModal.category }}
+                </Badge>
+              </div>
+              <h2 class="text-3xl font-bold text-[#263238] leading-tight">{{ selectedServiceModal.title }}</h2>
+            </div>
+
+            <!-- Card Info Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+              <div class="p-5 bg-gray-50 rounded-2xl flex items-start gap-4 border border-gray-100">
+                <div class="p-3 bg-white rounded-xl text-[#286AD8] shadow-sm">
+                  <DollarSign class="h-6 w-6" />
+                </div>
+                <div>
+                  <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Investimento</span>
+                  <p class="text-2xl font-black text-[#263238]">
+                    {{ formatPrice(selectedServiceModal.price, selectedServiceModal.priceType) }}
+                  </p>
+                </div>
+              </div>
+
+              <div class="p-5 bg-gray-50 rounded-2xl flex items-start gap-4 border border-gray-100">
+                <div class="p-3 bg-white rounded-xl text-green-600 shadow-sm">
+                  <Clock class="h-6 w-6" />
+                </div>
+                <div>
+                  <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Tempo estimado</span>
+                  <p class="text-2xl font-black text-[#263238]">
+                    {{ formatDelivery(selectedServiceModal.deliveryTime, selectedServiceModal.deliveryUnit) }}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Description -->
+            <div class="mb-8">
+              <h3 class="text-lg font-bold text-[#263238] mb-4">Sobre o Serviço</h3>
+              <p class="text-[#435574] leading-relaxed whitespace-pre-line text-lg">
+                {{ selectedServiceModal.description }}
+              </p>
+            </div>
+
+            <!-- What's included (Features) -->
+            <div class="mb-10">
+              <h3 class="text-lg font-bold text-[#263238] mb-4">O que está incluído</h3>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-8">
+                <div class="flex items-center gap-3 text-[#435574]">
+                  <CheckCircle class="h-5 w-5 text-green-500" />
+                  <span>Atendimento profissional e especializado</span>
+                </div>
+                <div class="flex items-center gap-3 text-[#435574]">
+                  <CheckCircle class="h-5 w-5 text-green-500" />
+                  <span>Materiais e ferramentas inclusas</span>
+                </div>
+                <div class="flex items-center gap-3 text-[#435574]">
+                  <CheckCircle class="h-5 w-5 text-green-500" />
+                  <span>Garantia de qualidade e suporte</span>
+                </div>
+                <div class="flex items-center gap-3 text-[#435574]">
+                  <CheckCircle class="h-5 w-5 text-green-500" />
+                  <span>Agendamento flexível de acordo com sua necessidade</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Freelancer Stats Bar -->
+            <div class="bg-gray-50 rounded-2xl p-6 mb-10">
+              <div class="grid grid-cols-3 gap-8 text-center">
+                <div>
+                  <p class="text-2xl font-black text-[#263238]">{{ freelancer?.completedJobs || 0 }}</p>
+                  <p class="text-xs font-bold text-[#435574] uppercase tracking-wider">Trabalhos Concluídos</p>
+                </div>
+                <div>
+                  <p class="text-2xl font-black text-[#263238]">{{ freelancer?.rating?.toFixed(1) || '0.0' }}</p>
+                  <p class="text-xs font-bold text-[#435574] uppercase tracking-wider">Avaliação Média</p>
+                </div>
+                <div>
+                  <p class="text-2xl font-black text-[#263238]">95%</p>
+                  <p class="text-xs font-bold text-[#435574] uppercase tracking-wider">Taxa de Sucesso</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="flex flex-col sm:flex-row gap-4 mb-4">
+              <Button 
+                @click="handleRequestService(selectedServiceModal)"
+                class="flex-1 bg-[#286AD8] hover:bg-[#435574] h-14 text-base font-bold shadow-lg shadow-[#286AD8]/20 transition-all active:scale-95 rounded-xl"
+              >
+                <Send class="h-5 w-5 mr-2" />
+                Solicitar este serviço
+              </Button>
+              <Button 
+                variant="outline"
+                class="bg-white border-2 border-gray-100 hover:border-[#286AD8] transition-all h-14 rounded-xl px-10 text-base font-bold text-[#435574] hover:text-[#286AD8]"
+              >
+                <MessageSquare class="h-5 w-5 mr-2" />
+                Conversar
+              </Button>
             </div>
           </div>
         </div>
