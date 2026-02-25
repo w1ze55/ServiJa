@@ -221,7 +221,7 @@ const filteredQuotes = computed(() =>
             <h3 class="text-gray-900 mb-1">Precisa de um novo serviço?</h3>
             <p class="text-gray-600">Busque entre centenas de profissionais qualificados</p>
           </div>
-          <Button @click="props.onNavigate('search')">
+          <Button @click="props.onNavigate('explore')">
             <Search :size="18" class="mr-2" />
             Buscar Profissionais
           </Button>
@@ -325,7 +325,7 @@ const filteredQuotes = computed(() =>
                   {{ activeTab !== 'all' ? `no status "${getStatusText(activeTab)}"` : '' }}
                 </h3>
                 <p class="text-gray-600 mb-4">Comece buscando profissionais para seus projetos</p>
-                <Button @click="props.onNavigate('search')">Buscar Profissionais</Button>
+                <Button @click="props.onNavigate('explore')">Buscar Profissionais</Button>
               </div>
             </div>
           </TabsContent>
