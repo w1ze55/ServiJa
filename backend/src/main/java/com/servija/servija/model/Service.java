@@ -69,6 +69,6 @@ public class Service {
     }
 
     public enum DeliveryUnit {
-        DAYS, WEEKS
+        DAYS, WEEKS, MONTHS
     }
 }
