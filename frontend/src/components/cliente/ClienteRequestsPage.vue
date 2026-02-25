@@ -116,7 +116,7 @@ const getEmptyMessage = () => {
     completed: 'Não há solicitações concluídas',
     cancelled: 'Não há solicitações canceladas'
   };
-  
+
   return messages[currentTab.value as keyof typeof messages] || 'Nenhuma solicitação encontrada';
 };
 
@@ -412,7 +412,7 @@ const getStatusLabel = (status: string) => {
 
         <Select :model-value="categoryFilter" @update:model-value="(val: string) => categoryFilter = val">
           <SelectTrigger>
-            <SelectValue placeholder="Todas as categorias" />
+            <SelectValue :label="categoryFilter === 'all' ? 'Todas as categorias' : categoryFilter" placeholder="Todas as categorias" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todas as categorias</SelectItem>
@@ -424,7 +424,7 @@ const getStatusLabel = (status: string) => {
 
         <Select :model-value="sortBy" @update:model-value="(val: string) => sortBy = val">
           <SelectTrigger>
-            <SelectValue :placeholder="getSortLabel(sortBy)" />
+            <SelectValue :label="getSortLabel(sortBy)" :placeholder="getSortLabel(sortBy)" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="recent">Mais recentes</SelectItem>

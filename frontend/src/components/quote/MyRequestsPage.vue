@@ -197,6 +197,28 @@ const formatDate = (dateString: string) => {
   if (diffDays < 7) return `${diffDays}d atrás`;
   return date.toLocaleDateString('pt-BR');
 };
+
+const getSortLabel = (value: string) => {
+  const options: Record<string, string> = {
+    'date-desc': 'Mais recentes',
+    'date-asc': 'Mais antigas',
+    'name-asc': 'Nome (A-Z)',
+    'name-desc': 'Nome (Z-A)',
+  };
+  return options[value] || value;
+};
+
+const getFilterStatusLabel = (value: string) => {
+  const labels: Record<string, string> = {
+    all: 'Todos os status',
+    pending: 'Pendente',
+    responded: 'Respondido',
+    accepted: 'Aceito',
+    rejected: 'Recusado',
+    cancelled: 'Cancelado',
+  };
+  return labels[value] || value;
+};
 </script>
 
 <template>
@@ -214,7 +236,7 @@ const formatDate = (dateString: string) => {
           <Select :model-value="filterStatus" @update:model-value="(val: string) => filterStatus = val">
             <SelectTrigger>
               <Filter class="h-4 w-4 mr-2" />
-              <SelectValue />
+              <SelectValue :label="getFilterStatusLabel(filterStatus)" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos os status</SelectItem>
@@ -231,7 +253,7 @@ const formatDate = (dateString: string) => {
           <Select :model-value="sortBy" @update:model-value="(val: string) => sortBy = val">
             <SelectTrigger>
               <ArrowUpDown class="h-4 w-4 mr-2" />
-              <SelectValue />
+              <SelectValue :label="getSortLabel(sortBy)" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="date-desc">Mais recentes</SelectItem>
