@@ -16,6 +16,18 @@ import {
   Share2,
   Heart,
   ChevronRight,
+  ExternalLink,
+  Calendar,
+  ChevronLeft,
+  X as CloseIcon,
+  Github,
+  Linkedin,
+  Instagram,
+  Twitter,
+  Facebook,
+  Youtube,
+  Globe,
+  Link2,
 } from 'lucide-vue-next';
 import Button from '../ui/button.vue';
 import Card from '../ui/card.vue';
@@ -91,14 +103,18 @@ interface PortfolioProject {
   title: string;
   description: string;
   category: string;
-  completedAt: string;
+  completedDate: string;
+  client: string;
   tags: string[];
+  featured: boolean;
   images: Array<{
     id: number;
-    url: string;
+    imageUrl: string;
     caption: string;
     displayOrder: number;
   }>;
+  projectUrl?: string;
+  videoUrl?: string;
 }
 
 interface Props {
@@ -120,6 +136,8 @@ const quoteDeadline = ref('');
 const showQuoteDialog = ref(false);
 const activeTab = ref('services');
 const isSendingQuote = ref(false);
+const selectedProject = ref<PortfolioProject | null>(null);
+const selectedImageIndex = ref(0);
 
 const categories = [
   'Eletricista',
@@ -137,16 +155,16 @@ const categories = [
 const loadFreelancerData = async () => {
   isLoading.value = true;
   error.value = '';
-  
+
   try {
     // Buscar dados do freelancer
     const freelancerResponse = await api.get(`/freelancer/${props.providerId}/profile`);
     freelancer.value = freelancerResponse.data;
-    
+
     // Buscar serviços do freelancer
-    const servicesResponse = await api.get('/services/public/all');
-    services.value = servicesResponse.data.filter((s: ServiceItem) => s.freelancerId === props.providerId);
-    
+    const servicesResponse = await api.get(`/services/public/freelancer/${props.providerId}`);
+    services.value = servicesResponse.data;
+
     // Buscar portfólio do freelancer
     try {
       const portfolioResponse = await api.get(`/portfolio/freelancer/${props.providerId}`);
@@ -155,7 +173,7 @@ const loadFreelancerData = async () => {
       console.log('Portfólio não disponível');
       portfolio.value = [];
     }
-    
+
   } catch (err: any) {
     console.error('Erro ao carregar dados do freelancer:', err);
     error.value = 'Não foi possível carregar os dados do profissional.';
@@ -183,6 +201,23 @@ const formatPrice = (price: number, priceType: string) => {
 const formatDelivery = (time: number, unit: string) => {
   const unitLabel = unit === 'HOURS' ? 'hora(s)' : unit === 'DAYS' ? 'dia(s)' : 'semana(s)';
   return `${time} ${unitLabel}`;
+};
+
+const handleViewProject = (project: PortfolioProject) => {
+  selectedProject.value = project;
+  selectedImageIndex.value = 0;
+};
+
+const getLinkIcon = (type: string) => {
+  const t = type.toLowerCase();
+  if (t.includes('github')) return Github;
+  if (t.includes('linkedin')) return Linkedin;
+  if (t.includes('instagram')) return Instagram;
+  if (t.includes('twitter') || t === 'x') return Twitter;
+  if (t.includes('facebook')) return Facebook;
+  if (t.includes('youtube')) return Youtube;
+  if (t.includes('portfolio') || t.includes('website') || t.includes('site')) return Globe;
+  return Link2;
 };
 
 const handleSendQuote = async () => {
@@ -222,7 +257,7 @@ const handleSendQuote = async () => {
 
     console.log('Enviando solicitação:', requestData);
     await api.post('/service-requests', requestData);
-    
+
     toast.success('Solicitação de orçamento enviada com sucesso!');
     showQuoteDialog.value = false;
     quoteMessage.value = '';
@@ -456,6 +491,13 @@ onMounted(() => {
 
               <!-- Services Tab -->
               <TabsContent value="services">
+                <div class="mb-6">
+                  <h3 class="text-[#263238] mb-1">Serviços cadastrados</h3>
+                  <p class="text-[#435574]">
+                    Disponíveis para contratação ({{ services.length }} itens)
+                  </p>
+                </div>
+                
                 <div v-if="services.length > 0" class="grid md:grid-cols-2 gap-4">
                   <Card
                     v-for="service in services"
@@ -474,7 +516,7 @@ onMounted(() => {
                       <div v-else class="w-full h-full flex items-center justify-center">
                         <Briefcase class="h-12 w-12 text-[#286AD8]/30" />
                       </div>
-                      <Badge class="absolute top-3 left-3 bg-white/90 backdrop-blur-sm">
+                      <Badge class="absolute top-3 left-3 bg-[#286AD8]/90 backdrop-blur-sm">
                         {{ service.category }}
                       </Badge>
                     </div>
@@ -542,10 +584,11 @@ onMounted(() => {
                         :key="link.id"
                         :href="link.url"
                         target="_blank"
-                        class="flex items-center gap-2 text-[#286AD8] hover:underline"
+                        class="flex items-center gap-3 p-3 rounded-lg border border-gray-100 hover:border-[#286AD8]/30 hover:bg-blue-50/30 transition-all group"
                       >
-                        <ChevronRight class="h-4 w-4" />
-                        {{ link.label || link.type }}
+                        <component :is="getLinkIcon(link.type)" class="h-5 w-5 text-[#435574] group-hover:text-[#286AD8]" />
+                        <span class="text-[#263238] font-medium group-hover:text-[#286AD8]">{{ link.label || link.type }}</span>
+                        <ExternalLink class="h-3.5 w-3.5 ml-auto text-gray-300 group-hover:text-[#286AD8]" />
                       </a>
                     </div>
                   </div>
@@ -554,22 +597,85 @@ onMounted(() => {
 
               <!-- Portfolio Tab -->
               <TabsContent value="portfolio">
-                <div v-if="portfolio.length > 0" class="grid md:grid-cols-2 gap-4">
+                <div class="mb-6">
+                  <h3 class="text-[#263238] mb-1">Portfólio</h3>
+                  <p class="text-[#435574]">
+                    Galeria de trabalhos realizados ({{ portfolio.length }} itens)
+                  </p>
+                </div>
+
+                <!-- Professional Links (Compact) -->
+                <div v-if="freelancer.professionalLinks && freelancer.professionalLinks.length > 0" class="mb-8 flex flex-wrap gap-2 justify-center">
+                  <a
+                    v-for="link in freelancer.professionalLinks"
+                    :key="link.id"
+                    :href="link.url"
+                    target="_blank"
+                    class="flex items-center gap-2 px-3 py-1.5 rounded-full border border-gray-200 bg-white text-xs text-[#435574] hover:border-[#286AD8] hover:text-[#286AD8] transition-all"
+                  >
+                    <component :is="getLinkIcon(link.type)" class="h-3.5 w-3.5" />
+                    <span>{{ link.label || link.type }}</span>
+                  </a>
+                </div>
+
+                <div v-if="portfolio.length > 0" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Card
                     v-for="project in portfolio"
                     :key="project.id"
-                    class="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
+                    @click="handleViewProject(project)"
+                    class="group relative bg-white border border-gray-200 rounded-lg overflow-hidden cursor-pointer hover:border-[#286AD8] hover:shadow-lg transition-all"
                   >
-                    <img
-                      v-if="project.images && project.images.length > 0"
-                      :src="project.images[0].url"
-                      :alt="project.title"
-                      class="w-full h-48 object-cover"
-                    />
+                    <div class="aspect-video relative bg-gray-100 overflow-hidden">
+                      <img
+                        v-if="project.images && project.images.length > 0"
+                        :src="project.images[0].imageUrl"
+                        :alt="project.title"
+                        class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
+                      <div v-else class="w-full h-full flex items-center justify-center">
+                        <Briefcase class="h-10 w-10 text-[#286AD8]/30" />
+                      </div>
+                      <Badge 
+                        v-if="project.featured" 
+                        class="absolute top-2 left-2 bg-yellow-500 hover:bg-yellow-600 text-white border-none text-[10px] px-1.5"
+                      >
+                        <Sparkles class="h-3 w-3 mr-1" />
+                        Destaque
+                      </Badge>
+                    </div>
+
                     <div class="p-4">
-                      <Badge variant="secondary" class="mb-2">{{ project.category }}</Badge>
-                      <h4 class="font-semibold text-[#263238] mb-1">{{ project.title }}</h4>
-                      <p class="text-sm text-[#435574]">{{ project.description }}</p>
+                      <p class="text-sm text-[#435574] line-clamp-2 mb-3">
+                        {{ project.description }}
+                      </p>
+
+                      <!-- Project Links on Card -->
+                      <div v-if="project.projectUrl || project.videoUrl" class="flex gap-2 mb-3">
+                        <Badge v-if="project.projectUrl" variant="outline" class="text-[10px] text-[#286AD8] border-[#286AD8]/20 bg-blue-50/50">
+                          <Link2 class="h-3 w-3 mr-1" /> Link
+                        </Badge>
+                        <Badge v-if="project.videoUrl" variant="outline" class="text-[10px] text-red-600 border-red-200 bg-red-50/50">
+                          <Youtube class="h-3 w-3 mr-1" /> Vídeo
+                        </Badge>
+                      </div>
+
+                      <div v-if="project.tags && project.tags.length > 0" class="flex flex-wrap gap-1">
+                        <Badge
+                          v-for="(tag, index) in project.tags.slice(0, 2)"
+                          :key="index"
+                          variant="secondary"
+                          class="bg-blue-50 text-[#286AD8] text-[10px] px-1.5 py-0"
+                        >
+                          {{ tag }}
+                        </Badge>
+                        <Badge
+                          v-if="project.tags.length > 2"
+                          variant="secondary"
+                          class="bg-gray-50 text-[#435574] text-[10px] px-1.5 py-0"
+                        >
+                          +{{ project.tags.length - 2 }}
+                        </Badge>
+                      </div>
                     </div>
                   </Card>
                 </div>
@@ -595,9 +701,31 @@ onMounted(() => {
             <!-- Work Model -->
             <Card class="p-6">
               <h3 class="font-semibold text-[#263238] mb-3">Modelo de trabalho</h3>
-              <Badge variant="secondary" class="text-sm">
-                {{ freelancer.workModel === 'remote' ? 'Remoto' : freelancer.workModel === 'onsite' ? 'Presencial' : 'Híbrido' }}
-              </Badge>
+              <div class="space-y-4">
+                <div class="flex items-center justify-between">
+                  <span class="text-sm text-[#435574]">Modo:</span>
+                  <Badge variant="secondary" class="text-sm">
+                    {{ freelancer.workModel === 'remoto' ? 'Remoto' : freelancer.workModel === 'presencial' ? 'Presencial' : freelancer.workModel === 'hibrido' ? 'Híbrido' : 'Não informado' }}
+                  </Badge>
+                </div>
+                
+                <div v-if="freelancer.serviceType" class="flex items-center justify-between border-t pt-3">
+                  <span class="text-sm text-[#435574]">Tipo:</span>
+                  <span class="text-sm font-medium text-[#263238]">{{ freelancer.serviceType }}</span>
+                </div>
+                
+                <div v-if="(freelancer.workModel === 'presencial' || freelancer.workModel === 'hibrido') && freelancer.serviceCities?.length" class="border-t pt-3">
+                  <p class="text-sm text-[#435574] mb-2">Cidades atendidas:</p>
+                  <div class="flex flex-wrap gap-1">
+                    <Badge v-for="city in freelancer.serviceCities.slice(0, 3)" :key="city.id" variant="outline" class="text-[10px] bg-white text-gray-600">
+                      {{ city.city }}
+                    </Badge>
+                    <span v-if="freelancer.serviceCities.length > 3" class="text-[10px] text-gray-400 self-center ml-1">
+                      +{{ freelancer.serviceCities.length - 3 }}
+                    </span>
+                  </div>
+                </div>
+              </div>
             </Card>
 
             <!-- Stats -->
@@ -642,4 +770,125 @@ onMounted(() => {
       </div>
     </div>
   </div>
+
+    <!-- Project Details Modal -->
+    <Dialog :open="selectedProject !== null" @update:open="(val) => !val && (selectedProject = null)">
+      <DialogContent class="max-w-4xl max-h-[90vh] p-0 border-none bg-transparent">
+        <div class="relative bg-white rounded-xl overflow-hidden shadow-2xl h-[80vh]">
+          <div class="grid grid-cols-1 md:grid-cols-2 h-full">
+            <!-- Image Carousel -->
+            <div class="relative bg-gray-900 flex items-center justify-center min-h-[300px] md:min-h-[500px]">
+              <img
+                v-if="selectedProject?.images && selectedProject.images.length > 0"
+                :src="selectedProject.images[selectedImageIndex].imageUrl"
+                :alt="selectedProject.title"
+                class="w-full h-full object-contain"
+              />
+              <div v-else class="flex flex-col items-center text-white/50">
+                <Briefcase class="h-16 w-16 mb-4" />
+                <span>Nenhuma imagem disponível</span>
+              </div>
+
+              <!-- Carousel Controls -->
+              <template v-if="selectedProject?.images && selectedProject.images.length > 1">
+                <button
+                  @click.stop="selectedImageIndex = (selectedImageIndex - 1 + selectedProject.images.length) % selectedProject.images.length"
+                  class="absolute left-4 top-1/2 -translate-y-1/2 p-2 bg-black/40 hover:bg-black/60 text-white rounded-full transition-colors"
+                >
+                  <ChevronLeft class="h-6 w-6" />
+                </button>
+                <button
+                  @click.stop="selectedImageIndex = (selectedImageIndex + 1) % selectedProject.images.length"
+                  class="absolute right-4 top-1/2 -translate-y-1/2 p-2 bg-black/40 hover:bg-black/60 text-white rounded-full transition-colors"
+                >
+                  <ChevronRight class="h-6 w-6" />
+                </button>
+
+                <!-- Indicators -->
+                <div class="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5">
+                  <span
+                    v-for="(_, index) in selectedProject.images"
+                    :key="index"
+                    class="w-2 h-2 rounded-full transition-all"
+                    :class="selectedImageIndex === index ? 'bg-[#286AD8] w-4' : 'bg-white/40'"
+                  ></span>
+                </div>
+              </template>
+            </div>
+
+            <!-- Project Details -->
+            <div class="p-6 md:p-8 flex flex-col h-full overflow-y-auto">
+              <div>
+                <Badge variant="secondary" class="mb-3 bg-blue-50 text-[#286AD8] border-none">
+                  {{ selectedProject?.category }}
+                </Badge>
+                <h2 class="text-2xl font-bold text-[#263238] mb-4 break-words">{{ selectedProject?.title }}</h2>
+
+                <p class="text-[#435574] leading-relaxed mb-6 whitespace-pre-line break-words w-full">
+                  {{ selectedProject?.description }}
+                </p>
+              </div>
+
+              <div class="mt-auto pt-6 border-t border-gray-100 flex flex-col gap-4">
+                <div class="flex flex-wrap items-center gap-3">
+                  <Badge v-if="selectedProject?.featured" class="bg-yellow-500 text-white border-none">
+                    <Sparkles class="h-3 w-3 mr-1" />
+                    Projeto em Destaque
+                  </Badge>
+                  <div class="flex items-center gap-2 text-sm text-[#435574]">
+                    <div class="p-2 bg-gray-50 rounded-lg">
+                      <Calendar class="h-4 w-4 text-[#286AD8]" />
+                    </div>
+                    <div>
+                      <p class="text-[10px] uppercase font-semibold text-gray-400">Concluído em</p>
+                      <p class="font-medium">
+                        {{ selectedProject?.completedDate ? new Date(selectedProject.completedDate).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }) : 'Data não informada' }}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div v-if="selectedProject?.client" class="flex items-center gap-2 text-sm text-[#435574]">
+                    <div class="p-2 bg-gray-50 rounded-lg">
+                      <Sparkles class="h-4 w-4 text-[#286AD8]" />
+                    </div>
+                    <div>
+                      <p class="text-[10px] uppercase font-semibold text-gray-400">Cliente</p>
+                      <p class="font-medium">{{ selectedProject.client }}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div v-if="selectedProject?.tags && selectedProject.tags.length > 0" class="flex flex-wrap gap-2">
+                  <Badge 
+                    v-for="tag in selectedProject.tags" 
+                    :key="tag"
+                    variant="secondary"
+                    class="bg-gray-100 hover:bg-gray-200 text-[#435574] transition-colors border-none"
+                  >
+                    {{ tag }}
+                  </Badge>
+                </div>
+
+                <!-- NEW: Project Links in Modal -->
+                <div v-if="selectedProject?.projectUrl || selectedProject?.videoUrl" class="flex flex-col sm:flex-row gap-3 pt-6 border-t border-gray-100">
+                  <Button v-if="selectedProject?.projectUrl" asChild class="flex-1 bg-[#286AD8] hover:bg-[#435574]">
+                    <a :href="selectedProject.projectUrl" target="_blank" class="flex items-center justify-center">
+                      <ExternalLink class="h-4 w-4 mr-2" />
+                      Acessar Projeto
+                    </a>
+                  </Button>
+                  <Button v-if="selectedProject?.videoUrl" asChild variant="outline" class="flex-1">
+                    <a :href="selectedProject.videoUrl" target="_blank" class="flex items-center justify-center">
+                      <Youtube class="h-4 w-4 mr-2" />
+                      Ver Vídeo
+                    </a>
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
 </template>
+```
