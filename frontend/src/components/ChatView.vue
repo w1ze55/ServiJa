@@ -34,7 +34,7 @@ export type Page =
   | 'freelancer-proposal-detail'
   | 'freelancer-deliveries'
   | 'freelancer-wallet'
-  | 'freelancer-invoices'
+
   | 'freelancer-portfolio'
   | 'freelancer-schedule'
   | 'freelancer-kyc'
