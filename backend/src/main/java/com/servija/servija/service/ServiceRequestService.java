@@ -1,5 +1,7 @@
 package com.servija.servija.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.servija.servija.dto.FreelancerResponseDTO;
 import com.servija.servija.dto.ServiceRequestDTO;
 import com.servija.servija.dto.ServiceRequestResponse;
@@ -14,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -24,6 +27,7 @@ public class ServiceRequestService {
     private final ServiceRequestRepository serviceRequestRepository;
     private final UserRepository userRepository;
     private final FileStorageService fileStorageService;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Transactional
     public ServiceRequestResponse create(String contractorEmail, ServiceRequestDTO dto) {
@@ -34,6 +38,15 @@ public class ServiceRequestService {
         if (dto.getFreelancerId() != null) {
             freelancer = userRepository.findById(dto.getFreelancerId())
                     .orElseThrow(() -> new RuntimeException("Freelancer not found"));
+        }
+
+        String attachmentsJson = null;
+        if (dto.getAttachments() != null && !dto.getAttachments().isEmpty()) {
+            try {
+                attachmentsJson = objectMapper.writeValueAsString(dto.getAttachments());
+            } catch (Exception e) {
+                log.warn("Erro ao serializar attachments: {}", e.getMessage());
+            }
         }
 
         ServiceRequest request = ServiceRequest.builder()
@@ -48,17 +61,19 @@ public class ServiceRequestService {
                 .address(dto.getAddress())
                 .desiredDate(dto.getDesiredDate() != null ? LocalDate.parse(dto.getDesiredDate()) : null)
                 .urgency(dto.getUrgency())
+                .attachments(attachmentsJson)
                 .build();
 
         ServiceRequest saved = serviceRequestRepository.save(request);
-        log.info("Service request created: {} for freelancer: {}", saved.getId(), freelancer != null ? freelancer.getId() : "any");
+        log.info("Service request created: {} for freelancer: {}", saved.getId(),
+                freelancer != null ? freelancer.getId() : "any");
         return toResponse(saved);
     }
 
     public List<ServiceRequestResponse> getByContractorEmail(String email) {
         User contractor = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Contractor not found"));
-        
+
         return serviceRequestRepository.findByContractorIdOrderByCreatedAtDesc(contractor.getId())
                 .stream()
                 .map(this::toResponse)
@@ -68,7 +83,7 @@ public class ServiceRequestService {
     public List<ServiceRequestResponse> getByFreelancerEmail(String email) {
         User freelancer = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Freelancer not found"));
-        
+
         return serviceRequestRepository.findByFreelancerIdOrderByCreatedAtDesc(freelancer.getId())
                 .stream()
                 .map(this::toResponse)
@@ -148,6 +163,18 @@ public class ServiceRequestService {
         }
     }
 
+    private List<String> parseAttachments(String json) {
+        if (json == null || json.isEmpty())
+            return new ArrayList<>();
+        try {
+            return objectMapper.readValue(json, new TypeReference<List<String>>() {
+            });
+        } catch (Exception e) {
+            log.warn("Erro ao deserializar attachments: {}", e.getMessage());
+            return new ArrayList<>();
+        }
+    }
+
     private boolean isS3Url(String url) {
         return url != null && url.contains(".s3.") && url.contains("amazonaws.com");
     }
@@ -178,6 +205,7 @@ public class ServiceRequestService {
                 .respondedAt(request.getRespondedAt())
                 .cancelReason(request.getCancelReason())
                 .rejectReason(request.getRejectReason())
+                .attachments(parseAttachments(request.getAttachments()))
                 .createdAt(request.getCreatedAt())
                 .updatedAt(request.getUpdatedAt())
                 .build();

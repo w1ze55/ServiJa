@@ -234,7 +234,8 @@ public class ServiceService {
      */
     @Transactional(readOnly = true)
     public List<ServiceResponse> getPublicServicesByFreelancer(Long freelancerId) {
-        List<Service> services = serviceRepository.findByFreelancerIdAndIsActiveOrderByCreatedAtDesc(freelancerId, true);
+        List<Service> services = serviceRepository.findByFreelancerIdAndIsActiveOrderByCreatedAtDesc(freelancerId,
+                true);
         return services.stream().map(this::toResponse).collect(Collectors.toList());
     }
 
@@ -299,6 +300,7 @@ public class ServiceService {
                 .tags(fromJson(service.getTags()))
                 .images(fromJson(service.getImages()))
                 .isActive(service.getIsActive())
+                .freelancerProfilePhoto(service.getFreelancer().getAvatarUrl())
                 .createdAt(service.getCreatedAt())
                 .updatedAt(service.getUpdatedAt())
                 .build();

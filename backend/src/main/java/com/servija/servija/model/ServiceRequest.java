@@ -97,7 +97,7 @@ public class ServiceRequest {
     private LocalDateTime updatedAt;
 
     public enum Priority {
-        LOW, MEDIUM, HIGH
+        LOW, MEDIUM, HIGH, URGENT
     }
 
     public enum Status {

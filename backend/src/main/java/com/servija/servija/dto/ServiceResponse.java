@@ -27,6 +27,7 @@ public class ServiceResponse {
     private List<String> tags;
     private List<String> images;
     private Boolean isActive;
+    private String freelancerProfilePhoto;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

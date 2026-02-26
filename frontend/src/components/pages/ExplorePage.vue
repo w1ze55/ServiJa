@@ -42,6 +42,7 @@ interface ServiceItem {
   priceType: string;
   deliveryTime: number;
   deliveryUnit: string;
+  freelancerProfilePhoto?: string;
   tags: string[];
   images: string[];
   isActive: boolean;
@@ -157,12 +158,13 @@ const filteredServices = computed(() => {
 });
 
 const freelancerGroups = computed(() => {
-  const groups: Record<number, { freelancerName: string; freelancerId: number; services: ServiceItem[] }> = {};
+  const groups: Record<number, { freelancerName: string; freelancerId: number; freelancerProfilePhoto?: string; services: ServiceItem[] }> = {};
   for (const svc of filteredServices.value) {
     if (!groups[svc.freelancerId]) {
       groups[svc.freelancerId] = {
         freelancerName: svc.freelancerName,
         freelancerId: svc.freelancerId,
+        freelancerProfilePhoto: svc.freelancerProfilePhoto,
         services: [],
       };
     }
@@ -377,8 +379,16 @@ onMounted(() => {
           @click="props.onNavigate('provider-profile', { providerId: group.freelancerId })"
         >
           <div class="flex items-center gap-4 mb-4">
-            <div class="w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center text-xl font-bold text-[#286AD8] border border-blue-100">
-              {{ getInitials(group.freelancerName) }}
+            <div class="w-16 h-16 rounded-full bg-blue-50 overflow-hidden flex items-center justify-center text-xl font-bold text-[#286AD8] border border-blue-100 flex-shrink-0">
+              <img
+                v-if="group.freelancerProfilePhoto"
+                :src="group.freelancerProfilePhoto"
+                :alt="group.freelancerName"
+                class="w-full h-full object-cover"
+              />
+              <template v-else>
+                {{ getInitials(group.freelancerName) }}
+              </template>
             </div>
             <div>
               <h3 class="font-bold text-[#263238] group-hover:text-[#286AD8] transition-colors">
@@ -477,8 +487,16 @@ onMounted(() => {
 
           <!-- Freelancer -->
           <div class="flex items-center gap-2 mb-3">
-            <div class="w-6 h-6 rounded-full bg-[#286AD8]/10 flex items-center justify-center text-xs font-semibold text-[#286AD8]">
-              {{ getInitials(service.freelancerName) }}
+            <div class="w-6 h-6 rounded-full bg-[#286AD8]/10 overflow-hidden flex items-center justify-center text-[10px] font-semibold text-[#286AD8]">
+              <img
+                v-if="service.freelancerProfilePhoto"
+                :src="service.freelancerProfilePhoto"
+                :alt="service.freelancerName"
+                class="w-full h-full object-cover"
+              />
+              <template v-else>
+                {{ getInitials(service.freelancerName) }}
+              </template>
             </div>
             <span class="text-sm text-[#435574]">{{ service.freelancerName }}</span>
           </div>
@@ -541,8 +559,16 @@ onMounted(() => {
                 </h3>
                 <div class="flex items-center gap-3 mb-2">
                   <div class="flex items-center gap-1.5">
-                    <div class="w-5 h-5 rounded-full bg-[#286AD8]/10 flex items-center justify-center text-[10px] font-semibold text-[#286AD8]">
-                      {{ getInitials(service.freelancerName) }}
+                    <div class="w-5 h-5 rounded-full bg-[#286AD8]/10 overflow-hidden flex items-center justify-center text-[8px] font-semibold text-[#286AD8]">
+                      <img
+                        v-if="service.freelancerProfilePhoto"
+                        :src="service.freelancerProfilePhoto"
+                        :alt="service.freelancerName"
+                        class="w-full h-full object-cover"
+                      />
+                      <template v-else>
+                        {{ getInitials(service.freelancerName) }}
+                      </template>
                     </div>
                     <span class="text-sm text-[#435574]">{{ service.freelancerName }}</span>
                   </div>

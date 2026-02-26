@@ -31,7 +31,10 @@ import {
   Link2,
   CheckCircle,
   MessageCircle,
+  Paperclip,
+  Trash2,
 } from 'lucide-vue-next';
+import { uploadImages } from '@/api/uploadService';
 import Button from '../ui/button.vue';
 import Card from '../ui/card.vue';
 import Badge from '../ui/badge.vue';
@@ -139,10 +142,13 @@ const formattedQuoteBudget = ref('');
 const quoteDeadline = ref('');
 const quoteDeadlineDate = ref('');
 const quoteDeadlineType = ref<'estimated' | 'decided'>('estimated');
-const quotePriority = ref('Media');
+const quotePriority = ref('MEDIUM');
+const requestedServiceTitle = ref('');
 const showQuoteDialog = ref(false);
 const activeTab = ref('services');
 const isSendingQuote = ref(false);
+const quoteAttachments = ref<File[]>([]);
+const fileInputRef = ref<HTMLInputElement | null>(null);
 const selectedProject = ref<PortfolioProject | null>(null);
 const selectedImageIndex = ref(0);
 
@@ -390,16 +396,26 @@ const handleSendQuote = async () => {
 
   isSendingQuote.value = true;
   try {
+    // Upload attachments to S3 first if any
+    let attachmentUrls: string[] = [];
+    if (quoteAttachments.value.length > 0) {
+      toast.info('Enviando anexos...');
+      attachmentUrls = await uploadImages(quoteAttachments.value);
+    }
+
     const requestData = {
-      serviceName: `${quoteCategory.value} - Solicitação`,
+      serviceName: requestedServiceTitle.value ? `${requestedServiceTitle.value} - Solicitação` : `${quoteCategory.value} - Solicitação`,
       category: quoteCategory.value,
-      description: quoteMessage.value,
+      description: requestedServiceTitle.value 
+        ? `[Solicitação referente ao serviço: ${requestedServiceTitle.value}]\n\n${quoteMessage.value}`
+        : quoteMessage.value,
       budget: Number(quoteBudget.value),
       deadline: deadline,
       priority: quotePriority.value,
       address: '',
       urgency: 'normal',
       freelancerId: Number(props.providerId),
+      attachments: attachmentUrls,
     };
 
     console.log('Enviando solicitação:', requestData);
@@ -407,10 +423,7 @@ const handleSendQuote = async () => {
 
     toast.success('Solicitação de orçamento enviada com sucesso!');
     showQuoteDialog.value = false;
-    quoteMessage.value = '';
-    quoteCategory.value = '';
-    quoteBudget.value = '';
-    quoteDeadline.value = '';
+    resetQuoteForm();
 
     setTimeout(() => {
       props.onNavigate('my-requests');
@@ -424,6 +437,44 @@ const handleSendQuote = async () => {
   }
 };
 
+const handleAddFiles = (event: Event) => {
+  const input = event.target as HTMLInputElement;
+  if (!input.files) return;
+  const maxSize = 10 * 1024 * 1024; // 10MB per file
+  Array.from(input.files).forEach((file) => {
+    if (file.size > maxSize) {
+      toast.error(`${file.name} excede 10MB e não pode ser anexado`);
+    } else if (quoteAttachments.value.length < 5) {
+      quoteAttachments.value.push(file);
+    } else {
+      toast.warning('Máximo de 5 arquivos por solicitação');
+    }
+  });
+  if (fileInputRef.value) fileInputRef.value.value = '';
+};
+
+const handleRemoveAttachment = (index: number) => {
+  quoteAttachments.value.splice(index, 1);
+};
+
+const formatFileSize = (bytes: number) => {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+};
+
+const resetQuoteForm = () => {
+  quoteMessage.value = '';
+  quoteCategory.value = '';
+  quoteBudget.value = '';
+  formattedQuoteBudget.value = '';
+  quoteDeadline.value = '';
+  quoteDeadlineDate.value = '';
+  quotePriority.value = 'MEDIUM';
+  requestedServiceTitle.value = '';
+  quoteAttachments.value = [];
+};
+
 const handleServiceClick = (service: ServiceItem) => {
   selectedServiceModal.value = service;
   selectedServiceImageIndex.value = 0;
@@ -431,9 +482,11 @@ const handleServiceClick = (service: ServiceItem) => {
 
 const handleRequestService = (service: ServiceItem) => {
   quoteCategory.value = service.category;
+  requestedServiceTitle.value = service.title;
   quoteDeadlineType.value = 'estimated';
   quoteDeadlineDate.value = '';
   quoteDeadline.value = ''; // Clear previous estimate
+  quotePriority.value = 'MEDIUM';
   selectedServiceModal.value = null;
   showQuoteDialog.value = true;
 };
@@ -660,10 +713,10 @@ onMounted(() => {
                             <SelectValue placeholder="Selecione a prioridade" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="Baixa">Baixa</SelectItem>
-                            <SelectItem value="Media">Média</SelectItem>
-                            <SelectItem value="Alta">Alta</SelectItem>
-                            <SelectItem value="Urgente">Urgente</SelectItem>
+                            <SelectItem value="LOW">Baixa</SelectItem>
+                            <SelectItem value="MEDIUM">Média</SelectItem>
+                            <SelectItem value="HIGH">Alta</SelectItem>
+                            <SelectItem value="URGENT">Urgente</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -678,6 +731,45 @@ onMounted(() => {
                           v-model="quoteMessage"
                           class="resize-none"
                         />
+                      </div>
+
+                      <!-- Attachments -->
+                      <div>
+                        <Label class="text-[#435574] mb-2 block text-sm">
+                          Anexos <span class="text-xs text-gray-400">(opcional · até 5 arquivos · máx. 10MB cada)</span>
+                        </Label>
+                        <input
+                          ref="fileInputRef"
+                          type="file"
+                          multiple
+                          class="hidden"
+                          @change="handleAddFiles"
+                        />
+                        <button
+                          type="button"
+                          @click="fileInputRef?.click()"
+                          class="w-full border-2 border-dashed border-gray-200 rounded-lg p-4 flex items-center justify-center gap-2 text-sm text-[#435574] hover:border-[#286AD8] hover:text-[#286AD8] transition-colors cursor-pointer"
+                        >
+                          <Paperclip class="h-4 w-4" />
+                          Clique para anexar arquivos
+                        </button>
+
+                        <ul v-if="quoteAttachments.length > 0" class="mt-2 space-y-1">
+                          <li
+                            v-for="(file, i) in quoteAttachments"
+                            :key="i"
+                            class="flex items-center justify-between bg-blue-50 border border-blue-100 rounded-md px-3 py-2 text-sm"
+                          >
+                            <span class="flex items-center gap-2 min-w-0">
+                              <Paperclip class="h-3.5 w-3.5 text-[#286AD8] shrink-0" />
+                              <span class="truncate text-[#263238]">{{ file.name }}</span>
+                              <span class="text-gray-400 shrink-0">{{ formatFileSize(file.size) }}</span>
+                            </span>
+                            <button type="button" @click="handleRemoveAttachment(i)" class="ml-2 text-gray-400 hover:text-red-500 transition-colors shrink-0">
+                              <Trash2 class="h-3.5 w-3.5" />
+                            </button>
+                          </li>
+                        </ul>
                       </div>
 
                       <Button 
