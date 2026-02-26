@@ -30,6 +30,7 @@ export interface RequestMessage {
 export interface AuditLogEntry {
     id: string;
     action: string;
+    operationKey?: string;
     user: string;
     timestamp: string;
     details?: string;
@@ -303,6 +304,24 @@ export const useClientRequestStore = defineStore('clientRequest', () => {
         }
     };
 
+    const loadHistory = async (requestId: string) => {
+        try {
+            const response = await api.get(`/service-requests/${requestId}/history`);
+            const request = requests.value.find((r) => r.id === requestId);
+            if (request) {
+                request.auditLog = response.data.map((entry: any) => ({
+                    id: String(entry.id),
+                    action: entry.operationType,
+                    operationKey: entry.operationKey,
+                    user: entry.userName,
+                    timestamp: entry.formattedDateTime,
+                }));
+            }
+        } catch (err) {
+            console.error('Erro ao carregar histórico:', err);
+        }
+    };
+
     return {
         requests,
         isLoading,
@@ -315,5 +334,6 @@ export const useClientRequestStore = defineStore('clientRequest', () => {
         acceptFreelancerResponse,
         rejectFreelancerResponse,
         sendMessage,
+        loadHistory,
     };
 });

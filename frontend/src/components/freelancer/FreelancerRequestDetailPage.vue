@@ -54,6 +54,7 @@ import Avatar from '../ui/avatar.vue';
 import AvatarFallback from '../ui/avatar-fallback.vue';
 import AvatarImage from '../ui/avatar-image.vue';
 import { useProposalStore, type Proposal, type Milestone } from '@/stores/proposalStore';
+import ServiceRequestTimeline from '../service/ServiceRequestTimeline.vue';
 import { toast } from '@/utils/toast';
 
 interface Props {
@@ -107,6 +108,7 @@ onMounted(async () => {
     proposal.value = proposalStore.getProposalById(props.requestId) || null;
     if (proposal.value) {
       proposalStore.markAsViewed(props.requestId);
+      await proposalStore.loadHistory(props.requestId);
     }
   }
 });
@@ -861,42 +863,10 @@ const getStatusBadge = (status: string) => {
 
         <!-- History Tab -->
         <TabsContent value="history" class="space-y-4">
-          <Card class="p-6">
-            <h3 class="text-lg font-semibold text-[#263238] mb-4">Histórico de Ações</h3>
-            <div v-if="!proposal.auditLog || proposal.auditLog.length === 0" class="text-center py-8">
-              <Clock class="h-12 w-12 text-gray-300 mx-auto mb-3" />
-              <p class="text-[#435574]">Nenhuma ação registrada</p>
-            </div>
-            <div v-else class="space-y-4">
-              <div v-for="(log, index) in proposal.auditLog" :key="log.id" class="flex gap-4">
-                <div class="flex flex-col items-center">
-                  <div class="w-3 h-3 bg-[#286AD8] rounded-full" />
-                  <div
-                    v-if="index < proposal.auditLog.length - 1"
-                    class="w-0.5 h-full bg-gray-300 my-1"
-                  />
-                </div>
-                <div class="flex-1 pb-6">
-                  <div class="flex items-start justify-between mb-1">
-                    <p class="font-medium text-[#263238]">{{ log.action }}</p>
-                    <span class="text-xs text-[#435574]">
-                      {{ new Date(log.timestamp).toLocaleString('pt-BR', {
-                        day: '2-digit',
-                        month: '2-digit',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      }) }}
-                    </span>
-                  </div>
-                  <p class="text-sm text-[#435574]">{{ log.user }}</p>
-                  <p v-if="log.details" class="text-sm text-[#435574] mt-1">
-                    {{ log.details }}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </Card>
+          <ServiceRequestTimeline
+            :entries="proposal.auditLog || []"
+            title="Histórico de Ações"
+          />
         </TabsContent>
       </Tabs>
     </template>

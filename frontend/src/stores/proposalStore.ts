@@ -66,6 +66,7 @@ export interface ProposalMessage {
 export interface AuditLogEntry {
   id: string;
   action: string;
+  operationKey?: string;
   user: string;
   timestamp: string;
   details?: string;
@@ -119,7 +120,7 @@ export const useProposalStore = defineStore('proposal', () => {
     error.value = null;
     try {
       const response = await api.get('/service-requests/received');
-      
+
       // Mapear dados da API para o formato da store
       proposals.value = response.data.map((req: any) => ({
         id: req.id.toString(),
@@ -353,6 +354,24 @@ export const useProposalStore = defineStore('proposal', () => {
     }
   };
 
+  const loadHistory = async (proposalId: string) => {
+    try {
+      const response = await api.get(`/service-requests/${proposalId}/history`);
+      const proposal = proposals.value.find((p) => p.id === proposalId);
+      if (proposal) {
+        proposal.auditLog = response.data.map((entry: any) => ({
+          id: String(entry.id),
+          action: entry.operationType,
+          operationKey: entry.operationKey,
+          user: entry.userName,
+          timestamp: entry.formattedDateTime,
+        }));
+      }
+    } catch (err) {
+      console.error('Erro ao carregar histórico:', err);
+    }
+  };
+
   return {
     proposals,
     isLoading,
@@ -369,5 +388,6 @@ export const useProposalStore = defineStore('proposal', () => {
     archiveProposal,
     sendMessage,
     updateMilestoneStatus,
+    loadHistory,
   };
 });

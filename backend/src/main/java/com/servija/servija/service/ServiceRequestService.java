@@ -6,6 +6,7 @@ import com.servija.servija.dto.FreelancerResponseDTO;
 import com.servija.servija.dto.ServiceRequestDTO;
 import com.servija.servija.dto.ServiceRequestResponse;
 import com.servija.servija.model.ServiceRequest;
+import com.servija.servija.model.ServiceRequestHistory.OperationType;
 import com.servija.servija.model.User;
 import com.servija.servija.repository.ServiceRequestRepository;
 import com.servija.servija.repository.UserRepository;
@@ -27,6 +28,7 @@ public class ServiceRequestService {
     private final ServiceRequestRepository serviceRequestRepository;
     private final UserRepository userRepository;
     private final FileStorageService fileStorageService;
+    private final ServiceRequestHistoryService historyService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Transactional
@@ -65,6 +67,7 @@ public class ServiceRequestService {
                 .build();
 
         ServiceRequest saved = serviceRequestRepository.save(request);
+        historyService.record(saved, contractor, OperationType.REQUEST_OPENED);
         log.info("Service request created: {} for freelancer: {}", saved.getId(),
                 freelancer != null ? freelancer.getId() : "any");
         return toResponse(saved);
@@ -97,9 +100,12 @@ public class ServiceRequestService {
     }
 
     @Transactional
-    public ServiceRequestResponse updateStatus(Long id, String status, String reason) {
+    public ServiceRequestResponse updateStatus(Long id, String status, String reason, String userEmail) {
         ServiceRequest request = serviceRequestRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Service request not found"));
+
+        User actionUser = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new RuntimeException("User not found"));
 
         ServiceRequest.Status newStatus = ServiceRequest.Status.valueOf(status.toUpperCase());
         request.setStatus(newStatus);
@@ -111,13 +117,26 @@ public class ServiceRequestService {
             request.setRejectReason(reason);
         }
 
-        return toResponse(serviceRequestRepository.save(request));
+        ServiceRequest saved = serviceRequestRepository.save(request);
+
+        if (newStatus == ServiceRequest.Status.REJECTED) {
+            historyService.record(saved, actionUser, OperationType.REQUEST_REJECTED);
+        } else if (newStatus == ServiceRequest.Status.ACCEPTED) {
+            historyService.record(saved, actionUser, OperationType.BUDGET_ACCEPTED);
+        } else if (newStatus == ServiceRequest.Status.NEGOTIATING) {
+            historyService.record(saved, actionUser, OperationType.COUNTER_PROPOSAL_SENT);
+        }
+
+        return toResponse(saved);
     }
 
     @Transactional
-    public ServiceRequestResponse respondToRequest(Long id, FreelancerResponseDTO dto) {
+    public ServiceRequestResponse respondToRequest(Long id, FreelancerResponseDTO dto, String freelancerEmail) {
         ServiceRequest request = serviceRequestRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Service request not found"));
+
+        User freelancer = userRepository.findByEmail(freelancerEmail)
+                .orElseThrow(() -> new RuntimeException("Freelancer not found"));
 
         request.setResponseValue(dto.getValue());
         request.setResponseDays(dto.getExecutionDays());
@@ -126,7 +145,10 @@ public class ServiceRequestService {
         request.setRespondedAt(LocalDateTime.now());
         request.setStatus(ServiceRequest.Status.NEGOTIATING);
 
-        return toResponse(serviceRequestRepository.save(request));
+        ServiceRequest saved = serviceRequestRepository.save(request);
+        historyService.record(saved, freelancer, OperationType.BUDGET_SENT);
+
+        return toResponse(saved);
     }
 
     @Transactional
