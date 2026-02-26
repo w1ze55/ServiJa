@@ -84,6 +84,28 @@ export const useProposalStore = defineStore('proposal', () => {
   const isLoading = ref(false);
   const error = ref<string | null>(null);
 
+  const extractFileName = (url: string): string => {
+    try {
+      const path = new URL(url).pathname;
+      const encoded = path.split('/').pop() || 'arquivo';
+      return decodeURIComponent(encoded);
+    } catch {
+      return url.split('/').pop() || 'arquivo';
+    }
+  };
+
+  const getFileType = (url: string): string => {
+    const ext = url.split('.').pop()?.toLowerCase().split('?')[0] || '';
+    const types: Record<string, string> = {
+      pdf: 'application/pdf',
+      jpg: 'image/jpeg', jpeg: 'image/jpeg',
+      png: 'image/png', gif: 'image/gif', webp: 'image/webp',
+      doc: 'application/msword',
+      docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    };
+    return types[ext] || 'application/octet-stream';
+  };
+
   const stats = computed<ProposalStats>(() => ({
     pending: proposals.value.filter((p) => p.status === 'pending').length,
     negotiating: proposals.value.filter((p) => p.status === 'negotiating').length,
@@ -112,7 +134,13 @@ export const useProposalStore = defineStore('proposal', () => {
         priority: req.priority.toLowerCase() as 'low' | 'medium' | 'high',
         status: mapApiStatusToLocal(req.status),
         receivedAt: req.createdAt,
-        attachments: [],
+        attachments: (req.attachments || []).map((url: string, idx: number) => ({
+          id: `att-${req.id}-${idx}`,
+          name: extractFileName(url),
+          size: '',
+          url,
+          type: getFileType(url),
+        })),
         viewed: true,
         address: req.address,
         desiredDate: req.desiredDate,

@@ -87,6 +87,28 @@ export const useClientRequestStore = defineStore('clientRequest', () => {
     const isLoading = ref(false);
     const error = ref<string | null>(null);
 
+    const extractFileName = (url: string): string => {
+        try {
+            const path = new URL(url).pathname;
+            const encoded = path.split('/').pop() || 'arquivo';
+            return decodeURIComponent(encoded);
+        } catch {
+            return url.split('/').pop() || 'arquivo';
+        }
+    };
+
+    const getFileType = (url: string): string => {
+        const ext = url.split('.').pop()?.toLowerCase().split('?')[0] || '';
+        const types: Record<string, string> = {
+            pdf: 'application/pdf',
+            jpg: 'image/jpeg', jpeg: 'image/jpeg',
+            png: 'image/png', gif: 'image/gif', webp: 'image/webp',
+            doc: 'application/msword',
+            docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        };
+        return types[ext] || 'application/octet-stream';
+    };
+
     const stats = computed<RequestStats>(() => ({
         pending: requests.value.filter((r) => r.status === 'pending' || r.status === 'sent').length,
         negotiating: requests.value.filter((r) => r.status === 'negotiating').length,
@@ -107,6 +129,13 @@ export const useClientRequestStore = defineStore('clientRequest', () => {
                 service: req.serviceName, // Backend usa serviceName
                 priority: (req.priority || 'MEDIUM').toLowerCase(),
                 status: (req.status || 'PENDING').toLowerCase(),
+                attachments: (req.attachments || []).map((url: string, idx: number) => ({
+                    id: `att-${req.id}-${idx}`,
+                    name: extractFileName(url),
+                    size: '',
+                    url,
+                    type: getFileType(url),
+                })),
                 freelancerResponse: req.responseValue ? {
                     value: req.responseValue,
                     executionDays: req.responseDays,

@@ -65,8 +65,8 @@ const props = defineProps<Props>();
 const proposalStore = useProposalStore();
 
 const searchQuery = ref('');
-const categoryFilter = ref('all');
-const sortBy = ref('recent');
+const categoryFilter = ref('Todas as categorias');
+const sortBy = ref('Mais recentes');
 const currentTab = ref('all');
 const currentPage = ref(1);
 const itemsPerPage = 6;
@@ -114,7 +114,7 @@ const filteredProposals = computed(() => {
       proposal.clientName.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
       proposal.service.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
       proposal.description.toLowerCase().includes(searchQuery.value.toLowerCase());
-    const matchesCategory = categoryFilter.value === 'all' || proposal.category === categoryFilter.value;
+    const matchesCategory = categoryFilter.value === 'Todas as categorias' || proposal.category === categoryFilter.value;
     const matchesTab =
       currentTab.value === 'all' ||
       (currentTab.value === 'pending' && proposal.status === 'pending') ||
@@ -126,13 +126,13 @@ const filteredProposals = computed(() => {
     return matchesSearch && matchesCategory && matchesTab;
   });
 
-  if (sortBy.value === 'recent') {
+  if (sortBy.value === 'Mais recentes') {
     filtered.sort((a, b) => new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime());
-  } else if (sortBy.value === 'budget-high') {
+  } else if (sortBy.value === 'Maior orçamento') {
     filtered.sort((a, b) => b.budget - a.budget);
-  } else if (sortBy.value === 'budget-low') {
+  } else if (sortBy.value === 'Menor orçamento') {
     filtered.sort((a, b) => a.budget - b.budget);
-  } else if (sortBy.value === 'priority') {
+  } else if (sortBy.value === 'Prioridade') {
     const priorityOrder = { high: 3, medium: 2, low: 1 };
     filtered.sort((a, b) => priorityOrder[b.priority] - priorityOrder[a.priority]);
   }
@@ -331,7 +331,7 @@ watch(currentTab, () => {
             <SelectValue placeholder="Todas as categorias" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todas as categorias</SelectItem>
+            <SelectItem value="Todas as categorias">Todas as categorias</SelectItem>
             <SelectItem v-for="cat in categories" :key="cat" :value="cat">
               {{ cat }}
             </SelectItem>
@@ -340,13 +340,13 @@ watch(currentTab, () => {
 
         <Select :model-value="sortBy" @update:model-value="(val: string) => sortBy = val">
           <SelectTrigger>
-            <SelectValue :placeholder="getSortLabel(sortBy)" />
+            <SelectValue placeholder="Mais recentes" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="recent">Mais recentes</SelectItem>
-            <SelectItem value="priority">Prioridade</SelectItem>
-            <SelectItem value="budget-high">Maior orçamento</SelectItem>
-            <SelectItem value="budget-low">Menor orçamento</SelectItem>
+            <SelectItem value="Mais recentes">Mais recentes</SelectItem>
+            <SelectItem value="Prioridade">Prioridade</SelectItem>
+            <SelectItem value="Maior orçamento">Maior orçamento</SelectItem>
+            <SelectItem value="Menor orçamento">Menor orçamento</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -375,10 +375,10 @@ watch(currentTab, () => {
         <Card v-else-if="currentProposals.length === 0" class="p-12 text-center">
           <FileText class="h-12 w-12 text-gray-400 mx-auto mb-4" />
           <h3 class="text-lg font-semibold text-[#263238] mb-2">
-            {{ searchQuery || categoryFilter !== 'all' ? 'Nenhuma solicitação encontrada' : getEmptyMessage() }}
+            {{ searchQuery || categoryFilter !== 'Todas as categorias' ? 'Nenhuma solicitação encontrada' : getEmptyMessage() }}
           </h3>
           <p class="text-[#435574]">
-            {{ searchQuery || categoryFilter !== 'all'
+            {{ searchQuery || categoryFilter !== 'Todas as categorias'
               ? 'Tente ajustar os filtros de busca'
               : 'Você receberá notificações quando novos clientes enviarem solicitações' }}
           </p>

@@ -408,6 +408,27 @@ const handleMessageAttachmentChange = (e: Event) => {
   }
 };
 
+const handleViewAttachment = (url: string) => {
+  window.open(url, '_blank');
+};
+
+const handleDownloadAttachment = async (url: string, fileName: string) => {
+  try {
+    const response = await fetch(url);
+    const blob = await response.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(blobUrl);
+  } catch {
+    window.open(url, '_blank');
+  }
+};
+
 const getUrgencyVariant = (urgency: string) => {
   if (urgency === 'Alta') return 'destructive';
   if (urgency === 'Média') return 'default';
@@ -824,11 +845,11 @@ const getStatusBadge = (status: string) => {
                   </div>
                 </div>
                 <div class="flex gap-2">
-                  <Button size="sm" variant="outline">
+                  <Button size="sm" variant="outline" @click="handleViewAttachment(att.url)">
                     <Eye class="h-4 w-4 mr-2" />
                     Visualizar
                   </Button>
-                  <Button size="sm" variant="outline">
+                  <Button size="sm" variant="outline" @click="handleDownloadAttachment(att.url, att.name)">
                     <Download class="h-4 w-4 mr-2" />
                     Baixar
                   </Button>
