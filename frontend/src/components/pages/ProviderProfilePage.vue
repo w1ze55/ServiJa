@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, watch, nextTick } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import {
   ArrowLeft,
   Star,
@@ -59,6 +59,7 @@ import AvatarImage from '../ui/avatar-image.vue';
 import AvatarFallback from '../ui/avatar-fallback.vue';
 import api from '@/api/config/axios';
 import { toast } from '@/utils/toast';
+import { useFavoritesStore } from '@/stores/favorites';
 
 interface FreelancerData {
   id: number;
@@ -148,6 +149,8 @@ const showQuoteDialog = ref(false);
 const activeTab = ref('services');
 const isSendingQuote = ref(false);
 const quoteAttachments = ref<File[]>([]);
+const favoritesStore = useFavoritesStore();
+const router = useRouter();
 const fileInputRef = ref<HTMLInputElement | null>(null);
 const selectedProject = ref<PortfolioProject | null>(null);
 const selectedImageIndex = ref(0);
@@ -478,6 +481,21 @@ const resetQuoteForm = () => {
 const handleServiceClick = (service: ServiceItem) => {
   selectedServiceModal.value = service;
   selectedServiceImageIndex.value = 0;
+  
+  // Update URL to include serviceId
+  router.replace({
+    query: { ...route.query, serviceId: service.id }
+  });
+};
+
+const handleCloseServiceModal = () => {
+  selectedServiceModal.value = null;
+  
+  // Remove serviceId from URL
+  const query = { ...route.query };
+  delete query.serviceId;
+  
+  router.replace({ query });
 };
 
 const handleRequestService = (service: ServiceItem) => {
@@ -505,8 +523,19 @@ const handleShare = () => {
   }
 };
 
+const handleToggleFavorite = async () => {
+  await favoritesStore.toggleFavoriteFreelancer(props.providerId);
+};
+
+const isFavorite = computed(() => {
+  return favoritesStore.isFavoriteFreelancer(props.providerId);
+});
+
 onMounted(() => {
   loadFreelancerData();
+  if (!favoritesStore.initialized) {
+    favoritesStore.fetchFavorites();
+  }
 });
 </script>
 
@@ -569,8 +598,13 @@ onMounted(() => {
                   <Button variant="outline" size="icon" @click="handleShare">
                     <Share2 class="h-4 w-4" />
                   </Button>
-                  <Button variant="outline" size="icon">
-                    <Heart class="h-4 w-4" />
+                  <Button 
+                    variant="outline" 
+                    size="icon"
+                    @click="handleToggleFavorite"
+                    :class="isFavorite ? 'text-red-500 border-red-200 bg-red-50 hover:bg-red-100 hover:text-red-600' : 'text-gray-400 hover:text-red-500'"
+                  >
+                    <Heart :class="['h-5 w-5', isFavorite ? 'fill-red-500 text-red-500' : '']" />
                   </Button>
                 </div>
               </div>
@@ -1207,7 +1241,7 @@ onMounted(() => {
     </Dialog>
 
     <!-- Service Details Modal (Deep Link / Direct Action) -->
-    <Dialog :open="selectedServiceModal !== null" @update:open="(val) => !val && (selectedServiceModal = null)">
+    <Dialog :open="selectedServiceModal !== null" @update:open="(val) => !val && handleCloseServiceModal()">
       <DialogContent class="max-w-4xl max-h-[90vh] p-0 border-none bg-transparent">
         <div v-if="selectedServiceModal" class="relative bg-white rounded-xl overflow-hidden shadow-2xl h-[85vh] flex flex-col">
           <!-- Gallery / Cover Image -->
@@ -1255,7 +1289,7 @@ onMounted(() => {
             </template>
             
             <button 
-              @click="selectedServiceModal = null" 
+              @click="handleCloseServiceModal" 
               class="absolute top-4 right-4 p-2 bg-black/20 hover:bg-black/40 backdrop-blur-md rounded-full text-white transition-all z-10"
             >
               <CloseIcon class="h-5 w-5" />

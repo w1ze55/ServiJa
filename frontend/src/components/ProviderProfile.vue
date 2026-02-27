@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import {
   ArrowLeft,
   Star,
@@ -10,6 +10,7 @@ import {
   Award,
   Sparkles,
   Send,
+  Heart,
 } from 'lucide-vue-next';
 import Button from './ui/button.vue';
 import Card from './ui/card.vue';
@@ -25,6 +26,7 @@ import DialogHeader from './ui/dialog-header.vue';
 import DialogTitle from './ui/dialog-title.vue';
 import DialogTrigger from './ui/dialog-trigger.vue';
 import { toast } from '../utils/toast';
+import { useFavoritesStore } from '../stores/favorites';
 
 export interface User {
   id: string;
@@ -162,10 +164,27 @@ const handleSendQuote = () => {
   showQuoteDialog.value = false;
   quoteMessage.value = '';
 
-  // Redireciona para o dashboard do contratante
   setTimeout(() => {
     props.onNavigate('contractor-dashboard');
   }, 1500);
+};
+
+const favoritesStore = useFavoritesStore();
+
+onMounted(() => {
+  if (!favoritesStore.initialized) {
+    favoritesStore.fetchFavorites();
+  }
+});
+
+const isFavorite = computed(() => {
+  const numericId = parseInt(props.providerId);
+  return favoritesStore.isFavoriteFreelancer(numericId);
+});
+
+const handleToggleFavorite = () => {
+  const numericId = parseInt(props.providerId);
+  favoritesStore.toggleFavoriteFreelancer(numericId);
 };
 </script>
 
@@ -247,6 +266,16 @@ const handleSendQuote = () => {
                   </div>
                 </DialogContent>
               </Dialog>
+
+              <Button 
+                variant="outline" 
+                size="lg"
+                @click="handleToggleFavorite"
+                :class="isFavorite ? 'text-red-500 border-red-200 bg-red-50' : ''"
+              >
+                <Heart :size="20" :class="`mr-2 ${isFavorite ? 'fill-current' : ''}`" />
+                {{ isFavorite ? 'Favorito' : 'Favoritar' }}
+              </Button>
 
               <Button variant="outline" size="lg">
                 <MessageSquare :size="20" class="mr-2" />
