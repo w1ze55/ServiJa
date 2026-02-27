@@ -1,5 +1,6 @@
 package com.servija.servija.controller;
 
+import com.servija.servija.dto.CounterProposalDTO;
 import com.servija.servija.dto.FreelancerResponseDTO;
 import com.servija.servija.dto.ServiceRequestDTO;
 import com.servija.servija.dto.ServiceRequestHistoryResponse;
@@ -88,6 +89,34 @@ public class ServiceRequestController {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String email = authentication.getName();
         return ResponseEntity.ok(serviceRequestService.respondToRequest(id, dto, email));
+    }
+
+    @PatchMapping("/{id}/counter-proposal")
+    @Operation(summary = "Enviar contra proposta", description = "Cliente envia uma contra proposta com novo valor e prazo")
+    @SecurityRequirement(name = "bearerAuth")
+    public ResponseEntity<ServiceRequestResponse> counterProposal(
+            @PathVariable Long id,
+            @RequestBody CounterProposalDTO dto,
+            Authentication authentication) {
+        return ResponseEntity.ok(serviceRequestService.counterProposal(id, dto, authentication.getName()));
+    }
+
+    @PatchMapping("/{id}/accept-counter")
+    @SecurityRequirement(name = "bearerAuth")
+    public ResponseEntity<ServiceRequestResponse> acceptCounter(
+            @PathVariable Long id,
+            Authentication authentication) {
+        return ResponseEntity.ok(serviceRequestService.acceptCounterProposal(id, authentication.getName()));
+    }
+
+    @PatchMapping("/{id}/reject-counter")
+    @SecurityRequirement(name = "bearerAuth")
+    public ResponseEntity<ServiceRequestResponse> rejectCounter(
+            @PathVariable Long id,
+            @RequestBody(required = false) Map<String, String> body,
+            Authentication authentication) {
+        String reason = (body != null) ? body.get("reason") : null;
+        return ResponseEntity.ok(serviceRequestService.rejectCounterProposal(id, reason, authentication.getName()));
     }
 
     @GetMapping("/{id}/history")

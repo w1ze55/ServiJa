@@ -54,6 +54,9 @@ export interface ServiceRequest {
     desiredDate?: string;
     attachments?: ServiceRequestAttachment[];
     freelancerResponse?: FreelancerResponse;
+    counterValue?: number;
+    counterDays?: number;
+    counterNotes?: string;
     cancelReason?: string;
     rejectReason?: string;
     messages?: RequestMessage[];
@@ -142,7 +145,12 @@ export const useClientRequestStore = defineStore('clientRequest', () => {
                     scope: req.responseScope,
                     notes: req.responseNotes,
                     sentAt: req.respondedAt
-                } : undefined
+                } : undefined,
+                counterValue: req.counterValue,
+                counterDays: req.counterDays,
+                counterNotes: req.counterNotes,
+                rejectReason: req.rejectReason,
+                cancelReason: req.cancelReason
             }));
         } catch (err) {
             error.value = 'Erro ao carregar solicitações';
@@ -269,6 +277,44 @@ export const useClientRequestStore = defineStore('clientRequest', () => {
         }
     };
 
+    const sendCounterProposal = async (
+        id: string,
+        value: number,
+        executionDays: number,
+        notes: string
+    ): Promise<boolean> => {
+        try {
+            const request = requests.value.find((r) => r.id === id);
+            if (!request) return false;
+
+            const response = await api.patch(`/service-requests/${id}/counter-proposal`, {
+                value,
+                executionDays,
+                notes
+            });
+
+            const updatedReq = response.data;
+            request.status = 'negotiating';
+            request.counterValue = updatedReq.counterValue;
+            request.counterDays = updatedReq.counterDays;
+            request.counterNotes = updatedReq.counterNotes;
+
+            request.auditLog = request.auditLog || [];
+            request.auditLog.unshift({
+                id: `log-${Date.now()}`,
+                action: 'Contra proposta enviada',
+                user: 'Você (Cliente)',
+                timestamp: new Date().toISOString(),
+                details: `Valor proposto: R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} | Prazo: ${executionDays} dias`,
+            });
+
+            return true;
+        } catch (err) {
+            console.error('Erro ao enviar contra proposta:', err);
+            return false;
+        }
+    };
+
     const sendMessage = async (
         id: string,
         message: string,
@@ -322,6 +368,7 @@ export const useClientRequestStore = defineStore('clientRequest', () => {
                     operationKey: entry.operationKey,
                     user: entry.userName,
                     timestamp: entry.formattedDateTime,
+                    details: entry.details,
                 }));
             }
         } catch (err) {
@@ -340,6 +387,7 @@ export const useClientRequestStore = defineStore('clientRequest', () => {
         cancelRequest,
         acceptFreelancerResponse,
         rejectFreelancerResponse,
+        sendCounterProposal,
         sendMessage,
         loadHistory,
     };

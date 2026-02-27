@@ -79,6 +79,16 @@ public class ServiceRequest {
     @Column(name = "responded_at")
     private LocalDateTime respondedAt;
 
+    // Counter-proposal fields
+    @Column(name = "counter_value", precision = 10, scale = 2)
+    private BigDecimal counterValue;
+
+    @Column(name = "counter_days")
+    private Integer counterDays;
+
+    @Column(name = "counter_notes", columnDefinition = "TEXT")
+    private String counterNotes;
+
     @Column(name = "cancel_reason", columnDefinition = "TEXT")
     private String cancelReason;
 

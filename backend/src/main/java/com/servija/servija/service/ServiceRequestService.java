@@ -2,6 +2,7 @@ package com.servija.servija.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.servija.servija.dto.CounterProposalDTO;
 import com.servija.servija.dto.FreelancerResponseDTO;
 import com.servija.servija.dto.ServiceRequestDTO;
 import com.servija.servija.dto.ServiceRequestResponse;
@@ -119,11 +120,15 @@ public class ServiceRequestService {
         ServiceRequest saved = serviceRequestRepository.save(request);
 
         if (newStatus == ServiceRequest.Status.REJECTED) {
-            historyService.record(saved, actionUser, OperationType.REQUEST_REJECTED);
+            String details = reason != null ? "Motivo: " + reason : null;
+            historyService.record(saved, actionUser, OperationType.REQUEST_REJECTED, details);
         } else if (newStatus == ServiceRequest.Status.ACCEPTED) {
             historyService.record(saved, actionUser, OperationType.BUDGET_ACCEPTED);
         } else if (newStatus == ServiceRequest.Status.NEGOTIATING) {
             historyService.record(saved, actionUser, OperationType.COUNTER_PROPOSAL_SENT);
+        } else if (newStatus == ServiceRequest.Status.CANCELLED) {
+            String details = reason != null ? "Motivo: " + reason : null;
+            historyService.record(saved, actionUser, OperationType.CANCELLED, details);
         }
 
         return toResponse(saved);
@@ -145,7 +150,85 @@ public class ServiceRequestService {
         request.setStatus(ServiceRequest.Status.NEGOTIATING);
 
         ServiceRequest saved = serviceRequestRepository.save(request);
-        historyService.record(saved, freelancer, OperationType.BUDGET_SENT);
+        String details = String.format("Valor: R$ %.2f | Prazo: %d dias", dto.getValue(), dto.getExecutionDays());
+        historyService.record(saved, freelancer, OperationType.BUDGET_SENT, details);
+
+        return toResponse(saved);
+    }
+
+    @Transactional
+    public ServiceRequestResponse counterProposal(Long id, CounterProposalDTO dto, String contractorEmail) {
+        ServiceRequest request = serviceRequestRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Service request not found"));
+
+        User contractor = userRepository.findByEmail(contractorEmail)
+                .orElseThrow(() -> new RuntimeException("Contractor not found"));
+
+        request.setCounterValue(dto.getValue());
+        request.setCounterDays(dto.getExecutionDays());
+        request.setCounterNotes(dto.getNotes());
+        request.setStatus(ServiceRequest.Status.NEGOTIATING);
+
+        ServiceRequest saved = serviceRequestRepository.save(request);
+        String details = String.format("Valor proposto: R$ %.2f | Prazo: %d dias", dto.getValue(),
+                dto.getExecutionDays());
+        historyService.record(saved, contractor, OperationType.COUNTER_PROPOSAL_SENT, details);
+
+        return toResponse(saved);
+    }
+
+    @Transactional
+    public ServiceRequestResponse acceptCounterProposal(Long id, String freelancerEmail) {
+        ServiceRequest request = serviceRequestRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Service request not found"));
+
+        User freelancer = userRepository.findByEmail(freelancerEmail)
+                .orElseThrow(() -> new RuntimeException("Freelancer not found"));
+
+        if (request.getCounterValue() != null) {
+            request.setResponseValue(request.getCounterValue());
+            request.setResponseDays(request.getCounterDays());
+            request.setResponseNotes(request.getCounterNotes());
+
+            // Clear counter fields after accepting
+            request.setCounterValue(null);
+            request.setCounterDays(null);
+            request.setCounterNotes(null);
+
+            request.setStatus(ServiceRequest.Status.ACCEPTED);
+
+            ServiceRequest saved = serviceRequestRepository.save(request);
+            String details = String.format("Contra proposta aceita. Novo valor: R$ %.2f", request.getResponseValue());
+            historyService.record(saved, freelancer, OperationType.COUNTER_PROPOSAL_ACCEPTED, details);
+            return toResponse(saved);
+        }
+
+        throw new RuntimeException("No counter proposal to accept");
+    }
+
+    @Transactional
+    public ServiceRequestResponse rejectCounterProposal(Long id, String reason, String freelancerEmail) {
+        ServiceRequest request = serviceRequestRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Service request not found"));
+
+        User freelancer = userRepository.findByEmail(freelancerEmail)
+                .orElseThrow(() -> new RuntimeException("Freelancer not found"));
+
+        // Clear counter fields
+        request.setCounterValue(null);
+        request.setCounterDays(null);
+        request.setCounterNotes(null);
+
+        // Status remains NEGOTIATING as we still have the original proposal
+        request.setStatus(ServiceRequest.Status.NEGOTIATING);
+
+        ServiceRequest saved = serviceRequestRepository.save(request);
+
+        String details = "Contra proposta recusada. Mantendo termos originais.";
+        if (reason != null && !reason.trim().isEmpty()) {
+            details += " Motivo: " + reason;
+        }
+        historyService.record(saved, freelancer, OperationType.COUNTER_PROPOSAL_REJECTED, details);
 
         return toResponse(saved);
     }
@@ -223,6 +306,9 @@ public class ServiceRequestService {
                 .responseScope(request.getResponseScope())
                 .responseNotes(request.getResponseNotes())
                 .respondedAt(request.getRespondedAt())
+                .counterValue(request.getCounterValue())
+                .counterDays(request.getCounterDays())
+                .counterNotes(request.getCounterNotes())
                 .cancelReason(request.getCancelReason())
                 .rejectReason(request.getRejectReason())
                 .attachments(parseAttachments(request.getAttachments()))

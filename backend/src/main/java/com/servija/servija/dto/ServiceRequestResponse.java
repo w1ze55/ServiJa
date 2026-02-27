@@ -42,6 +42,11 @@ public class ServiceRequestResponse {
     private String responseNotes;
     private LocalDateTime respondedAt;
 
+    // Counter-proposal
+    private BigDecimal counterValue;
+    private Integer counterDays;
+    private String counterNotes;
+
     private String cancelReason;
     private String rejectReason;
 

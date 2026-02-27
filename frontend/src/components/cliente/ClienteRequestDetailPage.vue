@@ -9,11 +9,9 @@ import {
   MessageSquare,
   CheckCircle,
   XCircle,
-  AlertCircle,
-  FileText,
-  Send,
   User,
   History,
+  FileEdit,
 } from 'lucide-vue-next';
 import Button from '../ui/button.vue';
 import Input from '../ui/input.vue';
@@ -58,7 +56,45 @@ const showCancelDialog = ref(false);
 const cancelReason = ref('');
 const showRejectDialog = ref(false);
 const rejectReason = ref('');
+const showCounterProposalDialog = ref(false);
+const counterValue = ref(0);
+const counterDays = ref(0);
+const counterNotes = ref('');
+const isSubmittingCounter = ref(false);
 const activeSection = ref<'details' | 'messages' | 'history'>('details');
+
+const handleOpenCounterProposalDialog = () => {
+  if (!request.value || !request.value.freelancerResponse) return;
+  counterValue.value = request.value.freelancerResponse.value;
+  counterDays.value = request.value.freelancerResponse.executionDays;
+  counterNotes.value = '';
+  showCounterProposalDialog.value = true;
+};
+
+const handleSendCounterProposal = async () => {
+  if (!request.value) return;
+
+  if (counterValue.value <= 0 || counterDays.value <= 0) {
+    toast.error('Informe um valor e prazo válidos');
+    return;
+  }
+
+  isSubmittingCounter.value = true;
+  const success = await store.sendCounterProposal(
+    request.value.id,
+    counterValue.value,
+    counterDays.value,
+    counterNotes.value
+  );
+  isSubmittingCounter.value = false;
+
+  if (success) {
+    toast.success('Contra proposta enviada com sucesso!');
+    showCounterProposalDialog.value = false;
+  } else {
+    toast.error('Erro ao enviar contra proposta');
+  }
+};
 
 onMounted(async () => {
   if (store.requests.length === 0) {
@@ -124,6 +160,13 @@ const handleSendMessage = async () => {
     toast.error('Erro ao enviar mensagem');
   }
 };
+
+const wasCounterProposalRejected = computed(() => {
+  if (!request.value) return false;
+  return request.value.status === 'negotiating' && 
+         !request.value.counterValue && 
+         request.value.auditLog?.some(log => log.operationKey === 'COUNTER_PROPOSAL_REJECTED');
+});
 
 const handleAcceptResponse = async () => {
   if (!request.value) return;
@@ -223,16 +266,16 @@ const getStatusLabel = (status: string) => {
           <div class="flex-1">
             <div class="flex items-center gap-3 mb-2 flex-wrap">
               <h1 class="text-2xl font-bold text-[#263238]">{{ request.service }}</h1>
-              <Badge :class="`${getStatusColor(request.status).bg} ${getStatusColor(request.status).text}`">
+              <Badge v-if="request" :class="`${getStatusColor(request.status).bg} ${getStatusColor(request.status).text}`">
                 {{ getStatusLabel(request.status) }}
               </Badge>
             </div>
             <div class="flex items-center gap-4 text-sm text-[#435574] flex-wrap">
-              <span class="flex items-center gap-1">
+              <span v-if="request" class="flex items-center gap-1">
                 <Calendar class="h-4 w-4" />
                 Criada em {{ formatDate(request.createdAt) }}
               </span>
-              <span v-if="request.address" class="flex items-center gap-1">
+              <span v-if="request?.address" class="flex items-center gap-1">
                 <MapPin class="h-4 w-4" />
                 {{ request.address }}
               </span>
@@ -240,7 +283,7 @@ const getStatusLabel = (status: string) => {
           </div>
           <div class="flex items-center gap-2">
             <Button
-              v-if="request.status === 'pending' || request.status === 'sent'"
+              v-if="request?.status === 'pending' || request?.status === 'sent'"
               @click="showCancelDialog = true"
               variant="outline"
               class="text-red-600 border-red-200 hover:bg-red-50"
@@ -248,6 +291,19 @@ const getStatusLabel = (status: string) => {
               <XCircle class="h-4 w-4 mr-2" />
               Cancelar
             </Button>
+          </div>
+        </div>
+
+        <!-- Rejection/Cancellation Reason Alert -->
+        <div v-if="(request.status === 'rejected' && request.rejectReason) || (request.status === 'cancelled' && request.cancelReason)" 
+             class="mt-4 p-4 rounded-lg border flex items-start gap-3"
+             :class="request.status === 'rejected' ? 'bg-red-50 border-red-100 text-red-900' : 'bg-gray-50 border-gray-100 text-gray-900'">
+          <AlertCircle class="h-5 w-5 mt-0.5 flex-shrink-0" :class="request.status === 'rejected' ? 'text-red-600' : 'text-gray-600'" />
+          <div>
+            <p class="font-semibold text-sm">
+              {{ request.status === 'rejected' ? 'Motivo da Recusa' : 'Motivo do Cancelamento' }}
+            </p>
+            <p class="text-sm opacity-90 italic">"{{ request.status === 'rejected' ? request.rejectReason : request.cancelReason }}"</p>
           </div>
         </div>
       </Card>
@@ -343,23 +399,57 @@ const getStatusLabel = (status: string) => {
             <!-- Action Buttons -->
             <div
               v-if="request.status === 'negotiating'"
-              class="flex items-center gap-3 pt-4 border-t"
+              class="space-y-4 pt-4 border-t"
             >
-              <Button
-                @click="handleAcceptResponse"
-                class="bg-green-600 hover:bg-green-700 flex-1"
-              >
-                <CheckCircle class="h-4 w-4 mr-2" />
-                Aceitar Proposta
-              </Button>
-              <Button
-                @click="handleOpenRejectDialog"
-                variant="outline"
-                class="text-red-600 border-red-200 hover:bg-red-50 flex-1"
-              >
-                <XCircle class="h-4 w-4 mr-2" />
-                Recusar
-              </Button>
+              <!-- Counter Proposal Summary -->
+              <div v-if="request.counterValue" class="p-4 bg-blue-50 border border-blue-100 rounded-lg">
+                <p class="text-sm font-medium text-blue-900 mb-1">Você enviou uma contra proposta:</p>
+                <p class="text-sm text-blue-700">
+                  <span class="font-bold">{{ formatCurrency(request.counterValue) }}</span> | 
+                  <span class="font-bold">{{ request.counterDays }} dias</span>
+                </p>
+                <p v-if="request.counterNotes" class="text-xs text-blue-600 mt-1 italic">
+                  "{{ request.counterNotes }}"
+                </p>
+              </div>
+
+              <!-- Rejection Alert -->
+              <div v-if="wasCounterProposalRejected" class="p-4 bg-amber-50 border border-amber-100 rounded-lg flex items-start gap-3">
+                <AlertCircle class="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+                <div>
+                  <p class="text-sm font-medium text-amber-900">Contra proposta recusada</p>
+                  <p class="text-xs text-amber-700 mt-1">
+                    O profissional preferiu manter a proposta original. Você pode aceitá-la ou recusar.
+                  </p>
+                </div>
+              </div>
+
+              <div class="flex items-center gap-3 flex-wrap">
+                <Button
+                  @click="handleAcceptResponse"
+                  class="bg-green-600 hover:bg-green-700 flex-1 min-w-[150px]"
+                >
+                  <CheckCircle class="h-4 w-4 mr-2" />
+                  Aceitar Proposta
+                </Button>
+                <Button
+                  @click="handleOpenRejectDialog"
+                  variant="outline"
+                  class="text-red-600 border-red-200 hover:bg-red-50 flex-1 min-w-[150px]"
+                >
+                  <XCircle class="h-4 w-4 mr-2" />
+                  Recusar
+                </Button>
+                <Button
+                  v-if="!request.counterValue && !wasCounterProposalRejected"
+                  @click="handleOpenCounterProposalDialog"
+                  variant="outline"
+                  class="text-[#286AD8] border-[#286AD8] hover:bg-blue-50 flex-1 min-w-[150px]"
+                >
+                  <FileEdit class="h-4 w-4 mr-2" />
+                  Contra Proposta
+                </Button>
+              </div>
             </div>
 
             <div v-else-if="request.status === 'accepted'" class="pt-4 border-t">
@@ -574,6 +664,58 @@ const getStatusLabel = (status: string) => {
           <Button @click="showRejectDialog = false" variant="outline">Cancelar</Button>
           <Button @click="handleRejectResponse" class="bg-red-600 hover:bg-red-700">
             Confirmar Recusa
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    <!-- Counter Proposal Dialog -->
+    <Dialog :open="showCounterProposalDialog" @update:open="(val) => showCounterProposalDialog = val">
+      <DialogContent class="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Enviar Contra Proposta</DialogTitle>
+          <DialogDescription>
+            Sugira um novo valor ou prazo para o serviço "{{ request?.service }}"
+          </DialogDescription>
+        </DialogHeader>
+        <div class="space-y-4 py-2">
+          <div class="grid grid-cols-2 gap-4">
+            <div class="space-y-2">
+              <Label for="counter-value">Novo Valor (R$)</Label>
+              <Input
+                id="counter-value"
+                type="number"
+                v-model="counterValue"
+                step="0.01"
+              />
+            </div>
+            <div class="space-y-2">
+              <Label for="counter-days">Novo Prazo (dias)</Label>
+              <Input
+                id="counter-days"
+                type="number"
+                v-model="counterDays"
+              />
+            </div>
+          </div>
+          <div class="space-y-2">
+            <Label for="counter-notes">Observações</Label>
+            <Textarea
+              id="counter-notes"
+              v-model="counterNotes"
+              placeholder="Explique sua proposta ou peça algum ajuste no escopo..."
+              :rows="3"
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button @click="showCounterProposalDialog = false" variant="outline">Cancelar</Button>
+          <Button 
+            @click="handleSendCounterProposal" 
+            class="bg-[#286AD8] hover:bg-[#435574]"
+            :disabled="isSubmittingCounter"
+          >
+            {{ isSubmittingCounter ? 'Enviando...' : 'Enviar Contra Proposta' }}
           </Button>
         </DialogFooter>
       </DialogContent>

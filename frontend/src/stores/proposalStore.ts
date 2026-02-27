@@ -22,6 +22,10 @@ export interface Proposal {
   address?: string;
   desiredDate?: string;
   freelancerResponse?: FreelancerResponse;
+  counterValue?: number;
+  counterDays?: number;
+  counterNotes?: string;
+  rejectReason?: string;
   messages?: ProposalMessage[];
   auditLog?: AuditLogEntry[];
 }
@@ -151,6 +155,10 @@ export const useProposalStore = defineStore('proposal', () => {
           notes: req.responseNotes,
           sentAt: req.respondedAt,
         } : undefined,
+        counterValue: req.counterValue,
+        counterDays: req.counterDays,
+        counterNotes: req.counterNotes,
+        rejectReason: req.rejectReason
       }));
     } catch (err) {
       error.value = 'Erro ao carregar propostas';
@@ -363,10 +371,66 @@ export const useProposalStore = defineStore('proposal', () => {
           operationKey: entry.operationKey,
           user: entry.userName,
           timestamp: entry.formattedDateTime,
+          details: entry.details,
         }));
       }
     } catch (err) {
       console.error('Erro ao carregar histórico:', err);
+    }
+  };
+
+  const acceptCounterProposal = async (proposalId: string) => {
+    try {
+      isLoading.value = true;
+      const response = await api.patch(`/service-requests/${proposalId}/accept-counter`);
+      const updatedRequest = response.data;
+
+      const index = proposals.value.findIndex((p) => p.id === proposalId);
+      if (index !== -1) {
+        proposals.value[index] = {
+          ...proposals.value[index],
+          status: 'accepted',
+          counterValue: undefined,
+          counterDays: undefined,
+          counterNotes: undefined,
+          freelancerResponse: updatedRequest.freelancerResponse ? {
+            value: updatedRequest.freelancerResponse.value,
+            executionDays: updatedRequest.freelancerResponse.executionDays,
+            scope: updatedRequest.freelancerResponse.scope,
+            notes: updatedRequest.freelancerResponse.notes,
+            sentAt: updatedRequest.freelancerResponse.sentAt,
+          } : proposals.value[index].freelancerResponse
+        };
+      }
+      return true;
+    } catch (err) {
+      console.error('Erro ao aceitar contra proposta:', err);
+      return false;
+    } finally {
+      isLoading.value = false;
+    }
+  };
+
+  const rejectCounterProposal = async (proposalId: string, reason?: string) => {
+    try {
+      isLoading.value = true;
+      await api.patch(`/service-requests/${proposalId}/reject-counter`, { reason });
+
+      const index = proposals.value.findIndex((p) => p.id === proposalId);
+      if (index !== -1) {
+        proposals.value[index] = {
+          ...proposals.value[index],
+          counterValue: undefined,
+          counterDays: undefined,
+          counterNotes: undefined,
+        };
+      }
+      return true;
+    } catch (err) {
+      console.error('Erro ao rejeitar contra proposta:', err);
+      return false;
+    } finally {
+      isLoading.value = false;
     }
   };
 
@@ -387,5 +451,7 @@ export const useProposalStore = defineStore('proposal', () => {
     sendMessage,
     updateMilestoneStatus,
     loadHistory,
+    acceptCounterProposal,
+    rejectCounterProposal,
   };
 });
