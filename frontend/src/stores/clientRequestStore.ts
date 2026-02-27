@@ -47,12 +47,11 @@ export interface ServiceRequest {
     description: string;
     budget: number;
     deadline: string;
-    priority: 'low' | 'medium' | 'high';
+    priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
     status: 'pending' | 'sent' | 'negotiating' | 'accepted' | 'rejected' | 'completed' | 'cancelled';
     createdAt: string;
     address?: string;
     desiredDate?: string;
-    urgency?: string;
     attachments?: ServiceRequestAttachment[];
     freelancerResponse?: FreelancerResponse;
     cancelReason?: string;
@@ -68,10 +67,9 @@ export interface CreateServiceRequestInput {
     description: string;
     budget: number;
     deadline: string;
-    priority: 'low' | 'medium' | 'high';
+    priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
     address?: string;
     desiredDate?: string;
-    urgency?: string;
     attachments?: File[];
 }
 
@@ -128,7 +126,7 @@ export const useClientRequestStore = defineStore('clientRequest', () => {
                 ...req,
                 id: String(req.id),
                 service: req.serviceName, // Backend usa serviceName
-                priority: (req.priority || 'MEDIUM').toLowerCase(),
+                priority: req.priority || 'MEDIUM',
                 status: (req.status || 'PENDING').toLowerCase(),
                 attachments: (req.attachments || []).map((url: string, idx: number) => ({
                     id: `att-${req.id}-${idx}`,
@@ -137,6 +135,7 @@ export const useClientRequestStore = defineStore('clientRequest', () => {
                     url,
                     type: getFileType(url),
                 })),
+                freelancerAvatar: req.freelancerAvatar,
                 freelancerResponse: req.responseValue ? {
                     value: req.responseValue,
                     executionDays: req.responseDays,
@@ -169,7 +168,6 @@ export const useClientRequestStore = defineStore('clientRequest', () => {
                 priority: input.priority,
                 address: input.address,
                 desiredDate: input.desiredDate,
-                urgency: input.urgency,
                 freelancerId: input.freelancerId
             };
 
@@ -178,8 +176,9 @@ export const useClientRequestStore = defineStore('clientRequest', () => {
                 ...response.data,
                 id: String(response.data.id),
                 service: response.data.serviceName,
-                priority: (response.data.priority || 'MEDIUM').toLowerCase(),
+                priority: response.data.priority || 'MEDIUM',
                 status: (response.data.status || 'PENDING').toLowerCase(),
+                freelancerAvatar: response.data.freelancerAvatar,
             };
 
             requests.value.unshift(newRequest);

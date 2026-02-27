@@ -416,7 +416,6 @@ const handleSendQuote = async () => {
       deadline: deadline,
       priority: quotePriority.value,
       address: '',
-      urgency: 'normal',
       freelancerId: Number(props.providerId),
       attachments: attachmentUrls,
     };

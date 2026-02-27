@@ -14,14 +14,13 @@ export interface Proposal {
   description: string;
   budget: number;
   deadline: string;
-  priority: 'low' | 'medium' | 'high';
+  priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
   status: 'pending' | 'negotiating' | 'accepted' | 'rejected' | 'completed' | 'archived';
   receivedAt: string;
   attachments?: ProposalAttachment[];
   viewed: boolean;
   address?: string;
   desiredDate?: string;
-  urgency?: string;
   freelancerResponse?: FreelancerResponse;
   messages?: ProposalMessage[];
   auditLog?: AuditLogEntry[];
@@ -132,7 +131,7 @@ export const useProposalStore = defineStore('proposal', () => {
         description: req.description,
         budget: Number(req.budget),
         deadline: req.deadline,
-        priority: req.priority.toLowerCase() as 'low' | 'medium' | 'high',
+        priority: req.priority || 'MEDIUM',
         status: mapApiStatusToLocal(req.status),
         receivedAt: req.createdAt,
         attachments: (req.attachments || []).map((url: string, idx: number) => ({
@@ -145,7 +144,6 @@ export const useProposalStore = defineStore('proposal', () => {
         viewed: true,
         address: req.address,
         desiredDate: req.desiredDate,
-        urgency: req.urgency,
         freelancerResponse: req.responseValue ? {
           value: Number(req.responseValue),
           executionDays: req.responseDays,

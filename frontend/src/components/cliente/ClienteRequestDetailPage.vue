@@ -21,6 +21,7 @@ import Card from '../ui/card.vue';
 import Badge from '../ui/badge.vue';
 import Avatar from '../ui/avatar.vue';
 import AvatarFallback from '../ui/avatar-fallback.vue';
+import AvatarImage from '../ui/avatar-image.vue';
 import Separator from '../ui/separator.vue';
 import Textarea from '../ui/textarea.vue';
 import Label from '../ui/label.vue';
@@ -412,14 +413,20 @@ const getStatusLabel = (status: string) => {
                 <p class="text-sm text-[#435574]">Prioridade</p>
                 <Badge
                   :class="
-                    request.priority === 'high'
+                    request.priority === 'URGENT'
+                      ? 'bg-red-200 text-red-900'
+                      : request.priority === 'HIGH'
                       ? 'bg-red-100 text-red-700'
-                      : request.priority === 'medium'
+                      : request.priority === 'MEDIUM'
                       ? 'bg-yellow-100 text-yellow-700'
                       : 'bg-gray-100 text-gray-700'
                   "
                 >
-                  {{ request.priority === 'high' ? 'Alta' : request.priority === 'medium' ? 'Média' : 'Baixa' }}
+                  {{ 
+                    request.priority === 'URGENT' ? 'Urgente' :
+                    request.priority === 'HIGH' ? 'Alta' :
+                    request.priority === 'MEDIUM' ? 'Média' : 'Baixa'
+                  }}
                 </Badge>
               </div>
               <template v-if="request.desiredDate">
@@ -437,6 +444,7 @@ const getStatusLabel = (status: string) => {
             <h3 class="font-semibold text-[#263238] mb-4">Profissional</h3>
             <div class="flex items-center gap-3 mb-3">
               <Avatar class="h-12 w-12">
+                <AvatarImage :src="request.freelancerAvatar" />
                 <AvatarFallback class="bg-[#286AD8] text-white">
                   {{ getInitials(request.freelancerName) }}
                 </AvatarFallback>

@@ -431,10 +431,11 @@ const handleDownloadAttachment = async (url: string, fileName: string) => {
   }
 };
 
-const getUrgencyVariant = (urgency: string) => {
-  if (urgency === 'Alta') return 'destructive';
-  if (urgency === 'Média') return 'default';
-  return 'secondary';
+const getPriorityVariant = (priority: string) => {
+  if (priority === 'URGENT') return 'destructive';
+  if (priority === 'HIGH') return 'default';
+  if (priority === 'MEDIUM') return 'secondary';
+  return 'outline';
 };
 
 const getStatusBadge = (status: string) => {
@@ -687,10 +688,14 @@ const getStatusBadge = (status: string) => {
                 <p class="text-[#263238] mt-1 font-semibold">{{ formatCurrency(proposal.budget) }}</p>
               </div>
               <div>
-                <Label class="text-sm text-[#435574]">Urgência</Label>
+                <Label class="text-sm text-[#435574]">Prioridade</Label>
                 <p class="text-[#263238] mt-1">
-                  <Badge :variant="getUrgencyVariant(proposal.urgency || 'Média')">
-                    {{ proposal.urgency || 'Média' }}
+                  <Badge :variant="getPriorityVariant(proposal.priority || 'MEDIUM')">
+                    {{ 
+                      proposal.priority === 'URGENT' ? 'Urgente' :
+                      proposal.priority === 'HIGH' ? 'Alta' :
+                      proposal.priority === 'MEDIUM' ? 'Média' : 'Baixa'
+                    }}
                   </Badge>
                 </p>
               </div>
