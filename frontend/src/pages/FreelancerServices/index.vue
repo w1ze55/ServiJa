@@ -126,6 +126,7 @@ const loadServices = async () => {
     const deliveryUnitMap: Record<string, string> = {
       'DAYS': 'dias',
       'WEEKS': 'semanas',
+      'MONTHS': 'meses',
     };
     
     services.value = response.data.map((s: any) => ({
@@ -171,13 +172,13 @@ const filteredServices = computed(() => {
   });
 
   // Ordenar
-  if (sortBy.value === 'recent') {
+  if (sortBy.value === 'Mais recentes') {
     filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  } else if (sortBy.value === 'price-asc') {
+  } else if (sortBy.value === 'Menor preço') {
     filtered.sort((a, b) => a.price - b.price);
-  } else if (sortBy.value === 'price-desc') {
+  } else if (sortBy.value === 'Maior preço') {
     filtered.sort((a, b) => b.price - a.price);
-  } else if (sortBy.value === 'title') {
+  } else if (sortBy.value === 'Nome (A-Z)') {
     filtered.sort((a, b) => a.title.localeCompare(b.title));
   }
 
@@ -198,6 +199,9 @@ const formatCurrency = (value: number) => {
 };
 
 const formatDeliveryTime = (time: number, unit: string) => {
+  if (unit === 'meses') {
+    return time === 1 ? '1 mês' : `${time} meses`;
+  }
   const unitLabel = unit === 'semanas' ? (time === 1 ? 'semana' : 'semanas') : (time === 1 ? 'dia' : 'dias');
   return `${time} ${unitLabel}`;
 };
@@ -247,10 +251,14 @@ const handleEditService = (serviceId: string) => {
       'por hora': 'hora',
       'por dia': 'dia',
     };
-    const deliveryUnitMap: Record<string, 'dia' | 'semana'> = {
-      'dias': 'dia',
-      'semanas': 'semana',
-    };
+    
+    // Converter prazo armazenado para dias totais
+    let totalDays = service.deliveryTime;
+    if (service.deliveryUnit === 'semanas') {
+      totalDays = service.deliveryTime * 7;
+    } else if (service.deliveryUnit === 'meses') {
+      totalDays = service.deliveryTime * 30;
+    }
     
     editingService.value = {
       id: service.id,
@@ -259,8 +267,7 @@ const handleEditService = (serviceId: string) => {
       description: service.description,
       price: service.price,
       priceType: priceTypeMap[service.priceType] || 'fixo',
-      deliveryTime: String(service.deliveryTime),
-      deliveryUnit: deliveryUnitMap[service.deliveryUnit] || 'dia',
+      deliveryTime: String(totalDays),
       tags: service.tags || [],
       images: service.images || [],
       isActive: service.isActive,
@@ -290,10 +297,22 @@ const handleServiceFormSubmit = async (formData: ServiceFormData) => {
       'hora': 'HOURLY',
       'dia': 'DAILY',
     };
-    const deliveryUnitMap: Record<string, string> = {
-      'dia': 'DAYS',
-      'semana': 'WEEKS',
-    };
+    
+    // Auto-conversão de dias para a melhor unidade
+    const days = parseInt(formData.deliveryTime);
+    let deliveryTime: number;
+    let deliveryUnit: string;
+    
+    if (days >= 30) {
+      deliveryTime = Math.floor(days / 30);
+      deliveryUnit = 'MONTHS';
+    } else if (days >= 7) {
+      deliveryTime = Math.floor(days / 7);
+      deliveryUnit = 'WEEKS';
+    } else {
+      deliveryTime = days;
+      deliveryUnit = 'DAYS';
+    }
     
     const payload = {
       title: formData.title,
@@ -301,8 +320,8 @@ const handleServiceFormSubmit = async (formData: ServiceFormData) => {
       description: formData.description,
       price: formData.price,
       priceType: priceTypeMap[formData.priceType] || 'FIXED',
-      deliveryTime: parseInt(formData.deliveryTime),
-      deliveryUnit: deliveryUnitMap[formData.deliveryUnit] || 'DAYS',
+      deliveryTime,
+      deliveryUnit,
       tags: formData.tags,
       images: formData.images,
       isActive: formData.isActive,
@@ -323,6 +342,7 @@ const handleServiceFormSubmit = async (formData: ServiceFormData) => {
       const deliveryUnitMapResponse: Record<string, string> = {
         'DAYS': 'dias',
         'WEEKS': 'semanas',
+        'MONTHS': 'meses',
       };
       
       services.value = services.value.map((s) =>
@@ -356,6 +376,7 @@ const handleServiceFormSubmit = async (formData: ServiceFormData) => {
       const deliveryUnitMapResponse: Record<string, string> = {
         'DAYS': 'dias',
         'WEEKS': 'semanas',
+        'MONTHS': 'meses',
       };
       
       services.value = [

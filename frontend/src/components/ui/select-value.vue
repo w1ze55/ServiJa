@@ -3,6 +3,7 @@ import { inject, computed } from 'vue';
 
 interface Props {
   placeholder?: string;
+  label?: string;
   [key: string]: any;
 }
 
@@ -10,6 +11,9 @@ const props = defineProps<Props>();
 const select = inject<{ value: { value: string } }>('select');
 
 const displayValue = computed(() => {
+  if (props.label) {
+    return props.label;
+  }
   if (select?.value.value) {
     return select.value.value;
   }

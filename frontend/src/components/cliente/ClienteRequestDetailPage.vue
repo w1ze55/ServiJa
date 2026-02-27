@@ -39,6 +39,7 @@ import AlertDialogFooter from '../ui/alert-dialog-footer.vue';
 import AlertDialogHeader from '../ui/alert-dialog-header.vue';
 import AlertDialogTitle from '../ui/alert-dialog-title.vue';
 import { useClientRequestStore, type ServiceRequest } from '@/stores/clientRequestStore';
+import ServiceRequestTimeline from '../service/ServiceRequestTimeline.vue';
 import { toast } from '@/utils/toast';
 
 interface Props {
@@ -63,6 +64,9 @@ onMounted(async () => {
     await store.loadRequests();
   }
   request.value = store.getRequestById(props.requestId) || null;
+  if (request.value) {
+    await store.loadHistory(props.requestId);
+  }
 });
 
 const formatCurrency = (value: number) => {
@@ -501,38 +505,11 @@ const getStatusLabel = (status: string) => {
       </Card>
 
       <!-- History Section -->
-      <Card v-if="activeSection === 'history'" class="p-6">
-        <h3 class="font-semibold text-[#263238] mb-4">Histórico de Atividades</h3>
-
-        <div v-if="!request.auditLog || request.auditLog.length === 0" class="text-center py-8">
-          <History class="h-10 w-10 text-gray-300 mx-auto mb-3" />
-          <p class="text-[#435574]">Nenhuma atividade registrada</p>
-        </div>
-
-        <div v-else class="space-y-0">
-          <div
-            v-for="(log, index) in [...(request.auditLog || [])].reverse()"
-            :key="log.id"
-            class="relative pl-8 pb-6 last:pb-0"
-          >
-            <!-- Timeline line -->
-            <div
-              v-if="index < (request.auditLog?.length || 0) - 1"
-              class="absolute left-[11px] top-6 w-0.5 h-full bg-gray-200"
-            ></div>
-            <!-- Timeline dot -->
-            <div class="absolute left-0 top-1 w-6 h-6 rounded-full bg-[#286AD8] flex items-center justify-center">
-              <div class="w-2 h-2 rounded-full bg-white"></div>
-            </div>
-            <!-- Content -->
-            <div>
-              <p class="font-medium text-sm text-[#263238]">{{ log.action }}</p>
-              <p class="text-xs text-[#435574]">{{ log.user }} · {{ formatDate(log.timestamp) }}</p>
-              <p v-if="log.details" class="text-sm text-[#435574] mt-1">{{ log.details }}</p>
-            </div>
-          </div>
-        </div>
-      </Card>
+      <ServiceRequestTimeline
+        v-if="activeSection === 'history'"
+        :entries="[...(request.auditLog || [])].reverse()"
+        title="Histórico de Atividades"
+      />
     </template>
 
     <!-- Cancel Dialog -->

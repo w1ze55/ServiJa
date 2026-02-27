@@ -1,9 +1,12 @@
 package com.servija.servija.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.servija.servija.dto.FreelancerResponseDTO;
 import com.servija.servija.dto.ServiceRequestDTO;
 import com.servija.servija.dto.ServiceRequestResponse;
 import com.servija.servija.model.ServiceRequest;
+import com.servija.servija.model.ServiceRequestHistory.OperationType;
 import com.servija.servija.model.User;
 import com.servija.servija.repository.ServiceRequestRepository;
 import com.servija.servija.repository.UserRepository;
@@ -14,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -24,6 +28,8 @@ public class ServiceRequestService {
     private final ServiceRequestRepository serviceRequestRepository;
     private final UserRepository userRepository;
     private final FileStorageService fileStorageService;
+    private final ServiceRequestHistoryService historyService;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Transactional
     public ServiceRequestResponse create(String contractorEmail, ServiceRequestDTO dto) {
@@ -34,6 +40,15 @@ public class ServiceRequestService {
         if (dto.getFreelancerId() != null) {
             freelancer = userRepository.findById(dto.getFreelancerId())
                     .orElseThrow(() -> new RuntimeException("Freelancer not found"));
+        }
+
+        String attachmentsJson = null;
+        if (dto.getAttachments() != null && !dto.getAttachments().isEmpty()) {
+            try {
+                attachmentsJson = objectMapper.writeValueAsString(dto.getAttachments());
+            } catch (Exception e) {
+                log.warn("Erro ao serializar attachments: {}", e.getMessage());
+            }
         }
 
         ServiceRequest request = ServiceRequest.builder()
@@ -48,17 +63,20 @@ public class ServiceRequestService {
                 .address(dto.getAddress())
                 .desiredDate(dto.getDesiredDate() != null ? LocalDate.parse(dto.getDesiredDate()) : null)
                 .urgency(dto.getUrgency())
+                .attachments(attachmentsJson)
                 .build();
 
         ServiceRequest saved = serviceRequestRepository.save(request);
-        log.info("Service request created: {} for freelancer: {}", saved.getId(), freelancer != null ? freelancer.getId() : "any");
+        historyService.record(saved, contractor, OperationType.REQUEST_OPENED);
+        log.info("Service request created: {} for freelancer: {}", saved.getId(),
+                freelancer != null ? freelancer.getId() : "any");
         return toResponse(saved);
     }
 
     public List<ServiceRequestResponse> getByContractorEmail(String email) {
         User contractor = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Contractor not found"));
-        
+
         return serviceRequestRepository.findByContractorIdOrderByCreatedAtDesc(contractor.getId())
                 .stream()
                 .map(this::toResponse)
@@ -68,7 +86,7 @@ public class ServiceRequestService {
     public List<ServiceRequestResponse> getByFreelancerEmail(String email) {
         User freelancer = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Freelancer not found"));
-        
+
         return serviceRequestRepository.findByFreelancerIdOrderByCreatedAtDesc(freelancer.getId())
                 .stream()
                 .map(this::toResponse)
@@ -82,9 +100,12 @@ public class ServiceRequestService {
     }
 
     @Transactional
-    public ServiceRequestResponse updateStatus(Long id, String status, String reason) {
+    public ServiceRequestResponse updateStatus(Long id, String status, String reason, String userEmail) {
         ServiceRequest request = serviceRequestRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Service request not found"));
+
+        User actionUser = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new RuntimeException("User not found"));
 
         ServiceRequest.Status newStatus = ServiceRequest.Status.valueOf(status.toUpperCase());
         request.setStatus(newStatus);
@@ -96,13 +117,26 @@ public class ServiceRequestService {
             request.setRejectReason(reason);
         }
 
-        return toResponse(serviceRequestRepository.save(request));
+        ServiceRequest saved = serviceRequestRepository.save(request);
+
+        if (newStatus == ServiceRequest.Status.REJECTED) {
+            historyService.record(saved, actionUser, OperationType.REQUEST_REJECTED);
+        } else if (newStatus == ServiceRequest.Status.ACCEPTED) {
+            historyService.record(saved, actionUser, OperationType.BUDGET_ACCEPTED);
+        } else if (newStatus == ServiceRequest.Status.NEGOTIATING) {
+            historyService.record(saved, actionUser, OperationType.COUNTER_PROPOSAL_SENT);
+        }
+
+        return toResponse(saved);
     }
 
     @Transactional
-    public ServiceRequestResponse respondToRequest(Long id, FreelancerResponseDTO dto) {
+    public ServiceRequestResponse respondToRequest(Long id, FreelancerResponseDTO dto, String freelancerEmail) {
         ServiceRequest request = serviceRequestRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Service request not found"));
+
+        User freelancer = userRepository.findByEmail(freelancerEmail)
+                .orElseThrow(() -> new RuntimeException("Freelancer not found"));
 
         request.setResponseValue(dto.getValue());
         request.setResponseDays(dto.getExecutionDays());
@@ -111,7 +145,10 @@ public class ServiceRequestService {
         request.setRespondedAt(LocalDateTime.now());
         request.setStatus(ServiceRequest.Status.NEGOTIATING);
 
-        return toResponse(serviceRequestRepository.save(request));
+        ServiceRequest saved = serviceRequestRepository.save(request);
+        historyService.record(saved, freelancer, OperationType.BUDGET_SENT);
+
+        return toResponse(saved);
     }
 
     @Transactional
@@ -148,6 +185,18 @@ public class ServiceRequestService {
         }
     }
 
+    private List<String> parseAttachments(String json) {
+        if (json == null || json.isEmpty())
+            return new ArrayList<>();
+        try {
+            return objectMapper.readValue(json, new TypeReference<List<String>>() {
+            });
+        } catch (Exception e) {
+            log.warn("Erro ao deserializar attachments: {}", e.getMessage());
+            return new ArrayList<>();
+        }
+    }
+
     private boolean isS3Url(String url) {
         return url != null && url.contains(".s3.") && url.contains("amazonaws.com");
     }
@@ -178,6 +227,7 @@ public class ServiceRequestService {
                 .respondedAt(request.getRespondedAt())
                 .cancelReason(request.getCancelReason())
                 .rejectReason(request.getRejectReason())
+                .attachments(parseAttachments(request.getAttachments()))
                 .createdAt(request.getCreatedAt())
                 .updatedAt(request.getUpdatedAt())
                 .build();

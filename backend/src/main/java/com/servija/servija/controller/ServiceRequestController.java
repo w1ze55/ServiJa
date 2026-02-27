@@ -2,7 +2,9 @@ package com.servija.servija.controller;
 
 import com.servija.servija.dto.FreelancerResponseDTO;
 import com.servija.servija.dto.ServiceRequestDTO;
+import com.servija.servija.dto.ServiceRequestHistoryResponse;
 import com.servija.servija.dto.ServiceRequestResponse;
+import com.servija.servija.service.ServiceRequestHistoryService;
 import com.servija.servija.service.ServiceRequestService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -24,6 +26,7 @@ import java.util.Map;
 public class ServiceRequestController {
 
     private final ServiceRequestService serviceRequestService;
+    private final ServiceRequestHistoryService historyService;
 
     @PostMapping
     @Operation(summary = "Criar solicitação de orçamento", description = "Cria uma nova solicitação de orçamento para um freelancer")
@@ -31,7 +34,7 @@ public class ServiceRequestController {
     public ResponseEntity<ServiceRequestResponse> create(@RequestBody ServiceRequestDTO dto) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String email = authentication.getName();
-        
+
         ServiceRequestResponse response = serviceRequestService.create(email, dto);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
@@ -42,7 +45,7 @@ public class ServiceRequestController {
     public ResponseEntity<List<ServiceRequestResponse>> getMyRequests() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String email = authentication.getName();
-        
+
         return ResponseEntity.ok(serviceRequestService.getByContractorEmail(email));
     }
 
@@ -52,7 +55,7 @@ public class ServiceRequestController {
     public ResponseEntity<List<ServiceRequestResponse>> getReceivedRequests() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String email = authentication.getName();
-        
+
         return ResponseEntity.ok(serviceRequestService.getByFreelancerEmail(email));
     }
 
@@ -69,9 +72,11 @@ public class ServiceRequestController {
     public ResponseEntity<ServiceRequestResponse> updateStatus(
             @PathVariable Long id,
             @RequestBody Map<String, String> body) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String email = authentication.getName();
         String status = body.get("status");
         String reason = body.get("reason");
-        return ResponseEntity.ok(serviceRequestService.updateStatus(id, status, reason));
+        return ResponseEntity.ok(serviceRequestService.updateStatus(id, status, reason, email));
     }
 
     @PatchMapping("/{id}/respond")
@@ -80,7 +85,16 @@ public class ServiceRequestController {
     public ResponseEntity<ServiceRequestResponse> respond(
             @PathVariable Long id,
             @RequestBody FreelancerResponseDTO dto) {
-        return ResponseEntity.ok(serviceRequestService.respondToRequest(id, dto));
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String email = authentication.getName();
+        return ResponseEntity.ok(serviceRequestService.respondToRequest(id, dto, email));
+    }
+
+    @GetMapping("/{id}/history")
+    @Operation(summary = "Obter histórico de ações", description = "Retorna o histórico de ações realizadas em uma solicitação")
+    @SecurityRequirement(name = "bearerAuth")
+    public ResponseEntity<List<ServiceRequestHistoryResponse>> getHistory(@PathVariable Long id) {
+        return ResponseEntity.ok(historyService.getHistory(id));
     }
 
     @DeleteMapping("/{id}")

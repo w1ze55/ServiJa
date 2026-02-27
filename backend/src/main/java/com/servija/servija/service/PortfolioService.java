@@ -1,6 +1,7 @@
 package com.servija.servija.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.servija.servija.dto.PortfolioProjectRequest;
 import com.servija.servija.dto.PortfolioProjectResponse;
@@ -33,6 +34,14 @@ public class PortfolioService {
     public List<PortfolioProjectResponse> getProjects() {
         Freelancer freelancer = freelancerService.getCurrentFreelancer();
         List<PortfolioProject> projects = projectRepository.findByFreelancerIdOrderByCreatedAtDesc(freelancer.getId());
+        return projects.stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<PortfolioProjectResponse> getPublicProjects(Long freelancerId) {
+        List<PortfolioProject> projects = projectRepository.findByFreelancerIdOrderByCreatedAtDesc(freelancerId);
         return projects.stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
@@ -214,7 +223,7 @@ public class PortfolioService {
         List<String> tags = new ArrayList<>();
         if (project.getTags() != null && !project.getTags().isEmpty()) {
             try {
-                tags = objectMapper.readValue(project.getTags(), List.class);
+                tags = objectMapper.readValue(project.getTags(), new TypeReference<List<String>>() {});
             } catch (JsonProcessingException e) {
                 log.error("Erro ao desserializar tags", e);
             }

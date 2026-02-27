@@ -294,7 +294,14 @@ const distanceValue = computed({
             @update:model-value="(val: string) => (filters.sortBy = val)"
           >
             <SelectTrigger>
-              <SelectValue />
+              <SelectValue :label="{
+                relevance: 'Relevância',
+                'rating-desc': 'Maior avaliação',
+                'rating-asc': 'Menor avaliação',
+                'price-asc': 'Menor preço',
+                'price-desc': 'Maior preço',
+                'recent': 'Mais recentes'
+              }[filters.sortBy] || filters.sortBy" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="relevance">Relevância</SelectItem>

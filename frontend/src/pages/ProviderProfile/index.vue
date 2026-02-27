@@ -9,7 +9,16 @@ const providerId = Number(route.params.providerId);
 
 const handleNavigate = (page: string, params?: any) => {
   if (params && params.providerId) {
-    router.push({ name: page, params: { providerId: params.providerId } });
+    const pushParams: any = { 
+      name: page, 
+      params: { providerId: params.providerId } 
+    };
+    
+    if (params.serviceId) {
+      pushParams.query = { serviceId: params.serviceId };
+    }
+    
+    router.push(pushParams);
   } else {
     router.push({ name: page });
   }

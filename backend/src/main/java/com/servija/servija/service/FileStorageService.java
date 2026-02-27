@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import jakarta.annotation.PostConstruct;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 import software.amazon.awssdk.core.sync.RequestBody;
@@ -29,6 +30,15 @@ public class FileStorageService {
     @Value("${aws.s3.region}")
     private String region;
 
+    @PostConstruct
+    public void init() {
+        if (bucketName != null)
+            bucketName = bucketName.trim();
+        if (region != null)
+            region = region.trim();
+        log.info("FileStorageService inicializado com balde: {} na região: {}", bucketName, region);
+    }
+
     private static final List<String> ALLOWED_CONTENT_TYPES = Arrays.asList(
             "image/jpeg",
             "image/png",
@@ -36,7 +46,7 @@ public class FileStorageService {
             "image/webp",
             "application/pdf");
 
-    private static final long MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+    private static final long MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
     public String storeFile(MultipartFile file) {
         // Validar arquivo
@@ -56,7 +66,7 @@ public class FileStorageService {
                     // Removido ACL pois o bucket já tem política pública
                     .build();
 
-            s3Client.putObject(putObjectRequest, RequestBody.fromInputStream(file.getInputStream(), file.getSize()));
+            s3Client.putObject(putObjectRequest, RequestBody.fromBytes(file.getBytes()));
 
             // Retornar URL pública (formato padrão do S3)
             String fileUrl = String.format("https://%s.s3.%s.amazonaws.com/%s", bucketName, region, newFilename);
@@ -94,7 +104,7 @@ public class FileStorageService {
         }
 
         if (file.getSize() > MAX_FILE_SIZE) {
-            throw new RuntimeException("Arquivo muito grande. Máximo permitido: 5MB");
+            throw new RuntimeException("Arquivo muito grande. Máximo permitido: 10MB");
         }
 
         String contentType = file.getContentType();

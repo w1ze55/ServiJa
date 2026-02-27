@@ -230,6 +230,16 @@ public class ServiceService {
     }
 
     /**
+     * Listar todos os serviços ativos de um freelancer específico (público)
+     */
+    @Transactional(readOnly = true)
+    public List<ServiceResponse> getPublicServicesByFreelancer(Long freelancerId) {
+        List<Service> services = serviceRepository.findByFreelancerIdAndIsActiveOrderByCreatedAtDesc(freelancerId,
+                true);
+        return services.stream().map(this::toResponse).collect(Collectors.toList());
+    }
+
+    /**
      * Listar todos os serviços ativos
      */
     @Transactional(readOnly = true)
@@ -275,7 +285,7 @@ public class ServiceService {
 
     // ==================== MÉTODOS AUXILIARES ====================
 
-    private ServiceResponse toResponse(Service service) {
+    public ServiceResponse toResponse(Service service) {
         return ServiceResponse.builder()
                 .id(service.getId())
                 .freelancerId(service.getFreelancer().getId())
@@ -290,6 +300,7 @@ public class ServiceService {
                 .tags(fromJson(service.getTags()))
                 .images(fromJson(service.getImages()))
                 .isActive(service.getIsActive())
+                .freelancerProfilePhoto(service.getFreelancer().getAvatarUrl())
                 .createdAt(service.getCreatedAt())
                 .updatedAt(service.getUpdatedAt())
                 .build();

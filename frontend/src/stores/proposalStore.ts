@@ -66,6 +66,7 @@ export interface ProposalMessage {
 export interface AuditLogEntry {
   id: string;
   action: string;
+  operationKey?: string;
   user: string;
   timestamp: string;
   details?: string;
@@ -84,6 +85,28 @@ export const useProposalStore = defineStore('proposal', () => {
   const isLoading = ref(false);
   const error = ref<string | null>(null);
 
+  const extractFileName = (url: string): string => {
+    try {
+      const path = new URL(url).pathname;
+      const encoded = path.split('/').pop() || 'arquivo';
+      return decodeURIComponent(encoded);
+    } catch {
+      return url.split('/').pop() || 'arquivo';
+    }
+  };
+
+  const getFileType = (url: string): string => {
+    const ext = url.split('.').pop()?.toLowerCase().split('?')[0] || '';
+    const types: Record<string, string> = {
+      pdf: 'application/pdf',
+      jpg: 'image/jpeg', jpeg: 'image/jpeg',
+      png: 'image/png', gif: 'image/gif', webp: 'image/webp',
+      doc: 'application/msword',
+      docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    };
+    return types[ext] || 'application/octet-stream';
+  };
+
   const stats = computed<ProposalStats>(() => ({
     pending: proposals.value.filter((p) => p.status === 'pending').length,
     negotiating: proposals.value.filter((p) => p.status === 'negotiating').length,
@@ -97,7 +120,7 @@ export const useProposalStore = defineStore('proposal', () => {
     error.value = null;
     try {
       const response = await api.get('/service-requests/received');
-      
+
       // Mapear dados da API para o formato da store
       proposals.value = response.data.map((req: any) => ({
         id: req.id.toString(),
@@ -112,7 +135,13 @@ export const useProposalStore = defineStore('proposal', () => {
         priority: req.priority.toLowerCase() as 'low' | 'medium' | 'high',
         status: mapApiStatusToLocal(req.status),
         receivedAt: req.createdAt,
-        attachments: [],
+        attachments: (req.attachments || []).map((url: string, idx: number) => ({
+          id: `att-${req.id}-${idx}`,
+          name: extractFileName(url),
+          size: '',
+          url,
+          type: getFileType(url),
+        })),
         viewed: true,
         address: req.address,
         desiredDate: req.desiredDate,
@@ -325,6 +354,24 @@ export const useProposalStore = defineStore('proposal', () => {
     }
   };
 
+  const loadHistory = async (proposalId: string) => {
+    try {
+      const response = await api.get(`/service-requests/${proposalId}/history`);
+      const proposal = proposals.value.find((p) => p.id === proposalId);
+      if (proposal) {
+        proposal.auditLog = response.data.map((entry: any) => ({
+          id: String(entry.id),
+          action: entry.operationType,
+          operationKey: entry.operationKey,
+          user: entry.userName,
+          timestamp: entry.formattedDateTime,
+        }));
+      }
+    } catch (err) {
+      console.error('Erro ao carregar histórico:', err);
+    }
+  };
+
   return {
     proposals,
     isLoading,
@@ -341,5 +388,6 @@ export const useProposalStore = defineStore('proposal', () => {
     archiveProposal,
     sendMessage,
     updateMilestoneStatus,
+    loadHistory,
   };
 });

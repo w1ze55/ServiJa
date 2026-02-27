@@ -185,6 +185,21 @@ public class ServiceController {
         }
     }
 
+    @GetMapping("/public/freelancer/{id}")
+    @Operation(summary = "Listar todos os serviços ativos de um freelancer (público)", description = "Retorna todos os serviços ativos de um freelancer específico")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Lista de serviços retornada com sucesso", content = @Content(array = @ArraySchema(schema = @Schema(implementation = ServiceResponse.class))))
+    })
+    public ResponseEntity<List<ServiceResponse>> getServicesByFreelancer(
+            @Parameter(description = "ID do freelancer", required = true) @PathVariable Long id) {
+        try {
+            List<ServiceResponse> services = serviceService.getPublicServicesByFreelancer(id);
+            return ResponseEntity.ok(services);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
     @GetMapping("/public/search")
     @Operation(summary = "Buscar serviços por texto (público)", description = "Realiza uma busca textual nos serviços públicos disponíveis")
     @ApiResponses(value = {

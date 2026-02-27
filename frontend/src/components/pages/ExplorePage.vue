@@ -2,20 +2,18 @@
 import { ref, computed, onMounted, watch } from 'vue';
 import {
   Search,
-  Star,
-  MapPin,
-  Clock,
-  Briefcase,
-  Heart,
   Grid3x3,
   List,
   SlidersHorizontal,
   Loader2,
   AlertCircle,
   RefreshCw,
-  DollarSign,
-  ChevronRight,
   X,
+  Briefcase,
+  Heart,
+  ChevronRight,
+  DollarSign,
+  Clock,
 } from 'lucide-vue-next';
 import Button from '../ui/button.vue';
 import Card from '../ui/card.vue';
@@ -25,8 +23,14 @@ import SelectContent from '../ui/select-content.vue';
 import SelectItem from '../ui/select-item.vue';
 import SelectTrigger from '../ui/select-trigger.vue';
 import SelectValue from '../ui/select-value.vue';
+import Tabs from '../ui/tabs.vue';
+import TabsList from '../ui/tabs-list.vue';
+import TabsTrigger from '../ui/tabs-trigger.vue';
+import ServiceCard from '../service/ServiceCard.vue';
+import FreelancerCard from '../freelancer/FreelancerCard.vue';
 import api from '@/api/config/axios';
 import { toast } from '@/utils/toast';
+import { useFavoritesStore } from '@/stores/favorites';
 
 interface ServiceItem {
   id: number;
@@ -39,6 +43,7 @@ interface ServiceItem {
   priceType: string;
   deliveryTime: number;
   deliveryUnit: string;
+  freelancerProfilePhoto?: string;
   tags: string[];
   images: string[];
   isActive: boolean;
@@ -58,8 +63,10 @@ const error = ref('');
 const searchQuery = ref('');
 const selectedCategory = ref('all');
 const sortBy = ref('recent');
+const searchMode = ref<'services' | 'professionals'>('services');
 const viewMode = ref<'grid' | 'list'>('grid');
-const favoriteIds = ref<Set<number>>(new Set());
+
+const favoritesStore = useFavoritesStore();
 
 const categories = [
   { value: 'all', label: 'Todas as categorias' },
@@ -79,6 +86,13 @@ const categories = [
   { value: 'Beleza', label: '💅 Beleza' },
 ];
 
+const sortOptions = [
+  { value: 'recent', label: 'Mais recentes' },
+  { value: 'price-asc', label: 'Menor preço' },
+  { value: 'price-desc', label: 'Maior preço' },
+  { value: 'name-asc', label: 'Nome (A-Z)' },
+];
+
 const loadServices = async () => {
   isLoading.value = true;
   error.value = '';
@@ -92,6 +106,11 @@ const loadServices = async () => {
     }
     const response = await api.get(url);
     services.value = response.data || [];
+    
+    // Also load favorites if not initialized
+    if (!favoritesStore.initialized) {
+      favoritesStore.fetchFavorites();
+    }
   } catch (err: any) {
     console.error('Erro ao carregar serviços:', err);
     error.value = 'Não foi possível carregar os serviços. Tente novamente.';
@@ -146,12 +165,13 @@ const filteredServices = computed(() => {
 });
 
 const freelancerGroups = computed(() => {
-  const groups: Record<number, { freelancerName: string; freelancerId: number; services: ServiceItem[] }> = {};
+  const groups: Record<number, { freelancerName: string; freelancerId: number; freelancerProfilePhoto?: string; services: ServiceItem[] }> = {};
   for (const svc of filteredServices.value) {
     if (!groups[svc.freelancerId]) {
       groups[svc.freelancerId] = {
         freelancerName: svc.freelancerName,
         freelancerId: svc.freelancerId,
+        freelancerProfilePhoto: svc.freelancerProfilePhoto,
         services: [],
       };
     }
@@ -162,34 +182,40 @@ const freelancerGroups = computed(() => {
 
 const totalFreelancers = computed(() => freelancerGroups.value.length);
 
-const toggleFavorite = (id: number) => {
-  if (favoriteIds.value.has(id)) {
-    favoriteIds.value.delete(id);
-  } else {
-    favoriteIds.value.add(id);
-  }
-  favoriteIds.value = new Set(favoriteIds.value);
+const toggleFavoriteService = (id: number) => {
+  favoritesStore.toggleFavoriteService(id);
 };
 
-const formatPrice = (price: number, priceType: string) => {
-  const formatted = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(price);
-  const suffix = priceType === 'HOURLY' ? '/hora' : priceType === 'DAILY' ? '/dia' : '';
-  return `${formatted}${suffix}`;
+const toggleFavoriteFreelancer = (id: number) => {
+  favoritesStore.toggleFavoriteFreelancer(id);
 };
 
-const formatDelivery = (time: number, unit: string) => {
-  const unitLabel = unit === 'HOURS' ? 'hora(s)' : unit === 'DAYS' ? 'dia(s)' : 'semana(s)';
-  return `${time} ${unitLabel}`;
+const isFavoriteService = (id: number) => favoritesStore.isFavoriteService(id);
+const isFavoriteFreelancer = (id: number) => favoritesStore.isFavoriteFreelancer(id);
+
+const handleViewProfile = (providerId: string | number) => {
+  props.onNavigate('provider-profile', { providerId: Number(providerId) });
 };
 
-const getInitials = (name: string) =>
-  name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+const handleViewService = (params: { providerId: number; serviceId: number }) => {
+  props.onNavigate('provider-profile', params);
+};
 
 const clearFilters = () => {
   searchQuery.value = '';
   selectedCategory.value = 'all';
   sortBy.value = 'recent';
   loadServices();
+};
+
+const getInitials = (name: string) => {
+  if (!name) return '';
+  return name
+    .split(' ')
+    .map((n) => n[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
 };
 
 onMounted(() => {
@@ -202,7 +228,7 @@ onMounted(() => {
     <!-- Header -->
     <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
       <div>
-        <h1 class="text-2xl font-bold text-[#263238] mb-2">Explorar Profissionais</h1>
+        <h1 class="text-2xl font-bold text-[#263238] mb-2">Explorar</h1>
         <p class="text-[#435574]">
           Encontre profissionais qualificados com serviços cadastrados na plataforma
         </p>
@@ -212,6 +238,20 @@ onMounted(() => {
         Atualizar
       </Button>
     </div>
+
+    <!-- Mode Toggle -->
+    <Tabs v-model="searchMode" class="w-full">
+      <TabsList class="grid w-full grid-cols-2 max-w-[400px]">
+        <TabsTrigger value="services" class="flex items-center gap-2">
+          <Briefcase class="h-4 w-4" />
+          Serviços
+        </TabsTrigger>
+        <TabsTrigger value="professionals" class="flex items-center gap-2">
+          <SlidersHorizontal class="h-4 w-4" />
+          Profissionais
+        </TabsTrigger>
+      </TabsList>
+    </Tabs>
 
     <!-- Search & Filters Bar -->
     <Card class="p-4">
@@ -240,7 +280,7 @@ onMounted(() => {
         <div class="w-full md:w-56">
           <Select :model-value="selectedCategory" @update:model-value="(val) => selectedCategory = val as string">
             <SelectTrigger>
-              <SelectValue placeholder="Categoria" />
+              <SelectValue :label="categories.find(c => c.value === selectedCategory)?.label" placeholder="Categoria" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem v-for="cat in categories" :key="cat.value" :value="cat.value">
@@ -254,7 +294,7 @@ onMounted(() => {
         <div class="w-full md:w-48">
           <Select :model-value="sortBy" @update:model-value="(val) => sortBy = val as string">
             <SelectTrigger>
-              <SelectValue />
+              <SelectValue :label="sortOptions.find(o => o.value === sortBy)?.label" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="recent">Mais recentes</SelectItem>
@@ -308,25 +348,14 @@ onMounted(() => {
       </div>
     </Card>
 
-    <!-- Results Count -->
-    <div class="flex items-center justify-between text-sm">
-      <p class="text-[#435574]">
-        <span class="font-semibold text-[#263238]">{{ filteredServices.length }}</span>
-        {{ filteredServices.length === 1 ? 'serviço' : 'serviços' }} de
-        <span class="font-semibold text-[#263238]">{{ totalFreelancers }}</span>
-        {{ totalFreelancers === 1 ? 'profissional' : 'profissionais' }}
-      </p>
-    </div>
-
-    <!-- Loading State -->
+    <!-- Results Content -->
     <div v-if="isLoading" class="flex items-center justify-center py-20">
       <div class="text-center">
         <Loader2 class="h-10 w-10 text-[#286AD8] animate-spin mx-auto mb-4" />
-        <p class="text-[#435574]">Carregando profissionais...</p>
+        <p class="text-[#435574]">Carregando resultados...</p>
       </div>
     </div>
 
-    <!-- Error State -->
     <div v-else-if="error" class="text-center py-16">
       <AlertCircle class="h-12 w-12 text-red-400 mx-auto mb-4" />
       <h3 class="text-lg font-semibold text-[#263238] mb-2">Ops, algo deu errado</h3>
@@ -336,174 +365,159 @@ onMounted(() => {
       </Button>
     </div>
 
-    <!-- Empty State -->
-    <div v-else-if="filteredServices.length === 0" class="text-center py-16">
-      <div class="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-        <Search class="h-10 w-10 text-[#435574]" />
+    <template v-else-if="searchMode === 'professionals'">
+      <div class="flex items-center justify-between text-sm mb-4">
+        <p class="text-[#435574]">
+          <span class="font-semibold text-[#263238]">{{ totalFreelancers }}</span>
+          {{ totalFreelancers === 1 ? 'profissional encontrado' : 'profissionais encontrados' }}
+        </p>
       </div>
-      <h3 class="text-lg font-semibold text-[#263238] mb-2">Nenhum profissional encontrado</h3>
-      <p class="text-[#435574] mb-6">
-        Tente ajustar seus filtros ou buscar por outro termo
-      </p>
-      <Button @click="clearFilters" variant="outline" class="border-[#286AD8] text-[#286AD8]">
-        Limpar filtros
-      </Button>
-    </div>
 
-    <!-- Grid View -->
-    <div v-else-if="viewMode === 'grid'" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-      <Card
-        v-for="service in filteredServices"
-        :key="service.id"
-        class="group hover:shadow-lg hover:border-[#286AD8]/30 transition-all duration-200 overflow-hidden cursor-pointer"
-        @click="props.onNavigate('provider-profile', { providerId: service.freelancerId })"
-      >
-        <!-- Service Image -->
-        <div class="relative h-40 bg-gradient-to-br from-[#286AD8]/10 to-[#435574]/10 overflow-hidden">
-          <img
-            v-if="service.images && service.images.length > 0"
-            :src="service.images[0]"
-            :alt="service.title"
-            class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-          />
-          <div v-else class="w-full h-full flex items-center justify-center">
-            <Briefcase class="h-12 w-12 text-[#286AD8]/30" />
-          </div>
-
-          <!-- Category Badge -->
-          <Badge class="absolute top-3 left-3 bg-white/90 text-[#263238] backdrop-blur-sm text-xs">
-            {{ service.category }}
-          </Badge>
-
-          <!-- Favorite -->
-          <button
-            @click.stop="toggleFavorite(service.id)"
-            :class="`absolute top-3 right-3 p-1.5 rounded-full transition-all ${
-              favoriteIds.has(service.id)
-                ? 'bg-red-50 text-red-500'
-                : 'bg-white/80 text-gray-400 hover:text-red-500 hover:bg-red-50'
-            }`"
-          >
-            <Heart :class="`h-4 w-4 ${favoriteIds.has(service.id) ? 'fill-current' : ''}`" />
-          </button>
+      <div v-if="freelancerGroups.length === 0" class="text-center py-16">
+        <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <Search class="h-8 w-8 text-[#435574]" />
         </div>
+        <h3 class="text-[#263238] mb-2">Nenhum profissional encontrado</h3>
+        <p class="text-[#435574] mb-6">Tente ajustar seus filtros ou fazer uma nova busca</p>
+        <Button @click="clearFilters" variant="outline" class="border-[#286AD8] text-[#286AD8]">
+          Limpar filtros
+        </Button>
+      </div>
 
-        <!-- Content -->
-        <div class="p-4">
-          <h3 class="font-semibold text-[#263238] mb-1 line-clamp-1 group-hover:text-[#286AD8] transition-colors">
-            {{ service.title }}
-          </h3>
+      <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <FreelancerCard
+          v-for="group in freelancerGroups"
+          :key="group.freelancerId"
+          :freelancer="{
+            id: group.freelancerId,
+            name: group.freelancerName,
+            avatar: group.freelancerProfilePhoto,
+            category: Array.from(new Set(group.services.map(s => s.category))).join(', '),
+            categories: Array.from(new Set(group.services.map(s => s.category))),
+            servicesCount: group.services.length,
+            rating: 5.0,
+            reviewCount: 0,
+            isAvailable: true
+          }"
+          :is-favorite="isFavoriteFreelancer(group.freelancerId)"
+          @view-profile="handleViewProfile"
+          @toggle-favorite="toggleFavoriteFreelancer"
+        />
+      </div>
+    </template>
 
-          <!-- Freelancer -->
-          <div class="flex items-center gap-2 mb-3">
-            <div class="w-6 h-6 rounded-full bg-[#286AD8]/10 flex items-center justify-center text-xs font-semibold text-[#286AD8]">
-              {{ getInitials(service.freelancerName) }}
-            </div>
-            <span class="text-sm text-[#435574]">{{ service.freelancerName }}</span>
-          </div>
+    <template v-else>
+      <div class="flex items-center justify-between text-sm mb-4">
+        <p class="text-[#435574]">
+          <span class="font-semibold text-[#263238]">{{ filteredServices.length }}</span>
+          {{ filteredServices.length === 1 ? 'serviço encontrado' : 'serviços encontrados' }}
+        </p>
+      </div>
 
-          <p class="text-sm text-[#435574] mb-3 line-clamp-2">{{ service.description }}</p>
-
-          <!-- Tags -->
-          <div v-if="service.tags && service.tags.length > 0" class="flex flex-wrap gap-1 mb-3">
-            <Badge v-for="tag in service.tags.slice(0, 3)" :key="tag" variant="secondary" class="text-xs px-2 py-0.5">
-              {{ tag }}
-            </Badge>
-            <Badge v-if="service.tags.length > 3" variant="secondary" class="text-xs px-2 py-0.5">
-              +{{ service.tags.length - 3 }}
-            </Badge>
-          </div>
-
-          <!-- Footer -->
-          <div class="flex items-center justify-between pt-3 border-t border-gray-100">
-            <div class="flex items-center gap-1 text-[#286AD8]">
-              <DollarSign class="h-4 w-4" />
-              <span class="font-bold text-sm">{{ formatPrice(service.price, service.priceType) }}</span>
-            </div>
-            <div class="flex items-center gap-1 text-[#435574]">
-              <Clock class="h-3.5 w-3.5" />
-              <span class="text-xs">{{ formatDelivery(service.deliveryTime, service.deliveryUnit) }}</span>
-            </div>
-          </div>
+      <div v-if="filteredServices.length === 0" class="text-center py-16">
+        <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <Search class="h-8 w-8 text-[#435574]" />
         </div>
-      </Card>
-    </div>
+        <h3 class="text-[#263238] mb-2">Nenhum serviço encontrado</h3>
+        <p class="text-[#435574] mb-6">Tente ajustar seus filtros ou fazer uma nova busca</p>
+        <Button @click="clearFilters" variant="outline" class="border-[#286AD8] text-[#286AD8]">
+          Limpar filtros
+        </Button>
+      </div>
 
-    <!-- List View -->
-    <div v-else class="space-y-3">
-      <Card
-        v-for="service in filteredServices"
-        :key="service.id"
-        class="p-5 hover:shadow-md hover:border-[#286AD8]/30 transition-all cursor-pointer group"
-        @click="props.onNavigate('provider-profile', { providerId: service.freelancerId })"
-      >
-        <div class="flex gap-4">
-          <!-- Image -->
-          <div class="hidden sm:block w-28 h-28 rounded-lg overflow-hidden bg-gradient-to-br from-[#286AD8]/10 to-[#435574]/10 flex-shrink-0">
-            <img
-              v-if="service.images && service.images.length > 0"
-              :src="service.images[0]"
-              :alt="service.title"
-              class="w-full h-full object-cover"
-            />
-            <div v-else class="w-full h-full flex items-center justify-center">
-              <Briefcase class="h-8 w-8 text-[#286AD8]/30" />
+      <!-- Grid View -->
+      <div v-else-if="viewMode === 'grid'" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <ServiceCard
+          v-for="service in filteredServices"
+          :key="service.id"
+          :service="service"
+          :is-favorite="isFavoriteService(service.id)"
+          @navigate="handleViewService"
+          @toggle-favorite="toggleFavoriteService"
+        />
+      </div>
+
+      <!-- List View -->
+      <div v-else class="space-y-4">
+        <Card
+          v-for="service in filteredServices"
+          :key="service.id"
+          class="p-5 hover:shadow-md hover:border-[#286AD8]/30 transition-all cursor-pointer group"
+          @click="handleViewService({ providerId: service.freelancerId, serviceId: service.id })"
+        >
+          <div class="flex gap-4">
+            <!-- Image -->
+            <div class="hidden sm:block w-28 h-28 rounded-lg overflow-hidden bg-gradient-to-br from-[#286AD8]/10 to-[#435574]/10 flex-shrink-0">
+              <img
+                v-if="service.images && service.images.length > 0"
+                :src="service.images[0]"
+                :alt="service.title"
+                class="w-full h-full object-cover"
+              />
+              <div v-else class="w-full h-full flex items-center justify-center">
+                <Briefcase class="h-8 w-8 text-[#286AD8]/30" />
+              </div>
             </div>
-          </div>
 
-          <!-- Content -->
-          <div class="flex-1 min-w-0">
-            <div class="flex items-start justify-between gap-3">
-              <div class="min-w-0">
-                <h3 class="font-semibold text-[#263238] group-hover:text-[#286AD8] transition-colors mb-1">
-                  {{ service.title }}
-                </h3>
-                <div class="flex items-center gap-3 mb-2">
-                  <div class="flex items-center gap-1.5">
-                    <div class="w-5 h-5 rounded-full bg-[#286AD8]/10 flex items-center justify-center text-[10px] font-semibold text-[#286AD8]">
-                      {{ getInitials(service.freelancerName) }}
+            <!-- Content -->
+            <div class="flex-1 min-w-0">
+              <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0">
+                  <h3 class="font-semibold text-[#263238] group-hover:text-[#286AD8] transition-colors mb-1">
+                    {{ service.title }}
+                  </h3>
+                  <div class="flex items-center gap-3 mb-2">
+                    <div class="flex items-center gap-1.5">
+                      <div class="w-5 h-5 rounded-full bg-[#286AD8]/10 overflow-hidden flex items-center justify-center text-[8px] font-semibold text-[#286AD8]">
+                        <img
+                          v-if="service.freelancerProfilePhoto"
+                          :src="service.freelancerProfilePhoto"
+                          :alt="service.freelancerName"
+                          class="w-full h-full object-cover"
+                        />
+                        <template v-else>
+                          {{ getInitials(service.freelancerName) }}
+                        </template>
+                      </div>
+                      <span class="text-sm text-[#435574]">{{ service.freelancerName }}</span>
                     </div>
-                    <span class="text-sm text-[#435574]">{{ service.freelancerName }}</span>
+                    <Badge variant="secondary" class="text-xs">{{ service.category }}</Badge>
                   </div>
-                  <Badge variant="secondary" class="text-xs">{{ service.category }}</Badge>
+                </div>
+
+                <div class="flex items-center gap-2 flex-shrink-0">
+                  <button
+                    @click.stop="toggleFavoriteService(service.id)"
+                    :class="`p-2 rounded-full transition-all ${
+                      isFavoriteService(service.id)
+                        ? 'text-red-500 bg-red-50'
+                        : 'text-gray-400 hover:text-red-500 hover:bg-red-50'
+                    }`"
+                  >
+                    <Heart :class="`h-4 w-4 ${isFavoriteService(service.id) ? 'fill-current' : ''}`" />
+                  </button>
+                  <ChevronRight class="h-5 w-5 text-gray-300 group-hover:text-[#286AD8] transition-colors" />
                 </div>
               </div>
 
-              <div class="flex items-center gap-2 flex-shrink-0">
-                <button
-                  @click.stop="toggleFavorite(service.id)"
-                  :class="`p-2 rounded-full transition-all ${
-                    favoriteIds.has(service.id)
-                      ? 'text-red-500 bg-red-50'
-                      : 'text-gray-400 hover:text-red-500 hover:bg-red-50'
-                  }`"
-                >
-                  <Heart :class="`h-4 w-4 ${favoriteIds.has(service.id) ? 'fill-current' : ''}`" />
-                </button>
-                <ChevronRight class="h-5 w-5 text-gray-300 group-hover:text-[#286AD8] transition-colors" />
-              </div>
-            </div>
+              <p class="text-sm text-[#435574] mb-3 line-clamp-2">{{ service.description }}</p>
 
-            <p class="text-sm text-[#435574] mb-3 line-clamp-2">{{ service.description }}</p>
-
-            <div class="flex items-center gap-4">
-              <div class="flex items-center gap-1 text-[#286AD8]">
-                <DollarSign class="h-4 w-4" />
-                <span class="font-bold text-sm">{{ formatPrice(service.price, service.priceType) }}</span>
-              </div>
-              <div class="flex items-center gap-1 text-[#435574]">
-                <Clock class="h-3.5 w-3.5" />
-                <span class="text-xs">{{ formatDelivery(service.deliveryTime, service.deliveryUnit) }}</span>
-              </div>
-              <div v-if="service.tags && service.tags.length > 0" class="flex gap-1 ml-auto">
-                <Badge v-for="tag in service.tags.slice(0, 2)" :key="tag" variant="secondary" class="text-xs px-2 py-0.5">
-                  {{ tag }}
-                </Badge>
+              <div class="flex items-center gap-4">
+                <div class="flex items-center gap-1 text-[#286AD8]">
+                  <DollarSign class="h-4 w-4" />
+                  <span class="font-bold text-sm">
+                    {{ new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(service.price) }}{{ service.priceType === 'HOURLY' ? '/hora' : service.priceType === 'DAILY' ? '/dia' : '' }}
+                  </span>
+                </div>
+                <div class="flex items-center gap-1 text-[#435574]">
+                  <Clock class="h-3.5 w-3.5" />
+                  <span class="text-xs">{{ service.deliveryTime }} {{ service.deliveryUnit === 'HOURS' ? 'hora(s)' : service.deliveryUnit === 'DAYS' ? 'dia(s)' : 'semana(s)' }}</span>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      </Card>
-    </div>
+        </Card>
+      </div>
+    </template>
   </div>
 </template>

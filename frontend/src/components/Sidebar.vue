@@ -9,6 +9,7 @@ import {
   LogOut,
   LayoutDashboard,
   Star,
+  Heart,
 } from 'lucide-vue-next';
 import Button from './ui/button.vue';
 import Separator from './ui/separator.vue';
@@ -43,7 +44,7 @@ export type Page =
   | 'freelancer-proposal-detail'
   | 'freelancer-deliveries'
   | 'freelancer-wallet'
-  | 'freelancer-invoices'
+
   | 'freelancer-portfolio'
   | 'freelancer-schedule'
   | 'freelancer-kyc'
@@ -83,6 +84,7 @@ const contractorMenuItems: MenuItem[] = [
   { icon: LayoutDashboard, label: 'Dashboard', page: 'contractor-dashboard', id: 'dashboard' },
   { icon: Search, label: 'Buscar Serviços', page: 'search', id: 'search' },
   { icon: MessageSquare, label: 'Mensagens', page: 'chat', id: 'messages' },
+  { icon: Heart, label: 'Meus Favoritos', page: 'favorites', id: 'favorites' },
   { icon: Star, label: 'Avaliações', page: 'contractor-dashboard', id: 'reviews' },
 ];
 

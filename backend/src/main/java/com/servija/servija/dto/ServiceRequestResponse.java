@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @Builder
@@ -33,6 +34,7 @@ public class ServiceRequestResponse {
     private String address;
     private LocalDate desiredDate;
     private String urgency;
+    private List<String> attachments;
 
     // Freelancer response
     private BigDecimal responseValue;

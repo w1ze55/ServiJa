@@ -26,7 +26,6 @@ export interface ServiceFormData {
   price: number;
   priceType: 'fixo' | 'hora' | 'dia';
   deliveryTime: string;
-  deliveryUnit: 'dia' | 'semana';
   tags: string[];
   images: string[];
   isActive: boolean;
@@ -49,7 +48,6 @@ const formData = ref<ServiceFormData>({
   price: props.service?.price || 0,
   priceType: props.service?.priceType || 'fixo',
   deliveryTime: props.service?.deliveryTime || '',
-  deliveryUnit: props.service?.deliveryUnit || 'dia',
   tags: props.service?.tags || [],
   images: props.service?.images || [],
   isActive: props.service?.isActive ?? true,
@@ -60,30 +58,34 @@ const errors = ref<Record<string, string>>({});
 const isUploading = ref(false);
 
 const categories = [
-  'Eletricista',
-  'Encanador',
-  'Pintor',
-  'Pedreiro',
-  'Marceneiro',
-  'Serralheiro',
-  'Jardineiro',
-  'Mecânico',
+  'Advogado',
+  'Arquiteto',
+  'Contador',
+  'Cozinheiro',
+  'Cuidador',
   'Designer Gráfico',
   'Desenvolvedor Web',
-  'Fotógrafo',
-  'Videomaker',
-  'Redator',
-  'Social Media',
-  'Professor Particular',
-  'Cozinheiro',
   'Diarista',
-  'Cuidador',
+  'Eletricista',
+  'Encanador',
+  'Fotógrafo',
+  'Jardineiro',
+  'Marceneiro',
+  'Mecânico',
+  'Pedreiro',
   'Personal Trainer',
-  'Advogado',
-  'Contador',
-  'Arquiteto',
+  'Pintor',
+  'Professor Particular',
+  'Redator',
+  'Serralheiro',
+  'Social Media',
+  'Videomaker',
   'Outro',
-];
+].sort((a, b) => {
+  if (a === 'Outro') return 1;
+  if (b === 'Outro') return -1;
+  return a.localeCompare(b, 'pt-BR');
+});
 
 watch(() => props.service, (newService) => {
   if (newService) {
@@ -95,11 +97,11 @@ watch(() => props.service, (newService) => {
       price: newService.price || 0,
       priceType: newService.priceType || 'fixo',
       deliveryTime: newService.deliveryTime || '',
-      deliveryUnit: newService.deliveryUnit || 'dia',
       tags: newService.tags || [],
       images: newService.images || [],
       isActive: newService.isActive ?? true,
     };
+    formattedPrice.value = formatPriceDisplay(newService.price || 0);
   }
 }, { immediate: true });
 
@@ -151,10 +153,65 @@ const handleRemoveTag = (tagToRemove: string) => {
 };
 
 const handleKeyPress = (e: KeyboardEvent) => {
-  if (e.key === 'Enter') {
+  if (e.key === 'Enter' || e.key === ',') {
     e.preventDefault();
     handleAddTag();
   }
+};
+
+// Formatação de preço no padrão brasileiro (XX.XXX.XXX,XX)
+const formatPriceDisplay = (value: number): string => {
+  if (!value) return '';
+  const parts = value.toFixed(2).split('.');
+  const intPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  return `${intPart},${parts[1]}`;
+};
+
+const formattedPrice = ref(formatPriceDisplay(formData.value.price));
+
+const handlePriceInput = (val: string) => {
+  // Remove tudo que não é dígito
+  let digits = val.replace(/\D/g, '');
+  
+  // Limitar a 10 dígitos (XX.XXX.XXX,XX = 99.999.999,99)
+  if (digits.length > 10) {
+    digits = digits.slice(0, 10);
+  }
+  
+  if (!digits) {
+    formattedPrice.value = '';
+    handleInputChange('price', 0);
+    return;
+  }
+  
+  // Converter para centavos: últimos 2 dígitos são decimais
+  const numValue = parseInt(digits) / 100;
+  
+  // Formatar para exibição
+  const parts = numValue.toFixed(2).split('.');
+  const intPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  formattedPrice.value = `${intPart},${parts[1]}`;
+  
+  handleInputChange('price', numValue);
+};
+
+// Prazo de entrega em dias (apenas dígitos, max 3 chars = 365 dias)
+const handleDeliveryTimeChange = (val: string) => {
+  const digits = val.replace(/\D/g, '').slice(0, 3);
+  const num = parseInt(digits) || 0;
+  
+  if (!digits) {
+    handleInputChange('deliveryTime', '');
+    return;
+  }
+
+  // Limite máximo: 365 dias (~12 meses)
+  if (num > 365) {
+    handleInputChange('deliveryTime', '365');
+    return;
+  }
+
+  handleInputChange('deliveryTime', digits);
 };
 
 const validateForm = () => {
@@ -162,6 +219,8 @@ const validateForm = () => {
 
   if (!formData.value.title.trim()) {
     newErrors.title = 'Título é obrigatório';
+  } else if (formData.value.title.length > 50) {
+    newErrors.title = 'Título deve ter no máximo 50 caracteres';
   }
 
   if (!formData.value.category) {
@@ -180,6 +239,8 @@ const validateForm = () => {
 
   if (!formData.value.deliveryTime || parseInt(formData.value.deliveryTime) <= 0) {
     newErrors.deliveryTime = 'Prazo de entrega é obrigatório';
+  } else if (parseInt(formData.value.deliveryTime) > 365) {
+    newErrors.deliveryTime = 'Prazo máximo é de 365 dias (12 meses)';
   }
 
   errors.value = newErrors;
@@ -207,12 +268,12 @@ const handleClose = () => {
     price: 0,
     priceType: 'fixo',
     deliveryTime: '',
-    deliveryUnit: 'dia',
     tags: [],
     images: [],
     isActive: true,
   };
   tagInput.value = '';
+  formattedPrice.value = '';
   errors.value = {};
   props.onClose();
 };
@@ -293,8 +354,12 @@ const handleRemoveImage = async (index: number) => {
             :model-value="formData.title"
             @update:model-value="(val) => handleInputChange('title', val)"
             :class="errors.title ? 'border-red-500' : ''"
+            maxlength="50"
           />
-          <p v-if="errors.title" class="text-sm text-red-500">{{ errors.title }}</p>
+          <div class="flex items-center justify-between">
+            <p v-if="errors.title" class="text-sm text-red-500">{{ errors.title }}</p>
+            <p class="text-sm text-gray-500 ml-auto">{{ formData.title.length }} / 50 caracteres</p>
+          </div>
         </div>
 
         <!-- Categoria -->
@@ -349,12 +414,12 @@ const handleRemoveImage = async (index: number) => {
               </span>
               <Input
                 id="price"
-                type="number"
-                min="0"
-                step="0.01"
+                type="text"
+                inputmode="numeric"
+                maxlength="13"
                 placeholder="0,00"
-                :model-value="String(formData.price || '')"
-                @update:model-value="(val: string) => handleInputChange('price', parseFloat(val as string) || 0)"
+                :model-value="formattedPrice"
+                @update:model-value="(val: string) => handlePriceInput(val)"
                 :class="`pl-10 ${errors.price ? 'border-red-500' : ''}`"
               />
             </div>
@@ -379,37 +444,29 @@ const handleRemoveImage = async (index: number) => {
         </div>
 
         <!-- Prazo de Entrega -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div class="space-y-2">
-            <Label for="deliveryTime">
-              Prazo de Entrega <span class="text-red-500">*</span>
-            </Label>
-            <Input
-              id="deliveryTime"
-              type="number"
-              min="1"
-              placeholder="Ex: 7"
-              :model-value="formData.deliveryTime"
-              @update:model-value="(val: string) => handleInputChange('deliveryTime', val)"
-              :class="errors.deliveryTime ? 'border-red-500' : ''"
-            />
-            <p v-if="errors.deliveryTime" class="text-sm text-red-500">{{ errors.deliveryTime }}</p>
-          </div>
-
-          <div class="space-y-2">
-            <Label for="deliveryUnit">Unidade</Label>
-            <Select
-              v-model="formData.deliveryUnit"
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="dia">Dias</SelectItem>
-                <SelectItem value="semana">Semanas</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+        <div class="space-y-2">
+          <Label for="deliveryTime">
+            Prazo de Entrega (em dias) <span class="text-red-500">*</span>
+          </Label>
+          <Input
+            id="deliveryTime"
+            type="text"
+            inputmode="numeric"
+            maxlength="3"
+            placeholder="Ex: 7"
+            :model-value="formData.deliveryTime"
+            @update:model-value="(val: string) => handleDeliveryTimeChange(val)"
+            :class="errors.deliveryTime ? 'border-red-500' : ''"
+          />
+          <p v-if="errors.deliveryTime" class="text-sm text-red-500">{{ errors.deliveryTime }}</p>
+          <p v-if="formData.deliveryTime && parseInt(formData.deliveryTime) > 0" class="text-sm text-gray-500">
+            ≈ {{ parseInt(formData.deliveryTime) >= 30 
+              ? `${Math.floor(parseInt(formData.deliveryTime) / 30)} ${Math.floor(parseInt(formData.deliveryTime) / 30) === 1 ? 'mês' : 'meses'}` 
+              : parseInt(formData.deliveryTime) >= 7 
+                ? `${Math.floor(parseInt(formData.deliveryTime) / 7)} ${Math.floor(parseInt(formData.deliveryTime) / 7) === 1 ? 'semana' : 'semanas'}` 
+                : `${formData.deliveryTime} ${parseInt(formData.deliveryTime) === 1 ? 'dia' : 'dias'}` 
+            }}
+          </p>
         </div>
 
         <!-- Tags/Habilidades -->
