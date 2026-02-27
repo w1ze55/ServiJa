@@ -285,7 +285,7 @@ public class ServiceService {
 
     // ==================== MÉTODOS AUXILIARES ====================
 
-    private ServiceResponse toResponse(Service service) {
+    public ServiceResponse toResponse(Service service) {
         return ServiceResponse.builder()
                 .id(service.getId())
                 .freelancerId(service.getFreelancer().getId())
