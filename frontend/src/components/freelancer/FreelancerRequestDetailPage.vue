@@ -25,6 +25,7 @@ import {
   Mail,
   Check,
   FileEdit,
+  Lock,
 } from 'lucide-vue-next';
 import Button from '../ui/button.vue';
 import Input from '../ui/input.vue';
@@ -866,57 +867,11 @@ const getStatusBadge = (status: string) => {
             </div>
 
             <!-- Message Input -->
-            <div class="space-y-3 border-t pt-4">
-              <div v-if="messageAttachments.length > 0" class="flex flex-wrap gap-2">
-                <Badge
-                  v-for="(file, idx) in messageAttachments"
-                  :key="idx"
-                  variant="secondary"
-                  class="pl-3 pr-1"
-                >
-                  {{ file.name }}
-                  <button
-                    @click="messageAttachments = messageAttachments.filter((_, i) => i !== idx)"
-                    class="ml-2 hover:bg-gray-300 rounded-full p-0.5"
-                  >
-                    <X class="h-3 w-3" />
-                  </button>
-                </Badge>
-              </div>
-
-              <div class="flex gap-2">
-                <Textarea
-                  :model-value="newMessage"
-                  @update:model-value="(val) => newMessage = val as string"
-                  placeholder="Digite sua mensagem..."
-                  :rows="3"
-                  class="flex-1"
-                />
-              </div>
-
-              <div class="flex gap-2">
-                <input
-                  ref="messageAttachmentInput"
-                  type="file"
-                  multiple
-                  class="hidden"
-                  @change="handleMessageAttachmentChange"
-                />
-                <Button
-                  @click="messageAttachmentInput?.click()"
-                  variant="outline"
-                >
-                  <Paperclip class="h-4 w-4 mr-2" />
-                  Anexar
-                </Button>
-                <Button
-                  @click="handleSendMessage"
-                  class="bg-[#286AD8] hover:bg-[#435574] flex-1"
-                >
-                  <Send class="h-4 w-4 mr-2" />
-                  Enviar Mensagem
-                </Button>
-              </div>
+            <div class="mt-6 flex items-center justify-center p-6 bg-gray-50 rounded-lg border border-dashed border-gray-200">
+              <p class="text-sm text-[#435574] flex items-center gap-2 text-center">
+                <Lock class="h-4 w-4 text-amber-500" />
+                O chat será liberado automaticamente após a confirmação do pagamento.
+              </p>
             </div>
           </Card>
         </TabsContent>

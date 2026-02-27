@@ -12,6 +12,7 @@ import {
   User,
   History,
   FileEdit,
+  Lock,
 } from 'lucide-vue-next';
 import Button from '../ui/button.vue';
 import Input from '../ui/input.vue';
@@ -580,25 +581,11 @@ const getStatusLabel = (status: string) => {
         </div>
 
         <!-- Message Input -->
-        <div
-          v-if="request.status !== 'cancelled' && request.status !== 'rejected' && request.status !== 'completed'"
-          class="flex gap-2"
-        >
-          <Textarea
-            :model-value="newMessage"
-            @update:model-value="(val) => newMessage = val as string"
-            placeholder="Digite sua mensagem..."
-            :rows="2"
-            class="flex-1"
-            @keydown.enter.ctrl="handleSendMessage"
-          />
-          <Button
-            @click="handleSendMessage"
-            class="bg-[#286AD8] hover:bg-[#435574] self-end"
-            :disabled="!newMessage.trim() || isSendingMessage"
-          >
-            <Send class="h-4 w-4" />
-          </Button>
+        <div class="flex items-center justify-center p-4 bg-gray-50 rounded-lg border border-dashed border-gray-200">
+          <p class="text-sm text-[#435574] flex items-center gap-2 text-center">
+            <Lock class="h-4 w-4 text-amber-500" />
+            O chat será liberado automaticamente após a confirmação do pagamento.
+          </p>
         </div>
       </Card>
 
