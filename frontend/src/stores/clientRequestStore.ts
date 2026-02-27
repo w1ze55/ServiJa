@@ -194,8 +194,10 @@ export const useClientRequestStore = defineStore('clientRequest', () => {
             const request = requests.value.find((r) => r.id === id);
             if (!request) return false;
 
-            // TODO: Chamar API
-            // await api.patch(`/service-requests/${id}/status`, { status: 'cancelled', reason });
+            await api.patch(`/service-requests/${id}/status`, {
+                status: 'CANCELLED',
+                reason
+            });
 
             request.status = 'cancelled';
             request.auditLog = request.auditLog || [];
@@ -219,8 +221,9 @@ export const useClientRequestStore = defineStore('clientRequest', () => {
             const request = requests.value.find((r) => r.id === id);
             if (!request) return false;
 
-            // TODO: Chamar API
-            // await api.patch(`/service-requests/${id}/status`, { status: 'accepted' });
+            await api.patch(`/service-requests/${id}/status`, {
+                status: 'ACCEPTED'
+            });
 
             request.status = 'accepted';
             request.auditLog = request.auditLog || [];
@@ -243,6 +246,11 @@ export const useClientRequestStore = defineStore('clientRequest', () => {
         try {
             const request = requests.value.find((r) => r.id === id);
             if (!request) return false;
+
+            await api.patch(`/service-requests/${id}/status`, {
+                status: 'REJECTED',
+                reason
+            });
 
             request.status = 'rejected';
             request.auditLog = request.auditLog || [];
