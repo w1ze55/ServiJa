@@ -33,7 +33,6 @@ public class ServiceRequestResponse {
     private String status;
     private String address;
     private LocalDate desiredDate;
-    private String urgency;
     private List<String> attachments;
 
     // Freelancer response

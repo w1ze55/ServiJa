@@ -60,9 +60,6 @@ public class ServiceRequest {
     @Column(name = "desired_date")
     private LocalDate desiredDate;
 
-    @Column(length = 20)
-    private String urgency;
-
     @Column(columnDefinition = "TEXT")
     private String attachments;
 

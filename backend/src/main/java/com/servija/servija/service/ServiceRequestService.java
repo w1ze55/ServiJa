@@ -62,7 +62,6 @@ public class ServiceRequestService {
                 .priority(ServiceRequest.Priority.valueOf(dto.getPriority().toUpperCase()))
                 .address(dto.getAddress())
                 .desiredDate(dto.getDesiredDate() != null ? LocalDate.parse(dto.getDesiredDate()) : null)
-                .urgency(dto.getUrgency())
                 .attachments(attachmentsJson)
                 .build();
 
@@ -219,7 +218,6 @@ public class ServiceRequestService {
                 .status(request.getStatus().name())
                 .address(request.getAddress())
                 .desiredDate(request.getDesiredDate())
-                .urgency(request.getUrgency())
                 .responseValue(request.getResponseValue())
                 .responseDays(request.getResponseDays())
                 .responseScope(request.getResponseScope())

@@ -22,7 +22,6 @@ public class ServiceRequestDTO {
     private String priority; // LOW, MEDIUM, HIGH
     private String address;
     private String desiredDate;
-    private String urgency;
     private List<String> attachments;
     private Long freelancerId;
 }

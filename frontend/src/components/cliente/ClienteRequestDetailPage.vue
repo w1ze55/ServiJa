@@ -512,10 +512,9 @@ const getStatusLabel = (status: string) => {
         </div>
       </Card>
 
-      <!-- History Section -->
       <ServiceRequestTimeline
         v-if="activeSection === 'history'"
-        :entries="[...(request.auditLog || [])].reverse()"
+        :entries="request.auditLog || []"
         title="Histórico de Atividades"
       />
     </template>
