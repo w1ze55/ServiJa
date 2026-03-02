@@ -1,0 +1,108 @@
+import { ref, onMounted, onUnmounted } from 'vue';
+import { Client } from '@stomp/stompjs';
+import SockJS from 'sockjs-client';
+
+export interface ServiceRequestNotification {
+  type: 'NEW_SERVICE_REQUEST' | 'SERVICE_REQUEST_STATUS_CHANGED' | 'NEW_PROPOSAL' | 'COUNTER_PROPOSAL' | 'PROPOSAL_ACCEPTED' | 'SERVICE_REQUEST_CANCELLED';
+  serviceRequestId: number;
+  contractorName?: string;
+  freelancerName?: string;
+  serviceName?: string;
+  status?: string;
+  proposalAmount?: string;
+  counterProposalAmount?: string;
+  reason?: string;
+  message: string;
+  timestamp: number;
+}
+
+export function useServiceRequestWebSocket(userEmail: string) {
+  const client = ref<Client | null>(null);
+  const connected = ref(false);
+  const lastNotification = ref<ServiceRequestNotification | null>(null);
+
+  const connect = () => {
+    if (client.value?.connected) {
+      console.log('WebSocket de solicitações já está conectado');
+      return;
+    }
+
+    // Construir URL do WebSocket a partir da API URL
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+    const wsUrl = `${apiUrl}/ws`;
+
+    console.log('🔌 Conectando WebSocket de solicitações em:', wsUrl);
+    console.log('📧 Email do usuário:', userEmail);
+
+    const stompClient = new Client({
+      webSocketFactory: () => new SockJS(wsUrl),
+      debug: (str) => {
+        console.log('STOMP (Solicitações):', str);
+      },
+      reconnectDelay: 5000,
+      heartbeatIncoming: 4000,
+      heartbeatOutgoing: 4000,
+    });
+
+    stompClient.onConnect = () => {
+      console.log('✅ WebSocket de solicitações conectado');
+      connected.value = true;
+
+      // Subscrever ao tópico de solicitações do usuário
+      stompClient.subscribe(`/topic/service-request/${userEmail}`, (message) => {
+        console.log('📩 Nova notificação de solicitação recebida:', message.body);
+        
+        try {
+          const notification: ServiceRequestNotification = JSON.parse(message.body);
+          lastNotification.value = notification;
+
+          // Disparar evento customizado para o componente
+          const event = new CustomEvent('service-request-notification', {
+            detail: notification
+          });
+          window.dispatchEvent(event);
+
+          console.log('🔔 Notificação processada:', notification.type);
+        } catch (error) {
+          console.error('❌ Erro ao processar notificação:', error);
+        }
+      });
+    };
+
+    stompClient.onStompError = (frame) => {
+      console.error('❌ Erro STOMP (Solicitações):', frame.headers['message']);
+      console.error('Detalhes:', frame.body);
+      connected.value = false;
+    };
+
+    stompClient.onWebSocketClose = () => {
+      console.log('🔌 WebSocket de solicitações desconectado');
+      connected.value = false;
+    };
+
+    stompClient.activate();
+    client.value = stompClient;
+  };
+
+  const disconnect = () => {
+    if (client.value) {
+      client.value.deactivate();
+      client.value = null;
+      connected.value = false;
+      console.log('🔌 WebSocket de solicitações desconectado manualmente');
+    }
+  };
+
+  // Auto-disconnect ao desmontar o componente
+  onUnmounted(() => {
+    disconnect();
+  });
+
+  return {
+    client,
+    connected,
+    lastNotification,
+    connect,
+    disconnect
+  };
+}
