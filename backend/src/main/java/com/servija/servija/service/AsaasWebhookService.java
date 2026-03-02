@@ -195,22 +195,31 @@ public class AsaasWebhookService {
         }
 
         String asaasPaymentId = (String) paymentData.get("id");
+        String asaasStatus = (String) paymentData.get("status");
         
-        List<Payment> payments = paymentRepository.findAll().stream()
-                .filter(p -> asaasPaymentId.equals(p.getAsaasPaymentId()))
-                .toList();
+        log.info("🔔 Webhook PAYMENT_RECEIVED/CONFIRMED recebido - Asaas Payment ID: {}, Status: {}", 
+                asaasPaymentId, asaasStatus);
+        
+        Payment payment = paymentRepository.findByAsaasPaymentId(asaasPaymentId);
 
-        if (payments.isEmpty()) {
-            log.warn("Pagamento não encontrado no sistema: {}", asaasPaymentId);
+        if (payment == null) {
+            log.error("❌ Pagamento não encontrado no sistema: {}", asaasPaymentId);
+            log.error("📋 Todos os IDs Asaas no banco: {}", 
+                    paymentRepository.findAll().stream()
+                        .map(Payment::getAsaasPaymentId)
+                        .toList());
             return;
         }
 
-        Payment payment = payments.get(0);
+        log.info("✅ Pagamento encontrado no banco - ID: {}, Status Atual: {}", 
+                payment.getId(), payment.getStatus());
 
         if (payment.getStatus() != Payment.PaymentStatus.COMPLETED) {
             payment.setStatus(Payment.PaymentStatus.COMPLETED);
             payment.setCompletedAt(LocalDateTime.now());
             paymentRepository.save(payment);
+
+            log.info("💾 Status atualizado para COMPLETED");
 
             // Registrar no histórico
             saveStatusHistory(payment, Payment.PaymentStatus.COMPLETED, "PAYMENT_RECEIVED", 
@@ -222,18 +231,20 @@ public class AsaasWebhookService {
                 payment.getAmount()
             );
 
+            log.info("💰 Saldo adicionado à carteira: R$ {}", payment.getAmount());
+
             // Atualizar status da solicitação para COMPLETED E HABILITAR CHAT
             ServiceRequest serviceRequest = payment.getServiceRequest();
             if (serviceRequest.getStatus() != ServiceRequest.Status.COMPLETED) {
                 serviceRequest.setStatus(ServiceRequest.Status.COMPLETED);
                 serviceRequest.setChatEnabled(true); // 🔓 HABILITAR CHAT
                 serviceRequestRepository.save(serviceRequest);
-                log.info("Status da solicitação atualizado para COMPLETED e chat habilitado: {}", serviceRequest.getId());
+                log.info("🔓 Chat habilitado! Solicitação ID: {}", serviceRequest.getId());
             } else if (!Boolean.TRUE.equals(serviceRequest.getChatEnabled())) {
                 // Se já estava completed mas chat não estava habilitado
                 serviceRequest.setChatEnabled(true);
                 serviceRequestRepository.save(serviceRequest);
-                log.info("Chat habilitado para solicitação: {}", serviceRequest.getId());
+                log.info("🔓 Chat habilitado (solicitação já estava COMPLETED)");
             }
 
             // Enviar notificação WebSocket para o cliente
@@ -242,8 +253,10 @@ public class AsaasWebhookService {
                 payment.getContractor().getEmail()
             );
 
-            log.info("Pagamento confirmado via webhook: {} - R$ {}", 
+            log.info("✅ Pagamento confirmado via webhook: {} - R$ {}", 
                     asaasPaymentId, payment.getAmount());
+        } else {
+            log.info("ℹ️ Pagamento já estava COMPLETED, nenhuma ação necessária");
         }
     }
 
@@ -273,12 +286,9 @@ public class AsaasWebhookService {
         String asaasPaymentId = (String) paymentData.get("id");
         log.info("Pagamento vencido: {}", asaasPaymentId);
         
-        List<Payment> payments = paymentRepository.findAll().stream()
-                .filter(p -> asaasPaymentId.equals(p.getAsaasPaymentId()))
-                .toList();
+        Payment payment = paymentRepository.findByAsaasPaymentId(asaasPaymentId);
 
-        if (!payments.isEmpty()) {
-            Payment payment = payments.get(0);
+        if (payment != null) {
             payment.setStatus(Payment.PaymentStatus.OVERDUE);
             paymentRepository.save(payment);
             
@@ -326,12 +336,9 @@ public class AsaasWebhookService {
 
         String asaasPaymentId = (String) paymentData.get("id");
         
-        List<Payment> payments = paymentRepository.findAll().stream()
-                .filter(p -> asaasPaymentId.equals(p.getAsaasPaymentId()))
-                .toList();
+        Payment payment = paymentRepository.findByAsaasPaymentId(asaasPaymentId);
 
-        if (!payments.isEmpty()) {
-            Payment payment = payments.get(0);
+        if (payment != null) {
             payment.setStatus(Payment.PaymentStatus.FAILED);
             paymentRepository.save(payment);
             
