@@ -30,6 +30,7 @@ public class ServiceRequestService {
     private final UserRepository userRepository;
     private final FileStorageService fileStorageService;
     private final ServiceRequestHistoryService historyService;
+    private final WebSocketService webSocketService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Transactional
@@ -68,6 +69,17 @@ public class ServiceRequestService {
 
         ServiceRequest saved = serviceRequestRepository.save(request);
         historyService.record(saved, contractor, OperationType.REQUEST_OPENED);
+        
+        // Notificar freelancer sobre nova solicitação
+        if (freelancer != null) {
+            webSocketService.notifyNewServiceRequest(
+                saved.getId(),
+                freelancer.getEmail(),
+                contractor.getName(),
+                dto.getServiceName()
+            );
+        }
+        
         log.info("Service request created: {} for freelancer: {}", saved.getId(),
                 freelancer != null ? freelancer.getId() : "any");
         return toResponse(saved);
@@ -153,6 +165,14 @@ public class ServiceRequestService {
         String details = String.format("Valor: R$ %.2f | Prazo: %d dias", dto.getValue(), dto.getExecutionDays());
         historyService.record(saved, freelancer, OperationType.BUDGET_SENT, details);
 
+        // Notificar contratante sobre nova proposta
+        webSocketService.notifyNewProposal(
+            saved.getId(),
+            request.getContractor().getEmail(),
+            freelancer.getName(),
+            String.format("R$ %.2f", dto.getValue())
+        );
+
         return toResponse(saved);
     }
 
@@ -173,6 +193,14 @@ public class ServiceRequestService {
         String details = String.format("Valor proposto: R$ %.2f | Prazo: %d dias", dto.getValue(),
                 dto.getExecutionDays());
         historyService.record(saved, contractor, OperationType.COUNTER_PROPOSAL_SENT, details);
+
+        // Notificar freelancer sobre contra-proposta
+        webSocketService.notifyCounterProposal(
+            saved.getId(),
+            request.getFreelancer().getEmail(),
+            contractor.getName(),
+            String.format("R$ %.2f", dto.getValue())
+        );
 
         return toResponse(saved);
     }
@@ -200,6 +228,14 @@ public class ServiceRequestService {
             ServiceRequest saved = serviceRequestRepository.save(request);
             String details = String.format("Contra proposta aceita. Novo valor: R$ %.2f", request.getResponseValue());
             historyService.record(saved, freelancer, OperationType.COUNTER_PROPOSAL_ACCEPTED, details);
+            
+            // Notificar ambas as partes sobre aceitação
+            webSocketService.notifyProposalAccepted(
+                saved.getId(),
+                freelancer.getEmail(),
+                request.getContractor().getEmail()
+            );
+            
             return toResponse(saved);
         }
 
