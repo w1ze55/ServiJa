@@ -13,6 +13,12 @@ import {
   History,
   FileEdit,
   Lock,
+  CreditCard,
+  PartyPopper,
+  Sparkles,
+  Send,
+  AlertCircle,
+  FileText,
 } from 'lucide-vue-next';
 import Button from '../ui/button.vue';
 import Input from '../ui/input.vue';
@@ -63,6 +69,7 @@ const counterDays = ref(0);
 const counterNotes = ref('');
 const isSubmittingCounter = ref(false);
 const activeSection = ref<'details' | 'messages' | 'history'>('details');
+const showCelebrationModal = ref(false);
 
 const handleOpenCounterProposalDialog = () => {
   if (!request.value || !request.value.freelancerResponse) return;
@@ -175,9 +182,20 @@ const handleAcceptResponse = async () => {
   const success = await store.acceptFreelancerResponse(request.value.id);
   if (success) {
     toast.success('Proposta aceita com sucesso!');
+    // Mostrar modal de celebração
+    setTimeout(() => {
+      showCelebrationModal.value = true;
+    }, 500);
   } else {
     toast.error('Erro ao aceitar proposta');
   }
+};
+
+const handleGoToCheckout = () => {
+  if (!request.value) return;
+  showCelebrationModal.value = false;
+  // Navegar para checkout
+  window.location.href = `/checkout?requestId=${request.value.id}`;
 };
 
 const handleOpenRejectDialog = () => {
@@ -295,6 +313,30 @@ const getStatusLabel = (status: string) => {
           </div>
         </div>
 
+        <!-- Payment Pending Alert (quando status é ACCEPTED) -->
+        <div 
+          v-if="request.status === 'accepted'" 
+          class="mt-4 p-4 rounded-lg border-2 border-green-300 bg-gradient-to-r from-green-50 to-yellow-50 flex items-start gap-3"
+        >
+          <div class="flex-shrink-0 w-10 h-10 bg-green-600 rounded-full flex items-center justify-center animate-bounce">
+            <CreditCard class="h-5 w-5 text-white" />
+          </div>
+          <div class="flex-1">
+            <p class="font-semibold text-green-900 mb-1">⚡ Ação Necessária: Pagamento Pendente</p>
+            <p class="text-sm text-green-800 mb-3">
+              Sua proposta foi aceita! Complete o pagamento agora para garantir o serviço e iniciar o trabalho com <span class="font-semibold">{{ request.freelancerName }}</span>.
+            </p>
+            <Button
+              @click="handleGoToCheckout"
+              class="bg-green-600 hover:bg-green-700"
+              size="sm"
+            >
+              <CreditCard class="h-4 w-4 mr-2" />
+              Realizar Pagamento Agora
+            </Button>
+          </div>
+        </div>
+
         <!-- Rejection/Cancellation Reason Alert -->
         <div v-if="(request.status === 'rejected' && request.rejectReason) || (request.status === 'cancelled' && request.cancelReason)" 
              class="mt-4 p-4 rounded-lg border flex items-start gap-3"
@@ -310,43 +352,59 @@ const getStatusLabel = (status: string) => {
       </Card>
 
       <!-- Navigation Tabs -->
-      <div class="flex gap-2 border-b border-gray-200 pb-0">
-        <button
-          @click="activeSection = 'details'"
-          :class="`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-            activeSection === 'details'
-              ? 'border-[#286AD8] text-[#286AD8]'
-              : 'border-transparent text-[#435574] hover:text-[#263238]'
-          }`"
-        >
-          Detalhes
-        </button>
-        <button
-          @click="activeSection = 'messages'"
-          :class="`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-            activeSection === 'messages'
-              ? 'border-[#286AD8] text-[#286AD8]'
-              : 'border-transparent text-[#435574] hover:text-[#263238]'
-          }`"
-        >
-          Mensagens
-          <Badge
-            v-if="request.messages && request.messages.length > 0"
-            class="ml-1 bg-[#286AD8] text-white text-xs"
+      <div class="flex gap-2 border-b border-gray-200 pb-0 items-center justify-between">
+        <div class="flex gap-2">
+          <button
+            @click="activeSection = 'details'"
+            :class="`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              activeSection === 'details'
+                ? 'border-[#286AD8] text-[#286AD8]'
+                : 'border-transparent text-[#435574] hover:text-[#263238]'
+            }`"
           >
-            {{ request.messages.length }}
-          </Badge>
-        </button>
-        <button
-          @click="activeSection = 'history'"
-          :class="`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-            activeSection === 'history'
-              ? 'border-[#286AD8] text-[#286AD8]'
-              : 'border-transparent text-[#435574] hover:text-[#263238]'
-          }`"
+            Detalhes
+          </button>
+          <button
+            @click="activeSection = 'messages'"
+            :class="`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              activeSection === 'messages'
+                ? 'border-[#286AD8] text-[#286AD8]'
+                : 'border-transparent text-[#435574] hover:text-[#263238]'
+            }`"
+          >
+            Mensagens
+            <Badge
+              v-if="request.messages && request.messages.length > 0"
+              class="ml-1 bg-[#286AD8] text-white text-xs"
+            >
+              {{ request.messages.length }}
+            </Badge>
+          </button>
+          <button
+            @click="activeSection = 'history'"
+            :class="`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              activeSection === 'history'
+                ? 'border-[#286AD8] text-[#286AD8]'
+                : 'border-transparent text-[#435574] hover:text-[#263238]'
+            }`"
+          >
+            Histórico
+          </button>
+        </div>
+        
+        <!-- Payment Button (só aparece quando status é ACCEPTED) -->
+        <Button
+          v-if="request.status === 'accepted'"
+          @click="handleGoToCheckout"
+          class="bg-green-600 hover:bg-green-700 shadow-lg hover:shadow-xl transition-all"
+          size="sm"
         >
-          Histórico
-        </button>
+          <CreditCard class="h-4 w-4 mr-2 animate-pulse" />
+          Realizar Pagamento
+          <Badge class="ml-2 bg-yellow-400 text-yellow-900 animate-bounce">
+            Pendente
+          </Badge>
+        </Button>
       </div>
 
       <!-- Details Section -->
@@ -705,6 +763,85 @@ const getStatusLabel = (status: string) => {
             {{ isSubmittingCounter ? 'Enviando...' : 'Enviar Contra Proposta' }}
           </Button>
         </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    <!-- Celebration Modal - "Hora de Fechar!" -->
+    <Dialog :open="showCelebrationModal" @update:open="(val) => showCelebrationModal = val">
+      <DialogContent class="sm:max-w-lg">
+        <div class="text-center space-y-6 py-4">
+          <!-- Animated Icon -->
+          <div class="relative inline-flex">
+            <div class="absolute inset-0 animate-ping opacity-75">
+              <div class="w-24 h-24 bg-green-200 rounded-full mx-auto"></div>
+            </div>
+            <div class="relative w-24 h-24 bg-gradient-to-br from-green-400 to-green-600 rounded-full mx-auto flex items-center justify-center">
+              <PartyPopper class="h-12 w-12 text-white animate-bounce" />
+            </div>
+          </div>
+
+          <!-- Title -->
+          <div>
+            <h2 class="text-3xl font-bold text-[#263238] mb-2 flex items-center justify-center gap-2">
+              <Sparkles class="h-6 w-6 text-yellow-500" />
+              Hora de Fechar!
+              <Sparkles class="h-6 w-6 text-yellow-500" />
+            </h2>
+            <p class="text-lg text-green-600 font-semibold">Proposta Aceita com Sucesso!</p>
+          </div>
+
+          <!-- Message -->
+          <div class="bg-gradient-to-r from-green-50 to-blue-50 rounded-lg p-6 space-y-3">
+            <p class="text-[#263238]">
+              Parabéns! Você acaba de aceitar a proposta de 
+              <span class="font-semibold">{{ request?.freelancerName }}</span>
+            </p>
+            <p class="text-sm text-[#435574]">
+              Para garantir o serviço e iniciar o trabalho, realize o pagamento agora mesmo.
+            </p>
+          </div>
+
+          <!-- Service Summary -->
+          <div v-if="request?.freelancerResponse" class="bg-white border-2 border-green-200 rounded-lg p-4 space-y-2">
+            <div class="flex justify-between items-center">
+              <span class="text-sm text-[#435574]">Valor do serviço:</span>
+              <span class="text-lg font-bold text-green-600">
+                {{ formatCurrency(request.freelancerResponse.value) }}
+              </span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-sm text-[#435574]">Prazo de execução:</span>
+              <span class="font-semibold text-[#263238]">
+                {{ request.freelancerResponse.executionDays }} dias
+              </span>
+            </div>
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="space-y-3 pt-4">
+            <Button
+              @click="handleGoToCheckout"
+              class="w-full bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white py-6 text-lg"
+              size="lg"
+            >
+              <CreditCard class="h-6 w-6 mr-2" />
+              Ir para Pagamento
+            </Button>
+            <Button
+              @click="showCelebrationModal = false"
+              variant="ghost"
+              class="w-full"
+            >
+              Fazer Depois
+            </Button>
+          </div>
+
+          <!-- Trust Badge -->
+          <div class="flex items-center justify-center gap-2 text-xs text-[#435574]">
+            <Lock class="h-4 w-4 text-green-600" />
+            <span>Pagamento 100% seguro e protegido</span>
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
   </div>

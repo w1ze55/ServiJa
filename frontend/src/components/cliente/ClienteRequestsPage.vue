@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import {
   FileText,
   Search,
@@ -57,6 +57,7 @@ import AlertDialogTitle from '../ui/alert-dialog-title.vue';
 import Textarea from '../ui/textarea.vue';
 import Label from '../ui/label.vue';
 import { useClientRequestStore, type ServiceRequest } from '@/stores/clientRequestStore';
+import { useServiceRequestWebSocket } from '@/composables/useServiceRequestWebSocket';
 import { toast } from '@/utils/toast';
 
 interface Props {
@@ -92,6 +93,9 @@ const showCancelDialog = ref(false);
 const selectedRequest = ref<ServiceRequest | null>(null);
 const cancelReason = ref('');
 
+// WebSocket
+let wsConnection: any = null;
+
 const categories = ['Eletricista', 'Encanador', 'Pintor', 'Pedreiro', 'Designer', 'Desenvolvedor'];
 
 // Mapeamento de valores de ordenação para português
@@ -122,7 +126,72 @@ const getEmptyMessage = () => {
 
 onMounted(() => {
   store.loadRequests();
+  
+  // Conectar WebSocket
+  const userEmail = getUserEmail();
+  console.log('🔍 Tentando conectar WebSocket para:', userEmail);
+  
+  if (userEmail) {
+    wsConnection = useServiceRequestWebSocket(userEmail);
+    wsConnection.connect();
+    
+    console.log('✅ WebSocket inicializado para solicitações (Cliente)');
+    
+    // Escutar notificações de solicitações
+    window.addEventListener('service-request-notification', handleServiceRequestNotification);
+  } else {
+    console.error('❌ Não foi possível extrair email do token');
+  }
 });
+
+onUnmounted(() => {
+  console.log('🔌 Desconectando WebSocket de solicitações (Cliente)');
+  window.removeEventListener('service-request-notification', handleServiceRequestNotification);
+  if (wsConnection) {
+    wsConnection.disconnect();
+  }
+});
+
+// Extrair email do usuário do JWT
+const getUserEmail = () => {
+  const token = localStorage.getItem('token');
+  if (!token) return null;
+  
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return payload.sub || payload.email;
+  } catch (error) {
+    console.error('Erro ao extrair email do token:', error);
+    return null;
+  }
+};
+
+// Lidar com notificações de solicitações via WebSocket
+const handleServiceRequestNotification = (event: any) => {
+  const notification = event.detail;
+  console.log('📩 Notificação recebida:', notification);
+  
+  // Mostrar toast baseado no tipo de notificação
+  switch (notification.type) {
+    case 'NEW_PROPOSAL':
+      toast.success(`${notification.freelancerName} enviou uma proposta de ${notification.proposalAmount}!`);
+      // Recarregar lista de solicitações
+      store.loadRequests();
+      break;
+    case 'PROPOSAL_ACCEPTED':
+      toast.success(notification.message);
+      store.loadRequests();
+      break;
+    case 'SERVICE_REQUEST_CANCELLED':
+      toast.warning('Solicitação cancelada');
+      store.loadRequests();
+      break;
+    case 'SERVICE_REQUEST_STATUS_CHANGED':
+      toast.info(`Status atualizado: ${notification.status}`);
+      store.loadRequests();
+      break;
+  }
+};
 
 const filteredRequests = computed(() => {
   let filtered = store.requests.filter((request) => {

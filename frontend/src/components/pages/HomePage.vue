@@ -4,6 +4,7 @@ import { ChevronRight, TrendingUp, Star } from 'lucide-vue-next';
 import Button from '../ui/button.vue';
 import FreelancerCard from '../freelancer/FreelancerCard.vue';
 import SearchWithAutocomplete from '../search/SearchWithAutocomplete.vue';
+import { CATEGORIES } from '@/constants/categories';
 
 interface Category {
   id: string;
@@ -35,16 +36,12 @@ const props = defineProps<Props>();
 const favoriteFreelancers = ref<string[]>([]);
 
 // Mock data - substituir por dados reais da API
-const categories: Category[] = [
-  { id: '1', name: 'Construção', icon: '🏗️', count: 245 },
-  { id: '2', name: 'Design', icon: '🎨', count: 189 },
-  { id: '3', name: 'Tecnologia', icon: '💻', count: 312 },
-  { id: '4', name: 'Consultoria', icon: '📊', count: 156 },
-  { id: '5', name: 'Marketing', icon: '📱', count: 198 },
-  { id: '6', name: 'Educação', icon: '📚', count: 134 },
-  { id: '7', name: 'Saúde', icon: '⚕️', count: 87 },
-  { id: '8', name: 'Eventos', icon: '🎉', count: 76 },
-];
+const categories: Category[] = CATEGORIES.slice(0, 8).map((cat, index) => ({
+  id: String(index + 1),
+  name: cat.value,
+  icon: cat.label.split(' ')[0], // mostrar emoji se tiver
+  count: Math.floor(Math.random() * 200) + 50
+}));
 
 const featuredFreelancers: Freelancer[] = [
   {
