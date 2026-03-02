@@ -54,6 +54,10 @@ public class ServiceRequest {
     @Builder.Default
     private Status status = Status.PENDING;
 
+    @Column(name = "chat_enabled")
+    @Builder.Default
+    private Boolean chatEnabled = false;
+
     @Column(length = 500)
     private String address;
 
