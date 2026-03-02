@@ -18,4 +18,9 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
     List<Payment> findByServiceRequestId(Long serviceRequestId);
     
     boolean existsByServiceRequest(ServiceRequest serviceRequest);
+    
+    /**
+     * Buscar pagamento por ID do Asaas (otimizado para webhook)
+     */
+    Payment findByAsaasPaymentId(String asaasPaymentId);
 }
