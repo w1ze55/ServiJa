@@ -637,7 +637,7 @@ const getWorkModelLabel = (value: string) => {
                 @update:model-value="(val: string) => editedData.workModel = val as ProfessionalProfile['workModel']"
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecione o modelo" />
+                  <SelectValue placeholder="Selecione o modelo" :label="WORK_MODELS.find(m => m.value === editedData.workModel)?.label" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem v-for="model in WORK_MODELS" :key="model.value" :value="model.value">
