@@ -355,14 +355,14 @@ watch(currentTab, () => {
     <!-- Tabs -->
     <Tabs :model-value="currentTab" @update:model-value="(val: string) => currentTab = val">
       <TabsList class="grid w-full grid-cols-6">
-        <TabsTrigger value="all">Todas</TabsTrigger>
+        <TabsTrigger value="all">Todas ({{ proposalStore.proposals.length }})</TabsTrigger>
         <TabsTrigger value="pending">
-          Pendentes {{ proposalStore.stats.pending > 0 ? `(${proposalStore.stats.pending})` : '' }}
+          Pendentes ({{ proposalStore.stats.pending }})
         </TabsTrigger>
-        <TabsTrigger value="negotiating">Negociando</TabsTrigger>
-        <TabsTrigger value="accepted">Aceitas</TabsTrigger>
-        <TabsTrigger value="rejected">Recusadas</TabsTrigger>
-        <TabsTrigger value="completed">Concluídas</TabsTrigger>
+        <TabsTrigger value="negotiating">Negociando ({{ proposalStore.stats.negotiating }})</TabsTrigger>
+        <TabsTrigger value="accepted">Aceitas ({{ proposalStore.stats.accepted }})</TabsTrigger>
+        <TabsTrigger value="rejected">Recusadas ({{ proposalStore.stats.rejected }})</TabsTrigger>
+        <TabsTrigger value="completed">Concluídas ({{ proposalStore.stats.completed }})</TabsTrigger>
       </TabsList>
 
       <TabsContent :value="currentTab" class="mt-6">
