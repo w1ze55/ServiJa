@@ -53,7 +53,9 @@ public class SecurityConfig {
                                 "/error",
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**",
-                                "/swagger-ui.html")
+                                "/swagger-ui.html",
+                                "/ws/**",
+                                "/api/webhooks/**")
                         .permitAll()
                         .anyRequest().authenticated())
                 .sessionManagement(session -> session

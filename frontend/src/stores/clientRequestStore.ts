@@ -47,14 +47,16 @@ export interface ServiceRequest {
     description: string;
     budget: number;
     deadline: string;
-    priority: 'low' | 'medium' | 'high';
+    priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
     status: 'pending' | 'sent' | 'negotiating' | 'accepted' | 'rejected' | 'completed' | 'cancelled';
     createdAt: string;
     address?: string;
     desiredDate?: string;
-    urgency?: string;
     attachments?: ServiceRequestAttachment[];
     freelancerResponse?: FreelancerResponse;
+    counterValue?: number;
+    counterDays?: number;
+    counterNotes?: string;
     cancelReason?: string;
     rejectReason?: string;
     messages?: RequestMessage[];
@@ -68,10 +70,9 @@ export interface CreateServiceRequestInput {
     description: string;
     budget: number;
     deadline: string;
-    priority: 'low' | 'medium' | 'high';
+    priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
     address?: string;
     desiredDate?: string;
-    urgency?: string;
     attachments?: File[];
 }
 
@@ -128,7 +129,7 @@ export const useClientRequestStore = defineStore('clientRequest', () => {
                 ...req,
                 id: String(req.id),
                 service: req.serviceName, // Backend usa serviceName
-                priority: (req.priority || 'MEDIUM').toLowerCase(),
+                priority: req.priority || 'MEDIUM',
                 status: (req.status || 'PENDING').toLowerCase(),
                 attachments: (req.attachments || []).map((url: string, idx: number) => ({
                     id: `att-${req.id}-${idx}`,
@@ -137,13 +138,19 @@ export const useClientRequestStore = defineStore('clientRequest', () => {
                     url,
                     type: getFileType(url),
                 })),
+                freelancerAvatar: req.freelancerAvatar,
                 freelancerResponse: req.responseValue ? {
                     value: req.responseValue,
                     executionDays: req.responseDays,
                     scope: req.responseScope,
                     notes: req.responseNotes,
                     sentAt: req.respondedAt
-                } : undefined
+                } : undefined,
+                counterValue: req.counterValue,
+                counterDays: req.counterDays,
+                counterNotes: req.counterNotes,
+                rejectReason: req.rejectReason,
+                cancelReason: req.cancelReason
             }));
         } catch (err) {
             error.value = 'Erro ao carregar solicitações';
@@ -169,7 +176,6 @@ export const useClientRequestStore = defineStore('clientRequest', () => {
                 priority: input.priority,
                 address: input.address,
                 desiredDate: input.desiredDate,
-                urgency: input.urgency,
                 freelancerId: input.freelancerId
             };
 
@@ -178,8 +184,9 @@ export const useClientRequestStore = defineStore('clientRequest', () => {
                 ...response.data,
                 id: String(response.data.id),
                 service: response.data.serviceName,
-                priority: (response.data.priority || 'MEDIUM').toLowerCase(),
+                priority: response.data.priority || 'MEDIUM',
                 status: (response.data.status || 'PENDING').toLowerCase(),
+                freelancerAvatar: response.data.freelancerAvatar,
             };
 
             requests.value.unshift(newRequest);
@@ -195,8 +202,10 @@ export const useClientRequestStore = defineStore('clientRequest', () => {
             const request = requests.value.find((r) => r.id === id);
             if (!request) return false;
 
-            // TODO: Chamar API
-            // await api.patch(`/service-requests/${id}/status`, { status: 'cancelled', reason });
+            await api.patch(`/service-requests/${id}/status`, {
+                status: 'CANCELLED',
+                reason
+            });
 
             request.status = 'cancelled';
             request.auditLog = request.auditLog || [];
@@ -220,8 +229,9 @@ export const useClientRequestStore = defineStore('clientRequest', () => {
             const request = requests.value.find((r) => r.id === id);
             if (!request) return false;
 
-            // TODO: Chamar API
-            // await api.patch(`/service-requests/${id}/status`, { status: 'accepted' });
+            await api.patch(`/service-requests/${id}/status`, {
+                status: 'ACCEPTED'
+            });
 
             request.status = 'accepted';
             request.auditLog = request.auditLog || [];
@@ -245,6 +255,11 @@ export const useClientRequestStore = defineStore('clientRequest', () => {
             const request = requests.value.find((r) => r.id === id);
             if (!request) return false;
 
+            await api.patch(`/service-requests/${id}/status`, {
+                status: 'REJECTED',
+                reason
+            });
+
             request.status = 'rejected';
             request.auditLog = request.auditLog || [];
             request.auditLog.push({
@@ -258,6 +273,44 @@ export const useClientRequestStore = defineStore('clientRequest', () => {
             return true;
         } catch (err) {
             console.error('Erro ao recusar proposta:', err);
+            return false;
+        }
+    };
+
+    const sendCounterProposal = async (
+        id: string,
+        value: number,
+        executionDays: number,
+        notes: string
+    ): Promise<boolean> => {
+        try {
+            const request = requests.value.find((r) => r.id === id);
+            if (!request) return false;
+
+            const response = await api.patch(`/service-requests/${id}/counter-proposal`, {
+                value,
+                executionDays,
+                notes
+            });
+
+            const updatedReq = response.data;
+            request.status = 'negotiating';
+            request.counterValue = updatedReq.counterValue;
+            request.counterDays = updatedReq.counterDays;
+            request.counterNotes = updatedReq.counterNotes;
+
+            request.auditLog = request.auditLog || [];
+            request.auditLog.unshift({
+                id: `log-${Date.now()}`,
+                action: 'Contra proposta enviada',
+                user: 'Você (Cliente)',
+                timestamp: new Date().toISOString(),
+                details: `Valor proposto: R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} | Prazo: ${executionDays} dias`,
+            });
+
+            return true;
+        } catch (err) {
+            console.error('Erro ao enviar contra proposta:', err);
             return false;
         }
     };
@@ -315,6 +368,7 @@ export const useClientRequestStore = defineStore('clientRequest', () => {
                     operationKey: entry.operationKey,
                     user: entry.userName,
                     timestamp: entry.formattedDateTime,
+                    details: entry.details,
                 }));
             }
         } catch (err) {
@@ -333,6 +387,7 @@ export const useClientRequestStore = defineStore('clientRequest', () => {
         cancelRequest,
         acceptFreelancerResponse,
         rejectFreelancerResponse,
+        sendCounterProposal,
         sendMessage,
         loadHistory,
     };

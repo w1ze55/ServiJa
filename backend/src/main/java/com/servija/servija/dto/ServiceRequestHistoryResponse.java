@@ -16,4 +16,5 @@ public class ServiceRequestHistoryResponse {
     private String operationKey;
     private String userName;
     private String formattedDateTime;
+    private String details;
 }

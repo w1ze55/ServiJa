@@ -6,6 +6,7 @@ import {
   Send,
   MessageSquare,
   Clock,
+  FileEdit,
 } from 'lucide-vue-next';
 import Card from '../ui/card.vue';
 
@@ -29,15 +30,18 @@ const props = withDefaults(defineProps<Props>(), {
 
 const getDotClass = (key?: string) => {
   if (key === 'REQUEST_OPENED') return 'bg-blue-100 ring-2 ring-blue-300';
-  if (key === 'REQUEST_REJECTED') return 'bg-red-100 ring-2 ring-red-300';
-  if (key === 'BUDGET_ACCEPTED') return 'bg-green-100 ring-2 ring-green-300';
+  if (key === 'REQUEST_REJECTED' || key === 'CANCELLED') return 'bg-red-100 ring-2 ring-red-300';
+  if (key === 'BUDGET_ACCEPTED' || key === 'COUNTER_PROPOSAL_ACCEPTED') return 'bg-green-100 ring-2 ring-green-300';
+  if (key === 'COUNTER_PROPOSAL_REJECTED') return 'bg-red-100 ring-2 ring-red-300';
+  if (key === 'COUNTER_PROPOSAL_SENT') return 'bg-purple-100 ring-2 ring-purple-300';
   return 'bg-amber-100 ring-2 ring-amber-300';
 };
 
 const getLabelClass = (key?: string) => {
   if (key === 'REQUEST_OPENED') return 'text-blue-700';
-  if (key === 'REQUEST_REJECTED') return 'text-red-700';
-  if (key === 'BUDGET_ACCEPTED') return 'text-green-700';
+  if (key === 'REQUEST_REJECTED' || key === 'COUNTER_PROPOSAL_REJECTED' || key === 'CANCELLED') return 'text-red-700';
+  if (key === 'BUDGET_ACCEPTED' || key === 'COUNTER_PROPOSAL_ACCEPTED') return 'text-green-700';
+  if (key === 'COUNTER_PROPOSAL_SENT') return 'text-purple-700';
   return 'text-amber-700';
 };
 </script>
@@ -71,9 +75,10 @@ const getLabelClass = (key?: string) => {
           ]"
         >
           <FileText v-if="log.operationKey === 'REQUEST_OPENED'" class="h-4 w-4 text-blue-600" />
-          <XCircle v-else-if="log.operationKey === 'REQUEST_REJECTED'" class="h-4 w-4 text-red-600" />
-          <CheckCircle v-else-if="log.operationKey === 'BUDGET_ACCEPTED'" class="h-4 w-4 text-green-600" />
+          <XCircle v-else-if="log.operationKey === 'REQUEST_REJECTED' || log.operationKey === 'COUNTER_PROPOSAL_REJECTED' || log.operationKey === 'CANCELLED'" class="h-4 w-4 text-red-600" />
+          <CheckCircle v-else-if="log.operationKey === 'BUDGET_ACCEPTED' || log.operationKey === 'COUNTER_PROPOSAL_ACCEPTED'" class="h-4 w-4 text-green-600" />
           <Send v-else-if="log.operationKey === 'BUDGET_SENT'" class="h-4 w-4 text-amber-600" />
+          <FileEdit v-else-if="log.operationKey === 'COUNTER_PROPOSAL_SENT'" class="h-4 w-4 text-purple-600" />
           <MessageSquare v-else class="h-4 w-4 text-amber-600" />
         </div>
 

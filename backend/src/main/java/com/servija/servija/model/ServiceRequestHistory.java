@@ -34,12 +34,18 @@ public class ServiceRequestHistory {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    @Column(name = "details", columnDefinition = "TEXT")
+    private String details;
+
     public enum OperationType {
         REQUEST_OPENED("Solicitação aberta"),
         REQUEST_REJECTED("Solicitação recusada"),
         BUDGET_SENT("Orçamento enviado"),
         COUNTER_PROPOSAL_SENT("Contra proposta enviada"),
-        BUDGET_ACCEPTED("Orçamento aceito");
+        COUNTER_PROPOSAL_ACCEPTED("Contra proposta aceita"),
+        COUNTER_PROPOSAL_REJECTED("Contra proposta rejeitada"),
+        BUDGET_ACCEPTED("Orçamento aceito"),
+        CANCELLED("Solicitação cancelada");
 
         private final String label;
 

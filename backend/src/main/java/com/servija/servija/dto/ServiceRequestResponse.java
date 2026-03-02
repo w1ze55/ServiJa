@@ -33,7 +33,6 @@ public class ServiceRequestResponse {
     private String status;
     private String address;
     private LocalDate desiredDate;
-    private String urgency;
     private List<String> attachments;
 
     // Freelancer response
@@ -42,6 +41,11 @@ public class ServiceRequestResponse {
     private String responseScope;
     private String responseNotes;
     private LocalDateTime respondedAt;
+
+    // Counter-proposal
+    private BigDecimal counterValue;
+    private Integer counterDays;
+    private String counterNotes;
 
     private String cancelReason;
     private String rejectReason;

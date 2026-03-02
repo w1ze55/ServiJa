@@ -10,6 +10,7 @@ import SelectContent from './ui/select-content.vue';
 import SelectItem from './ui/select-item.vue';
 import SelectTrigger from './ui/select-trigger.vue';
 import SelectValue from './ui/select-value.vue';
+import { CATEGORIES } from '@/constants/categories';
 
 interface Provider {
   id: string;
@@ -47,16 +48,12 @@ const sortBy = ref('rating');
 const location = ref('');
 
 // Mock data - substituir por dados reais da API
-const categories: Category[] = [
-  { id: '1', name: 'Eletricista', icon: '⚡', count: 156 },
-  { id: '2', name: 'Encanador', icon: '🔧', count: 132 },
-  { id: '3', name: 'Pintor', icon: '🎨', count: 98 },
-  { id: '4', name: 'Pedreiro', icon: '🧱', count: 87 },
-  { id: '5', name: 'Marceneiro', icon: '🪚', count: 65 },
-  { id: '6', name: 'Jardineiro', icon: '🌱', count: 54 },
-  { id: '7', name: 'Limpeza', icon: '🧹', count: 143 },
-  { id: '8', name: 'Designer', icon: '✏️', count: 76 },
-];
+const categories: Category[] = CATEGORIES.slice(0, 8).map((cat, index) => ({
+  id: String(index + 1),
+  name: cat.value,
+  icon: cat.label.split(' ')[0], // Extract emoji
+  count: Math.floor(Math.random() * 200) + 50 // Mock count
+}));
 
 const providers: Provider[] = [
   {

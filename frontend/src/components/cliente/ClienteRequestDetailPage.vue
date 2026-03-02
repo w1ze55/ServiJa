@@ -9,11 +9,16 @@ import {
   MessageSquare,
   CheckCircle,
   XCircle,
-  AlertCircle,
-  FileText,
-  Send,
   User,
   History,
+  FileEdit,
+  Lock,
+  CreditCard,
+  PartyPopper,
+  Sparkles,
+  Send,
+  AlertCircle,
+  FileText,
 } from 'lucide-vue-next';
 import Button from '../ui/button.vue';
 import Input from '../ui/input.vue';
@@ -21,6 +26,7 @@ import Card from '../ui/card.vue';
 import Badge from '../ui/badge.vue';
 import Avatar from '../ui/avatar.vue';
 import AvatarFallback from '../ui/avatar-fallback.vue';
+import AvatarImage from '../ui/avatar-image.vue';
 import Separator from '../ui/separator.vue';
 import Textarea from '../ui/textarea.vue';
 import Label from '../ui/label.vue';
@@ -57,7 +63,46 @@ const showCancelDialog = ref(false);
 const cancelReason = ref('');
 const showRejectDialog = ref(false);
 const rejectReason = ref('');
+const showCounterProposalDialog = ref(false);
+const counterValue = ref(0);
+const counterDays = ref(0);
+const counterNotes = ref('');
+const isSubmittingCounter = ref(false);
 const activeSection = ref<'details' | 'messages' | 'history'>('details');
+const showCelebrationModal = ref(false);
+
+const handleOpenCounterProposalDialog = () => {
+  if (!request.value || !request.value.freelancerResponse) return;
+  counterValue.value = request.value.freelancerResponse.value;
+  counterDays.value = request.value.freelancerResponse.executionDays;
+  counterNotes.value = '';
+  showCounterProposalDialog.value = true;
+};
+
+const handleSendCounterProposal = async () => {
+  if (!request.value) return;
+
+  if (counterValue.value <= 0 || counterDays.value <= 0) {
+    toast.error('Informe um valor e prazo válidos');
+    return;
+  }
+
+  isSubmittingCounter.value = true;
+  const success = await store.sendCounterProposal(
+    request.value.id,
+    counterValue.value,
+    counterDays.value,
+    counterNotes.value
+  );
+  isSubmittingCounter.value = false;
+
+  if (success) {
+    toast.success('Contra proposta enviada com sucesso!');
+    showCounterProposalDialog.value = false;
+  } else {
+    toast.error('Erro ao enviar contra proposta');
+  }
+};
 
 onMounted(async () => {
   if (store.requests.length === 0) {
@@ -124,15 +169,33 @@ const handleSendMessage = async () => {
   }
 };
 
+const wasCounterProposalRejected = computed(() => {
+  if (!request.value) return false;
+  return request.value.status === 'negotiating' && 
+         !request.value.counterValue && 
+         request.value.auditLog?.some(log => log.operationKey === 'COUNTER_PROPOSAL_REJECTED');
+});
+
 const handleAcceptResponse = async () => {
   if (!request.value) return;
 
   const success = await store.acceptFreelancerResponse(request.value.id);
   if (success) {
     toast.success('Proposta aceita com sucesso!');
+    // Mostrar modal de celebração
+    setTimeout(() => {
+      showCelebrationModal.value = true;
+    }, 500);
   } else {
     toast.error('Erro ao aceitar proposta');
   }
+};
+
+const handleGoToCheckout = () => {
+  if (!request.value) return;
+  showCelebrationModal.value = false;
+  // Navegar para checkout
+  window.location.href = `/checkout?requestId=${request.value.id}`;
 };
 
 const handleOpenRejectDialog = () => {
@@ -222,16 +285,16 @@ const getStatusLabel = (status: string) => {
           <div class="flex-1">
             <div class="flex items-center gap-3 mb-2 flex-wrap">
               <h1 class="text-2xl font-bold text-[#263238]">{{ request.service }}</h1>
-              <Badge :class="`${getStatusColor(request.status).bg} ${getStatusColor(request.status).text}`">
+              <Badge v-if="request" :class="`${getStatusColor(request.status).bg} ${getStatusColor(request.status).text}`">
                 {{ getStatusLabel(request.status) }}
               </Badge>
             </div>
             <div class="flex items-center gap-4 text-sm text-[#435574] flex-wrap">
-              <span class="flex items-center gap-1">
+              <span v-if="request" class="flex items-center gap-1">
                 <Calendar class="h-4 w-4" />
                 Criada em {{ formatDate(request.createdAt) }}
               </span>
-              <span v-if="request.address" class="flex items-center gap-1">
+              <span v-if="request?.address" class="flex items-center gap-1">
                 <MapPin class="h-4 w-4" />
                 {{ request.address }}
               </span>
@@ -239,7 +302,7 @@ const getStatusLabel = (status: string) => {
           </div>
           <div class="flex items-center gap-2">
             <Button
-              v-if="request.status === 'pending' || request.status === 'sent'"
+              v-if="request?.status === 'pending' || request?.status === 'sent'"
               @click="showCancelDialog = true"
               variant="outline"
               class="text-red-600 border-red-200 hover:bg-red-50"
@@ -249,46 +312,99 @@ const getStatusLabel = (status: string) => {
             </Button>
           </div>
         </div>
+
+        <!-- Payment Pending Alert (quando status é ACCEPTED) -->
+        <div 
+          v-if="request.status === 'accepted'" 
+          class="mt-4 p-4 rounded-lg border-2 border-green-300 bg-gradient-to-r from-green-50 to-yellow-50 flex items-start gap-3"
+        >
+          <div class="flex-shrink-0 w-10 h-10 bg-green-600 rounded-full flex items-center justify-center animate-bounce">
+            <CreditCard class="h-5 w-5 text-white" />
+          </div>
+          <div class="flex-1">
+            <p class="font-semibold text-green-900 mb-1">⚡ Ação Necessária: Pagamento Pendente</p>
+            <p class="text-sm text-green-800 mb-3">
+              Sua proposta foi aceita! Complete o pagamento agora para garantir o serviço e iniciar o trabalho com <span class="font-semibold">{{ request.freelancerName }}</span>.
+            </p>
+            <Button
+              @click="handleGoToCheckout"
+              class="bg-green-600 hover:bg-green-700"
+              size="sm"
+            >
+              <CreditCard class="h-4 w-4 mr-2" />
+              Realizar Pagamento Agora
+            </Button>
+          </div>
+        </div>
+
+        <!-- Rejection/Cancellation Reason Alert -->
+        <div v-if="(request.status === 'rejected' && request.rejectReason) || (request.status === 'cancelled' && request.cancelReason)" 
+             class="mt-4 p-4 rounded-lg border flex items-start gap-3"
+             :class="request.status === 'rejected' ? 'bg-red-50 border-red-100 text-red-900' : 'bg-gray-50 border-gray-100 text-gray-900'">
+          <AlertCircle class="h-5 w-5 mt-0.5 flex-shrink-0" :class="request.status === 'rejected' ? 'text-red-600' : 'text-gray-600'" />
+          <div>
+            <p class="font-semibold text-sm">
+              {{ request.status === 'rejected' ? 'Motivo da Recusa' : 'Motivo do Cancelamento' }}
+            </p>
+            <p class="text-sm opacity-90 italic">"{{ request.status === 'rejected' ? request.rejectReason : request.cancelReason }}"</p>
+          </div>
+        </div>
       </Card>
 
       <!-- Navigation Tabs -->
-      <div class="flex gap-2 border-b border-gray-200 pb-0">
-        <button
-          @click="activeSection = 'details'"
-          :class="`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-            activeSection === 'details'
-              ? 'border-[#286AD8] text-[#286AD8]'
-              : 'border-transparent text-[#435574] hover:text-[#263238]'
-          }`"
-        >
-          Detalhes
-        </button>
-        <button
-          @click="activeSection = 'messages'"
-          :class="`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-            activeSection === 'messages'
-              ? 'border-[#286AD8] text-[#286AD8]'
-              : 'border-transparent text-[#435574] hover:text-[#263238]'
-          }`"
-        >
-          Mensagens
-          <Badge
-            v-if="request.messages && request.messages.length > 0"
-            class="ml-1 bg-[#286AD8] text-white text-xs"
+      <div class="flex gap-2 border-b border-gray-200 pb-0 items-center justify-between">
+        <div class="flex gap-2">
+          <button
+            @click="activeSection = 'details'"
+            :class="`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              activeSection === 'details'
+                ? 'border-[#286AD8] text-[#286AD8]'
+                : 'border-transparent text-[#435574] hover:text-[#263238]'
+            }`"
           >
-            {{ request.messages.length }}
-          </Badge>
-        </button>
-        <button
-          @click="activeSection = 'history'"
-          :class="`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-            activeSection === 'history'
-              ? 'border-[#286AD8] text-[#286AD8]'
-              : 'border-transparent text-[#435574] hover:text-[#263238]'
-          }`"
+            Detalhes
+          </button>
+          <button
+            @click="activeSection = 'messages'"
+            :class="`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              activeSection === 'messages'
+                ? 'border-[#286AD8] text-[#286AD8]'
+                : 'border-transparent text-[#435574] hover:text-[#263238]'
+            }`"
+          >
+            Mensagens
+            <Badge
+              v-if="request.messages && request.messages.length > 0"
+              class="ml-1 bg-[#286AD8] text-white text-xs"
+            >
+              {{ request.messages.length }}
+            </Badge>
+          </button>
+          <button
+            @click="activeSection = 'history'"
+            :class="`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              activeSection === 'history'
+                ? 'border-[#286AD8] text-[#286AD8]'
+                : 'border-transparent text-[#435574] hover:text-[#263238]'
+            }`"
+          >
+            Histórico
+          </button>
+        </div>
+        
+        <!-- Payment Button (só aparece quando status é ACCEPTED) -->
+        <Button
+          v-if="request.status === 'accepted'"
+          @click="handleGoToCheckout"
+          class="bg-green-600 hover:bg-green-700 shadow-lg hover:shadow-xl transition-all"
+          size="sm"
         >
-          Histórico
-        </button>
+          <CreditCard class="h-4 w-4 mr-2 animate-pulse" />
+          Realizar Pagamento
+          <Badge class="ml-2 bg-yellow-400 text-yellow-900 animate-bounce">
+            Pendente
+          </Badge>
+        </Button>
       </div>
 
       <!-- Details Section -->
@@ -342,23 +458,57 @@ const getStatusLabel = (status: string) => {
             <!-- Action Buttons -->
             <div
               v-if="request.status === 'negotiating'"
-              class="flex items-center gap-3 pt-4 border-t"
+              class="space-y-4 pt-4 border-t"
             >
-              <Button
-                @click="handleAcceptResponse"
-                class="bg-green-600 hover:bg-green-700 flex-1"
-              >
-                <CheckCircle class="h-4 w-4 mr-2" />
-                Aceitar Proposta
-              </Button>
-              <Button
-                @click="handleOpenRejectDialog"
-                variant="outline"
-                class="text-red-600 border-red-200 hover:bg-red-50 flex-1"
-              >
-                <XCircle class="h-4 w-4 mr-2" />
-                Recusar
-              </Button>
+              <!-- Counter Proposal Summary -->
+              <div v-if="request.counterValue" class="p-4 bg-blue-50 border border-blue-100 rounded-lg">
+                <p class="text-sm font-medium text-blue-900 mb-1">Você enviou uma contra proposta:</p>
+                <p class="text-sm text-blue-700">
+                  <span class="font-bold">{{ formatCurrency(request.counterValue) }}</span> | 
+                  <span class="font-bold">{{ request.counterDays }} dias</span>
+                </p>
+                <p v-if="request.counterNotes" class="text-xs text-blue-600 mt-1 italic">
+                  "{{ request.counterNotes }}"
+                </p>
+              </div>
+
+              <!-- Rejection Alert -->
+              <div v-if="wasCounterProposalRejected" class="p-4 bg-amber-50 border border-amber-100 rounded-lg flex items-start gap-3">
+                <AlertCircle class="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+                <div>
+                  <p class="text-sm font-medium text-amber-900">Contra proposta recusada</p>
+                  <p class="text-xs text-amber-700 mt-1">
+                    O profissional preferiu manter a proposta original. Você pode aceitá-la ou recusar.
+                  </p>
+                </div>
+              </div>
+
+              <div class="flex items-center gap-3 flex-wrap">
+                <Button
+                  @click="handleAcceptResponse"
+                  class="bg-green-600 hover:bg-green-700 flex-1 min-w-[150px]"
+                >
+                  <CheckCircle class="h-4 w-4 mr-2" />
+                  Aceitar Proposta
+                </Button>
+                <Button
+                  @click="handleOpenRejectDialog"
+                  variant="outline"
+                  class="text-red-600 border-red-200 hover:bg-red-50 flex-1 min-w-[150px]"
+                >
+                  <XCircle class="h-4 w-4 mr-2" />
+                  Recusar
+                </Button>
+                <Button
+                  v-if="!request.counterValue && !wasCounterProposalRejected"
+                  @click="handleOpenCounterProposalDialog"
+                  variant="outline"
+                  class="text-[#286AD8] border-[#286AD8] hover:bg-blue-50 flex-1 min-w-[150px]"
+                >
+                  <FileEdit class="h-4 w-4 mr-2" />
+                  Contra Proposta
+                </Button>
+              </div>
             </div>
 
             <div v-else-if="request.status === 'accepted'" class="pt-4 border-t">
@@ -412,14 +562,20 @@ const getStatusLabel = (status: string) => {
                 <p class="text-sm text-[#435574]">Prioridade</p>
                 <Badge
                   :class="
-                    request.priority === 'high'
+                    request.priority === 'URGENT'
+                      ? 'bg-red-200 text-red-900'
+                      : request.priority === 'HIGH'
                       ? 'bg-red-100 text-red-700'
-                      : request.priority === 'medium'
+                      : request.priority === 'MEDIUM'
                       ? 'bg-yellow-100 text-yellow-700'
                       : 'bg-gray-100 text-gray-700'
                   "
                 >
-                  {{ request.priority === 'high' ? 'Alta' : request.priority === 'medium' ? 'Média' : 'Baixa' }}
+                  {{ 
+                    request.priority === 'URGENT' ? 'Urgente' :
+                    request.priority === 'HIGH' ? 'Alta' :
+                    request.priority === 'MEDIUM' ? 'Média' : 'Baixa'
+                  }}
                 </Badge>
               </div>
               <template v-if="request.desiredDate">
@@ -437,6 +593,7 @@ const getStatusLabel = (status: string) => {
             <h3 class="font-semibold text-[#263238] mb-4">Profissional</h3>
             <div class="flex items-center gap-3 mb-3">
               <Avatar class="h-12 w-12">
+                <AvatarImage :src="request.freelancerAvatar" />
                 <AvatarFallback class="bg-[#286AD8] text-white">
                   {{ getInitials(request.freelancerName) }}
                 </AvatarFallback>
@@ -482,32 +639,17 @@ const getStatusLabel = (status: string) => {
         </div>
 
         <!-- Message Input -->
-        <div
-          v-if="request.status !== 'cancelled' && request.status !== 'rejected' && request.status !== 'completed'"
-          class="flex gap-2"
-        >
-          <Textarea
-            :model-value="newMessage"
-            @update:model-value="(val) => newMessage = val as string"
-            placeholder="Digite sua mensagem..."
-            :rows="2"
-            class="flex-1"
-            @keydown.enter.ctrl="handleSendMessage"
-          />
-          <Button
-            @click="handleSendMessage"
-            class="bg-[#286AD8] hover:bg-[#435574] self-end"
-            :disabled="!newMessage.trim() || isSendingMessage"
-          >
-            <Send class="h-4 w-4" />
-          </Button>
+        <div class="flex items-center justify-center p-4 bg-gray-50 rounded-lg border border-dashed border-gray-200">
+          <p class="text-sm text-[#435574] flex items-center gap-2 text-center">
+            <Lock class="h-4 w-4 text-amber-500" />
+            O chat será liberado automaticamente após a confirmação do pagamento.
+          </p>
         </div>
       </Card>
 
-      <!-- History Section -->
       <ServiceRequestTimeline
         v-if="activeSection === 'history'"
-        :entries="[...(request.auditLog || [])].reverse()"
+        :entries="request.auditLog || []"
         title="Histórico de Atividades"
       />
     </template>
@@ -569,6 +711,137 @@ const getStatusLabel = (status: string) => {
             Confirmar Recusa
           </Button>
         </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    <!-- Counter Proposal Dialog -->
+    <Dialog :open="showCounterProposalDialog" @update:open="(val) => showCounterProposalDialog = val">
+      <DialogContent class="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Enviar Contra Proposta</DialogTitle>
+          <DialogDescription>
+            Sugira um novo valor ou prazo para o serviço "{{ request?.service }}"
+          </DialogDescription>
+        </DialogHeader>
+        <div class="space-y-4 py-2">
+          <div class="grid grid-cols-2 gap-4">
+            <div class="space-y-2">
+              <Label for="counter-value">Novo Valor (R$)</Label>
+              <Input
+                id="counter-value"
+                type="number"
+                v-model="counterValue"
+                step="0.01"
+              />
+            </div>
+            <div class="space-y-2">
+              <Label for="counter-days">Novo Prazo (dias)</Label>
+              <Input
+                id="counter-days"
+                type="number"
+                v-model="counterDays"
+              />
+            </div>
+          </div>
+          <div class="space-y-2">
+            <Label for="counter-notes">Observações</Label>
+            <Textarea
+              id="counter-notes"
+              v-model="counterNotes"
+              placeholder="Explique sua proposta ou peça algum ajuste no escopo..."
+              :rows="3"
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button @click="showCounterProposalDialog = false" variant="outline">Cancelar</Button>
+          <Button 
+            @click="handleSendCounterProposal" 
+            class="bg-[#286AD8] hover:bg-[#435574]"
+            :disabled="isSubmittingCounter"
+          >
+            {{ isSubmittingCounter ? 'Enviando...' : 'Enviar Contra Proposta' }}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    <!-- Celebration Modal - "Hora de Fechar!" -->
+    <Dialog :open="showCelebrationModal" @update:open="(val) => showCelebrationModal = val">
+      <DialogContent class="sm:max-w-lg">
+        <div class="text-center space-y-6 py-4">
+          <!-- Animated Icon -->
+          <div class="relative inline-flex">
+            <div class="absolute inset-0 animate-ping opacity-75">
+              <div class="w-24 h-24 bg-green-200 rounded-full mx-auto"></div>
+            </div>
+            <div class="relative w-24 h-24 bg-gradient-to-br from-green-400 to-green-600 rounded-full mx-auto flex items-center justify-center">
+              <PartyPopper class="h-12 w-12 text-white animate-bounce" />
+            </div>
+          </div>
+
+          <!-- Title -->
+          <div>
+            <h2 class="text-3xl font-bold text-[#263238] mb-2 flex items-center justify-center gap-2">
+              <Sparkles class="h-6 w-6 text-yellow-500" />
+              Hora de Fechar!
+              <Sparkles class="h-6 w-6 text-yellow-500" />
+            </h2>
+            <p class="text-lg text-green-600 font-semibold">Proposta Aceita com Sucesso!</p>
+          </div>
+
+          <!-- Message -->
+          <div class="bg-gradient-to-r from-green-50 to-blue-50 rounded-lg p-6 space-y-3">
+            <p class="text-[#263238]">
+              Parabéns! Você acaba de aceitar a proposta de 
+              <span class="font-semibold">{{ request?.freelancerName }}</span>
+            </p>
+            <p class="text-sm text-[#435574]">
+              Para garantir o serviço e iniciar o trabalho, realize o pagamento agora mesmo.
+            </p>
+          </div>
+
+          <!-- Service Summary -->
+          <div v-if="request?.freelancerResponse" class="bg-white border-2 border-green-200 rounded-lg p-4 space-y-2">
+            <div class="flex justify-between items-center">
+              <span class="text-sm text-[#435574]">Valor do serviço:</span>
+              <span class="text-lg font-bold text-green-600">
+                {{ formatCurrency(request.freelancerResponse.value) }}
+              </span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-sm text-[#435574]">Prazo de execução:</span>
+              <span class="font-semibold text-[#263238]">
+                {{ request.freelancerResponse.executionDays }} dias
+              </span>
+            </div>
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="space-y-3 pt-4">
+            <Button
+              @click="handleGoToCheckout"
+              class="w-full bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white py-6 text-lg"
+              size="lg"
+            >
+              <CreditCard class="h-6 w-6 mr-2" />
+              Ir para Pagamento
+            </Button>
+            <Button
+              @click="showCelebrationModal = false"
+              variant="ghost"
+              class="w-full"
+            >
+              Fazer Depois
+            </Button>
+          </div>
+
+          <!-- Trust Badge -->
+          <div class="flex items-center justify-center gap-2 text-xs text-[#435574]">
+            <Lock class="h-4 w-4 text-green-600" />
+            <span>Pagamento 100% seguro e protegido</span>
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
   </div>

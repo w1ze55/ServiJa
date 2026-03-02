@@ -31,6 +31,7 @@ import FreelancerCard from '../freelancer/FreelancerCard.vue';
 import api from '@/api/config/axios';
 import { toast } from '@/utils/toast';
 import { useFavoritesStore } from '@/stores/favorites';
+import { CATEGORIES } from '@/constants/categories';
 
 interface ServiceItem {
   id: number;
@@ -70,20 +71,7 @@ const favoritesStore = useFavoritesStore();
 
 const categories = [
   { value: 'all', label: 'Todas as categorias' },
-  { value: 'Construção Civil', label: '🏗️ Construção Civil' },
-  { value: 'Eletricista', label: '⚡ Eletricista' },
-  { value: 'Encanador', label: '🔧 Encanador' },
-  { value: 'Pintor', label: '🎨 Pintor' },
-  { value: 'Design Gráfico', label: '🖌️ Design Gráfico' },
-  { value: 'Desenvolvimento Web', label: '💻 Desenvolvimento Web' },
-  { value: 'Marketing Digital', label: '📱 Marketing Digital' },
-  { value: 'Limpeza', label: '🧹 Limpeza' },
-  { value: 'Jardinagem', label: '🌿 Jardinagem' },
-  { value: 'Automóveis', label: '🚗 Automóveis' },
-  { value: 'Educação', label: '📚 Educação' },
-  { value: 'Saúde e Bem-estar', label: '⚕️ Saúde e Bem-estar' },
-  { value: 'Eventos', label: '🎉 Eventos' },
-  { value: 'Beleza', label: '💅 Beleza' },
+  ...CATEGORIES
 ];
 
 const sortOptions = [

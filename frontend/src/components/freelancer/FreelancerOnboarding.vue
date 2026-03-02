@@ -30,6 +30,7 @@ import Avatar from '../ui/avatar.vue';
 import AvatarImage from '../ui/avatar-image.vue';
 import AvatarFallback from '../ui/avatar-fallback.vue';
 import { toast } from '../../utils/toast';
+import { CATEGORIES } from '@/constants/categories';
 import { formatCPF, formatPhone } from '@/utils/masks';
 
 interface OnboardingData {
@@ -76,16 +77,7 @@ const steps = [
   { id: 5, title: 'Verificação', icon: CheckCircle },
 ];
 
-const categories = [
-  'Eletricista',
-  'Encanador',
-  'Pintor',
-  'Designer',
-  'Desenvolvedor',
-  'Fotógrafo',
-  'Marceneiro',
-  'Pedreiro',
-];
+const categories = CATEGORIES;
 
 const availableSkills = [
   'Instalação',
@@ -426,8 +418,8 @@ const handleServiceAreaKeyPress = (e: KeyboardEvent) => {
                   <SelectValue placeholder="Selecione uma categoria" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem v-for="cat in categories" :key="cat" :value="cat">
-                    {{ cat }}
+                  <SelectItem v-for="cat in categories" :key="cat.value" :value="cat.value">
+                    {{ cat.label }}
                   </SelectItem>
                 </SelectContent>
               </Select>

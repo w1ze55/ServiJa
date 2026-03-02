@@ -10,6 +10,7 @@ import SelectContent from '../ui/select-content.vue';
 import SelectItem from '../ui/select-item.vue';
 import SelectTrigger from '../ui/select-trigger.vue';
 import SelectValue from '../ui/select-value.vue';
+import { CATEGORIES } from '@/constants/categories';
 
 export interface Filters {
   location: string;
@@ -257,30 +258,17 @@ const distanceValue = computed({
           </Label>
           <div class="space-y-2 max-h-64 overflow-y-auto">
             <div
-              v-for="option in [
-                { value: 'Eletricista', label: 'Eletricista' },
-                { value: 'Encanador', label: 'Encanador' },
-                { value: 'Pintor', label: 'Pintor' },
-                { value: 'Pedreiro', label: 'Pedreiro' },
-                { value: 'Marceneiro', label: 'Marceneiro' },
-                { value: 'Jardineiro', label: 'Jardineiro' },
-                { value: 'Arquiteta', label: 'Arquiteto(a)' },
-                { value: 'Designer Gráfico', label: 'Designer Gráfico' },
-                { value: 'Desenvolvedora Web', label: 'Desenvolvedor(a) Web' },
-                { value: 'Fotógrafa', label: 'Fotógrafo(a)' },
-                { value: 'Consultora de Marketing', label: 'Consultor(a) de Marketing' },
-                { value: 'Personal Trainer', label: 'Personal Trainer' },
-              ]"
-              :key="option.value"
+              v-for="cat in CATEGORIES"
+              :key="cat.value"
               class="flex items-center space-x-2"
             >
               <Checkbox
-                :id="`category-${option.value}`"
-                :checked="filters.categories.includes(option.value)"
-                @update:checked="(checked) => handleCategoryChange(option.value, checked as boolean)"
+                :id="`category-${cat.value}`"
+                :checked="filters.categories.includes(cat.value)"
+                @update:checked="(checked) => handleCategoryChange(cat.value, checked as boolean)"
               />
-              <label :for="`category-${option.value}`" class="text-sm text-[#435574] cursor-pointer">
-                {{ option.label }}
+              <label :for="`category-${cat.value}`" class="text-sm text-[#435574] cursor-pointer">
+                {{ cat.label }}
               </label>
             </div>
           </div>

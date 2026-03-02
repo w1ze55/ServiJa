@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router';
 import MainLayout from '@/components/layout/MainLayout.vue';
+import FreelancerDeliveriesPage from '@/components/freelancer/FreelancerDeliveriesPage.vue';
 import { useNavigation } from '@/utils/navigation';
 import { ref, onMounted } from 'vue';
-import { Package } from 'lucide-vue-next';
 
 const router = useRouter();
 const { navigate, logout } = useNavigation();
@@ -26,13 +26,6 @@ const handleSearch = (query: string) => router.push({ path: '/search', query: { 
 
 <template>
   <MainLayout v-if="user" :user="user" current-page="freelancer-deliveries" :on-navigate="handleNavigate" :on-logout="handleLogout" :on-search="handleSearch">
-    <div class="max-w-4xl mx-auto text-center py-16">
-      <div class="inline-flex p-6 bg-blue-100 rounded-full mb-6">
-        <Package class="h-16 w-16 text-blue-600" />
-      </div>
-      <h1 class="text-3xl font-bold text-gray-900 mb-4">Entregas</h1>
-      <p class="text-gray-600 mb-8">Esta página está em desenvolvimento.</p>
-      <p class="text-sm text-gray-500">Em breve você poderá gerenciar suas entregas aqui.</p>
-    </div>
+    <FreelancerDeliveriesPage :on-navigate="handleNavigate" />
   </MainLayout>
 </template>

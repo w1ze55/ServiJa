@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import {
   FileText,
   Search,
@@ -55,6 +55,7 @@ import DialogTitle from '../ui/dialog-title.vue';
 import Textarea from '../ui/textarea.vue';
 import Label from '../ui/label.vue';
 import { useProposalStore, type Proposal } from '@/stores/proposalStore';
+import { useServiceRequestWebSocket } from '@/composables/useServiceRequestWebSocket';
 import { toast } from '@/utils/toast';
 
 interface Props {
@@ -67,6 +68,9 @@ const proposalStore = useProposalStore();
 const searchQuery = ref('');
 const categoryFilter = ref('Todas as categorias');
 const sortBy = ref('Mais recentes');
+const timeFilter = ref('Últimos 7 dias');
+const customDateFrom = ref('');
+const customDateTo = ref('');
 const currentTab = ref('all');
 const currentPage = ref(1);
 const itemsPerPage = 6;
@@ -75,6 +79,9 @@ const showRejectDialog = ref(false);
 const showArchiveDialog = ref(false);
 const selectedProposal = ref<Proposal | null>(null);
 const rejectReason = ref('');
+
+// WebSocket
+let wsConnection: any = null;
 
 const categories = ['Eletricista', 'Encanador', 'Pintor', 'Pedreiro', 'Designer', 'Desenvolvedor'];
 
@@ -106,7 +113,76 @@ const getEmptyMessage = () => {
 
 onMounted(() => {
   proposalStore.loadProposals();
+  
+  // Conectar WebSocket
+  const userEmail = getUserEmail();
+  console.log('🔍 Tentando conectar WebSocket para:', userEmail);
+  
+  if (userEmail) {
+    wsConnection = useServiceRequestWebSocket(userEmail);
+    wsConnection.connect();
+    
+    console.log('✅ WebSocket inicializado para solicitações');
+    
+    // Escutar notificações de solicitações
+    window.addEventListener('service-request-notification', handleServiceRequestNotification);
+  } else {
+    console.error('❌ Não foi possível extrair email do token');
+  }
 });
+
+onUnmounted(() => {
+  console.log('🔌 Desconectando WebSocket de solicitações');
+  window.removeEventListener('service-request-notification', handleServiceRequestNotification);
+  if (wsConnection) {
+    wsConnection.disconnect();
+  }
+});
+
+// Extrair email do usuário do JWT
+const getUserEmail = () => {
+  const token = localStorage.getItem('token');
+  if (!token) return null;
+  
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return payload.sub || payload.email;
+  } catch (error) {
+    console.error('Erro ao extrair email do token:', error);
+    return null;
+  }
+};
+
+// Lidar com notificações de solicitações via WebSocket
+const handleServiceRequestNotification = (event: any) => {
+  const notification = event.detail;
+  console.log('📩 Notificação recebida:', notification);
+  
+  // Mostrar toast baseado no tipo de notificação
+  switch (notification.type) {
+    case 'NEW_SERVICE_REQUEST':
+      toast.success(`Nova solicitação de ${notification.contractorName}!`);
+      // Recarregar lista de propostas
+      proposalStore.loadProposals();
+      break;
+    case 'COUNTER_PROPOSAL':
+      toast.info(`${notification.contractorName} fez uma contra-proposta de ${notification.counterProposalAmount}`);
+      proposalStore.loadProposals();
+      break;
+    case 'PROPOSAL_ACCEPTED':
+      toast.success(notification.message);
+      proposalStore.loadProposals();
+      break;
+    case 'SERVICE_REQUEST_CANCELLED':
+      toast.warning('Solicitação cancelada');
+      proposalStore.loadProposals();
+      break;
+    case 'SERVICE_REQUEST_STATUS_CHANGED':
+      toast.info(`Status atualizado: ${notification.status}`);
+      proposalStore.loadProposals();
+      break;
+  }
+};
 
 const filteredProposals = computed(() => {
   let filtered = proposalStore.proposals.filter((proposal) => {
@@ -122,8 +198,46 @@ const filteredProposals = computed(() => {
       (currentTab.value === 'accepted' && proposal.status === 'accepted') ||
       (currentTab.value === 'rejected' && proposal.status === 'rejected') ||
       (currentTab.value === 'completed' && (proposal.status === 'completed' || proposal.status === 'archived'));
+    // Filtro por período
+    const matchesTime = (() => {
+      const proposalDate = new Date(proposal.receivedAt);
+      const now = new Date();
+      const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-    return matchesSearch && matchesCategory && matchesTab;
+      switch (timeFilter.value) {
+        case 'Hoje':
+          return proposalDate >= startOfToday;
+        case 'Ontem': {
+          const startOfYesterday = new Date(startOfToday);
+          startOfYesterday.setDate(startOfYesterday.getDate() - 1);
+          return proposalDate >= startOfYesterday && proposalDate < startOfToday;
+        }
+        case 'Últimos 7 dias': {
+          const sevenDaysAgo = new Date(startOfToday);
+          sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+          return proposalDate >= sevenDaysAgo;
+        }
+        case 'Mês atual':
+          return proposalDate.getMonth() === now.getMonth() && proposalDate.getFullYear() === now.getFullYear();
+        case 'Último mês': {
+          const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+          const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+          return proposalDate >= lastMonth && proposalDate <= endOfLastMonth;
+        }
+        case 'Intervalo personalizado': {
+          const from = customDateFrom.value ? new Date(customDateFrom.value + 'T00:00:00') : null;
+          const to = customDateTo.value ? new Date(customDateTo.value + 'T23:59:59') : null;
+          if (from && to) return proposalDate >= from && proposalDate <= to;
+          if (from) return proposalDate >= from;
+          if (to) return proposalDate <= to;
+          return true;
+        }
+        default:
+          return true;
+      }
+    })();
+
+    return matchesSearch && matchesCategory && matchesTab && matchesTime;
   });
 
   if (sortBy.value === 'Mais recentes') {
@@ -133,8 +247,8 @@ const filteredProposals = computed(() => {
   } else if (sortBy.value === 'Menor orçamento') {
     filtered.sort((a, b) => a.budget - b.budget);
   } else if (sortBy.value === 'Prioridade') {
-    const priorityOrder = { high: 3, medium: 2, low: 1 };
-    filtered.sort((a, b) => priorityOrder[b.priority] - priorityOrder[a.priority]);
+    const priorityOrder = { HIGH: 3, MEDIUM: 2, LOW: 1, URGENT: 4 };
+    filtered.sort((a, b) => (priorityOrder[b.priority] ?? 0) - (priorityOrder[a.priority] ?? 0));
   }
 
   return filtered;
@@ -315,7 +429,7 @@ watch(currentTab, () => {
 
     <!-- Filters -->
     <Card class="p-4">
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div class="relative">
           <Search class="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-[#435574]" />
           <Input
@@ -338,6 +452,20 @@ watch(currentTab, () => {
           </SelectContent>
         </Select>
 
+        <Select :model-value="timeFilter" @update:model-value="(val: string) => { timeFilter = val; currentPage = 1; }">
+          <SelectTrigger>
+            <SelectValue placeholder="Últimos 7 dias" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="Hoje">Hoje</SelectItem>
+            <SelectItem value="Ontem">Ontem</SelectItem>
+            <SelectItem value="Últimos 7 dias">Últimos 7 dias</SelectItem>
+            <SelectItem value="Mês atual">Mês atual</SelectItem>
+            <SelectItem value="Último mês">Último mês</SelectItem>
+            <SelectItem value="Intervalo personalizado">Intervalo personalizado</SelectItem>
+          </SelectContent>
+        </Select>
+
         <Select :model-value="sortBy" @update:model-value="(val: string) => sortBy = val">
           <SelectTrigger>
             <SelectValue placeholder="Mais recentes" />
@@ -350,19 +478,39 @@ watch(currentTab, () => {
           </SelectContent>
         </Select>
       </div>
+
+      <!-- Custom Date Range -->
+      <div v-if="timeFilter === 'Intervalo personalizado'" class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 pt-4 border-t">
+        <div class="space-y-1">
+          <label class="text-sm font-medium text-[#435574]">De</label>
+          <Input
+            type="date"
+            :model-value="customDateFrom"
+            @update:model-value="(val: string) => { customDateFrom = val; currentPage = 1; }"
+          />
+        </div>
+        <div class="space-y-1">
+          <label class="text-sm font-medium text-[#435574]">Até</label>
+          <Input
+            type="date"
+            :model-value="customDateTo"
+            @update:model-value="(val: string) => { customDateTo = val; currentPage = 1; }"
+          />
+        </div>
+      </div>
     </Card>
 
     <!-- Tabs -->
     <Tabs :model-value="currentTab" @update:model-value="(val: string) => currentTab = val">
       <TabsList class="grid w-full grid-cols-6">
-        <TabsTrigger value="all">Todas</TabsTrigger>
+        <TabsTrigger value="all">Todas ({{ proposalStore.proposals.length }})</TabsTrigger>
         <TabsTrigger value="pending">
-          Pendentes {{ proposalStore.stats.pending > 0 ? `(${proposalStore.stats.pending})` : '' }}
+          Pendentes ({{ proposalStore.stats.pending }})
         </TabsTrigger>
-        <TabsTrigger value="negotiating">Negociando</TabsTrigger>
-        <TabsTrigger value="accepted">Aceitas</TabsTrigger>
-        <TabsTrigger value="rejected">Recusadas</TabsTrigger>
-        <TabsTrigger value="completed">Concluídas</TabsTrigger>
+        <TabsTrigger value="negotiating">Negociando ({{ proposalStore.stats.negotiating }})</TabsTrigger>
+        <TabsTrigger value="accepted">Aceitas ({{ proposalStore.stats.accepted }})</TabsTrigger>
+        <TabsTrigger value="rejected">Recusadas ({{ proposalStore.stats.rejected }})</TabsTrigger>
+        <TabsTrigger value="completed">Concluídas ({{ proposalStore.stats.completed }})</TabsTrigger>
       </TabsList>
 
       <TabsContent :value="currentTab" class="mt-6">
@@ -471,18 +619,18 @@ watch(currentTab, () => {
                         </template>
 
                         <!-- Priority Badge -->
-                        <template v-if="proposal.priority === 'high'">
+                        <template v-if="proposal.priority === 'HIGH' || proposal.priority === 'URGENT'">
                           <Badge class="bg-red-100 text-red-700 hover:bg-red-100">
                             <AlertCircle class="h-3 w-3 mr-1" />
                             Alta
                           </Badge>
                         </template>
-                        <template v-else-if="proposal.priority === 'medium'">
+                        <template v-else-if="proposal.priority === 'MEDIUM'">
                           <Badge class="bg-yellow-100 text-yellow-700 hover:bg-yellow-100">
                             Média
                           </Badge>
                         </template>
-                        <template v-else-if="proposal.priority === 'low'">
+                        <template v-else-if="proposal.priority === 'LOW'">
                           <Badge variant="secondary">Baixa</Badge>
                         </template>
                       </div>

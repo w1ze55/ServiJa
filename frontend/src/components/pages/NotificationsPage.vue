@@ -52,9 +52,21 @@ const notifications = ref<Notification[]>([
   {
     id: '1',
     type: 'financial',
+    title: 'Proposta Aceita - Pagamento Necessário',
+    message: 'Sua proposta para o serviço de instalação elétrica foi aceita! Realize o pagamento para confirmar a contratação.',
+    timestamp: '2026-11-11T10:30:00',
+    isRead: false,
+    actionLink: {
+      page: 'checkout',
+      params: { requestId: '1' },
+    },
+  },
+  {
+    id: '2',
+    type: 'financial',
     title: 'Pagamento Aprovado',
     message: 'Seu pagamento de R$ 3.200,00 para João Silva foi aprovado com sucesso.',
-    timestamp: '2026-11-11T10:30:00',
+    timestamp: '2026-11-11T09:30:00',
     isRead: false,
     actionLink: {
       page: 'service-timeline',
@@ -62,7 +74,7 @@ const notifications = ref<Notification[]>([
     },
   },
   {
-    id: '2',
+    id: '3',
     type: 'message',
     title: 'Nova Mensagem',
     message: 'Maria Santos enviou uma mensagem sobre o projeto de design.',
@@ -214,7 +226,12 @@ const handleNotificationClick = (notification: Notification) => {
     handleMarkAsRead(notification.id);
   }
   if (notification.actionLink) {
-    props.onNavigate(notification.actionLink.page, notification.actionLink.params);
+    // Para checkout, usar router.push com query params
+    if (notification.actionLink.page === 'checkout') {
+      props.onNavigate('checkout', notification.actionLink.params);
+    } else {
+      props.onNavigate(notification.actionLink.page, notification.actionLink.params);
+    }
   }
 };
 

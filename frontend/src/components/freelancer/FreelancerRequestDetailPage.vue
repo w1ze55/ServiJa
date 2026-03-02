@@ -23,8 +23,9 @@ import {
   XCircle,
   Phone,
   Mail,
-  Play,
   Check,
+  FileEdit,
+  Lock,
 } from 'lucide-vue-next';
 import Button from '../ui/button.vue';
 import Input from '../ui/input.vue';
@@ -69,8 +70,10 @@ const activeTab = ref('details');
 const showSendProposalDialog = ref(false);
 const showConfirmDialog = ref(false);
 const showRejectDialog = ref(false);
+const showRejectCounterDialog = ref(false);
 const showCompleteDialog = ref(false);
 const rejectReason = ref('');
+const rejectCounterReason = ref('');
 const isLoading = ref(false);
 
 const proposal = ref<Proposal | null>(null);
@@ -431,10 +434,43 @@ const handleDownloadAttachment = async (url: string, fileName: string) => {
   }
 };
 
-const getUrgencyVariant = (urgency: string) => {
-  if (urgency === 'Alta') return 'destructive';
-  if (urgency === 'Média') return 'default';
-  return 'secondary';
+const handleAcceptCounterProposal = async () => {
+  if (!proposal.value) return;
+  
+  isLoading.value = true;
+  const success = await proposalStore.acceptCounterProposal(proposal.value.id);
+  isLoading.value = false;
+
+  if (success) {
+    toast.success('Contra proposta aceita com sucesso!');
+    proposal.value = proposalStore.getProposalById(proposal.value.id) || null;
+  } else {
+    toast.error('Erro ao aceitar contra proposta');
+  }
+};
+
+const handleRejectCounterProposal = async () => {
+  if (!proposal.value) return;
+
+  isLoading.value = true;
+  const success = await proposalStore.rejectCounterProposal(proposal.value.id, rejectCounterReason.value);
+  isLoading.value = false;
+
+  if (success) {
+    toast.success('Contra proposta rejeitada. Mantendo termos originais.');
+    showRejectCounterDialog.value = false;
+    rejectCounterReason.value = '';
+    proposal.value = proposalStore.getProposalById(proposal.value.id) || null;
+  } else {
+    toast.error('Erro ao rejeitar contra proposta');
+  }
+};
+
+const getPriorityVariant = (priority: string) => {
+  if (priority === 'URGENT') return 'destructive';
+  if (priority === 'HIGH') return 'default';
+  if (priority === 'MEDIUM') return 'secondary';
+  return 'outline';
 };
 
 const getStatusBadge = (status: string) => {
@@ -502,7 +538,7 @@ const getStatusBadge = (status: string) => {
             Recusar
           </Button>
           <Button
-            v-if="proposal.status === 'pending' || proposal.status === 'negotiating'"
+            v-if="(proposal.status === 'pending' || proposal.status === 'negotiating') && !proposal.freelancerResponse"
             @click="showSendProposalDialog = true"
             class="bg-[#286AD8] hover:bg-[#435574]"
           >
@@ -517,6 +553,16 @@ const getStatusBadge = (status: string) => {
             <CheckCircle class="h-4 w-4 mr-2" />
             Marcar Concluído
           </Button>
+        </div>
+      </div>
+
+      <!-- Rejection Reason Alert -->
+      <div v-if="proposal.status === 'rejected' && proposal.rejectReason" 
+           class="mt-4 p-4 rounded-lg border border-red-100 bg-red-50 text-red-900 flex items-start gap-3">
+        <AlertCircle class="h-5 w-5 mt-0.5 flex-shrink-0 text-red-600" />
+        <div>
+          <p class="font-semibold text-sm">Motivo da Recusa</p>
+          <p class="text-sm opacity-90 italic">"{{ proposal.rejectReason }}"</p>
         </div>
       </div>
 
@@ -551,6 +597,55 @@ const getStatusBadge = (status: string) => {
           <Button variant="outline" @click="activeTab = 'messages'">
             <MessageSquare class="h-4 w-4 mr-2" />
             Enviar Mensagem
+          </Button>
+        </div>
+      </Card>
+
+      <!-- Counter Proposal from Client -->
+      <Card v-if="proposal.counterValue" class="p-6 border-l-4 border-l-amber-500 bg-amber-50/30">
+        <div class="flex items-center gap-2 mb-4">
+          <FileEdit class="h-5 w-5 text-amber-600" />
+          <h3 class="text-lg font-semibold text-[#263238]">Contra Proposta do Cliente</h3>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <div class="bg-white p-3 rounded border border-amber-200">
+            <p class="text-sm text-[#435574]">Novo Valor Proposto</p>
+            <p class="text-xl font-bold text-green-600">
+              {{ formatCurrency(proposal.counterValue) }}
+            </p>
+          </div>
+          <div class="bg-white p-3 rounded border border-amber-200">
+            <p class="text-sm text-[#435574]">Novo Prazo Proposto</p>
+            <p class="text-xl font-bold text-[#263238]">
+              {{ proposal.counterDays }} dias
+            </p>
+          </div>
+        </div>
+        <div v-if="proposal.counterNotes">
+          <p class="text-sm font-medium text-[#263238] mb-1">Observações do Cliente:</p>
+          <p class="text-sm text-[#435574] italic">"{{ proposal.counterNotes }}"</p>
+        </div>
+        <div class="mt-4 p-3 bg-amber-100/50 rounded text-sm text-amber-800">
+          <p>O cliente sugeriu novos termos. Você pode aceitá-los para atualizar seu orçamento ou manter sua proposta inicial.</p>
+        </div>
+        
+        <div class="mt-6 flex gap-3">
+          <Button 
+            @click="handleAcceptCounterProposal"
+            :disabled="isLoading"
+            class="flex-1 bg-green-600 hover:bg-green-700"
+          >
+            <Check class="h-4 w-4 mr-2" />
+            Aceitar Contra Proposta
+          </Button>
+          <Button 
+            @click="showRejectCounterDialog = true"
+            variant="outline"
+            :disabled="isLoading"
+            class="flex-1 border-amber-500 text-amber-700 hover:bg-amber-50"
+          >
+            <XCircle class="h-4 w-4 mr-2" />
+            Manter Proposta Inicial
           </Button>
         </div>
       </Card>
@@ -687,10 +782,14 @@ const getStatusBadge = (status: string) => {
                 <p class="text-[#263238] mt-1 font-semibold">{{ formatCurrency(proposal.budget) }}</p>
               </div>
               <div>
-                <Label class="text-sm text-[#435574]">Urgência</Label>
+                <Label class="text-sm text-[#435574]">Prioridade</Label>
                 <p class="text-[#263238] mt-1">
-                  <Badge :variant="getUrgencyVariant(proposal.urgency || 'Média')">
-                    {{ proposal.urgency || 'Média' }}
+                  <Badge :variant="getPriorityVariant(proposal.priority || 'MEDIUM')">
+                    {{ 
+                      proposal.priority === 'URGENT' ? 'Urgente' :
+                      proposal.priority === 'HIGH' ? 'Alta' :
+                      proposal.priority === 'MEDIUM' ? 'Média' : 'Baixa'
+                    }}
                   </Badge>
                 </p>
               </div>
@@ -768,57 +867,11 @@ const getStatusBadge = (status: string) => {
             </div>
 
             <!-- Message Input -->
-            <div class="space-y-3 border-t pt-4">
-              <div v-if="messageAttachments.length > 0" class="flex flex-wrap gap-2">
-                <Badge
-                  v-for="(file, idx) in messageAttachments"
-                  :key="idx"
-                  variant="secondary"
-                  class="pl-3 pr-1"
-                >
-                  {{ file.name }}
-                  <button
-                    @click="messageAttachments = messageAttachments.filter((_, i) => i !== idx)"
-                    class="ml-2 hover:bg-gray-300 rounded-full p-0.5"
-                  >
-                    <X class="h-3 w-3" />
-                  </button>
-                </Badge>
-              </div>
-
-              <div class="flex gap-2">
-                <Textarea
-                  :model-value="newMessage"
-                  @update:model-value="(val) => newMessage = val as string"
-                  placeholder="Digite sua mensagem..."
-                  :rows="3"
-                  class="flex-1"
-                />
-              </div>
-
-              <div class="flex gap-2">
-                <input
-                  ref="messageAttachmentInput"
-                  type="file"
-                  multiple
-                  class="hidden"
-                  @change="handleMessageAttachmentChange"
-                />
-                <Button
-                  @click="messageAttachmentInput?.click()"
-                  variant="outline"
-                >
-                  <Paperclip class="h-4 w-4 mr-2" />
-                  Anexar
-                </Button>
-                <Button
-                  @click="handleSendMessage"
-                  class="bg-[#286AD8] hover:bg-[#435574] flex-1"
-                >
-                  <Send class="h-4 w-4 mr-2" />
-                  Enviar Mensagem
-                </Button>
-              </div>
+            <div class="mt-6 flex items-center justify-center p-6 bg-gray-50 rounded-lg border border-dashed border-gray-200">
+              <p class="text-sm text-[#435574] flex items-center gap-2 text-center">
+                <Lock class="h-4 w-4 text-amber-500" />
+                O chat será liberado automaticamente após a confirmação do pagamento.
+              </p>
             </div>
           </Card>
         </TabsContent>
@@ -1149,6 +1202,38 @@ const getStatusBadge = (status: string) => {
           </Button>
           <Button @click="handleRejectProposal" class="bg-red-600 hover:bg-red-700" :disabled="isLoading">
             {{ isLoading ? 'Recusando...' : 'Confirmar Recusa' }}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    <!-- Reject Counter Proposal Dialog -->
+    <Dialog :open="showRejectCounterDialog" @update:open="(val) => showRejectCounterDialog = val">
+      <DialogContent class="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Manter Proposta Inicial</DialogTitle>
+          <DialogDescription>
+            Informe o motivo ao cliente (opcional)
+          </DialogDescription>
+        </DialogHeader>
+        <div class="space-y-4">
+          <div class="space-y-2">
+            <Label for="reject-counter-reason">Motivo</Label>
+            <Textarea
+              id="reject-counter-reason"
+              :model-value="rejectCounterReason"
+              @update:model-value="(val) => rejectCounterReason = val as string"
+              placeholder="Ex: Custos de materiais, agenda, etc."
+              :rows="4"
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button @click="showRejectCounterDialog = false" variant="outline">
+            Cancelar
+          </Button>
+          <Button @click="handleRejectCounterProposal" class="bg-amber-600 hover:bg-amber-700 text-white" :disabled="isLoading">
+            {{ isLoading ? 'Enviando...' : 'Confirmar e Manter Inicial' }}
           </Button>
         </DialogFooter>
       </DialogContent>

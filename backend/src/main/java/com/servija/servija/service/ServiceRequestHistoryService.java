@@ -29,10 +29,16 @@ public class ServiceRequestHistoryService {
 
         @Transactional
         public void record(ServiceRequest serviceRequest, User user, OperationType operationType) {
+                record(serviceRequest, user, operationType, null);
+        }
+
+        @Transactional
+        public void record(ServiceRequest serviceRequest, User user, OperationType operationType, String details) {
                 ServiceRequestHistory history = ServiceRequestHistory.builder()
                                 .serviceRequest(serviceRequest)
                                 .user(user)
                                 .operationType(operationType)
+                                .details(details)
                                 .build();
 
                 historyRepository.save(history);
@@ -51,12 +57,26 @@ public class ServiceRequestHistoryService {
                 ZonedDateTime brazilTime = history.getCreatedAt()
                                 .atZone(ZoneOffset.UTC)
                                 .withZoneSameInstant(BRAZIL_ZONE);
+
+                String details = history.getDetails();
+                if (details == null) {
+                        ServiceRequest request = history.getServiceRequest();
+                        if (history.getOperationType() == OperationType.REQUEST_REJECTED) {
+                                details = request.getRejectReason() != null ? "Motivo: " + request.getRejectReason()
+                                                : null;
+                        } else if (history.getOperationType() == OperationType.CANCELLED) {
+                                details = request.getCancelReason() != null ? "Motivo: " + request.getCancelReason()
+                                                : null;
+                        }
+                }
+
                 return ServiceRequestHistoryResponse.builder()
                                 .id(history.getId())
                                 .operationType(history.getOperationType().getLabel())
                                 .operationKey(history.getOperationType().name())
                                 .userName(history.getUser().getName())
                                 .formattedDateTime(brazilTime.format(FORMATTER))
+                                .details(details)
                                 .build();
         }
 }

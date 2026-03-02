@@ -24,6 +24,7 @@ import {
   Package,
   Map,
   FolderKanban,
+  ClipboardList,
   ChevronDown,
 } from "lucide-vue-next";
 import Avatar from "../ui/avatar.vue";
@@ -219,12 +220,12 @@ const menuItems = computed(() =>
       ],
 );
 
-// Sub-items do dropdown "Dados Profissionais" (apenas para freelancers)
+// Sub-items do dropdown "Área Profissional" (apenas para freelancers)
 const professionalSubItems = [
   {
     id: "freelancer-professional-profile",
-    label: "Portfólio Profissional",
-    icon: FolderKanban,
+    label: "Dados Profissionais",
+    icon: ClipboardList,
   },
   { id: "freelancer-services", label: "Meus Serviços", icon: Briefcase },
   { id: "freelancer-portfolio", label: "Galeria de Trabalhos", icon: Images },
@@ -316,7 +317,7 @@ const getInitials = (name: string) => {
           :class="`flex-1 py-4 space-y-1 overflow-y-auto ${sidebarExpanded ? 'px-4' : 'px-2'}`"
         >
           <template v-for="(item, index) in menuItems" :key="item.id">
-            <!-- Dropdown "Dados Profissionais" - inserido após Dashboard (index 0) para freelancers -->
+            <!-- Dropdown "Área Profissional" - inserido após Dashboard (index 0) para freelancers -->
             <div
               v-if="index === 1 && currentUser.type === 'provider'"
               class="mb-1"
@@ -332,14 +333,14 @@ const getInitials = (name: string) => {
                       : 'text-white/70 hover:bg-white/10 hover:text-white'
                   }
                 `"
-                :title="!sidebarExpanded ? 'Dados Profissionais' : ''"
+                :title="!sidebarExpanded ? 'Área Profissional' : ''"
               >
                 <FolderKanban class="h-5 w-5 flex-shrink-0" />
                 <span
                   v-show="sidebarExpanded"
                   class="flex-1 text-left whitespace-nowrap"
                 >
-                  Dados Profissionais
+                  Área Profissional
                 </span>
                 <ChevronDown
                   v-show="sidebarExpanded"
@@ -440,7 +441,7 @@ const getInitials = (name: string) => {
         <!-- Navigation -->
         <nav class="flex-1 p-4 space-y-1 overflow-y-auto">
           <template v-for="(item, index) in menuItems" :key="item.id">
-            <!-- Dropdown "Dados Profissionais" - inserido após Dashboard (index 0) para freelancers -->
+            <!-- Dropdown "Área Profissional" - inserido após Dashboard (index 0) para freelancers -->
             <div
               v-if="index === 1 && currentUser.type === 'provider'"
               class="mb-1"
@@ -457,7 +458,7 @@ const getInitials = (name: string) => {
                 `"
               >
                 <FolderKanban class="h-5 w-5" />
-                <span class="flex-1 text-left">Dados Profissionais</span>
+                <span class="flex-1 text-left">Área Profissional</span>
                 <ChevronDown
                   :class="`h-4 w-4 transition-transform duration-200 ${
                     professionalDropdownOpen ? 'rotate-180' : ''

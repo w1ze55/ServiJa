@@ -17,6 +17,7 @@ import SelectValue from '../ui/select-value.vue';
 import Badge from '../ui/badge.vue';
 import { toast } from '../../utils/toast';
 import { uploadImages, deleteImage } from '../../api/uploadService';
+import { CATEGORIES } from '@/constants/categories';
 
 export interface ServiceFormData {
   id?: string;
@@ -57,35 +58,7 @@ const tagInput = ref('');
 const errors = ref<Record<string, string>>({});
 const isUploading = ref(false);
 
-const categories = [
-  'Advogado',
-  'Arquiteto',
-  'Contador',
-  'Cozinheiro',
-  'Cuidador',
-  'Designer Gráfico',
-  'Desenvolvedor Web',
-  'Diarista',
-  'Eletricista',
-  'Encanador',
-  'Fotógrafo',
-  'Jardineiro',
-  'Marceneiro',
-  'Mecânico',
-  'Pedreiro',
-  'Personal Trainer',
-  'Pintor',
-  'Professor Particular',
-  'Redator',
-  'Serralheiro',
-  'Social Media',
-  'Videomaker',
-  'Outro',
-].sort((a, b) => {
-  if (a === 'Outro') return 1;
-  if (b === 'Outro') return -1;
-  return a.localeCompare(b, 'pt-BR');
-});
+const categories = CATEGORIES;
 
 watch(() => props.service, (newService) => {
   if (newService) {
@@ -374,8 +347,8 @@ const handleRemoveImage = async (index: number) => {
               <SelectValue placeholder="Selecione uma categoria" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem v-for="category in categories" :key="category" :value="category">
-                {{ category }}
+              <SelectItem v-for="cat in categories" :key="cat.value" :value="cat.value">
+                {{ cat.label }}
               </SelectItem>
             </SelectContent>
           </Select>

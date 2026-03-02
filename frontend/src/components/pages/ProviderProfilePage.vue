@@ -416,7 +416,6 @@ const handleSendQuote = async () => {
       deadline: deadline,
       priority: quotePriority.value,
       address: '',
-      urgency: 'normal',
       freelancerId: Number(props.providerId),
       attachments: attachmentUrls,
     };
@@ -636,194 +635,7 @@ onMounted(() => {
                 </Badge>
               </div>
 
-              <!-- Action Buttons -->
-              <div class="flex gap-3">
-                <Dialog v-model:open="showQuoteDialog">
-                  <Button @click="showQuoteDialog = true" class="bg-[#286AD8] hover:bg-[#435574]">
-                    <Send class="h-4 w-4 mr-2" />
-                    Solicitar Orçamento
-                  </Button>
-                  <DialogContent class="max-w-md">
-                    <DialogHeader>
-                      <DialogTitle>Solicitar Orçamento</DialogTitle>
-                    </DialogHeader>
-                    <div class="space-y-4">
-                      <div>
-                        <Label class="text-[#435574] mb-2 block text-sm">
-                          Categoria <span class="text-red-500">*</span>
-                        </Label>
-                        <Select v-model="quoteCategory">
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecione a categoria" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem v-for="cat in categories" :key="cat" :value="cat">
-                              {{ cat }}
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div>
-                        <Label class="text-[#435574] mb-2 block text-sm">
-                          Orçamento estimado <span class="text-red-500">*</span>
-                        </Label>
-                        <div class="relative">
-                          <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">
-                            R$
-                          </span>
-                          <Input
-                            type="text"
-                            inputmode="numeric"
-                            placeholder="0,00"
-                            :model-value="formattedQuoteBudget"
-                            @update:model-value="(val: string) => handleQuoteBudgetInput(val)"
-                            class="pl-10"
-                          />
-                        </div>
-                      </div>
-
-                      <div class="space-y-3">
-                        <Label class="text-[#435574] mb-2 block text-sm">
-                          Prazo desejado <span class="text-red-500">*</span>
-                        </Label>
-                        
-                        <div class="flex p-1 bg-gray-100 rounded-lg mb-2">
-                          <button
-                            type="button"
-                            @click="quoteDeadlineType = 'estimated'"
-                            :class="[
-                              'flex-1 py-1.5 text-xs font-bold rounded-md transition-all',
-                              quoteDeadlineType === 'estimated' ? 'bg-white text-[#286AD8] shadow-sm' : 'text-[#435574] hover:text-[#263238]'
-                            ]"
-                          >
-                            Prazo estimado
-                          </button>
-                          <button
-                            type="button"
-                            @click="quoteDeadlineType = 'decided'"
-                            :class="[
-                              'flex-1 py-1.5 text-xs font-bold rounded-md transition-all',
-                              quoteDeadlineType === 'decided' ? 'bg-white text-[#286AD8] shadow-sm' : 'text-[#435574] hover:text-[#263238]'
-                            ]"
-                          >
-                            Prazo decidido
-                          </button>
-                        </div>
-
-                        <div v-if="quoteDeadlineType === 'estimated'">
-                          <div class="relative">
-                            <Input
-                              type="text"
-                              inputmode="numeric"
-                              placeholder="Quantidade de dias"
-                              :model-value="quoteDeadline"
-                              @update:model-value="handleDeadlineInput"
-                              class="pr-24"
-                            />
-                            <div class="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2 pointer-events-none">
-                              <span class="text-xs text-gray-400 font-medium">dia(s)</span>
-                              <Badge v-if="getDeadlineApproximation(quoteDeadline)" variant="secondary" class="bg-blue-50 text-[#286AD8] border-[#286AD8]/20 px-2 h-6 text-[10px]">
-                                {{ getDeadlineApproximation(quoteDeadline) }}
-                              </Badge>
-                            </div>
-                          </div>
-                        </div>
-                        <div v-else>
-                          <Input
-                            type="date"
-                            v-model="quoteDeadlineDate"
-                            class="w-full"
-                          />
-                        </div>
-                      </div>
-
-                      <div>
-                        <Label class="text-[#435574] mb-2 block text-sm">
-                          Prioridade <span class="text-red-500">*</span>
-                        </Label>
-                        <Select v-model="quotePriority">
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecione a prioridade" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="LOW">Baixa</SelectItem>
-                            <SelectItem value="MEDIUM">Média</SelectItem>
-                            <SelectItem value="HIGH">Alta</SelectItem>
-                            <SelectItem value="URGENT">Urgente</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div>
-                        <Label class="text-[#435574] mb-2 block text-sm">
-                          Descrição do serviço <span class="text-red-500">*</span>
-                        </Label>
-                        <Textarea
-                          placeholder="Ex: Preciso instalar 3 ventiladores de teto na sala e quartos..."
-                          :rows="5"
-                          v-model="quoteMessage"
-                          class="resize-none"
-                        />
-                      </div>
-
-                      <!-- Attachments -->
-                      <div>
-                        <Label class="text-[#435574] mb-2 block text-sm">
-                          Anexos <span class="text-xs text-gray-400">(opcional · até 5 arquivos · máx. 10MB cada)</span>
-                        </Label>
-                        <input
-                          ref="fileInputRef"
-                          type="file"
-                          multiple
-                          class="hidden"
-                          @change="handleAddFiles"
-                        />
-                        <button
-                          type="button"
-                          @click="fileInputRef?.click()"
-                          class="w-full border-2 border-dashed border-gray-200 rounded-lg p-4 flex items-center justify-center gap-2 text-sm text-[#435574] hover:border-[#286AD8] hover:text-[#286AD8] transition-colors cursor-pointer"
-                        >
-                          <Paperclip class="h-4 w-4" />
-                          Clique para anexar arquivos
-                        </button>
-
-                        <ul v-if="quoteAttachments.length > 0" class="mt-2 space-y-1">
-                          <li
-                            v-for="(file, i) in quoteAttachments"
-                            :key="i"
-                            class="flex items-center justify-between bg-blue-50 border border-blue-100 rounded-md px-3 py-2 text-sm"
-                          >
-                            <span class="flex items-center gap-2 min-w-0">
-                              <Paperclip class="h-3.5 w-3.5 text-[#286AD8] shrink-0" />
-                              <span class="truncate text-[#263238]">{{ file.name }}</span>
-                              <span class="text-gray-400 shrink-0">{{ formatFileSize(file.size) }}</span>
-                            </span>
-                            <button type="button" @click="handleRemoveAttachment(i)" class="ml-2 text-gray-400 hover:text-red-500 transition-colors shrink-0">
-                              <Trash2 class="h-3.5 w-3.5" />
-                            </button>
-                          </li>
-                        </ul>
-                      </div>
-
-                      <Button 
-                        @click="handleSendQuote" 
-                        class="w-full bg-[#286AD8]"
-                        :disabled="isSendingQuote"
-                      >
-                        <Loader2 v-if="isSendingQuote" class="h-4 w-4 mr-2 animate-spin" />
-                        <Send v-else class="h-4 w-4 mr-2" />
-                        {{ isSendingQuote ? 'Enviando...' : 'Enviar Solicitação' }}
-                      </Button>
-                    </div>
-                  </DialogContent>
-                </Dialog>
-
-                <Button variant="outline">
-                  <MessageSquare class="h-4 w-4 mr-2" />
-                  Mensagem
-                </Button>
-              </div>
+              <!-- Action Buttons removed as per request -->
             </div>
           </div>
         </Card>
@@ -1435,5 +1247,183 @@ onMounted(() => {
         </div>
       </DialogContent>
     </Dialog>
+    <!-- Quote Dialog -->
+    <Dialog v-model:open="showQuoteDialog">
+      <DialogContent class="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Solicitar Orçamento</DialogTitle>
+        </DialogHeader>
+        <div class="space-y-4">
+          <div>
+            <Label class="text-[#435574] mb-2 block text-sm">
+              Categoria <span class="text-red-500">*</span>
+            </Label>
+            <Select v-model="quoteCategory">
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione a categoria" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem v-for="cat in categories" :key="cat" :value="cat">
+                  {{ cat }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <Label class="text-[#435574] mb-2 block text-sm">
+              Orçamento estimado <span class="text-red-500">*</span>
+            </Label>
+            <div class="relative">
+              <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">
+                R$
+              </span>
+              <Input
+                type="text"
+                inputmode="numeric"
+                placeholder="0,00"
+                :model-value="formattedQuoteBudget"
+                @update:model-value="(val: string) => handleQuoteBudgetInput(val)"
+                class="pl-10"
+              />
+            </div>
+          </div>
+
+          <div class="space-y-3">
+            <Label class="text-[#435574] mb-2 block text-sm">
+              Prazo desejado <span class="text-red-500">*</span>
+            </Label>
+            
+            <div class="flex p-1 bg-gray-100 rounded-lg mb-2">
+              <button
+                type="button"
+                @click="quoteDeadlineType = 'estimated'"
+                :class="[
+                  'flex-1 py-1.5 text-xs font-bold rounded-md transition-all',
+                  quoteDeadlineType === 'estimated' ? 'bg-white text-[#286AD8] shadow-sm' : 'text-[#435574] hover:text-[#263238]'
+                ]"
+              >
+                Prazo estimado
+              </button>
+              <button
+                type="button"
+                @click="quoteDeadlineType = 'decided'"
+                :class="[
+                  'flex-1 py-1.5 text-xs font-bold rounded-md transition-all',
+                  quoteDeadlineType === 'decided' ? 'bg-white text-[#286AD8] shadow-sm' : 'text-[#435574] hover:text-[#263238]'
+                ]"
+              >
+                Prazo decidido
+              </button>
+            </div>
+
+            <div v-if="quoteDeadlineType === 'estimated'">
+              <div class="relative">
+                <Input
+                  type="text"
+                  inputmode="numeric"
+                  placeholder="Quantidade de dias"
+                  :model-value="quoteDeadline"
+                  @update:model-value="handleDeadlineInput"
+                  class="pr-24"
+                />
+                <div class="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2 pointer-events-none">
+                  <span class="text-xs text-gray-400 font-medium">dia(s)</span>
+                  <Badge v-if="getDeadlineApproximation(quoteDeadline)" variant="secondary" class="bg-blue-50 text-[#286AD8] border-[#286AD8]/20 px-2 h-6 text-[10px]">
+                    {{ getDeadlineApproximation(quoteDeadline) }}
+                  </Badge>
+                </div>
+              </div>
+            </div>
+            <div v-else>
+              <Input
+                type="date"
+                v-model="quoteDeadlineDate"
+                class="w-full"
+              />
+            </div>
+          </div>
+
+          <div>
+            <Label class="text-[#435574] mb-2 block text-sm">
+              Prioridade <span class="text-red-500">*</span>
+            </Label>
+            <Select v-model="quotePriority">
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione a prioridade" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="LOW">Baixa</SelectItem>
+                <SelectItem value="MEDIUM">Média</SelectItem>
+                <SelectItem value="HIGH">Alta</SelectItem>
+                <SelectItem value="URGENT">Urgente</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <Label class="text-[#435574] mb-2 block text-sm">
+              Descrição do serviço <span class="text-red-500">*</span>
+            </Label>
+            <Textarea
+              placeholder="Ex: Preciso instalar 3 ventiladores de teto na sala e quartos..."
+              :rows="5"
+              v-model="quoteMessage"
+              class="resize-none"
+            />
+          </div>
+
+          <!-- Attachments -->
+          <div>
+            <Label class="text-[#435574] mb-2 block text-sm">
+              Anexos <span class="text-xs text-gray-400">(opcional · até 5 arquivos · máx. 10MB cada)</span>
+            </Label>
+            <input
+              ref="fileInputRef"
+              type="file"
+              multiple
+              class="hidden"
+              @change="handleAddFiles"
+            />
+            <button
+              type="button"
+              @click="fileInputRef?.click()"
+              class="w-full border-2 border-dashed border-gray-200 rounded-lg p-4 flex items-center justify-center gap-2 text-sm text-[#435574] hover:border-[#286AD8] hover:text-[#286AD8] transition-colors cursor-pointer"
+            >
+              <Paperclip class="h-4 w-4" />
+              Clique para anexar arquivos
+            </button>
+
+            <ul v-if="quoteAttachments.length > 0" class="mt-2 space-y-1">
+              <li
+                v-for="(file, i) in quoteAttachments"
+                :key="i"
+                class="flex items-center justify-between bg-blue-50 border border-blue-100 rounded-md px-3 py-2 text-sm"
+              >
+                <span class="flex items-center gap-2 min-w-0">
+                  <Paperclip class="h-3.5 w-3.5 text-[#286AD8] shrink-0" />
+                  <span class="truncate text-[#263238]">{{ file.name }}</span>
+                  <span class="text-gray-400 shrink-0">{{ formatFileSize(file.size) }}</span>
+                </span>
+                <button type="button" @click="handleRemoveAttachment(i)" class="ml-2 text-gray-400 hover:text-red-500 transition-colors shrink-0">
+                  <Trash2 class="h-3.5 w-3.5" />
+                </button>
+              </li>
+            </ul>
+          </div>
+
+          <Button 
+            @click="handleSendQuote" 
+            class="w-full bg-[#286AD8]"
+            :disabled="isSendingQuote"
+          >
+            <Loader2 v-if="isSendingQuote" class="h-4 w-4 mr-2 animate-spin" />
+            <Send v-else class="h-4 w-4 mr-2" />
+            {{ isSendingQuote ? 'Enviando...' : 'Enviar Solicitação' }}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
 </template>
+
 ```

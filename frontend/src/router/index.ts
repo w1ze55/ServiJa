@@ -33,6 +33,8 @@ import FreelancerAccountSettingsPage from "@/pages/FreelancerAccountSettings/ind
 import ProviderProfilePage from "@/pages/ProviderProfile/index.vue";
 import NotFoundPage from "@/pages/NotFound/index.vue";
 import RegisterPage from "@/pages/Register/index.vue";
+import CheckoutPage from "@/pages/Checkout/index.vue";
+import PaymentSuccessPage from "@/pages/PaymentSuccess/index.vue";
 
 const routes: RouteRecordRaw[] = [
   // ============ ROTAS PÚBLICAS ============
@@ -262,6 +264,22 @@ const routes: RouteRecordRaw[] = [
     component: ProviderProfilePage,
     meta: { requiresAuth: true },
     props: true,
+  },
+
+  // Checkout (Cliente)
+  {
+    path: "/checkout",
+    name: "checkout",
+    component: CheckoutPage,
+    meta: { requiresAuth: true, userType: "contractor" },
+  },
+
+  // Payment Success
+  {
+    path: "/payment-success",
+    name: "payment-success",
+    component: PaymentSuccessPage,
+    meta: { requiresAuth: true, userType: "contractor" },
   },
 
   // ============ PÁGINA 404 - DEVE SER A ÚLTIMA ROTA ============

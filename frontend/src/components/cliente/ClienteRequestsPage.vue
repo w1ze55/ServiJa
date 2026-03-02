@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import {
   FileText,
   Search,
@@ -25,6 +25,7 @@ import Card from '../ui/card.vue';
 import Badge from '../ui/badge.vue';
 import Avatar from '../ui/avatar.vue';
 import AvatarFallback from '../ui/avatar-fallback.vue';
+import AvatarImage from '../ui/avatar-image.vue';
 import Select from '../ui/select.vue';
 import SelectContent from '../ui/select-content.vue';
 import SelectItem from '../ui/select-item.vue';
@@ -56,6 +57,7 @@ import AlertDialogTitle from '../ui/alert-dialog-title.vue';
 import Textarea from '../ui/textarea.vue';
 import Label from '../ui/label.vue';
 import { useClientRequestStore, type ServiceRequest } from '@/stores/clientRequestStore';
+import { useServiceRequestWebSocket } from '@/composables/useServiceRequestWebSocket';
 import { toast } from '@/utils/toast';
 
 interface Props {
@@ -81,16 +83,18 @@ const newRequest = ref({
   description: '',
   budget: 0,
   deadline: '',
-  priority: 'medium' as 'low' | 'medium' | 'high',
+  priority: 'MEDIUM' as 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT',
   address: '',
   desiredDate: '',
-  urgency: 'Média',
 });
 
 // Cancel dialog
 const showCancelDialog = ref(false);
 const selectedRequest = ref<ServiceRequest | null>(null);
 const cancelReason = ref('');
+
+// WebSocket
+let wsConnection: any = null;
 
 const categories = ['Eletricista', 'Encanador', 'Pintor', 'Pedreiro', 'Designer', 'Desenvolvedor'];
 
@@ -122,7 +126,72 @@ const getEmptyMessage = () => {
 
 onMounted(() => {
   store.loadRequests();
+  
+  // Conectar WebSocket
+  const userEmail = getUserEmail();
+  console.log('🔍 Tentando conectar WebSocket para:', userEmail);
+  
+  if (userEmail) {
+    wsConnection = useServiceRequestWebSocket(userEmail);
+    wsConnection.connect();
+    
+    console.log('✅ WebSocket inicializado para solicitações (Cliente)');
+    
+    // Escutar notificações de solicitações
+    window.addEventListener('service-request-notification', handleServiceRequestNotification);
+  } else {
+    console.error('❌ Não foi possível extrair email do token');
+  }
 });
+
+onUnmounted(() => {
+  console.log('🔌 Desconectando WebSocket de solicitações (Cliente)');
+  window.removeEventListener('service-request-notification', handleServiceRequestNotification);
+  if (wsConnection) {
+    wsConnection.disconnect();
+  }
+});
+
+// Extrair email do usuário do JWT
+const getUserEmail = () => {
+  const token = localStorage.getItem('token');
+  if (!token) return null;
+  
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return payload.sub || payload.email;
+  } catch (error) {
+    console.error('Erro ao extrair email do token:', error);
+    return null;
+  }
+};
+
+// Lidar com notificações de solicitações via WebSocket
+const handleServiceRequestNotification = (event: any) => {
+  const notification = event.detail;
+  console.log('📩 Notificação recebida:', notification);
+  
+  // Mostrar toast baseado no tipo de notificação
+  switch (notification.type) {
+    case 'NEW_PROPOSAL':
+      toast.success(`${notification.freelancerName} enviou uma proposta de ${notification.proposalAmount}!`);
+      // Recarregar lista de solicitações
+      store.loadRequests();
+      break;
+    case 'PROPOSAL_ACCEPTED':
+      toast.success(notification.message);
+      store.loadRequests();
+      break;
+    case 'SERVICE_REQUEST_CANCELLED':
+      toast.warning('Solicitação cancelada');
+      store.loadRequests();
+      break;
+    case 'SERVICE_REQUEST_STATUS_CHANGED':
+      toast.info(`Status atualizado: ${notification.status}`);
+      store.loadRequests();
+      break;
+  }
+};
 
 const filteredRequests = computed(() => {
   let filtered = store.requests.filter((request) => {
@@ -149,7 +218,7 @@ const filteredRequests = computed(() => {
   } else if (sortBy.value === 'budget-low') {
     filtered.sort((a, b) => a.budget - b.budget);
   } else if (sortBy.value === 'priority') {
-    const priorityOrder = { high: 3, medium: 2, low: 1 };
+    const priorityOrder = { URGENT: 4, HIGH: 3, MEDIUM: 2, LOW: 1 };
     filtered.sort((a, b) => priorityOrder[b.priority] - priorityOrder[a.priority]);
   }
 
@@ -214,10 +283,9 @@ const handleOpenCreateDialog = () => {
     description: '',
     budget: 0,
     deadline: '',
-    priority: 'medium',
+    priority: 'MEDIUM',
     address: '',
     desiredDate: '',
-    urgency: 'Média',
   };
   showCreateDialog.value = true;
 };
@@ -250,7 +318,6 @@ const handleCreateRequest = async () => {
     priority: newRequest.value.priority,
     address: newRequest.value.address,
     desiredDate: newRequest.value.desiredDate,
-    urgency: newRequest.value.urgency,
   });
   isCreating.value = false;
 
@@ -483,6 +550,7 @@ const getStatusLabel = (status: string) => {
             >
               <div class="flex items-start gap-4">
                 <Avatar class="h-12 w-12 hidden sm:flex">
+                  <AvatarImage :src="request.freelancerAvatar" />
                   <AvatarFallback class="bg-[#286AD8] text-white">
                     {{ getInitials(request.freelancerName || request.service) }}
                   </AvatarFallback>
@@ -560,13 +628,19 @@ const getStatusLabel = (status: string) => {
                         </template>
 
                         <!-- Priority Badge -->
-                        <template v-if="request.priority === 'high'">
+                        <template v-if="request.priority === 'URGENT'">
+                          <Badge class="bg-red-200 text-red-900 hover:bg-red-200">
+                            <AlertCircle class="h-3 w-3 mr-1" />
+                            Urgente
+                          </Badge>
+                        </template>
+                        <template v-else-if="request.priority === 'HIGH'">
                           <Badge class="bg-red-100 text-red-700 hover:bg-red-100">
                             <AlertCircle class="h-3 w-3 mr-1" />
                             Alta
                           </Badge>
                         </template>
-                        <template v-else-if="request.priority === 'medium'">
+                        <template v-else-if="request.priority === 'MEDIUM'">
                           <Badge class="bg-yellow-100 text-yellow-700 hover:bg-yellow-100">
                             Média
                           </Badge>
@@ -774,9 +848,10 @@ const getStatusLabel = (status: string) => {
                   <SelectValue placeholder="Prioridade" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="low">Baixa</SelectItem>
-                  <SelectItem value="medium">Média</SelectItem>
-                  <SelectItem value="high">Alta</SelectItem>
+                  <SelectItem value="LOW">Baixa</SelectItem>
+                  <SelectItem value="MEDIUM">Média</SelectItem>
+                  <SelectItem value="HIGH">Alta</SelectItem>
+                  <SelectItem value="URGENT">Urgente</SelectItem>
                 </SelectContent>
               </Select>
             </div>

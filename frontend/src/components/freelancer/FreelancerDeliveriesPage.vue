@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import {
   Package,
   Upload,
@@ -7,26 +7,24 @@ import {
   Clock,
   FileText,
   Download,
-  Edit,
-  Trash2,
-  Plus,
-  AlertCircle,
+  Eye,
   Calendar,
   CheckCircle,
+  MessageSquare,
+  DollarSign,
+  AlertCircle,
+  Loader2,
+  Briefcase,
+  Trash2,
+  X,
 } from 'lucide-vue-next';
 import Button from '../ui/button.vue';
-import Input from '../ui/input.vue';
-import Label from '../ui/label.vue';
 import Card from '../ui/card.vue';
 import Badge from '../ui/badge.vue';
 import Progress from '../ui/progress.vue';
-import Textarea from '../ui/textarea.vue';
-import Dialog from '../ui/dialog.vue';
-import DialogContent from '../ui/dialog-content.vue';
-import DialogDescription from '../ui/dialog-description.vue';
-import DialogFooter from '../ui/dialog-footer.vue';
-import DialogHeader from '../ui/dialog-header.vue';
-import DialogTitle from '../ui/dialog-title.vue';
+import Avatar from '../ui/avatar.vue';
+import AvatarFallback from '../ui/avatar-fallback.vue';
+import AvatarImage from '../ui/avatar-image.vue';
 import AlertDialog from '../ui/alert-dialog.vue';
 import AlertDialogAction from '../ui/alert-dialog-action.vue';
 import AlertDialogCancel from '../ui/alert-dialog-cancel.vue';
@@ -35,272 +33,286 @@ import AlertDialogDescription from '../ui/alert-dialog-description.vue';
 import AlertDialogFooter from '../ui/alert-dialog-footer.vue';
 import AlertDialogHeader from '../ui/alert-dialog-header.vue';
 import AlertDialogTitle from '../ui/alert-dialog-title.vue';
-import { toast } from '../../utils/toast';
-
-interface FileVersion {
-  id: string;
-  name: string;
-  size: string;
-  uploadedAt: string;
-  version: number;
-}
-
-interface Milestone {
-  id: string;
-  title: string;
-  description: string;
-  deadline: string;
-  status: 'pending' | 'in-progress' | 'submitted' | 'approved' | 'rejected';
-  completedAt?: string;
-  files: FileVersion[];
-  clientFeedback?: string;
-  criteria: string[];
-}
-
-interface Contract {
-  id: string;
-  service: string;
-  clientName: string;
-  totalAmount: number;
-  milestones: Milestone[];
-}
+import Dialog from '../ui/dialog.vue';
+import DialogContent from '../ui/dialog-content.vue';
+import DialogDescription from '../ui/dialog-description.vue';
+import DialogFooter from '../ui/dialog-footer.vue';
+import DialogHeader from '../ui/dialog-header.vue';
+import DialogTitle from '../ui/dialog-title.vue';
+import Label from '../ui/label.vue';
+import Textarea from '../ui/textarea.vue';
+import ServiceRequestTimeline from '../service/ServiceRequestTimeline.vue';
+import { useProposalStore, type Proposal, type Milestone } from '@/stores/proposalStore';
+import { toast } from '@/utils/toast';
+import api from '@/api/config/axios';
 
 interface Props {
   onNavigate: (page: string, params?: any) => void;
 }
 
 const props = defineProps<Props>();
+const proposalStore = useProposalStore();
 
-const selectedContract = ref<string | null>(null);
-const showMilestoneDialog = ref(false);
+const selectedProjectId = ref<string | null>(null);
+const showCompleteDialog = ref(false);
 const showUploadDialog = ref(false);
-const showDeleteDialog = ref(false);
-const editingMilestone = ref<Milestone | null>(null);
-const selectedMilestone = ref<Milestone | null>(null);
-const milestoneToDelete = ref<Milestone | null>(null);
-const uploadProgress = ref(0);
+const isCompleting = ref(false);
 const isUploading = ref(false);
+const uploadProgress = ref(0);
+const uploadFiles = ref<File[]>([]);
+const uploadDescription = ref('');
 
-// Form states
-const milestoneForm = ref({
-  title: '',
-  description: '',
-  deadline: '',
-  criteria: [''],
+// Load data
+onMounted(async () => {
+  await proposalStore.loadProposals();
+  // Auto-select first active project
+  if (activeProjects.value.length > 0 && !selectedProjectId.value) {
+    selectedProjectId.value = activeProjects.value[0].id;
+    await proposalStore.loadHistory(activeProjects.value[0].id);
+  }
 });
 
-const uploadForm = ref({
-  description: '',
-  files: [] as File[],
-});
-
-// Mock data
-const contracts = ref<Contract[]>([
-  {
-    id: '1',
-    service: 'Instalação Elétrica Residencial',
-    clientName: 'Maria Silva',
-    totalAmount: 2500,
-    milestones: [
-      {
-        id: 'm1',
-        title: 'Planejamento e Projeto',
-        description: 'Elaboração do projeto elétrico completo com diagrama unifilar',
-        deadline: '2026-11-15',
-        status: 'approved',
-        completedAt: '2026-11-14 16:30',
-        criteria: [
-          'Diagrama unifilar completo',
-          'Lista de materiais',
-          'Cronograma de execução',
-        ],
-        files: [
-          {
-            id: 'f1',
-            name: 'Projeto_Eletrico_v2.pdf',
-            size: '2.3 MB',
-            uploadedAt: '2026-11-14 16:30',
-            version: 2,
-          },
-          {
-            id: 'f2',
-            name: 'Lista_Materiais.xlsx',
-            size: '0.8 MB',
-            uploadedAt: '2026-11-14 16:25',
-            version: 1,
-          },
-        ],
-        clientFeedback: 'Excelente trabalho! Projeto muito bem detalhado.',
-      },
-      {
-        id: 'm2',
-        title: 'Instalação dos Pontos de Luz',
-        description: 'Instalação de todos os pontos de luz conforme projeto',
-        deadline: '2026-11-20',
-        status: 'submitted',
-        completedAt: '2026-11-18 10:00',
-        criteria: [
-          'Instalação de 15 pontos de luz',
-          'Fotos do trabalho concluído',
-          'Testes de funcionamento',
-        ],
-        files: [
-          {
-            id: 'f3',
-            name: 'Fotos_Instalacao.zip',
-            size: '4.5 MB',
-            uploadedAt: '2026-11-18 10:00',
-            version: 1,
-          },
-        ],
-      },
-      {
-        id: 'm3',
-        title: 'Instalação de Tomadas',
-        description: 'Instalação de todas as tomadas conforme projeto',
-        deadline: '2026-11-25',
-        status: 'in-progress',
-        criteria: [
-          'Instalação de 25 tomadas',
-          'Testes de aterramento',
-          'Documentação fotográfica',
-        ],
-        files: [],
-      },
-      {
-        id: 'm4',
-        title: 'Quadro de Distribuição',
-        description: 'Montagem e instalação do quadro de distribuição',
-        deadline: '2026-11-30',
-        status: 'pending',
-        criteria: [
-          'Instalação do quadro',
-          'Organização dos disjuntores',
-          'Etiquetagem dos circuitos',
-          'Testes finais',
-        ],
-        files: [],
-      },
-    ],
-  },
-]);
-
-const currentContract = computed(() =>
-  contracts.value.find((c) => c.id === (selectedContract.value || '1'))
+// Active projects = proposals with status 'accepted'
+const activeProjects = computed(() =>
+  proposalStore.proposals.filter((p) => p.status === 'accepted')
 );
 
-const handleCreateMilestone = () => {
-  if (!milestoneForm.value.title || !milestoneForm.value.description || !milestoneForm.value.deadline) {
-    toast.error('Preencha todos os campos obrigatórios');
-    return;
-  }
+const selectedProject = computed(() =>
+  activeProjects.value.find((p) => p.id === selectedProjectId.value) || null
+);
 
-  toast.success('Marco criado com sucesso!');
-  showMilestoneDialog.value = false;
-  milestoneForm.value = { title: '', description: '', deadline: '', criteria: [''] };
+// Watch for project selection to load history
+watch(selectedProjectId, async (newId) => {
+  if (newId) {
+    await proposalStore.loadHistory(newId);
+  }
+});
+
+// Progress calculation based on milestones or a default
+const projectProgress = computed(() => {
+  const project = selectedProject.value;
+  if (!project) return 0;
+  const milestones = project.freelancerResponse?.milestones;
+  if (milestones && milestones.length > 0) {
+    const completed = milestones.filter((m) => m.status === 'completed').length;
+    return Math.round((completed / milestones.length) * 100);
+  }
+  return 50; // Default if no milestones
+});
+
+const paymentProgress = computed(() => {
+  const project = selectedProject.value;
+  if (!project) return 0;
+  const milestones = project.freelancerResponse?.milestones;
+  if (milestones && milestones.length > 0) {
+    const completedValue = milestones
+      .filter((m) => m.status === 'completed')
+      .reduce((sum, m) => sum + m.value, 0);
+    const totalValue = milestones.reduce((sum, m) => sum + m.value, 0);
+    return totalValue > 0 ? Math.round((completedValue / totalValue) * 100) : 0;
+  }
+  return 0;
+});
+
+const paidAmount = computed(() => {
+  const project = selectedProject.value;
+  if (!project) return 0;
+  const milestones = project.freelancerResponse?.milestones;
+  if (milestones && milestones.length > 0) {
+    return milestones
+      .filter((m) => m.status === 'completed')
+      .reduce((sum, m) => sum + m.value, 0);
+  }
+  return 0;
+});
+
+const totalAmount = computed(() => {
+  const project = selectedProject.value;
+  if (!project) return 0;
+  return project.freelancerResponse?.value || project.budget;
+});
+
+// Select project
+const selectProject = async (id: string) => {
+  selectedProjectId.value = id;
 };
 
-const handleUpdateMilestone = () => {
-  if (!milestoneForm.value.title || !milestoneForm.value.description || !milestoneForm.value.deadline) {
-    toast.error('Preencha todos os campos obrigatórios');
-    return;
-  }
+// Format currency
+const formatCurrency = (value: number) =>
+  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 
-  toast.success('Marco atualizado com sucesso!');
-  showMilestoneDialog.value = false;
-  editingMilestone.value = null;
-  milestoneForm.value = { title: '', description: '', deadline: '', criteria: [''] };
+// Client initials
+const getInitials = (name: string) =>
+  name
+    .split(' ')
+    .map((n) => n[0])
+    .join('')
+    .substring(0, 2)
+    .toUpperCase();
+
+// Open chat
+const openChat = () => {
+  props.onNavigate('chat');
 };
 
-const handleUploadFiles = () => {
-  if (uploadForm.value.files.length === 0) {
+// Handle complete delivery
+const handleCompleteDelivery = async () => {
+  if (!selectedProject.value) return;
+  isCompleting.value = true;
+  try {
+    const success = await proposalStore.completeProposal(selectedProject.value.id);
+    if (success) {
+      toast.success('Entrega concluída com sucesso! O cliente será notificado.');
+      showCompleteDialog.value = false;
+      // Reload to update the list
+      await proposalStore.loadProposals();
+      // Select next project if available
+      if (activeProjects.value.length > 0) {
+        selectedProjectId.value = activeProjects.value[0].id;
+      } else {
+        selectedProjectId.value = null;
+      }
+    } else {
+      toast.error('Erro ao concluir a entrega. Tente novamente.');
+    }
+  } catch {
+    toast.error('Erro ao concluir a entrega. Tente novamente.');
+  } finally {
+    isCompleting.value = false;
+  }
+};
+
+// Handle milestone status update
+const handleMilestoneComplete = async (milestone: Milestone) => {
+  if (!selectedProject.value) return;
+  const newStatus = milestone.status === 'completed' ? 'pending' : 'completed';
+  const success = await proposalStore.updateMilestoneStatus(
+    selectedProject.value.id,
+    milestone.id,
+    newStatus
+  );
+  if (success) {
+    const label = newStatus === 'completed' ? 'concluído' : 'reaberto';
+    toast.success(`Marco "${milestone.title}" ${label}!`);
+  } else {
+    toast.error('Erro ao atualizar marco.');
+  }
+};
+
+// File upload
+const handleFileSelect = (e: Event) => {
+  const target = e.target as HTMLInputElement;
+  if (target.files) {
+    uploadFiles.value = [...uploadFiles.value, ...Array.from(target.files)];
+  }
+};
+
+const removeUploadFile = (index: number) => {
+  uploadFiles.value = uploadFiles.value.filter((_, i) => i !== index);
+};
+
+const openUploadDialog = () => {
+  uploadFiles.value = [];
+  uploadDescription.value = '';
+  uploadProgress.value = 0;
+  isUploading.value = false;
+  showUploadDialog.value = true;
+};
+
+const handleUploadFiles = async () => {
+  if (uploadFiles.value.length === 0) {
     toast.error('Selecione pelo menos um arquivo');
     return;
   }
 
-  // Check file sizes
-  const oversizedFiles = uploadForm.value.files.filter((f) => f.size > 5 * 1024 * 1024);
-  if (oversizedFiles.length > 0) {
-    toast.error('Alguns arquivos excedem o limite de 5 MB');
+  const oversized = uploadFiles.value.filter((f) => f.size > 10 * 1024 * 1024);
+  if (oversized.length > 0) {
+    toast.error('Alguns arquivos excedem o limite de 10 MB');
     return;
   }
 
   isUploading.value = true;
   uploadProgress.value = 0;
 
-  // Simulate upload progress
-  const interval = setInterval(() => {
-    uploadProgress.value += 10;
-    if (uploadProgress.value >= 100) {
-      clearInterval(interval);
-      isUploading.value = false;
-      toast.success('Arquivos enviados com sucesso!');
-      showUploadDialog.value = false;
-      uploadForm.value = { description: '', files: [] };
+  try {
+    const formData = new FormData();
+    uploadFiles.value.forEach((file) => formData.append('files', file));
+
+    // Simulate progress
+    const progressInterval = setInterval(() => {
+      if (uploadProgress.value < 90) uploadProgress.value += 10;
+    }, 300);
+
+    await api.post('/upload/images', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+
+    clearInterval(progressInterval);
+    uploadProgress.value = 100;
+
+    toast.success('Arquivos enviados com sucesso!');
+    showUploadDialog.value = false;
+
+    // Reload proposals to get updated attachments
+    await proposalStore.loadProposals();
+  } catch {
+    toast.error('Erro ao enviar arquivos. Tente novamente.');
+  } finally {
+    isUploading.value = false;
+  }
+};
+
+// View attachment
+const handleViewAttachment = (url: string) => {
+  window.open(url, '_blank');
+};
+
+// Download attachment
+const handleDownloadAttachment = (url: string, fileName: string) => {
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = fileName;
+  link.target = '_blank';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+
+// Format date
+const formatDate = (dateString: string) => {
+  try {
+    return new Date(dateString).toLocaleDateString('pt-BR');
+  } catch {
+    return dateString;
+  }
+};
+
+// Get status badge config for project cards
+const getProjectStatusConfig = (project: Proposal) => {
+  // Check milestones for more nuanced status
+  const milestones = project.freelancerResponse?.milestones;
+  if (milestones && milestones.length > 0) {
+    const allCompleted = milestones.every((m) => m.status === 'completed');
+    if (allCompleted) {
+      return { label: 'Revisão Solicitada', class: 'bg-orange-100 text-orange-700 hover:bg-orange-100', icon: AlertCircle };
     }
-  }, 200);
-};
-
-const handleRequestApproval = (milestone: Milestone) => {
-  if (milestone.files.length === 0) {
-    toast.error('Envie pelo menos um arquivo antes de solicitar aprovação');
-    return;
+    const hasInProgress = milestones.some((m) => m.status === 'in_progress');
+    if (hasInProgress) {
+      return { label: 'Em Andamento', class: 'bg-blue-100 text-blue-700 hover:bg-blue-100', icon: Clock };
+    }
   }
-  toast.success('Solicitação de aprovação enviada ao cliente!');
+  return { label: 'Em Andamento', class: 'bg-blue-100 text-blue-700 hover:bg-blue-100', icon: Clock };
 };
 
-const handleDeleteMilestone = () => {
-  if (milestoneToDelete.value) {
-    toast.success('Marco excluído com sucesso');
-    milestoneToDelete.value = null;
-    showDeleteDialog.value = false;
-  }
-};
-
-const handleEditMilestone = (milestone: Milestone) => {
-  editingMilestone.value = milestone;
-  milestoneForm.value = {
-    title: milestone.title,
-    description: milestone.description,
-    deadline: milestone.deadline,
-    criteria: milestone.criteria,
-  };
-  showMilestoneDialog.value = true;
-};
-
-const addCriteria = () => {
-  milestoneForm.value = {
-    ...milestoneForm.value,
-    criteria: [...milestoneForm.value.criteria, ''],
-  };
-};
-
-const removeCriteria = (index: number) => {
-  milestoneForm.value = {
-    ...milestoneForm.value,
-    criteria: milestoneForm.value.criteria.filter((_, i) => i !== index),
-  };
-};
-
-const updateCriteria = (index: number, value: string) => {
-  const newCriteria = [...milestoneForm.value.criteria];
-  newCriteria[index] = value;
-  milestoneForm.value = { ...milestoneForm.value, criteria: newCriteria };
-};
-
-// Status badge removed - using templates directly
-
-const calculateProgress = computed(() => {
-  if (!currentContract.value) return 0;
-  const total = currentContract.value.milestones.length;
-  const completed = currentContract.value.milestones.filter((m) => m.status === 'approved').length;
-  return (completed / total) * 100;
-});
-
-const handleFileSelect = (e: Event) => {
-  const target = e.target as HTMLInputElement;
-  if (target.files) {
-    uploadForm.value = { ...uploadForm.value, files: Array.from(target.files) };
+// Get milestone status badge
+const getMilestoneStatusConfig = (status: Milestone['status']) => {
+  switch (status) {
+    case 'completed':
+      return { label: 'Concluído', class: 'bg-green-100 text-green-700 hover:bg-green-100' };
+    case 'in_progress':
+      return { label: 'Em Andamento', class: 'bg-blue-100 text-blue-700 hover:bg-blue-100' };
+    default:
+      return { label: 'Pendente', class: 'bg-gray-100 text-gray-600 hover:bg-gray-100' };
   }
 };
 </script>
@@ -310,341 +322,382 @@ const handleFileSelect = (e: Event) => {
     <!-- Header -->
     <div class="flex items-start justify-between">
       <div>
-        <h1 class="text-[#263238] mb-2">Entregas & Marcos</h1>
-        <p class="text-[#435574]">Gerencie os marcos de entrega dos seus contratos</p>
+        <h1 class="text-2xl font-bold text-[#263238] mb-2">Projetos em Andamento</h1>
+        <p class="text-[#435574]">Acompanhe e gerencie seus projetos ativos</p>
       </div>
-      <Button
-        @click="
-          editingMilestone = null;
-          milestoneForm = { title: '', description: '', deadline: '', criteria: [''] };
-          showMilestoneDialog = true;
-        "
-        class="bg-[#286AD8] hover:bg-[#435574]"
+      <Badge
+        v-if="activeProjects.length > 0"
+        class="bg-blue-100 text-blue-700 hover:bg-blue-100 text-sm px-3 py-1"
       >
-        <Plus class="h-4 w-4 mr-2" />
-        Novo Marco
-      </Button>
+        {{ activeProjects.length }} Projeto{{ activeProjects.length !== 1 ? 's' : '' }} Ativo{{ activeProjects.length !== 1 ? 's' : '' }}
+      </Badge>
     </div>
 
-    <!-- Contract Summary -->
-    <Card v-if="currentContract" class="p-6">
-      <div class="flex items-start justify-between mb-4">
-        <div>
-          <h3 class="text-[#263238] mb-1">{{ currentContract.service }}</h3>
-          <p class="text-sm text-[#435574]">Cliente: {{ currentContract.clientName }}</p>
-        </div>
-        <div class="text-right">
-          <p class="text-sm text-[#435574]">Valor Total</p>
-          <p class="text-xl text-[#263238]">
-            {{ new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(currentContract.totalAmount) }}
-          </p>
-        </div>
-      </div>
+    <!-- Loading State -->
+    <div v-if="proposalStore.isLoading" class="flex items-center justify-center py-16">
+      <Loader2 class="h-8 w-8 text-[#286AD8] animate-spin mr-3" />
+      <span class="text-[#435574]">Carregando projetos...</span>
+    </div>
 
-      <div class="space-y-2">
-        <div class="flex items-center justify-between text-sm">
-          <span class="text-[#435574]">Progresso do Projeto</span>
-          <span class="text-[#263238]">{{ Math.round(calculateProgress) }}%</span>
-        </div>
-        <Progress :value="calculateProgress" class="h-2" />
-        <p class="text-xs text-[#435574]">
-          {{ currentContract.milestones.filter((m) => m.status === 'approved').length }} de
-          {{ currentContract.milestones.length }} marcos concluídos
-        </p>
+    <!-- Empty State -->
+    <Card v-else-if="activeProjects.length === 0" class="p-12 text-center">
+      <div class="inline-flex p-6 bg-gray-100 rounded-full mb-6">
+        <Package class="h-16 w-16 text-gray-400" />
       </div>
+      <h2 class="text-xl font-semibold text-[#263238] mb-2">Nenhum projeto em andamento</h2>
+      <p class="text-[#435574] mb-6">Quando um cliente aceitar sua proposta, o projeto aparecerá aqui.</p>
+      <Button @click="props.onNavigate('freelancer-proposals')" class="bg-[#286AD8] hover:bg-[#435574]">
+        <FileText class="h-4 w-4 mr-2" />
+        Ver Solicitações
+      </Button>
     </Card>
 
-    <!-- Milestones List -->
-    <div class="space-y-4">
-      <Card
-        v-for="(milestone, index) in currentContract?.milestones"
-        :key="milestone.id"
-        class="p-6"
-      >
-        <div class="flex items-start gap-4">
-          <!-- Timeline -->
-          <div class="flex flex-col items-center">
-            <div
-              :class="`w-10 h-10 rounded-full flex items-center justify-center ${
-                milestone.status === 'approved'
-                  ? 'bg-green-100'
-                  : milestone.status === 'submitted'
-                  ? 'bg-yellow-100'
-                  : milestone.status === 'in-progress'
-                  ? 'bg-blue-100'
-                  : 'bg-gray-100'
-              }`"
-            >
-              <Check v-if="milestone.status === 'approved'" class="h-5 w-5 text-green-600" />
-              <span v-else class="text-sm text-[#263238]">{{ index + 1 }}</span>
+    <template v-else>
+      <!-- Project Selection Cards -->
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <Card
+          v-for="project in activeProjects"
+          :key="project.id"
+          :class="[
+            'p-5 cursor-pointer transition-all duration-200',
+            selectedProjectId === project.id
+              ? 'ring-2 ring-[#286AD8] border-[#286AD8] shadow-md'
+              : 'hover:shadow-md hover:border-gray-300',
+          ]"
+          @click="selectProject(project.id)"
+        >
+          <div class="flex items-start justify-between mb-3">
+            <h3 class="font-semibold text-[#263238] text-sm leading-tight flex-1 mr-2">
+              {{ project.service }}
+            </h3>
+            <Badge :class="getProjectStatusConfig(project).class" class="text-xs whitespace-nowrap flex-shrink-0">
+              <component :is="getProjectStatusConfig(project).icon" class="h-3 w-3 mr-1" />
+              {{ getProjectStatusConfig(project).label }}
+            </Badge>
+          </div>
+
+          <div class="flex items-center gap-2 mb-3">
+            <Avatar class="h-6 w-6">
+              <AvatarImage v-if="project.clientAvatar" :src="project.clientAvatar" />
+              <AvatarFallback class="text-xs bg-gray-200 text-gray-600">
+                {{ getInitials(project.clientName) }}
+              </AvatarFallback>
+            </Avatar>
+            <span class="text-sm text-[#435574]">{{ project.clientName }}</span>
+          </div>
+
+          <div class="space-y-1 mb-3">
+            <div class="flex items-center justify-between text-xs">
+              <span class="text-[#435574]">Progresso</span>
+              <span class="text-[#263238] font-medium">
+                {{ project.freelancerResponse?.milestones?.length
+                  ? Math.round(
+                      (project.freelancerResponse.milestones.filter((m) => m.status === 'completed').length /
+                        project.freelancerResponse.milestones.length) *
+                        100
+                    )
+                  : 50
+                }}%
+              </span>
             </div>
-            <div
-              v-if="index < (currentContract?.milestones.length || 0) - 1"
-              class="w-0.5 h-full bg-gray-200 my-2 flex-1"
+            <Progress
+              :value="
+                project.freelancerResponse?.milestones?.length
+                  ? (project.freelancerResponse.milestones.filter((m) => m.status === 'completed').length /
+                      project.freelancerResponse.milestones.length) *
+                    100
+                  : 50
+              "
+              class="h-1.5"
             />
           </div>
 
-          <!-- Content -->
-          <div class="flex-1">
-            <div class="flex items-start justify-between mb-3">
-              <div class="flex-1">
-                <div class="flex items-center gap-2 mb-1">
-                  <h3 class="text-[#263238]">{{ milestone.title }}</h3>
-                  <template v-if="milestone.status === 'pending'">
-                    <Badge variant="secondary">
-                      <Clock class="h-3 w-3 mr-1" />
-                      Pendente
-                    </Badge>
-                  </template>
-                  <template v-else-if="milestone.status === 'in-progress'">
-                    <Badge class="bg-blue-100 text-blue-700 hover:bg-blue-100">
-                      <Clock class="h-3 w-3 mr-1" />
-                      Em Andamento
-                    </Badge>
-                  </template>
-                  <template v-else-if="milestone.status === 'submitted'">
-                    <Badge class="bg-yellow-100 text-yellow-700 hover:bg-yellow-100">
-                      <AlertCircle class="h-3 w-3 mr-1" />
-                      Aguardando Aprovação
-                    </Badge>
-                  </template>
-                  <template v-else-if="milestone.status === 'approved'">
-                    <Badge class="bg-green-100 text-green-700 hover:bg-green-100">
-                      <CheckCircle class="h-3 w-3 mr-1" />
-                      Aprovado
-                    </Badge>
-                  </template>
-                  <template v-else-if="milestone.status === 'rejected'">
-                    <Badge class="bg-red-100 text-red-700 hover:bg-red-100">
-                      <AlertCircle class="h-3 w-3 mr-1" />
-                      Rejeitado
-                    </Badge>
-                  </template>
-                </div>
-                <p class="text-sm text-[#435574] mb-2">{{ milestone.description }}</p>
-                <div class="flex items-center gap-4 text-sm text-[#435574]">
-                  <span class="flex items-center gap-1">
-                    <Calendar class="h-4 w-4" />
-                    Prazo: {{ new Date(milestone.deadline).toLocaleDateString('pt-BR') }}
-                  </span>
-                  <span
-                    v-if="milestone.completedAt"
-                    class="flex items-center gap-1 text-green-600"
-                  >
-                    <CheckCircle class="h-4 w-4" />
-                    Concluído em {{ milestone.completedAt }}
-                  </span>
-                </div>
-              </div>
+          <div class="flex items-center justify-between text-xs text-[#435574]">
+            <span class="flex items-center gap-1">
+              <Calendar class="h-3 w-3" />
+              Prazo: {{ project.deadline }}
+            </span>
+            <span class="font-medium text-[#263238]">
+              {{ formatCurrency(project.freelancerResponse?.value || project.budget) }}
+            </span>
+          </div>
+        </Card>
+      </div>
 
-              <!-- Actions -->
-              <div v-if="milestone.status !== 'approved'" class="flex gap-2">
-                <Button
-                  @click="handleEditMilestone(milestone)"
-                  variant="ghost"
-                  size="icon"
-                >
-                  <Edit class="h-4 w-4" />
-                </Button>
-                <Button
-                  @click="
-                    milestoneToDelete = milestone;
-                    showDeleteDialog = true;
-                  "
-                  variant="ghost"
-                  size="icon"
-                  class="text-red-600 hover:text-red-700 hover:bg-red-50"
-                >
-                  <Trash2 class="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-
-            <!-- Criteria -->
-            <div v-if="milestone.criteria.length > 0" class="mb-3 p-3 bg-gray-50 rounded-lg">
-              <p class="text-sm text-[#263238] mb-2">Critérios de Conclusão:</p>
-              <ul class="space-y-1">
-                <li
-                  v-for="(criteria, idx) in milestone.criteria"
-                  :key="idx"
-                  class="text-sm text-[#435574] flex items-start gap-2"
-                >
-                  <CheckCircle class="h-4 w-4 text-green-600 flex-shrink-0 mt-0.5" />
-                  {{ criteria }}
-                </li>
-              </ul>
-            </div>
-
-            <!-- Files -->
-            <div v-if="milestone.files.length > 0" class="mb-3">
-              <p class="text-sm text-[#263238] mb-2">Arquivos Enviados:</p>
-              <div class="space-y-2">
-                <div
-                  v-for="file in milestone.files"
-                  :key="file.id"
-                  class="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-                >
-                  <div class="flex items-center gap-3">
-                    <FileText class="h-5 w-5 text-[#286AD8]" />
-                    <div>
-                      <p class="text-sm text-[#263238]">{{ file.name }}</p>
-                      <p class="text-xs text-[#435574]">
-                        {{ file.size }} • v{{ file.version }} • {{ file.uploadedAt }}
-                      </p>
-                    </div>
+      <!-- Selected Project Details -->
+      <template v-if="selectedProject">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <!-- Main Column -->
+          <div class="lg:col-span-2 space-y-6">
+            <!-- Project Details Card -->
+            <Card class="p-6">
+              <div class="flex items-start justify-between mb-4">
+                <div>
+                  <div class="flex items-center gap-3 mb-2">
+                    <h2 class="text-lg font-semibold text-[#263238]">{{ selectedProject.service }}</h2>
+                    <Badge :class="getProjectStatusConfig(selectedProject).class">
+                      <component :is="getProjectStatusConfig(selectedProject).icon" class="h-3 w-3 mr-1" />
+                      {{ getProjectStatusConfig(selectedProject).label }}
+                    </Badge>
                   </div>
-                  <Button variant="ghost" size="icon">
-                    <Download class="h-4 w-4" />
-                  </Button>
+                  <p class="text-sm text-[#435574] leading-relaxed">{{ selectedProject.description }}</p>
                 </div>
               </div>
-            </div>
 
-            <!-- Client Feedback -->
-            <div
-              v-if="milestone.clientFeedback"
-              class="p-3 bg-green-50 border border-green-200 rounded-lg mb-3"
-            >
-              <p class="text-sm text-[#263238] mb-1">Feedback do Cliente:</p>
-              <p class="text-sm text-green-800">{{ milestone.clientFeedback }}</p>
-            </div>
+              <!-- Progress Bars -->
+              <div class="space-y-4 mb-6">
+                <div class="space-y-1.5">
+                  <div class="flex items-center justify-between text-sm">
+                    <span class="text-[#435574]">Progresso do Projeto</span>
+                    <span class="text-[#263238] font-medium">{{ projectProgress }}%</span>
+                  </div>
+                  <Progress :value="projectProgress" class="h-2" />
+                </div>
 
-            <!-- Action Buttons -->
-            <div v-if="milestone.status !== 'approved'" class="flex gap-2">
-              <template v-if="milestone.status === 'pending' || milestone.status === 'in-progress'">
-                <Button
-                  @click="
-                    selectedMilestone = milestone;
-                    showUploadDialog = true;
-                  "
-                  size="sm"
-                  variant="outline"
-                  class="border-[#286AD8] text-[#286AD8] hover:bg-blue-50"
-                >
+                <div class="space-y-1.5">
+                  <div class="flex items-center justify-between text-sm">
+                    <span class="text-[#435574]">Pagamento</span>
+                    <span class="text-[#263238] font-medium">
+                      {{ formatCurrency(paidAmount) }} / {{ formatCurrency(totalAmount) }}
+                    </span>
+                  </div>
+                  <Progress :value="paymentProgress" class="h-2" />
+                </div>
+              </div>
+
+              <!-- Dates -->
+              <div class="flex gap-8 mb-6">
+                <div>
+                  <p class="text-xs text-[#435574] mb-0.5">Data de Início</p>
+                  <p class="text-sm font-medium text-[#263238]">{{ formatDate(selectedProject.receivedAt) }}</p>
+                </div>
+                <div>
+                  <p class="text-xs text-[#435574] mb-0.5">Prazo de Entrega</p>
+                  <p class="text-sm font-medium text-[#263238]">{{ selectedProject.deadline }}</p>
+                </div>
+              </div>
+
+              <!-- Action Buttons -->
+              <div class="flex flex-wrap gap-3">
+                <Button @click="openUploadDialog" variant="outline" class="border-[#286AD8] text-[#286AD8] hover:bg-blue-50">
                   <Upload class="h-4 w-4 mr-2" />
                   Enviar Arquivos
                 </Button>
+                <Button variant="outline" @click="openChat">
+                  <MessageSquare class="h-4 w-4 mr-2" />
+                  Mensagem
+                </Button>
                 <Button
-                  v-if="milestone.files.length > 0"
-                  @click="handleRequestApproval(milestone)"
-                  size="sm"
+                  @click="showCompleteDialog = true"
                   class="bg-[#286AD8] hover:bg-[#435574]"
                 >
                   <Check class="h-4 w-4 mr-2" />
-                  Solicitar Aprovação
-                </Button>
-              </template>
-              <p v-else-if="milestone.status === 'submitted'" class="text-sm text-yellow-600">
-                Aguardando aprovação do cliente...
-              </p>
-            </div>
-          </div>
-        </div>
-      </Card>
-    </div>
-
-    <!-- Create/Edit Milestone Dialog -->
-    <Dialog :open="showMilestoneDialog" @update:open="(val) => showMilestoneDialog = val">
-      <DialogContent class="sm:max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>
-            {{ editingMilestone ? 'Editar Marco' : 'Criar Novo Marco' }}
-          </DialogTitle>
-          <DialogDescription>
-            Defina os detalhes do marco de entrega
-          </DialogDescription>
-        </DialogHeader>
-
-        <div class="space-y-4">
-          <div class="space-y-2">
-            <Label for="title">Título do Marco *</Label>
-            <Input
-              id="title"
-              :model-value="milestoneForm.title"
-              @update:model-value="(val) => milestoneForm.title = val as string"
-              placeholder="Ex: Planejamento e Projeto"
-            />
-          </div>
-
-          <div class="space-y-2">
-            <Label for="description">Descrição *</Label>
-            <Textarea
-              id="description"
-              :model-value="milestoneForm.description"
-              @update:model-value="(val) => milestoneForm.description = val as string"
-              placeholder="Descreva o que será entregue neste marco..."
-              :rows="3"
-            />
-          </div>
-
-          <div class="space-y-2">
-            <Label for="deadline">Prazo de Entrega *</Label>
-            <Input
-              id="deadline"
-              type="date"
-              :model-value="milestoneForm.deadline"
-              @update:model-value="(val) => milestoneForm.deadline = val as string"
-            />
-          </div>
-
-          <div class="space-y-2">
-            <Label>Critérios de Conclusão</Label>
-            <div class="space-y-2">
-              <div v-for="(criteria, index) in milestoneForm.criteria" :key="index" class="flex gap-2">
-                <Input
-                  :model-value="criteria"
-                  @update:model-value="(val) => updateCriteria(index, val as string)"
-                  placeholder="Ex: Instalação completa dos pontos de luz"
-                />
-                <Button
-                  v-if="milestoneForm.criteria.length > 1"
-                  @click="removeCriteria(index)"
-                  variant="ghost"
-                  size="icon"
-                  class="text-red-600"
-                >
-                  <Trash2 class="h-4 w-4" />
+                  Concluir
                 </Button>
               </div>
-            </div>
-            <Button @click="addCriteria" variant="outline" size="sm" class="mt-2">
-              <Plus class="h-4 w-4 mr-2" />
-              Adicionar Critério
-            </Button>
+            </Card>
+
+            <!-- Milestones Section -->
+            <Card
+              v-if="selectedProject.freelancerResponse?.milestones && selectedProject.freelancerResponse.milestones.length > 0"
+              class="p-6"
+            >
+              <h3 class="text-lg font-semibold text-[#263238] mb-4">Marcos de Entrega</h3>
+              <div class="space-y-3">
+                <div
+                  v-for="milestone in selectedProject.freelancerResponse.milestones"
+                  :key="milestone.id"
+                  :class="[
+                    'p-4 rounded-lg border transition-colors',
+                    milestone.status === 'completed'
+                      ? 'bg-green-50 border-green-200'
+                      : milestone.status === 'in_progress'
+                      ? 'bg-blue-50 border-blue-200'
+                      : 'bg-gray-50 border-gray-200',
+                  ]"
+                >
+                  <div class="flex items-start justify-between">
+                    <div class="flex-1">
+                      <div class="flex items-center gap-2 mb-1">
+                        <h4 class="font-medium text-[#263238]">{{ milestone.title }}</h4>
+                        <Badge :class="getMilestoneStatusConfig(milestone.status).class" class="text-xs">
+                          {{ getMilestoneStatusConfig(milestone.status).label }}
+                        </Badge>
+                      </div>
+                      <p class="text-sm text-[#435574] mb-2">{{ milestone.description }}</p>
+                      <div class="flex items-center gap-4 text-xs text-[#435574]">
+                        <span class="flex items-center gap-1">
+                          <Calendar class="h-3 w-3" />
+                          Prazo: {{ milestone.deadline }}
+                        </span>
+                        <span class="flex items-center gap-1">
+                          <DollarSign class="h-3 w-3" />
+                          {{ formatCurrency(milestone.value) }}
+                        </span>
+                      </div>
+                    </div>
+                    <Button
+                      v-if="milestone.status !== 'completed'"
+                      @click.stop="handleMilestoneComplete(milestone)"
+                      size="sm"
+                      class="bg-[#286AD8] hover:bg-[#435574] ml-3"
+                    >
+                      <Check class="h-3 w-3 mr-1" />
+                      Concluir Marco
+                    </Button>
+                    <Button
+                      v-else
+                      @click.stop="handleMilestoneComplete(milestone)"
+                      size="sm"
+                      variant="outline"
+                      class="text-green-700 border-green-300 hover:bg-green-50 ml-3"
+                    >
+                      <CheckCircle class="h-3 w-3 mr-1" />
+                      Concluído
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </Card>
+
+            <!-- Project Files -->
+            <Card class="p-6">
+              <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-[#263238]">Arquivos do Projeto</h3>
+                <Badge v-if="selectedProject.attachments && selectedProject.attachments.length > 0" variant="secondary">
+                  {{ selectedProject.attachments.length }} arquivo{{ selectedProject.attachments.length !== 1 ? 's' : '' }}
+                </Badge>
+              </div>
+
+              <div v-if="!selectedProject.attachments || selectedProject.attachments.length === 0" class="text-center py-8">
+                <FileText class="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                <p class="text-[#435574]">Nenhum arquivo anexado a este projeto</p>
+              </div>
+
+              <div v-else class="space-y-2">
+                <div
+                  v-for="attachment in selectedProject.attachments"
+                  :key="attachment.id"
+                  class="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                >
+                  <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
+                      <FileText class="h-5 w-5 text-[#286AD8]" />
+                    </div>
+                    <div>
+                      <p class="text-sm font-medium text-[#263238]">{{ attachment.name }}</p>
+                      <p v-if="attachment.size" class="text-xs text-[#435574]">{{ attachment.size }}</p>
+                    </div>
+                  </div>
+                  <div class="flex gap-1">
+                    <Button
+                      @click="handleViewAttachment(attachment.url)"
+                      variant="ghost"
+                      size="icon"
+                      class="text-[#435574] hover:text-[#286AD8]"
+                    >
+                      <Eye class="h-4 w-4" />
+                    </Button>
+                    <Button
+                      @click="handleDownloadAttachment(attachment.url, attachment.name)"
+                      variant="ghost"
+                      size="icon"
+                      class="text-[#435574] hover:text-[#286AD8]"
+                    >
+                      <Download class="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </Card>
+          </div>
+
+          <!-- Sidebar Column -->
+          <div class="space-y-6">
+            <!-- Client Info Card -->
+            <Card class="p-6">
+              <h3 class="text-lg font-semibold text-[#263238] mb-4">Informações do Cliente</h3>
+              <div class="flex items-center gap-3 mb-4">
+                <Avatar class="h-12 w-12">
+                  <AvatarImage v-if="selectedProject.clientAvatar" :src="selectedProject.clientAvatar" />
+                  <AvatarFallback class="bg-amber-100 text-amber-700 font-semibold">
+                    {{ getInitials(selectedProject.clientName) }}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <p class="font-semibold text-[#263238]">{{ selectedProject.clientName }}</p>
+                  <p class="text-sm text-[#435574]">Cliente</p>
+                </div>
+              </div>
+              <Button
+                @click="openChat"
+                variant="outline"
+                class="w-full"
+              >
+                <MessageSquare class="h-4 w-4 mr-2" />
+                Abrir Chat
+              </Button>
+            </Card>
+
+            <!-- Activity History Card -->
+            <ServiceRequestTimeline
+              :entries="selectedProject.auditLog || []"
+              title="Histórico de Atividades"
+            />
           </div>
         </div>
+      </template>
+    </template>
 
-        <DialogFooter>
-          <Button @click="showMilestoneDialog = false" variant="outline">
-            Cancelar
-          </Button>
-          <Button
-            @click="editingMilestone ? handleUpdateMilestone() : handleCreateMilestone()"
+    <!-- Complete Delivery Confirmation Dialog -->
+    <AlertDialog :open="showCompleteDialog" @update:open="(val) => (showCompleteDialog = val)">
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Concluir Entrega do Projeto</AlertDialogTitle>
+          <AlertDialogDescription>
+            <template v-if="selectedProject">
+              Você está prestes a marcar o projeto
+              <strong>"{{ selectedProject.service }}"</strong> como concluído.
+              <br /><br />
+              O cliente será notificado e poderá revisar a entrega. Certifique-se de que todos os
+              arquivos e marcos estão finalizados antes de confirmar.
+              <br /><br />
+              <span class="text-amber-600 font-medium">Esta ação não pode ser desfeita.</span>
+            </template>
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel @click="showCompleteDialog = false" :disabled="isCompleting">Cancelar</AlertDialogCancel>
+          <AlertDialogAction
+            @click="handleCompleteDelivery"
+            :disabled="isCompleting"
             class="bg-[#286AD8] hover:bg-[#435574]"
           >
-            {{ editingMilestone ? 'Atualizar' : 'Criar' }} Marco
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+            <Loader2 v-if="isCompleting" class="h-4 w-4 mr-2 animate-spin" />
+            <Check v-else class="h-4 w-4 mr-2" />
+            {{ isCompleting ? 'Concluindo...' : 'Confirmar Conclusão' }}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
 
     <!-- Upload Files Dialog -->
-    <Dialog :open="showUploadDialog" @update:open="(val) => showUploadDialog = val">
+    <Dialog :open="showUploadDialog" @update:open="(val) => (showUploadDialog = val)">
       <DialogContent class="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Enviar Arquivos</DialogTitle>
           <DialogDescription>
-            Faça upload dos arquivos relacionados ao marco "{{ selectedMilestone?.title }}"
+            Faça upload de arquivos relacionados ao projeto
+            <template v-if="selectedProject">"{{ selectedProject.service }}"</template>
           </DialogDescription>
         </DialogHeader>
 
         <div class="space-y-4">
           <div class="space-y-2">
-            <Label for="file-description">Descrição (opcional)</Label>
+            <Label for="upload-description">Descrição (opcional)</Label>
             <Textarea
-              id="file-description"
-              :model-value="uploadForm.description"
-              @update:model-value="(val) => uploadForm.description = val as string"
+              id="upload-description"
+              v-model="uploadDescription"
               placeholder="Adicione uma descrição sobre os arquivos..."
               :rows="2"
             />
@@ -652,39 +705,55 @@ const handleFileSelect = (e: Event) => {
 
           <div class="space-y-2">
             <Label>Arquivos *</Label>
-            <div class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-[#286AD8] transition-colors cursor-pointer">
+            <div
+              class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-[#286AD8] transition-colors cursor-pointer"
+              @click="($refs.fileInput as HTMLInputElement)?.click()"
+            >
               <Upload class="h-12 w-12 text-gray-400 mx-auto mb-4" />
               <p class="text-[#263238] mb-2">
                 Clique para fazer upload ou arraste os arquivos
               </p>
               <p class="text-sm text-[#435574] mb-4">
-                PDF, JPG, PNG, ZIP • Máximo 5 MB por arquivo
+                PDF, JPG, PNG, ZIP • Máximo 10 MB por arquivo
               </p>
               <input
+                ref="fileInput"
                 type="file"
                 multiple
                 @change="handleFileSelect"
                 class="hidden"
-                id="file-upload"
               />
-              <Button @click="document.getElementById('file-upload')?.click()" size="sm">
+              <Button @click.stop="($refs.fileInput as HTMLInputElement)?.click()" size="sm" variant="outline">
                 Selecionar Arquivos
               </Button>
             </div>
 
-            <div v-if="uploadForm.files.length > 0" class="mt-3 space-y-2">
-              <p class="text-sm text-[#263238]">
-                Arquivos selecionados ({{ uploadForm.files.length }}):
+            <div v-if="uploadFiles.length > 0" class="mt-3 space-y-2">
+              <p class="text-sm font-medium text-[#263238]">
+                Arquivos selecionados ({{ uploadFiles.length }}):
               </p>
               <div
-                v-for="(file, index) in uploadForm.files"
+                v-for="(file, index) in uploadFiles"
                 :key="index"
                 class="flex items-center justify-between p-2 bg-gray-50 rounded"
               >
-                <span class="text-sm text-[#263238]">{{ file.name }}</span>
-                <span class="text-xs text-[#435574]">
-                  {{ (file.size / (1024 * 1024)).toFixed(2) }} MB
-                </span>
+                <div class="flex items-center gap-2">
+                  <FileText class="h-4 w-4 text-[#286AD8]" />
+                  <span class="text-sm text-[#263238]">{{ file.name }}</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="text-xs text-[#435574]">
+                    {{ (file.size / (1024 * 1024)).toFixed(2) }} MB
+                  </span>
+                  <Button
+                    @click="removeUploadFile(index)"
+                    variant="ghost"
+                    size="icon"
+                    class="h-6 w-6 text-red-500 hover:text-red-700 hover:bg-red-50"
+                  >
+                    <X class="h-3 w-3" />
+                  </Button>
+                </div>
               </div>
             </div>
           </div>
@@ -699,42 +768,20 @@ const handleFileSelect = (e: Event) => {
         </div>
 
         <DialogFooter>
-          <Button @click="showUploadDialog = false" variant="outline">
+          <Button @click="showUploadDialog = false" variant="outline" :disabled="isUploading">
             Cancelar
           </Button>
           <Button
             @click="handleUploadFiles"
-            :disabled="isUploading"
+            :disabled="isUploading || uploadFiles.length === 0"
             class="bg-[#286AD8] hover:bg-[#435574]"
           >
-            <Upload class="h-4 w-4 mr-2" />
-            Enviar Arquivos
+            <Loader2 v-if="isUploading" class="h-4 w-4 mr-2 animate-spin" />
+            <Upload v-else class="h-4 w-4 mr-2" />
+            {{ isUploading ? 'Enviando...' : 'Enviar Arquivos' }}
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
-
-    <!-- Delete Confirmation -->
-    <AlertDialog :open="showDeleteDialog" @update:open="(val) => showDeleteDialog = val">
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Excluir Marco</AlertDialogTitle>
-          <AlertDialogDescription>
-            Tem certeza que deseja excluir o marco "{{ milestoneToDelete?.title }}"?
-            Esta ação não pode ser desfeita.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Cancelar</AlertDialogCancel>
-          <AlertDialogAction
-            @click="handleDeleteMilestone"
-            class="bg-red-600 hover:bg-red-700"
-          >
-            Excluir
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
   </div>
 </template>
-
