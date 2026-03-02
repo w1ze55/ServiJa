@@ -607,7 +607,7 @@ const getWorkModelLabel = (value: string) => {
   <div class="max-w-4xl mx-auto space-y-6 p-6">
     <!-- Header -->
     <div>
-      <h1 class="text-2xl font-bold text-[#263238] mb-2">Portfólio Profissional</h1>
+      <h1 class="text-2xl font-bold text-[#263238] mb-2">Dados Profissionais</h1>
       <p class="text-[#435574]">Configure suas informações profissionais para atrair mais clientes</p>
     </div>
 
