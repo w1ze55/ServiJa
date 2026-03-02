@@ -1,9 +1,11 @@
 package com.servija.servija.service;
 
 import com.servija.servija.model.Payment;
+import com.servija.servija.model.PaymentStatusHistory;
 import com.servija.servija.model.ServiceRequest;
 import com.servija.servija.model.WithdrawalRequest;
 import com.servija.servija.repository.PaymentRepository;
+import com.servija.servija.repository.PaymentStatusHistoryRepository;
 import com.servija.servija.repository.ServiceRequestRepository;
 import com.servija.servija.repository.WithdrawalRequestRepository;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +23,7 @@ import java.util.Map;
 public class AsaasWebhookService {
 
     private final PaymentRepository paymentRepository;
+    private final PaymentStatusHistoryRepository paymentStatusHistoryRepository;
     private final ServiceRequestRepository serviceRequestRepository;
     private final WithdrawalRequestRepository withdrawalRepository;
     private final FreelancerWalletService walletService;
@@ -209,18 +212,28 @@ public class AsaasWebhookService {
             payment.setCompletedAt(LocalDateTime.now());
             paymentRepository.save(payment);
 
+            // Registrar no histórico
+            saveStatusHistory(payment, Payment.PaymentStatus.COMPLETED, "PAYMENT_RECEIVED", 
+                "Pagamento recebido/confirmado via webhook Asaas");
+
             // Adicionar saldo pendente na carteira do freelancer
             walletService.addPendingBalance(
                 payment.getFreelancer(),
                 payment.getAmount()
             );
 
-            // Atualizar status da solicitação para COMPLETED
+            // Atualizar status da solicitação para COMPLETED E HABILITAR CHAT
             ServiceRequest serviceRequest = payment.getServiceRequest();
             if (serviceRequest.getStatus() != ServiceRequest.Status.COMPLETED) {
                 serviceRequest.setStatus(ServiceRequest.Status.COMPLETED);
+                serviceRequest.setChatEnabled(true); // 🔓 HABILITAR CHAT
                 serviceRequestRepository.save(serviceRequest);
-                log.info("Status da solicitação atualizado para COMPLETED: {}", serviceRequest.getId());
+                log.info("Status da solicitação atualizado para COMPLETED e chat habilitado: {}", serviceRequest.getId());
+            } else if (!Boolean.TRUE.equals(serviceRequest.getChatEnabled())) {
+                // Se já estava completed mas chat não estava habilitado
+                serviceRequest.setChatEnabled(true);
+                serviceRequestRepository.save(serviceRequest);
+                log.info("Chat habilitado para solicitação: {}", serviceRequest.getId());
             }
 
             // Enviar notificação WebSocket para o cliente
@@ -232,6 +245,23 @@ public class AsaasWebhookService {
             log.info("Pagamento confirmado via webhook: {} - R$ {}", 
                     asaasPaymentId, payment.getAmount());
         }
+    }
+
+    /**
+     * Salvar histórico de mudança de status
+     */
+    private void saveStatusHistory(Payment payment, Payment.PaymentStatus newStatus, 
+                                   String asaasEvent, String details) {
+        PaymentStatusHistory history = PaymentStatusHistory.builder()
+            .payment(payment)
+            .status(newStatus)
+            .asaasEvent(asaasEvent)
+            .details(details)
+            .build();
+        
+        paymentStatusHistoryRepository.save(history);
+        log.debug("Histórico de status salvo: Payment ID={}, Status={}, Event={}", 
+                 payment.getId(), newStatus, asaasEvent);
     }
 
     /**
@@ -251,6 +281,10 @@ public class AsaasWebhookService {
             Payment payment = payments.get(0);
             payment.setStatus(Payment.PaymentStatus.OVERDUE);
             paymentRepository.save(payment);
+            
+            saveStatusHistory(payment, Payment.PaymentStatus.OVERDUE, "PAYMENT_OVERDUE",
+                "Pagamento vencido");
+            
             log.info("Status do pagamento atualizado para OVERDUE: {}", asaasPaymentId);
         }
     }
@@ -301,6 +335,9 @@ public class AsaasWebhookService {
             payment.setStatus(Payment.PaymentStatus.FAILED);
             paymentRepository.save(payment);
             
+            saveStatusHistory(payment, Payment.PaymentStatus.FAILED, "PAYMENT_REPROVED_BY_RISK_ANALYSIS",
+                "Pagamento reprovado pela análise de risco");
+            
             webSocketService.notifyPaymentFailed(
                 payment.getId(),
                 payment.getContractor().getEmail(),
@@ -347,6 +384,9 @@ public class AsaasWebhookService {
             Payment payment = payments.get(0);
             payment.setStatus(Payment.PaymentStatus.FAILED);
             paymentRepository.save(payment);
+            
+            saveStatusHistory(payment, Payment.PaymentStatus.FAILED, "PAYMENT_CREDIT_CARD_CAPTURE_REFUSED",
+                "Captura de cartão recusada");
             
             webSocketService.notifyPaymentFailed(
                 payment.getId(),
@@ -397,6 +437,9 @@ public class AsaasWebhookService {
             payment.setStatus(Payment.PaymentStatus.CHARGEBACK);
             paymentRepository.save(payment);
             
+            saveStatusHistory(payment, Payment.PaymentStatus.CHARGEBACK, "PAYMENT_CHARGEBACK_REQUESTED",
+                "Chargeback solicitado");
+            
             log.error("⚠️ CHARGEBACK solicitado: {} - R$ {}", 
                     asaasPaymentId, payment.getAmount());
         }
@@ -438,6 +481,10 @@ public class AsaasWebhookService {
             Payment payment = payments.get(0);
             payment.setStatus(Payment.PaymentStatus.CANCELLED);
             paymentRepository.save(payment);
+            
+            saveStatusHistory(payment, Payment.PaymentStatus.CANCELLED, "PAYMENT_DELETED",
+                "Pagamento deletado/cancelado");
+            
             log.info("Pagamento deletado: {}", asaasPaymentId);
         }
     }
@@ -600,6 +647,9 @@ public class AsaasWebhookService {
         Payment payment = payments.get(0);
         payment.setStatus(Payment.PaymentStatus.REFUNDED);
         paymentRepository.save(payment);
+
+        saveStatusHistory(payment, Payment.PaymentStatus.REFUNDED, "PAYMENT_REFUNDED",
+            "Pagamento reembolsado/estornado");
 
         log.info("Pagamento reembolsado via webhook: {}", asaasPaymentId);
     }

@@ -26,6 +26,7 @@ import Avatar from '../ui/avatar.vue';
 import AvatarFallback from '../ui/avatar-fallback.vue';
 import AvatarImage from '../ui/avatar-image.vue';
 import Badge from '../ui/badge.vue';
+import PaymentTimeline from './PaymentTimeline.vue';
 
 interface Proposal {
   freelancerId: string;
@@ -721,6 +722,12 @@ onUnmounted(() => {
               >
                 🔄 Gerar Novo QR Code
               </Button>
+            </div>
+
+            <!-- Payment Timeline -->
+            <div v-if="currentPaymentId" class="mt-8 pt-6 border-t border-gray-200">
+              <h4 class="text-lg font-semibold text-[#263238] mb-4">📋 Status do Pagamento</h4>
+              <PaymentTimeline :payment-id="currentPaymentId" />
             </div>
           </div>
         </Card>

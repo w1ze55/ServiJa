@@ -86,4 +86,12 @@ public class PaymentController {
         PaymentResponse response = paymentService.getPaymentByServiceRequestId(serviceRequestId);
         return ResponseEntity.ok(response);
     }
+
+    @GetMapping("/{id}/history")
+    @Operation(summary = "Obter histórico de status", description = "Retorna o histórico de mudanças de status de um pagamento")
+    @SecurityRequirement(name = "bearerAuth")
+    public ResponseEntity<List<Map<String, Object>>> getPaymentHistory(@PathVariable Long id) {
+        List<Map<String, Object>> history = paymentService.getPaymentHistory(id);
+        return ResponseEntity.ok(history);
+    }
 }

@@ -4,9 +4,11 @@ import com.servija.servija.dto.PaymentRequest;
 import com.servija.servija.dto.PaymentResponse;
 import com.servija.servija.exception.ResourceNotFoundException;
 import com.servija.servija.model.Payment;
+import com.servija.servija.model.PaymentStatusHistory;
 import com.servija.servija.model.ServiceRequest;
 import com.servija.servija.model.User;
 import com.servija.servija.repository.PaymentRepository;
+import com.servija.servija.repository.PaymentStatusHistoryRepository;
 import com.servija.servija.repository.ServiceRequestRepository;
 import com.servija.servija.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +30,7 @@ import java.util.stream.Collectors;
 public class PaymentService {
 
     private final PaymentRepository paymentRepository;
+    private final PaymentStatusHistoryRepository paymentStatusHistoryRepository;
     private final ServiceRequestRepository serviceRequestRepository;
     private final UserRepository userRepository;
     private final AsaasService asaasService;
@@ -137,6 +140,15 @@ public class PaymentService {
         }
 
         payment = paymentRepository.save(payment);
+
+        // Registrar no histórico de status
+        PaymentStatusHistory initialHistory = PaymentStatusHistory.builder()
+                .payment(payment)
+                .status(payment.getStatus())
+                .asaasEvent("PAYMENT_CREATED")
+                .details("Pagamento criado via " + request.getPaymentMethod())
+                .build();
+        paymentStatusHistoryRepository.save(initialHistory);
 
         // NÃO atualizar status da solicitação aqui!
         // O status só deve mudar para COMPLETED quando o pagamento for confirmado (via webhook)
@@ -363,5 +375,28 @@ public class PaymentService {
                 .createdAt(payment.getCreatedAt())
                 .completedAt(payment.getCompletedAt())
                 .build();
+    }
+
+    /**
+     * Buscar histórico de status de um pagamento
+     */
+    public List<Map<String, Object>> getPaymentHistory(Long paymentId) {
+        Payment payment = paymentRepository.findById(paymentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Pagamento não encontrado"));
+
+        List<PaymentStatusHistory> history = paymentStatusHistoryRepository
+                .findByPaymentOrderByCreatedAtAsc(payment);
+
+        return history.stream()
+                .map(h -> {
+                    Map<String, Object> map = new java.util.HashMap<>();
+                    map.put("id", h.getId());
+                    map.put("status", h.getStatus().name());
+                    map.put("asaasEvent", h.getAsaasEvent() != null ? h.getAsaasEvent() : "");
+                    map.put("details", h.getDetails() != null ? h.getDetails() : "");
+                    map.put("createdAt", h.getCreatedAt().toString());
+                    return map;
+                })
+                .collect(Collectors.toList());
     }
 }
