@@ -115,6 +115,8 @@ const getStatusColor = (status: string) => {
       return 'bg-yellow-100 text-yellow-800';
     case 'accepted':
       return 'bg-green-100 text-green-800';
+    case 'in_progress':
+      return 'bg-purple-100 text-purple-800';
     case 'rejected':
       return 'bg-red-100 text-red-800';
     case 'completed':
@@ -130,6 +132,8 @@ const getStatusIcon = (status: string) => {
       return Clock;
     case 'accepted':
       return CheckCircle;
+    case 'in_progress':
+      return Clock;
     case 'rejected':
       return XCircle;
     case 'completed':

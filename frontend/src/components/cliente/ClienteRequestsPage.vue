@@ -116,7 +116,7 @@ const getEmptyMessage = () => {
     all: 'Você ainda não criou nenhuma solicitação',
     pending: 'Não há solicitações pendentes no momento',
     negotiating: 'Não há solicitações em negociação',
-    accepted: 'Não há solicitações aceitas',
+    accepted: 'Não há solicitações em andamento',
     completed: 'Não há solicitações concluídas',
     cancelled: 'Não há solicitações canceladas'
   };
@@ -203,8 +203,8 @@ const filteredRequests = computed(() => {
     const matchesTab =
       currentTab.value === 'all' ||
       (currentTab.value === 'pending' && (request.status === 'pending' || request.status === 'sent')) ||
-      (currentTab.value === 'negotiating' && request.status === 'negotiating') ||
-      (currentTab.value === 'accepted' && request.status === 'accepted') ||
+      (currentTab.value === 'negotiating' && (request.status === 'negotiating' || request.status === 'accepted')) ||
+      (currentTab.value === 'in_progress' && request.status === 'in_progress') ||
       (currentTab.value === 'completed' && request.status === 'completed') ||
       (currentTab.value === 'cancelled' && (request.status === 'cancelled' || request.status === 'rejected'));
 
@@ -362,6 +362,7 @@ const getStatusLabel = (status: string) => {
     sent: 'Enviada',
     negotiating: 'Negociando',
     accepted: 'Aceita',
+    in_progress: 'Em Andamento',
     rejected: 'Recusada',
     completed: 'Concluída',
     cancelled: 'Cancelada',
@@ -427,8 +428,8 @@ const getStatusLabel = (status: string) => {
             <CheckCircle class="h-5 w-5 text-green-600" />
           </div>
           <div>
-            <p class="text-sm text-[#435574]">Aceitas</p>
-            <p class="text-xl font-bold text-[#263238]">{{ store.stats.accepted }}</p>
+            <p class="text-sm text-[#435574]">Em Andamento</p>
+            <p class="text-xl font-bold text-[#263238]">{{ store.stats.inProgress }}</p>
           </div>
         </div>
       </Card>
@@ -506,14 +507,12 @@ const getStatusLabel = (status: string) => {
     <!-- Tabs -->
     <Tabs :model-value="currentTab" @update:model-value="(val: string) => currentTab = val">
       <TabsList class="tabs-list grid w-full grid-cols-6">
-        <TabsTrigger value="all">Todas</TabsTrigger>
-        <TabsTrigger value="pending">
-          Pendentes {{ store.stats.pending > 0 ? `(${store.stats.pending})` : '' }}
-        </TabsTrigger>
-        <TabsTrigger value="negotiating">Negociando</TabsTrigger>
-        <TabsTrigger value="accepted">Aceitas</TabsTrigger>
-        <TabsTrigger value="completed">Concluídas</TabsTrigger>
-        <TabsTrigger value="cancelled">Canceladas</TabsTrigger>
+        <TabsTrigger value="all">Todas ({{ store.requests.length }})</TabsTrigger>
+        <TabsTrigger value="pending">Pendentes ({{ store.stats.pending }})</TabsTrigger>
+        <TabsTrigger value="negotiating">Negociando ({{ store.stats.negotiating }})</TabsTrigger>
+        <TabsTrigger value="in_progress">Em Andamento ({{ store.stats.inProgress }})</TabsTrigger>
+        <TabsTrigger value="completed">Concluídas ({{ store.stats.completed }})</TabsTrigger>
+        <TabsTrigger value="cancelled">Canceladas ({{ store.stats.cancelled }})</TabsTrigger>
       </TabsList>
 
       <TabsContent :value="currentTab" class="mt-6">

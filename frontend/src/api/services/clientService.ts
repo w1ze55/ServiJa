@@ -13,7 +13,7 @@ export interface Quote {
   serviceTitle: string;
   description: string;
   budget?: number;
-  status: 'pending' | 'accepted' | 'rejected' | 'completed';
+  status: 'pending' | 'accepted' | 'in_progress' | 'rejected' | 'completed';
   freelancerId: string;
   freelancerName: string;
   createdAt: string;

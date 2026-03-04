@@ -35,6 +35,8 @@ public class PaymentService {
     private final UserRepository userRepository;
     private final AsaasService asaasService;
     private final FreelancerWalletService walletService;
+    private final ServiceRequestHistoryService serviceRequestHistoryService;
+    private final WebSocketService webSocketService;
 
     private static final BigDecimal PLATFORM_FEE_PERCENTAGE = new BigDecimal("0.10"); // 10%
     private static final BigDecimal ASAAS_PIX_FEE = new BigDecimal("0.99"); // Taxa Asaas para PIX (promocional)
@@ -143,7 +145,7 @@ public class PaymentService {
 
         payment = paymentRepository.save(payment);
 
-        // Registrar no histórico de status
+        // Registrar no histórico de status do pagamento
         PaymentStatusHistory initialHistory = PaymentStatusHistory.builder()
                 .payment(payment)
                 .status(payment.getStatus())
@@ -151,6 +153,13 @@ public class PaymentService {
                 .details("Pagamento criado via " + request.getPaymentMethod())
                 .build();
         paymentStatusHistoryRepository.save(initialHistory);
+
+        // Registrar no histórico da solicitação de serviço
+        serviceRequestHistoryService.record(
+                serviceRequest,
+                contractor,
+                com.servija.servija.model.ServiceRequestHistory.OperationType.PAYMENT_CREATED,
+                "Pagamento de R$ " + String.format("%.2f", totalAmount) + " criado via " + request.getPaymentMethod().toUpperCase());
 
         // NÃO atualizar status da solicitação aqui!
         // O status só deve mudar para COMPLETED quando o pagamento for confirmado (via
@@ -398,5 +407,72 @@ public class PaymentService {
                     return map;
                 })
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * 🧪 MÉTODO DE TESTE - REMOVER EM PRODUÇÃO
+     * Simula a confirmação de um pagamento PIX para testes locais
+     */
+    @Transactional
+    public void simulatePaymentConfirmation(Long paymentId) {
+        Payment payment = paymentRepository.findById(paymentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Pagamento não encontrado"));
+
+        if (payment.getStatus() == Payment.PaymentStatus.COMPLETED) {
+            log.warn("🧪 Pagamento já está confirmado: {}", paymentId);
+            return;
+        }
+
+        log.info("🧪 SIMULANDO confirmação de pagamento: {}", paymentId);
+
+        // Atualizar status do pagamento
+        payment.setStatus(Payment.PaymentStatus.COMPLETED);
+        payment.setCompletedAt(LocalDateTime.now());
+        paymentRepository.save(payment);
+
+        // Registrar no histórico do pagamento
+        PaymentStatusHistory history = PaymentStatusHistory.builder()
+                .payment(payment)
+                .status(Payment.PaymentStatus.COMPLETED)
+                .asaasEvent("SIMULATED_CONFIRMATION")
+                .details("🧪 Confirmação simulada para testes")
+                .build();
+        paymentStatusHistoryRepository.save(history);
+
+        // Adicionar saldo pendente na carteira do freelancer
+        walletService.addPendingBalance(
+                payment.getFreelancer(),
+                payment.getAmount());
+
+        log.info("🧪 Saldo adicionado à carteira: R$ {}", payment.getAmount());
+
+        // Atualizar status da solicitação para IN_PROGRESS e habilitar chat
+        ServiceRequest serviceRequest = payment.getServiceRequest();
+        if (serviceRequest.getStatus() != ServiceRequest.Status.IN_PROGRESS && 
+            serviceRequest.getStatus() != ServiceRequest.Status.COMPLETED) {
+            serviceRequest.setStatus(ServiceRequest.Status.IN_PROGRESS);
+            serviceRequest.setChatEnabled(true);
+            serviceRequestRepository.save(serviceRequest);
+
+            // Registrar no histórico da solicitação
+            serviceRequestHistoryService.record(
+                    serviceRequest,
+                    payment.getContractor(),
+                    com.servija.servija.model.ServiceRequestHistory.OperationType.PAYMENT_CONFIRMED,
+                    "🧪 Pagamento simulado de R$ " + String.format("%.2f", payment.getTotalAmount()) + " confirmado");
+
+            log.info("🧪 Solicitação atualizada para IN_PROGRESS, chat habilitado");
+        }
+
+        // Notificar via WebSocket - CLIENTE E FREELANCER
+        webSocketService.notifyPixPaymentConfirmed(
+                payment.getId(),
+                payment.getContractor().getEmail());
+        
+        webSocketService.notifyPixPaymentConfirmed(
+                payment.getId(),
+                payment.getFreelancer().getEmail());
+
+        log.info("🧪 Simulação de confirmação concluída com sucesso!");
     }
 }
