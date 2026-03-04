@@ -18,6 +18,7 @@ export interface Proposal {
   status: 'pending' | 'negotiating' | 'accepted' | 'in_progress' | 'rejected' | 'completed' | 'archived';
   receivedAt: string;
   attachments?: ProposalAttachment[];
+  freelancerAttachments?: ProposalAttachment[];
   viewed: boolean;
   address?: string;
   desiredDate?: string;
@@ -158,7 +159,14 @@ export const useProposalStore = defineStore('proposal', () => {
         counterValue: req.counterValue,
         counterDays: req.counterDays,
         counterNotes: req.counterNotes,
-        rejectReason: req.rejectReason
+        rejectReason: req.rejectReason,
+        freelancerAttachments: (req.freelancerAttachments || []).map((url: string, idx: number) => ({
+          id: `fatt-${req.id}-${idx}`,
+          name: extractFileName(url),
+          size: '',
+          url,
+          type: getFileType(url),
+        })),
       }));
     } catch (err) {
       error.value = 'Erro ao carregar propostas';

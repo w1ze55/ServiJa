@@ -119,6 +119,20 @@ public class ServiceRequestController {
         return ResponseEntity.ok(serviceRequestService.rejectCounterProposal(id, reason, authentication.getName()));
     }
 
+    @PostMapping("/{id}/freelancer-attachments")
+    @Operation(summary = "Adicionar arquivos do freelancer", description = "Freelancer envia URLs de arquivos para vincular à solicitação")
+    @SecurityRequirement(name = "bearerAuth")
+    public ResponseEntity<ServiceRequestResponse> addFreelancerAttachments(
+            @PathVariable Long id,
+            @RequestBody Map<String, List<String>> body,
+            Authentication authentication) {
+        List<String> urls = body.get("urls");
+        if (urls == null || urls.isEmpty()) {
+            return ResponseEntity.badRequest().build();
+        }
+        return ResponseEntity.ok(serviceRequestService.addFreelancerAttachments(id, urls, authentication.getName()));
+    }
+
     @GetMapping("/{id}/history")
     @Operation(summary = "Obter histórico de ações", description = "Retorna o histórico de ações realizadas em uma solicitação")
     @SecurityRequirement(name = "bearerAuth")

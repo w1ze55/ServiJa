@@ -34,6 +34,7 @@ public class ServiceRequestResponse {
     private String address;
     private LocalDate desiredDate;
     private List<String> attachments;
+    private List<String> freelancerAttachments;
 
     // Freelancer response
     private BigDecimal responseValue;
