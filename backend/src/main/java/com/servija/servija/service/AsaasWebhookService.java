@@ -232,19 +232,18 @@ public class AsaasWebhookService {
 
             log.info("💰 Saldo adicionado à carteira: R$ {}", payment.getAmount());
 
-            // Atualizar status da solicitação para ACCEPTED E HABILITAR CHAT
+            // Atualizar status da solicitação para COMPLETED E HABILITAR CHAT
             ServiceRequest serviceRequest = payment.getServiceRequest();
-            if (serviceRequest.getStatus() != ServiceRequest.Status.ACCEPTED) {
-                serviceRequest.setStatus(ServiceRequest.Status.ACCEPTED);
+            if (serviceRequest.getStatus() != ServiceRequest.Status.COMPLETED) {
+                serviceRequest.setStatus(ServiceRequest.Status.COMPLETED);
                 serviceRequest.setChatEnabled(true); // 🔓 HABILITAR CHAT
                 serviceRequestRepository.save(serviceRequest);
-                log.info("🔓 Chat habilitado e status atualizado para ACCEPTED! Solicitação ID: {}",
-                        serviceRequest.getId());
+                log.info("🔓 Chat habilitado! Solicitação ID: {}", serviceRequest.getId());
             } else if (!Boolean.TRUE.equals(serviceRequest.getChatEnabled())) {
-                // Se já estava ACCEPTED mas chat não estava habilitado
+                // Se já estava completed mas chat não estava habilitado
                 serviceRequest.setChatEnabled(true);
                 serviceRequestRepository.save(serviceRequest);
-                log.info("🔓 Chat habilitado (solicitação já estava ACCEPTED)");
+                log.info("🔓 Chat habilitado (solicitação já estava COMPLETED)");
             }
 
             // Enviar notificação WebSocket para o cliente

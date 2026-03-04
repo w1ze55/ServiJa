@@ -226,19 +226,8 @@ public class PaymentService {
         if (payments.isEmpty()) {
             throw new ResourceNotFoundException("Nenhum pagamento encontrado para esta solicitação");
         }
-
-        Payment payment = payments.get(0);
-
-        // Se o pagamento não for final, verificar status no Asaas para garantir
-        // sincronia
-        if (payment.getStatus() != Payment.PaymentStatus.COMPLETED &&
-                payment.getStatus() != Payment.PaymentStatus.REFUNDED &&
-                payment.getAsaasPaymentId() != null) {
-            log.info("Sincronizando status do pagamento {} com Asaas ao buscar por solicitação", payment.getId());
-            return checkAsaasPaymentStatus(payment.getId());
-        }
-
-        return mapToResponse(payment);
+        // Retornar o pagamento mais recente
+        return mapToResponse(payments.get(0));
     }
 
     public List<PaymentResponse> getMyPayments(String email) {
