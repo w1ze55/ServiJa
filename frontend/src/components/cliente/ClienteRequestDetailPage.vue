@@ -70,6 +70,8 @@ const counterNotes = ref('');
 const isSubmittingCounter = ref(false);
 const activeSection = ref<'details' | 'messages' | 'history'>('details');
 const showCelebrationModal = ref(false);
+const showCompleteDialog = ref(false);
+const isCompletingService = ref(false);
 
 const handleOpenCounterProposalDialog = () => {
   if (!request.value || !request.value.freelancerResponse) return;
@@ -77,6 +79,30 @@ const handleOpenCounterProposalDialog = () => {
   counterDays.value = request.value.freelancerResponse.executionDays;
   counterNotes.value = '';
   showCounterProposalDialog.value = true;
+};
+
+const loadData = async () => {
+  await store.loadRequests();
+  request.value = store.getRequestById(props.requestId) || null;
+  if (request.value) {
+    await store.loadHistory(props.requestId);
+  }
+};
+
+const handleCompleteService = async () => {
+  if (!request.value) return;
+  
+  isCompletingService.value = true;
+  const success = await store.completeService(request.value.id);
+  isCompletingService.value = false;
+  
+  if (success) {
+    toast.success('Serviço marcado como concluído!');
+    showCompleteDialog.value = false;
+    await loadData();
+  } else {
+    toast.error('Erro ao concluir o serviço');
+  }
 };
 
 const handleSendCounterProposal = async () => {
@@ -236,6 +262,7 @@ const getStatusColor = (status: string) => {
     sent: { bg: 'bg-blue-100', text: 'text-blue-700' },
     negotiating: { bg: 'bg-amber-100', text: 'text-amber-700' },
     accepted: { bg: 'bg-green-100', text: 'text-green-700' },
+    in_progress: { bg: 'bg-purple-100', text: 'text-purple-700' },
     completed: { bg: 'bg-teal-100', text: 'text-teal-700' },
     rejected: { bg: 'bg-red-100', text: 'text-red-700' },
     cancelled: { bg: 'bg-gray-100', text: 'text-gray-700' },
@@ -249,6 +276,7 @@ const getStatusLabel = (status: string) => {
     sent: 'Enviada',
     negotiating: 'Negociando',
     accepted: 'Aceita',
+    in_progress: 'Em Andamento',
     rejected: 'Recusada',
     completed: 'Concluída',
     cancelled: 'Cancelada',
@@ -404,6 +432,17 @@ const getStatusLabel = (status: string) => {
           <Badge class="ml-2 bg-yellow-400 text-yellow-900 animate-bounce">
             Pendente
           </Badge>
+        </Button>
+
+        <!-- Complete Service Button (só aparece quando status é IN_PROGRESS) -->
+        <Button
+          v-if="request.status === 'in_progress'"
+          @click="showCompleteDialog = true"
+          class="bg-teal-600 hover:bg-teal-700 shadow-lg hover:shadow-xl transition-all"
+          size="sm"
+        >
+          <CheckCircle class="h-4 w-4 mr-2" />
+          Marcar como Concluído
         </Button>
       </div>
 
@@ -639,7 +678,22 @@ const getStatusLabel = (status: string) => {
         </div>
 
         <!-- Message Input -->
-        <div class="flex items-center justify-center p-4 bg-gray-50 rounded-lg border border-dashed border-gray-200">
+        <div v-if="request.status === 'in_progress' || request.status === 'completed'" class="flex gap-2">
+          <Textarea
+            v-model="newMessage"
+            placeholder="Digite sua mensagem..."
+            :rows="2"
+            class="flex-1"
+          />
+          <Button
+            @click="handleSendMessage"
+            :disabled="!newMessage.trim() || isSendingMessage"
+            class="bg-[#286AD8] hover:bg-[#435574]"
+          >
+            <Send class="h-4 w-4" />
+          </Button>
+        </div>
+        <div v-else class="flex items-center justify-center p-4 bg-gray-50 rounded-lg border border-dashed border-gray-200">
           <p class="text-sm text-[#435574] flex items-center gap-2 text-center">
             <Lock class="h-4 w-4 text-amber-500" />
             O chat será liberado automaticamente após a confirmação do pagamento.
@@ -761,6 +815,41 @@ const getStatusLabel = (status: string) => {
             :disabled="isSubmittingCounter"
           >
             {{ isSubmittingCounter ? 'Enviando...' : 'Enviar Contra Proposta' }}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    <!-- Complete Service Dialog -->
+    <Dialog :open="showCompleteDialog" @update:open="(val) => showCompleteDialog = val">
+      <DialogContent class="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Confirmar Conclusão do Serviço</DialogTitle>
+          <DialogDescription>
+            Você está prestes a marcar este serviço como concluído. Isso indica que o freelancer finalizou o trabalho e você está satisfeito com o resultado.
+          </DialogDescription>
+        </DialogHeader>
+        <div class="bg-green-50 border border-green-200 rounded-lg p-4 my-4">
+          <div class="flex items-start gap-3">
+            <CheckCircle class="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
+            <div class="text-sm text-green-800">
+              <p class="font-medium mb-1">Ao confirmar:</p>
+              <ul class="list-disc list-inside space-y-1 text-green-700">
+                <li>O serviço será marcado como concluído</li>
+                <li>O freelancer poderá receber a avaliação</li>
+                <li>Você poderá contratar novos serviços</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button @click="showCompleteDialog = false" variant="outline">Cancelar</Button>
+          <Button 
+            @click="handleCompleteService" 
+            class="bg-teal-600 hover:bg-teal-700"
+            :disabled="isCompletingService"
+          >
+            {{ isCompletingService ? 'Processando...' : 'Confirmar Conclusão' }}
           </Button>
         </DialogFooter>
       </DialogContent>

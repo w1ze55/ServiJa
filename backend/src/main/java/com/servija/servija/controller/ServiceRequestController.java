@@ -126,6 +126,15 @@ public class ServiceRequestController {
         return ResponseEntity.ok(historyService.getHistory(id));
     }
 
+    @PatchMapping("/{id}/complete")
+    @Operation(summary = "Marcar serviço como concluído", description = "Cliente marca o serviço como concluído após execução pelo freelancer")
+    @SecurityRequirement(name = "bearerAuth")
+    public ResponseEntity<ServiceRequestResponse> completeService(@PathVariable Long id) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String email = authentication.getName();
+        return ResponseEntity.ok(serviceRequestService.completeService(id, email));
+    }
+
     @DeleteMapping("/{id}")
     @Operation(summary = "Excluir solicitação", description = "Exclui uma solicitação de orçamento")
     @SecurityRequirement(name = "bearerAuth")

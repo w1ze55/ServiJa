@@ -56,6 +56,7 @@ import Textarea from '../ui/textarea.vue';
 import Label from '../ui/label.vue';
 import { useProposalStore, type Proposal } from '@/stores/proposalStore';
 import { useServiceRequestWebSocket } from '@/composables/useServiceRequestWebSocket';
+import { usePaymentWebSocket } from '@/composables/usePaymentWebSocket';
 import { toast } from '@/utils/toast';
 
 interface Props {
@@ -82,6 +83,7 @@ const rejectReason = ref('');
 
 // WebSocket
 let wsConnection: any = null;
+let paymentWsConnection: any = null;
 
 const categories = ['Eletricista', 'Encanador', 'Pintor', 'Pedreiro', 'Designer', 'Desenvolvedor'];
 
@@ -103,7 +105,7 @@ const getEmptyMessage = () => {
     all: 'Você ainda não recebeu nenhuma solicitação',
     pending: 'Não há solicitações pendentes no momento',
     negotiating: 'Não há solicitações em negociação',
-    accepted: 'Não há solicitações aceitas',
+    accepted: 'Não há solicitações em andamento',
     rejected: 'Não há solicitações recusadas',
     completed: 'Não há solicitações concluídas'
   };
@@ -126,16 +128,29 @@ onMounted(() => {
     
     // Escutar notificações de solicitações
     window.addEventListener('service-request-notification', handleServiceRequestNotification);
+    
+    // Conectar WebSocket de pagamentos
+    paymentWsConnection = usePaymentWebSocket(userEmail);
+    paymentWsConnection.connect();
+    
+    console.log('✅ WebSocket de pagamentos inicializado');
+    
+    // Escutar notificações de pagamentos
+    window.addEventListener('payment-notification', handlePaymentNotification);
   } else {
     console.error('❌ Não foi possível extrair email do token');
   }
 });
 
 onUnmounted(() => {
-  console.log('🔌 Desconectando WebSocket de solicitações');
+  console.log('🔌 Desconectando WebSocket de solicitações e pagamentos');
   window.removeEventListener('service-request-notification', handleServiceRequestNotification);
+  window.removeEventListener('payment-notification', handlePaymentNotification);
   if (wsConnection) {
     wsConnection.disconnect();
+  }
+  if (paymentWsConnection) {
+    paymentWsConnection.disconnect();
   }
 });
 
@@ -184,6 +199,23 @@ const handleServiceRequestNotification = (event: any) => {
   }
 };
 
+// Lidar com notificações de pagamentos via WebSocket
+const handlePaymentNotification = (event: any) => {
+  const notification = event.detail;
+  console.log('💰 Notificação de pagamento recebida:', notification);
+  
+  switch (notification.type) {
+    case 'PIX_CONFIRMED':
+      toast.success('💰 Pagamento confirmado! O serviço está em andamento.');
+      proposalStore.loadProposals();
+      break;
+    case 'PAYMENT_STATUS_CHANGED':
+      toast.info(`Status do pagamento: ${notification.status}`);
+      proposalStore.loadProposals();
+      break;
+  }
+};
+
 const filteredProposals = computed(() => {
   let filtered = proposalStore.proposals.filter((proposal) => {
     const matchesSearch =
@@ -194,8 +226,8 @@ const filteredProposals = computed(() => {
     const matchesTab =
       currentTab.value === 'all' ||
       (currentTab.value === 'pending' && proposal.status === 'pending') ||
-      (currentTab.value === 'negotiating' && proposal.status === 'negotiating') ||
-      (currentTab.value === 'accepted' && proposal.status === 'accepted') ||
+      (currentTab.value === 'negotiating' && (proposal.status === 'negotiating' || proposal.status === 'accepted')) ||
+      (currentTab.value === 'in_progress' && proposal.status === 'in_progress') ||
       (currentTab.value === 'rejected' && proposal.status === 'rejected') ||
       (currentTab.value === 'completed' && (proposal.status === 'completed' || proposal.status === 'archived'));
     // Filtro por período
@@ -398,15 +430,15 @@ watch(currentTab, () => {
 
       <Card
         class="p-4 cursor-pointer hover:shadow-md transition-shadow"
-        @click="currentTab = 'accepted'"
+        @click="currentTab = 'in_progress'"
       >
         <div class="flex items-center gap-3">
           <div class="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
             <CheckCircle class="h-5 w-5 text-green-600" />
           </div>
           <div>
-            <p class="text-sm text-[#435574]">Aceitas</p>
-            <p class="text-xl font-bold text-[#263238]">{{ proposalStore.stats.accepted }}</p>
+            <p class="text-sm text-[#435574]">Em Andamento</p>
+            <p class="text-xl font-bold text-[#263238]">{{ proposalStore.stats.inProgress }}</p>
           </div>
         </div>
       </Card>
@@ -508,7 +540,7 @@ watch(currentTab, () => {
           Pendentes ({{ proposalStore.stats.pending }})
         </TabsTrigger>
         <TabsTrigger value="negotiating">Negociando ({{ proposalStore.stats.negotiating }})</TabsTrigger>
-        <TabsTrigger value="accepted">Aceitas ({{ proposalStore.stats.accepted }})</TabsTrigger>
+        <TabsTrigger value="in_progress">Em Andamento ({{ proposalStore.stats.inProgress }})</TabsTrigger>
         <TabsTrigger value="rejected">Recusadas ({{ proposalStore.stats.rejected }})</TabsTrigger>
         <TabsTrigger value="completed">Concluídas ({{ proposalStore.stats.completed }})</TabsTrigger>
       </TabsList>
@@ -597,6 +629,12 @@ watch(currentTab, () => {
                           <Badge class="bg-green-100 text-green-700 hover:bg-green-100">
                             <CheckCircle class="h-3 w-3 mr-1" />
                             Aceita
+                          </Badge>
+                        </template>
+                        <template v-else-if="proposal.status === 'in_progress'">
+                          <Badge class="bg-purple-100 text-purple-700 hover:bg-purple-100">
+                            <Clock class="h-3 w-3 mr-1" />
+                            Em Andamento
                           </Badge>
                         </template>
                         <template v-else-if="proposal.status === 'rejected'">

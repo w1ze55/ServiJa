@@ -6,7 +6,9 @@ import com.servija.servija.dto.CounterProposalDTO;
 import com.servija.servija.dto.FreelancerResponseDTO;
 import com.servija.servija.dto.ServiceRequestDTO;
 import com.servija.servija.dto.ServiceRequestResponse;
+import com.servija.servija.exception.ResourceNotFoundException;
 import com.servija.servija.model.ServiceRequest;
+import com.servija.servija.model.ServiceRequest.Status;
 import com.servija.servija.model.ServiceRequestHistory.OperationType;
 import com.servija.servija.model.User;
 import com.servija.servija.repository.ServiceRequestRepository;
@@ -265,6 +267,35 @@ public class ServiceRequestService {
             details += " Motivo: " + reason;
         }
         historyService.record(saved, freelancer, OperationType.COUNTER_PROPOSAL_REJECTED, details);
+
+        return toResponse(saved);
+    }
+
+    @Transactional
+    public ServiceRequestResponse completeService(Long id, String contractorEmail) {
+        ServiceRequest request = serviceRequestRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Solicitação não encontrada"));
+
+        User contractor = userRepository.findByEmail(contractorEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
+
+        // Validar se é o contratante da solicitação
+        if (!request.getContractor().getId().equals(contractor.getId())) {
+            throw new IllegalStateException("Apenas o contratante pode marcar o serviço como concluído");
+        }
+
+        // Validar se o status é IN_PROGRESS
+        if (request.getStatus() != Status.IN_PROGRESS) {
+            throw new IllegalStateException("O serviço só pode ser concluído quando está em andamento");
+        }
+
+        request.setStatus(Status.COMPLETED);
+        ServiceRequest saved = serviceRequestRepository.save(request);
+
+        historyService.record(saved, contractor, OperationType.SERVICE_COMPLETED, 
+                "Serviço marcado como concluído pelo cliente");
+
+        log.info("Serviço concluído - ID: {}, Contratante: {}", id, contractorEmail);
 
         return toResponse(saved);
     }

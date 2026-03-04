@@ -315,6 +315,46 @@ const getInitials = (name: string) => {
     .slice(0, 2);
 };
 
+// =============================================
+// 🧪 BOTÃO DE TESTE - REMOVER EM PRODUÇÃO
+// =============================================
+const isSimulatingPayment = ref(false);
+
+const simulatePaymentConfirmation = async () => {
+  if (!currentPaymentId.value) {
+    alert('Nenhum pagamento para simular');
+    return;
+  }
+
+  isSimulatingPayment.value = true;
+
+  try {
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+    const token = localStorage.getItem('token');
+
+    const response = await fetch(`${apiUrl}/api/payments/${currentPaymentId.value}/simulate-confirmation`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Erro ao simular confirmação');
+    }
+
+    console.log('✅ Simulação de confirmação enviada!');
+    alert('Simulação enviada! Aguarde a confirmação via WebSocket...');
+  } catch (error) {
+    console.error('Erro ao simular pagamento:', error);
+    alert('Erro ao simular pagamento. Verifique se o endpoint existe no backend.');
+  } finally {
+    isSimulatingPayment.value = false;
+  }
+};
+// =============================================
+
 // Estado para mensagens de erro/status
 const paymentError = ref<string | null>(null);
 
@@ -878,6 +918,21 @@ onUnmounted(() => {
               >
                 🔄 Recarregar QR Code
               </Button>
+
+              <!-- 🧪 BOTÃO DE TESTE - REMOVER EM PRODUÇÃO -->
+              <div v-if="!paymentConfirmed" class="mt-4 p-3 bg-yellow-100 border-2 border-yellow-400 border-dashed rounded-lg">
+                <p class="text-xs text-yellow-800 font-bold mb-2">🧪 MODO DE TESTE (REMOVER EM PRODUÇÃO)</p>
+                <Button
+                  @click="simulatePaymentConfirmation"
+                  :disabled="isSimulatingPayment"
+                  class="w-full bg-yellow-500 hover:bg-yellow-600 text-yellow-900"
+                  size="sm"
+                >
+                  <Loader2 v-if="isSimulatingPayment" class="h-4 w-4 mr-2 animate-spin" />
+                  {{ isSimulatingPayment ? 'Simulando...' : '⚡ Simular Confirmação do Pagamento' }}
+                </Button>
+              </div>
+              <!-- FIM DO BOTÃO DE TESTE -->
             </div>
 
             <!-- Payment Timeline -->

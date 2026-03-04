@@ -5,6 +5,7 @@ import com.servija.servija.dto.PixTransactionWebhookDTO;
 import com.servija.servija.model.Payment;
 import com.servija.servija.model.PaymentStatusHistory;
 import com.servija.servija.model.ServiceRequest;
+import com.servija.servija.model.ServiceRequestHistory;
 import com.servija.servija.model.WithdrawalRequest;
 import com.servija.servija.repository.PaymentRepository;
 import com.servija.servija.repository.PaymentStatusHistoryRepository;
@@ -31,6 +32,7 @@ public class AsaasWebhookService {
     private final WithdrawalRequestRepository withdrawalRepository;
     private final FreelancerWalletService walletService;
     private final WebSocketService webSocketService;
+    private final ServiceRequestHistoryService serviceRequestHistoryService;
     private final ObjectMapper objectMapper;
 
     /**
@@ -236,24 +238,36 @@ public class AsaasWebhookService {
 
             log.info("💰 Saldo adicionado à carteira: R$ {}", payment.getAmount());
 
-            // Atualizar status da solicitação para COMPLETED E HABILITAR CHAT
+            // Atualizar status da solicitação para IN_PROGRESS E HABILITAR CHAT
             ServiceRequest serviceRequest = payment.getServiceRequest();
-            if (serviceRequest.getStatus() != ServiceRequest.Status.COMPLETED) {
-                serviceRequest.setStatus(ServiceRequest.Status.COMPLETED);
+            if (serviceRequest.getStatus() != ServiceRequest.Status.IN_PROGRESS && 
+                serviceRequest.getStatus() != ServiceRequest.Status.COMPLETED) {
+                serviceRequest.setStatus(ServiceRequest.Status.IN_PROGRESS);
                 serviceRequest.setChatEnabled(true); // 🔓 HABILITAR CHAT
                 serviceRequestRepository.save(serviceRequest);
-                log.info("🔓 Chat habilitado! Solicitação ID: {}", serviceRequest.getId());
+                log.info("🔓 Chat habilitado! Solicitação ID: {} - Status: IN_PROGRESS", serviceRequest.getId());
+                
+                // Registrar no histórico da solicitação
+                serviceRequestHistoryService.record(
+                        serviceRequest,
+                        payment.getContractor(),
+                        ServiceRequestHistory.OperationType.PAYMENT_CONFIRMED,
+                        "Pagamento de R$ " + String.format("%.2f", payment.getTotalAmount()) + " confirmado");
             } else if (!Boolean.TRUE.equals(serviceRequest.getChatEnabled())) {
-                // Se já estava completed mas chat não estava habilitado
+                // Se já estava em andamento mas chat não estava habilitado
                 serviceRequest.setChatEnabled(true);
                 serviceRequestRepository.save(serviceRequest);
-                log.info("🔓 Chat habilitado (solicitação já estava COMPLETED)");
+                log.info("🔓 Chat habilitado (solicitação já estava {}))", serviceRequest.getStatus());
             }
 
-            // Enviar notificação WebSocket para o cliente
+            // Enviar notificação WebSocket para o cliente E FREELANCER
             webSocketService.notifyPixPaymentConfirmed(
                     payment.getId(),
                     payment.getContractor().getEmail());
+            
+            webSocketService.notifyPixPaymentConfirmed(
+                    payment.getId(),
+                    payment.getFreelancer().getEmail());
 
             log.info("✅ Pagamento confirmado via webhook: {} - R$ {}",
                     asaasPaymentId, payment.getAmount());
@@ -907,23 +921,35 @@ public class AsaasWebhookService {
 
             log.info("💰 Saldo adicionado à carteira do freelancer: R$ {}", payment.getAmount());
 
-            // Atualizar status da solicitação e habilitar chat
+            // Atualizar status da solicitação para IN_PROGRESS e habilitar chat
             ServiceRequest serviceRequest = payment.getServiceRequest();
-            if (serviceRequest.getStatus() != ServiceRequest.Status.COMPLETED) {
-                serviceRequest.setStatus(ServiceRequest.Status.COMPLETED);
+            if (serviceRequest.getStatus() != ServiceRequest.Status.IN_PROGRESS && 
+                serviceRequest.getStatus() != ServiceRequest.Status.COMPLETED) {
+                serviceRequest.setStatus(ServiceRequest.Status.IN_PROGRESS);
                 serviceRequest.setChatEnabled(true);
                 serviceRequestRepository.save(serviceRequest);
-                log.info("🔓 Chat habilitado! Solicitação ID: {}", serviceRequest.getId());
+                log.info("🔓 Chat habilitado! Solicitação ID: {} - Status: IN_PROGRESS", serviceRequest.getId());
+                
+                // Registrar no histórico da solicitação
+                serviceRequestHistoryService.record(
+                        serviceRequest,
+                        payment.getContractor(),
+                        ServiceRequestHistory.OperationType.PAYMENT_CONFIRMED,
+                        "Pagamento PIX de R$ " + String.format("%.2f", payment.getTotalAmount()) + " confirmado");
             } else if (!Boolean.TRUE.equals(serviceRequest.getChatEnabled())) {
                 serviceRequest.setChatEnabled(true);
                 serviceRequestRepository.save(serviceRequest);
-                log.info("🔓 Chat habilitado (solicitação já estava COMPLETED)");
+                log.info("🔓 Chat habilitado (solicitação já estava {})", serviceRequest.getStatus());
             }
 
-            // Notificar via WebSocket
+            // Notificar via WebSocket - CLIENTE E FREELANCER
             webSocketService.notifyPixPaymentConfirmed(
                     payment.getId(),
                     payment.getContractor().getEmail());
+            
+            webSocketService.notifyPixPaymentConfirmed(
+                    payment.getId(),
+                    payment.getFreelancer().getEmail());
 
             log.info("✅ Pagamento PIX confirmado via webhook: Payment ID={}, Transaction ID={}, Valor=R$ {}",
                     payment.getId(), pixTransaction.getId(), payment.getAmount());
@@ -962,6 +988,14 @@ public class AsaasWebhookService {
         saveStatusHistory(payment, Payment.PaymentStatus.CANCELLED, "PIX_TRANSACTION_CANCELLED",
                 "Transação PIX cancelada. ID: " + pixTransaction.getId());
 
+        // Registrar no histórico da solicitação
+        ServiceRequest serviceRequest = payment.getServiceRequest();
+        serviceRequestHistoryService.record(
+                serviceRequest,
+                payment.getContractor(),
+                ServiceRequestHistory.OperationType.PAYMENT_CANCELLED,
+                "Pagamento PIX cancelado");
+
         // Notificar via WebSocket
         webSocketService.notifyPaymentFailed(
                 payment.getId(),
@@ -982,6 +1016,15 @@ public class AsaasWebhookService {
         saveStatusHistory(payment, Payment.PaymentStatus.FAILED, "PIX_TRANSACTION_FAILED",
                 "Transação PIX falhou. ID: " + pixTransaction.getId() +
                         (pixTransaction.getRefusalReason() != null ? " Motivo: " + pixTransaction.getRefusalReason() : ""));
+
+        // Registrar no histórico da solicitação
+        ServiceRequest serviceRequest = payment.getServiceRequest();
+        String reason = pixTransaction.getRefusalReason() != null ? ": " + pixTransaction.getRefusalReason() : "";
+        serviceRequestHistoryService.record(
+                serviceRequest,
+                payment.getContractor(),
+                ServiceRequestHistory.OperationType.PAYMENT_FAILED,
+                "Pagamento PIX falhou" + reason);
 
         // Notificar via WebSocket
         webSocketService.notifyPaymentFailed(

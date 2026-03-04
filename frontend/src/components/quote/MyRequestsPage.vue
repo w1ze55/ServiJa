@@ -40,7 +40,7 @@ interface QuoteRequest {
   budget?: number;
   deadline?: string;
   priority?: string;
-  status: 'pending' | 'sent' | 'negotiating' | 'responded' | 'accepted' | 'rejected' | 'cancelled';
+  status: 'pending' | 'sent' | 'negotiating' | 'responded' | 'accepted' | 'in_progress' | 'rejected' | 'completed' | 'cancelled';
   createdAt: string;
   lastMessage?: string;
   lastMessageDate?: string;
@@ -124,11 +124,23 @@ const getStatusConfig = (status: QuoteRequest['status']) => {
       color: 'bg-green-100 text-green-700 border-green-200',
       iconColor: 'text-green-600',
     },
+    in_progress: {
+      label: 'Em Andamento',
+      icon: Clock,
+      color: 'bg-purple-100 text-purple-700 border-purple-200',
+      iconColor: 'text-purple-600',
+    },
     rejected: {
       label: 'Recusado',
       icon: XCircle,
       color: 'bg-red-100 text-red-700 border-red-200',
       iconColor: 'text-red-600',
+    },
+    completed: {
+      label: 'Concluído',
+      icon: CheckCircle,
+      color: 'bg-teal-100 text-teal-700 border-teal-200',
+      iconColor: 'text-teal-600',
     },
     cancelled: {
       label: 'Cancelado',
