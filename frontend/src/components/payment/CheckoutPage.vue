@@ -68,8 +68,14 @@ const getUserEmail = (): string => {
 
 const userEmail = getUserEmail();
 
-// Inicializar WebSocket
-const { connected: wsConnected, connect: connectWS, disconnect: disconnectWS } = usePaymentWebSocket(userEmail);
+// Inicializar WebSocket com fallback de polling
+const { 
+  connected: wsConnected, 
+  connect: connectWS, 
+  disconnect: disconnectWS,
+  setPaymentId: setWsPaymentId,
+  startPolling 
+} = usePaymentWebSocket(userEmail);
 
 const paymentMethod = ref<string>('');
 const isProcessing = ref(false);
@@ -247,6 +253,15 @@ const generatePixQrCode = async () => {
 
     const payment = await response.json();
     currentPaymentId.value = payment.id;
+    
+    // Configurar monitoramento do pagamento (WebSocket + polling fallback)
+    setWsPaymentId(payment.id);
+    
+    // Iniciar polling como fallback se WebSocket não estiver conectado
+    if (!wsConnected.value) {
+      console.log('⚠️ WebSocket não conectado, iniciando polling...');
+      startPolling();
+    }
 
     // Buscar os dados do QR Code
     if (payment.asaasPaymentId) {
@@ -413,6 +428,15 @@ const checkExistingPayment = async () => {
       if (payment.status === 'PENDING' || payment.status === 'PROCESSING') {
         currentPaymentId.value = payment.id;
         paymentMethod.value = payment.paymentMethod?.toLowerCase() || 'pix';
+        
+        // Configurar monitoramento do pagamento (WebSocket + polling fallback)
+        setWsPaymentId(payment.id);
+        
+        // Iniciar polling como fallback se WebSocket não estiver conectado
+        if (!wsConnected.value) {
+          console.log('⚠️ WebSocket não conectado, iniciando polling...');
+          startPolling();
+        }
         
         // Se for PIX, buscar QR Code atualizado da API
         if (payment.paymentMethod?.toLowerCase() === 'pix') {
