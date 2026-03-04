@@ -6,7 +6,7 @@ import animationData from './404-animation.json';
 const router = useRouter();
 
 const goHome = () => {
-  router.push('/');
+  router.push('/login');
 };
 
 </script>
