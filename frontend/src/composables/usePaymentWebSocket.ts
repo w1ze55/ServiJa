@@ -39,7 +39,9 @@ export function usePaymentWebSocket(userEmail: string) {
         token: token || '',
       },
       debug: (str) => {
-        console.log('STOMP:', str);
+        if (str.includes('ERROR') || str.includes('CONNECTED') || str.includes('DISCONNECT')) {
+          console.log('STOMP:', str);
+        }
       },
       reconnectDelay: 5000,
       heartbeatIncoming: 4000,
@@ -51,7 +53,6 @@ export function usePaymentWebSocket(userEmail: string) {
       connected.value = true;
 
       // Inscrever no tópico de pagamentos do usuário
-      // Usar /user/queue/payment para notificações privadas
       stompClient.subscribe(`/user/queue/payment`, (message) => {
         console.log('📨 Notificação de pagamento recebida:', message.body);
         const notification: PaymentNotification = JSON.parse(message.body);
