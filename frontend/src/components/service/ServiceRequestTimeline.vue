@@ -7,6 +7,10 @@ import {
   MessageSquare,
   Clock,
   FileEdit,
+  CreditCard,
+  DollarSign,
+  AlertCircle,
+  CheckCircle2,
 } from 'lucide-vue-next';
 import Card from '../ui/card.vue';
 
@@ -34,6 +38,12 @@ const getDotClass = (key?: string) => {
   if (key === 'BUDGET_ACCEPTED' || key === 'COUNTER_PROPOSAL_ACCEPTED') return 'bg-green-100 ring-2 ring-green-300';
   if (key === 'COUNTER_PROPOSAL_REJECTED') return 'bg-red-100 ring-2 ring-red-300';
   if (key === 'COUNTER_PROPOSAL_SENT') return 'bg-purple-100 ring-2 ring-purple-300';
+  // Payment events
+  if (key === 'PAYMENT_CREATED') return 'bg-blue-100 ring-2 ring-blue-300';
+  if (key === 'PAYMENT_PENDING') return 'bg-yellow-100 ring-2 ring-yellow-300';
+  if (key === 'PAYMENT_CONFIRMED') return 'bg-green-100 ring-2 ring-green-300';
+  if (key === 'PAYMENT_CANCELLED' || key === 'PAYMENT_FAILED') return 'bg-red-100 ring-2 ring-red-300';
+  if (key === 'SERVICE_COMPLETED') return 'bg-green-100 ring-2 ring-green-300';
   return 'bg-amber-100 ring-2 ring-amber-300';
 };
 
@@ -42,6 +52,11 @@ const getLabelClass = (key?: string) => {
   if (key === 'REQUEST_REJECTED' || key === 'COUNTER_PROPOSAL_REJECTED' || key === 'CANCELLED') return 'text-red-700';
   if (key === 'BUDGET_ACCEPTED' || key === 'COUNTER_PROPOSAL_ACCEPTED') return 'text-green-700';
   if (key === 'COUNTER_PROPOSAL_SENT') return 'text-purple-700';
+  // Payment events
+  if (key === 'PAYMENT_CREATED') return 'text-blue-700';
+  if (key === 'PAYMENT_PENDING') return 'text-yellow-700';
+  if (key === 'PAYMENT_CONFIRMED' || key === 'SERVICE_COMPLETED') return 'text-green-700';
+  if (key === 'PAYMENT_CANCELLED' || key === 'PAYMENT_FAILED') return 'text-red-700';
   return 'text-amber-700';
 };
 </script>
@@ -79,6 +94,12 @@ const getLabelClass = (key?: string) => {
           <CheckCircle v-else-if="log.operationKey === 'BUDGET_ACCEPTED' || log.operationKey === 'COUNTER_PROPOSAL_ACCEPTED'" class="h-4 w-4 text-green-600" />
           <Send v-else-if="log.operationKey === 'BUDGET_SENT'" class="h-4 w-4 text-amber-600" />
           <FileEdit v-else-if="log.operationKey === 'COUNTER_PROPOSAL_SENT'" class="h-4 w-4 text-purple-600" />
+          <!-- Payment events -->
+          <CreditCard v-else-if="log.operationKey === 'PAYMENT_CREATED'" class="h-4 w-4 text-blue-600" />
+          <Clock v-else-if="log.operationKey === 'PAYMENT_PENDING'" class="h-4 w-4 text-yellow-600" />
+          <DollarSign v-else-if="log.operationKey === 'PAYMENT_CONFIRMED'" class="h-4 w-4 text-green-600" />
+          <AlertCircle v-else-if="log.operationKey === 'PAYMENT_CANCELLED' || log.operationKey === 'PAYMENT_FAILED'" class="h-4 w-4 text-red-600" />
+          <CheckCircle2 v-else-if="log.operationKey === 'SERVICE_COMPLETED'" class="h-4 w-4 text-green-600" />
           <MessageSquare v-else class="h-4 w-4 text-amber-600" />
         </div>
 
