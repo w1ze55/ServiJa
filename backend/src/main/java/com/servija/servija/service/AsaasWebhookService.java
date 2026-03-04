@@ -35,7 +35,7 @@ public class AsaasWebhookService {
     @Transactional
     public void processWebhook(Map<String, Object> payload) {
         String event = (String) payload.get("event");
-        
+
         if (event == null) {
             log.warn("Webhook sem evento especificado");
             return;
@@ -45,7 +45,7 @@ public class AsaasWebhookService {
 
         @SuppressWarnings("unchecked")
         Map<String, Object> payment = (Map<String, Object>) payload.get("payment");
-        
+
         @SuppressWarnings("unchecked")
         Map<String, Object> transfer = (Map<String, Object>) payload.get("transfer");
 
@@ -196,22 +196,22 @@ public class AsaasWebhookService {
 
         String asaasPaymentId = (String) paymentData.get("id");
         String asaasStatus = (String) paymentData.get("status");
-        
-        log.info("🔔 Webhook PAYMENT_RECEIVED/CONFIRMED recebido - Asaas Payment ID: {}, Status: {}", 
+
+        log.info("🔔 Webhook PAYMENT_RECEIVED/CONFIRMED recebido - Asaas Payment ID: {}, Status: {}",
                 asaasPaymentId, asaasStatus);
-        
+
         Payment payment = paymentRepository.findByAsaasPaymentId(asaasPaymentId);
 
         if (payment == null) {
             log.error("❌ Pagamento não encontrado no sistema: {}", asaasPaymentId);
-            log.error("📋 Todos os IDs Asaas no banco: {}", 
+            log.error("📋 Todos os IDs Asaas no banco: {}",
                     paymentRepository.findAll().stream()
-                        .map(Payment::getAsaasPaymentId)
-                        .toList());
+                            .map(Payment::getAsaasPaymentId)
+                            .toList());
             return;
         }
 
-        log.info("✅ Pagamento encontrado no banco - ID: {}, Status Atual: {}", 
+        log.info("✅ Pagamento encontrado no banco - ID: {}, Status Atual: {}",
                 payment.getId(), payment.getStatus());
 
         if (payment.getStatus() != Payment.PaymentStatus.COMPLETED) {
@@ -222,38 +222,37 @@ public class AsaasWebhookService {
             log.info("💾 Status atualizado para COMPLETED");
 
             // Registrar no histórico
-            saveStatusHistory(payment, Payment.PaymentStatus.COMPLETED, "PAYMENT_RECEIVED", 
-                "Pagamento recebido/confirmado via webhook Asaas");
+            saveStatusHistory(payment, Payment.PaymentStatus.COMPLETED, "PAYMENT_RECEIVED",
+                    "Pagamento recebido/confirmado via webhook Asaas");
 
             // Adicionar saldo pendente na carteira do freelancer
             walletService.addPendingBalance(
-                payment.getFreelancer(),
-                payment.getAmount()
-            );
+                    payment.getFreelancer(),
+                    payment.getAmount());
 
             log.info("💰 Saldo adicionado à carteira: R$ {}", payment.getAmount());
 
-            // Atualizar status da solicitação para COMPLETED E HABILITAR CHAT
+            // Atualizar status da solicitação para ACCEPTED E HABILITAR CHAT
             ServiceRequest serviceRequest = payment.getServiceRequest();
-            if (serviceRequest.getStatus() != ServiceRequest.Status.COMPLETED) {
-                serviceRequest.setStatus(ServiceRequest.Status.COMPLETED);
+            if (serviceRequest.getStatus() != ServiceRequest.Status.ACCEPTED) {
+                serviceRequest.setStatus(ServiceRequest.Status.ACCEPTED);
                 serviceRequest.setChatEnabled(true); // 🔓 HABILITAR CHAT
                 serviceRequestRepository.save(serviceRequest);
-                log.info("🔓 Chat habilitado! Solicitação ID: {}", serviceRequest.getId());
+                log.info("🔓 Chat habilitado e status atualizado para ACCEPTED! Solicitação ID: {}",
+                        serviceRequest.getId());
             } else if (!Boolean.TRUE.equals(serviceRequest.getChatEnabled())) {
-                // Se já estava completed mas chat não estava habilitado
+                // Se já estava ACCEPTED mas chat não estava habilitado
                 serviceRequest.setChatEnabled(true);
                 serviceRequestRepository.save(serviceRequest);
-                log.info("🔓 Chat habilitado (solicitação já estava COMPLETED)");
+                log.info("🔓 Chat habilitado (solicitação já estava ACCEPTED)");
             }
 
             // Enviar notificação WebSocket para o cliente
             webSocketService.notifyPixPaymentConfirmed(
-                payment.getId(),
-                payment.getContractor().getEmail()
-            );
+                    payment.getId(),
+                    payment.getContractor().getEmail());
 
-            log.info("✅ Pagamento confirmado via webhook: {} - R$ {}", 
+            log.info("✅ Pagamento confirmado via webhook: {} - R$ {}",
                     asaasPaymentId, payment.getAmount());
         } else {
             log.info("ℹ️ Pagamento já estava COMPLETED, nenhuma ação necessária");
@@ -263,49 +262,52 @@ public class AsaasWebhookService {
     /**
      * Salvar histórico de mudança de status
      */
-    private void saveStatusHistory(Payment payment, Payment.PaymentStatus newStatus, 
-                                   String asaasEvent, String details) {
+    private void saveStatusHistory(Payment payment, Payment.PaymentStatus newStatus,
+            String asaasEvent, String details) {
         PaymentStatusHistory history = PaymentStatusHistory.builder()
-            .payment(payment)
-            .status(newStatus)
-            .asaasEvent(asaasEvent)
-            .details(details)
-            .build();
-        
+                .payment(payment)
+                .status(newStatus)
+                .asaasEvent(asaasEvent)
+                .details(details)
+                .build();
+
         paymentStatusHistoryRepository.save(history);
-        log.debug("Histórico de status salvo: Payment ID={}, Status={}, Event={}", 
-                 payment.getId(), newStatus, asaasEvent);
+        log.debug("Histórico de status salvo: Payment ID={}, Status={}, Event={}",
+                payment.getId(), newStatus, asaasEvent);
     }
 
     /**
      * Pagamento vencido
      */
     private void handlePaymentOverdue(Map<String, Object> paymentData) {
-        if (paymentData == null) return;
+        if (paymentData == null)
+            return;
 
         String asaasPaymentId = (String) paymentData.get("id");
         log.info("Pagamento vencido: {}", asaasPaymentId);
-        
+
         Payment payment = paymentRepository.findByAsaasPaymentId(asaasPaymentId);
 
         if (payment != null) {
             payment.setStatus(Payment.PaymentStatus.OVERDUE);
             paymentRepository.save(payment);
-            
+
             saveStatusHistory(payment, Payment.PaymentStatus.OVERDUE, "PAYMENT_OVERDUE",
-                "Pagamento vencido");
-            
+                    "Pagamento vencido");
+
             log.info("Status do pagamento atualizado para OVERDUE: {}", asaasPaymentId);
         }
     }
 
-    // ==================== EVENTOS DE AUTORIZAÇÃO E ANÁLISE DE RISCO ====================
+    // ==================== EVENTOS DE AUTORIZAÇÃO E ANÁLISE DE RISCO
+    // ====================
 
     /**
      * Pagamento autorizado (aguardando captura)
      */
     private void handlePaymentAuthorized(Map<String, Object> paymentData) {
-        if (paymentData == null) return;
+        if (paymentData == null)
+            return;
         String asaasPaymentId = (String) paymentData.get("id");
         log.info("Pagamento autorizado (aguardando captura): {}", asaasPaymentId);
     }
@@ -314,7 +316,8 @@ public class AsaasWebhookService {
      * Pagamento aguardando análise de risco
      */
     private void handlePaymentAwaitingRiskAnalysis(Map<String, Object> paymentData) {
-        if (paymentData == null) return;
+        if (paymentData == null)
+            return;
         String asaasPaymentId = (String) paymentData.get("id");
         log.info("Pagamento aguardando análise de risco: {}", asaasPaymentId);
     }
@@ -323,7 +326,8 @@ public class AsaasWebhookService {
      * Pagamento aprovado pela análise de risco
      */
     private void handlePaymentApprovedByRiskAnalysis(Map<String, Object> paymentData) {
-        if (paymentData == null) return;
+        if (paymentData == null)
+            return;
         String asaasPaymentId = (String) paymentData.get("id");
         log.info("Pagamento aprovado pela análise de risco: {}", asaasPaymentId);
     }
@@ -332,25 +336,25 @@ public class AsaasWebhookService {
      * Pagamento reprovado pela análise de risco
      */
     private void handlePaymentReprovedByRiskAnalysis(Map<String, Object> paymentData) {
-        if (paymentData == null) return;
+        if (paymentData == null)
+            return;
 
         String asaasPaymentId = (String) paymentData.get("id");
-        
+
         Payment payment = paymentRepository.findByAsaasPaymentId(asaasPaymentId);
 
         if (payment != null) {
             payment.setStatus(Payment.PaymentStatus.FAILED);
             paymentRepository.save(payment);
-            
+
             saveStatusHistory(payment, Payment.PaymentStatus.FAILED, "PAYMENT_REPROVED_BY_RISK_ANALYSIS",
-                "Pagamento reprovado pela análise de risco");
-            
+                    "Pagamento reprovado pela análise de risco");
+
             webSocketService.notifyPaymentFailed(
-                payment.getId(),
-                payment.getContractor().getEmail(),
-                "Pagamento reprovado pela análise de risco"
-            );
-            
+                    payment.getId(),
+                    payment.getContractor().getEmail(),
+                    "Pagamento reprovado pela análise de risco");
+
             log.warn("Pagamento reprovado pela análise de risco: {}", asaasPaymentId);
         }
     }
@@ -361,7 +365,8 @@ public class AsaasWebhookService {
      * Pagamento criado
      */
     private void handlePaymentCreated(Map<String, Object> paymentData) {
-        if (paymentData == null) return;
+        if (paymentData == null)
+            return;
         String asaasPaymentId = (String) paymentData.get("id");
         log.info("Pagamento criado no Asaas: {}", asaasPaymentId);
     }
@@ -370,7 +375,8 @@ public class AsaasWebhookService {
      * Pagamento atualizado
      */
     private void handlePaymentUpdated(Map<String, Object> paymentData) {
-        if (paymentData == null) return;
+        if (paymentData == null)
+            return;
         String asaasPaymentId = (String) paymentData.get("id");
         log.info("Pagamento atualizado: {}", asaasPaymentId);
     }
@@ -379,10 +385,11 @@ public class AsaasWebhookService {
      * Captura de cartão recusada
      */
     private void handlePaymentCaptureRefused(Map<String, Object> paymentData) {
-        if (paymentData == null) return;
+        if (paymentData == null)
+            return;
 
         String asaasPaymentId = (String) paymentData.get("id");
-        
+
         List<Payment> payments = paymentRepository.findAll().stream()
                 .filter(p -> asaasPaymentId.equals(p.getAsaasPaymentId()))
                 .toList();
@@ -391,16 +398,15 @@ public class AsaasWebhookService {
             Payment payment = payments.get(0);
             payment.setStatus(Payment.PaymentStatus.FAILED);
             paymentRepository.save(payment);
-            
+
             saveStatusHistory(payment, Payment.PaymentStatus.FAILED, "PAYMENT_CREDIT_CARD_CAPTURE_REFUSED",
-                "Captura de cartão recusada");
-            
+                    "Captura de cartão recusada");
+
             webSocketService.notifyPaymentFailed(
-                payment.getId(),
-                payment.getContractor().getEmail(),
-                "Captura de cartão recusada"
-            );
-            
+                    payment.getId(),
+                    payment.getContractor().getEmail(),
+                    "Captura de cartão recusada");
+
             log.error("Captura de cartão recusada: {}", asaasPaymentId);
         }
     }
@@ -411,7 +417,8 @@ public class AsaasWebhookService {
      * Estorno em progresso
      */
     private void handlePaymentRefundInProgress(Map<String, Object> paymentData) {
-        if (paymentData == null) return;
+        if (paymentData == null)
+            return;
         String asaasPaymentId = (String) paymentData.get("id");
         log.info("Estorno em progresso: {}", asaasPaymentId);
     }
@@ -420,7 +427,8 @@ public class AsaasWebhookService {
      * Estorno negado
      */
     private void handlePaymentRefundDenied(Map<String, Object> paymentData) {
-        if (paymentData == null) return;
+        if (paymentData == null)
+            return;
         String asaasPaymentId = (String) paymentData.get("id");
         log.warn("Estorno negado: {}", asaasPaymentId);
     }
@@ -431,10 +439,11 @@ public class AsaasWebhookService {
      * Chargeback solicitado
      */
     private void handlePaymentChargebackRequested(Map<String, Object> paymentData) {
-        if (paymentData == null) return;
+        if (paymentData == null)
+            return;
 
         String asaasPaymentId = (String) paymentData.get("id");
-        
+
         List<Payment> payments = paymentRepository.findAll().stream()
                 .filter(p -> asaasPaymentId.equals(p.getAsaasPaymentId()))
                 .toList();
@@ -443,11 +452,11 @@ public class AsaasWebhookService {
             Payment payment = payments.get(0);
             payment.setStatus(Payment.PaymentStatus.CHARGEBACK);
             paymentRepository.save(payment);
-            
+
             saveStatusHistory(payment, Payment.PaymentStatus.CHARGEBACK, "PAYMENT_CHARGEBACK_REQUESTED",
-                "Chargeback solicitado");
-            
-            log.error("⚠️ CHARGEBACK solicitado: {} - R$ {}", 
+                    "Chargeback solicitado");
+
+            log.error("⚠️ CHARGEBACK solicitado: {} - R$ {}",
                     asaasPaymentId, payment.getAmount());
         }
     }
@@ -456,7 +465,8 @@ public class AsaasWebhookService {
      * Chargeback em disputa
      */
     private void handlePaymentChargebackDispute(Map<String, Object> paymentData) {
-        if (paymentData == null) return;
+        if (paymentData == null)
+            return;
         String asaasPaymentId = (String) paymentData.get("id");
         log.info("Chargeback em disputa: {}", asaasPaymentId);
     }
@@ -465,7 +475,8 @@ public class AsaasWebhookService {
      * Aguardando reversão de chargeback
      */
     private void handlePaymentAwaitingChargebackReversal(Map<String, Object> paymentData) {
-        if (paymentData == null) return;
+        if (paymentData == null)
+            return;
         String asaasPaymentId = (String) paymentData.get("id");
         log.info("Aguardando reversão de chargeback (disputa vencida): {}", asaasPaymentId);
     }
@@ -476,10 +487,11 @@ public class AsaasWebhookService {
      * Pagamento deletado
      */
     private void handlePaymentDeleted(Map<String, Object> paymentData) {
-        if (paymentData == null) return;
+        if (paymentData == null)
+            return;
 
         String asaasPaymentId = (String) paymentData.get("id");
-        
+
         List<Payment> payments = paymentRepository.findAll().stream()
                 .filter(p -> asaasPaymentId.equals(p.getAsaasPaymentId()))
                 .toList();
@@ -488,10 +500,10 @@ public class AsaasWebhookService {
             Payment payment = payments.get(0);
             payment.setStatus(Payment.PaymentStatus.CANCELLED);
             paymentRepository.save(payment);
-            
+
             saveStatusHistory(payment, Payment.PaymentStatus.CANCELLED, "PAYMENT_DELETED",
-                "Pagamento deletado/cancelado");
-            
+                    "Pagamento deletado/cancelado");
+
             log.info("Pagamento deletado: {}", asaasPaymentId);
         }
     }
@@ -500,10 +512,11 @@ public class AsaasWebhookService {
      * Pagamento restaurado
      */
     private void handlePaymentRestored(Map<String, Object> paymentData) {
-        if (paymentData == null) return;
+        if (paymentData == null)
+            return;
 
         String asaasPaymentId = (String) paymentData.get("id");
-        
+
         List<Payment> payments = paymentRepository.findAll().stream()
                 .filter(p -> asaasPaymentId.equals(p.getAsaasPaymentId()))
                 .toList();
@@ -522,7 +535,8 @@ public class AsaasWebhookService {
      * Split cancelado
      */
     private void handlePaymentSplitCancelled(Map<String, Object> paymentData) {
-        if (paymentData == null) return;
+        if (paymentData == null)
+            return;
         String asaasPaymentId = (String) paymentData.get("id");
         log.warn("Split cancelado: {}", asaasPaymentId);
     }
@@ -531,7 +545,8 @@ public class AsaasWebhookService {
      * Bloqueio por divergência de split
      */
     private void handlePaymentSplitDivergenceBlock(Map<String, Object> paymentData) {
-        if (paymentData == null) return;
+        if (paymentData == null)
+            return;
         String asaasPaymentId = (String) paymentData.get("id");
         log.warn("Valor bloqueado por divergência de split: {}", asaasPaymentId);
     }
@@ -540,7 +555,8 @@ public class AsaasWebhookService {
      * Bloqueio por divergência de split finalizado
      */
     private void handlePaymentSplitDivergenceBlockFinished(Map<String, Object> paymentData) {
-        if (paymentData == null) return;
+        if (paymentData == null)
+            return;
         String asaasPaymentId = (String) paymentData.get("id");
         log.info("Bloqueio por divergência de split finalizado: {}", asaasPaymentId);
     }
@@ -551,7 +567,8 @@ public class AsaasWebhookService {
      * Boleto visualizado
      */
     private void handlePaymentBankSlipViewed(Map<String, Object> paymentData) {
-        if (paymentData == null) return;
+        if (paymentData == null)
+            return;
         String asaasPaymentId = (String) paymentData.get("id");
         log.info("Boleto visualizado pelo cliente: {}", asaasPaymentId);
     }
@@ -560,7 +577,8 @@ public class AsaasWebhookService {
      * Checkout visualizado
      */
     private void handlePaymentCheckoutViewed(Map<String, Object> paymentData) {
-        if (paymentData == null) return;
+        if (paymentData == null)
+            return;
         String asaasPaymentId = (String) paymentData.get("id");
         log.info("Checkout visualizado pelo cliente: {}", asaasPaymentId);
     }
@@ -569,10 +587,11 @@ public class AsaasWebhookService {
      * Boleto cancelado por expiração
      */
     private void handlePaymentBankSlipCancelled(Map<String, Object> paymentData) {
-        if (paymentData == null) return;
+        if (paymentData == null)
+            return;
 
         String asaasPaymentId = (String) paymentData.get("id");
-        
+
         List<Payment> payments = paymentRepository.findAll().stream()
                 .filter(p -> asaasPaymentId.equals(p.getAsaasPaymentId()))
                 .toList();
@@ -591,7 +610,8 @@ public class AsaasWebhookService {
      * Pagamento antecipado
      */
     private void handlePaymentAnticipated(Map<String, Object> paymentData) {
-        if (paymentData == null) return;
+        if (paymentData == null)
+            return;
         String asaasPaymentId = (String) paymentData.get("id");
         log.info("Pagamento antecipado: {}", asaasPaymentId);
     }
@@ -600,7 +620,8 @@ public class AsaasWebhookService {
      * Negativação solicitada
      */
     private void handlePaymentDunningRequested(Map<String, Object> paymentData) {
-        if (paymentData == null) return;
+        if (paymentData == null)
+            return;
         String asaasPaymentId = (String) paymentData.get("id");
         log.warn("Negativação solicitada: {}", asaasPaymentId);
     }
@@ -609,7 +630,8 @@ public class AsaasWebhookService {
      * Negativação recebida
      */
     private void handlePaymentDunningReceived(Map<String, Object> paymentData) {
-        if (paymentData == null) return;
+        if (paymentData == null)
+            return;
         String asaasPaymentId = (String) paymentData.get("id");
         log.info("Recebimento de negativação: {}", asaasPaymentId);
     }
@@ -618,10 +640,11 @@ public class AsaasWebhookService {
      * Recebimento em dinheiro desfeito
      */
     private void handlePaymentReceivedInCashUndone(Map<String, Object> paymentData) {
-        if (paymentData == null) return;
+        if (paymentData == null)
+            return;
 
         String asaasPaymentId = (String) paymentData.get("id");
-        
+
         List<Payment> payments = paymentRepository.findAll().stream()
                 .filter(p -> asaasPaymentId.equals(p.getAsaasPaymentId()))
                 .toList();
@@ -638,10 +661,11 @@ public class AsaasWebhookService {
      * Pagamento reembolsado
      */
     private void handlePaymentRefunded(Map<String, Object> paymentData) {
-        if (paymentData == null) return;
+        if (paymentData == null)
+            return;
 
         String asaasPaymentId = (String) paymentData.get("id");
-        
+
         List<Payment> payments = paymentRepository.findAll().stream()
                 .filter(p -> asaasPaymentId.equals(p.getAsaasPaymentId()))
                 .toList();
@@ -656,7 +680,7 @@ public class AsaasWebhookService {
         paymentRepository.save(payment);
 
         saveStatusHistory(payment, Payment.PaymentStatus.REFUNDED, "PAYMENT_REFUNDED",
-            "Pagamento reembolsado/estornado");
+                "Pagamento reembolsado/estornado");
 
         log.info("Pagamento reembolsado via webhook: {}", asaasPaymentId);
     }
@@ -671,7 +695,7 @@ public class AsaasWebhookService {
         }
 
         String asaasTransferId = (String) transferData.get("id");
-        
+
         List<WithdrawalRequest> withdrawals = withdrawalRepository.findAll().stream()
                 .filter(w -> asaasTransferId.equals(w.getAsaasTransferId()))
                 .toList();
@@ -688,7 +712,7 @@ public class AsaasWebhookService {
             withdrawal.setProcessedAt(LocalDateTime.now());
             withdrawalRepository.save(withdrawal);
 
-            log.info("Saque confirmado via webhook: {} - R$ {}", 
+            log.info("Saque confirmado via webhook: {} - R$ {}",
                     asaasTransferId, withdrawal.getAmount());
         }
     }
@@ -697,11 +721,12 @@ public class AsaasWebhookService {
      * Transferência falhou
      */
     private void handleTransferFailed(Map<String, Object> transferData) {
-        if (transferData == null) return;
+        if (transferData == null)
+            return;
 
         String asaasTransferId = (String) transferData.get("id");
         String failReason = (String) transferData.get("failReason");
-        
+
         List<WithdrawalRequest> withdrawals = withdrawalRepository.findAll().stream()
                 .filter(w -> asaasTransferId.equals(w.getAsaasTransferId()))
                 .toList();
@@ -718,11 +743,10 @@ public class AsaasWebhookService {
 
         // Reverter saldo do freelancer
         walletService.addPendingBalance(
-            withdrawal.getFreelancer(),
-            withdrawal.getAmount()
-        );
+                withdrawal.getFreelancer(),
+                withdrawal.getAmount());
 
-        log.error("Saque falhou via webhook: {} - Motivo: {}", 
+        log.error("Saque falhou via webhook: {} - Motivo: {}",
                 asaasTransferId, failReason);
     }
 }

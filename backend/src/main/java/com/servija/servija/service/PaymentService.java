@@ -40,7 +40,8 @@ public class PaymentService {
     private static final BigDecimal ASAAS_PIX_FEE = new BigDecimal("0.99"); // Taxa Asaas para PIX (promocional)
     private static final BigDecimal ASAAS_BOLETO_FEE = new BigDecimal("0.99"); // Taxa Asaas para Boleto (promocional)
     private static final BigDecimal ASAAS_CREDIT_CARD_FIXED_FEE = new BigDecimal("0.49"); // Taxa fixa cartão
-    private static final BigDecimal ASAAS_CREDIT_CARD_PERCENTAGE = new BigDecimal("0.0199"); // 1,99% cartão (promocional)
+    private static final BigDecimal ASAAS_CREDIT_CARD_PERCENTAGE = new BigDecimal("0.0199"); // 1,99% cartão
+                                                                                             // (promocional)
     private static final int RELEASE_DAYS = 7; // Dias para liberar saldo ao freelancer
 
     @Transactional
@@ -66,7 +67,7 @@ public class PaymentService {
         }
 
         BigDecimal amount = request.getAmount(); // Valor que o CLIENTE paga
-        
+
         // Calcular taxa do gateway baseado no método de pagamento
         BigDecimal gatewayFee = BigDecimal.ZERO;
         switch (request.getPaymentMethod().toLowerCase()) {
@@ -78,37 +79,38 @@ public class PaymentService {
                 break;
             case "credit-card":
                 gatewayFee = ASAAS_CREDIT_CARD_FIXED_FEE
-                    .add(amount.multiply(ASAAS_CREDIT_CARD_PERCENTAGE));
+                        .add(amount.multiply(ASAAS_CREDIT_CARD_PERCENTAGE));
                 break;
         }
-        
+
         // Valor líquido após deduzir taxa do gateway
         BigDecimal netAmount = amount.subtract(gatewayFee);
-        
+
         // Taxa da plataforma (10% do valor líquido)
         BigDecimal platformFee = netAmount.multiply(PLATFORM_FEE_PERCENTAGE);
-        
+
         // Valor que o freelancer receberá (após todas as deduções)
         BigDecimal freelancerAmount = netAmount.subtract(platformFee);
-        
+
         // totalAmount é o que o cliente paga (não muda)
         BigDecimal totalAmount = amount;
 
-        // Obter CPF do contratante (usar CPF do request se fornecido, senão usar do perfil)
-        String cpfCnpj = request.getCpf() != null && !request.getCpf().isEmpty() 
-            ? request.getCpf() 
-            : contractor.getCpf();
-            
+        // Obter CPF do contratante (usar CPF do request se fornecido, senão usar do
+        // perfil)
+        String cpfCnpj = request.getCpf() != null && !request.getCpf().isEmpty()
+                ? request.getCpf()
+                : contractor.getCpf();
+
         if (cpfCnpj == null || cpfCnpj.isEmpty()) {
-            throw new IllegalStateException("CPF/CNPJ do contratante não cadastrado. Por favor, informe o CPF para realizar o pagamento.");
+            throw new IllegalStateException(
+                    "CPF/CNPJ do contratante não cadastrado. Por favor, informe o CPF para realizar o pagamento.");
         }
 
         // Criar ou recuperar cliente no Asaas
         String asaasCustomerId = asaasService.getOrCreateCustomer(
-            contractor.getEmail(),
-            contractor.getName(),
-            cpfCnpj
-        );
+                contractor.getEmail(),
+                contractor.getName(),
+                cpfCnpj);
 
         Payment payment = Payment.builder()
                 .serviceRequest(serviceRequest)
@@ -151,8 +153,9 @@ public class PaymentService {
         paymentStatusHistoryRepository.save(initialHistory);
 
         // NÃO atualizar status da solicitação aqui!
-        // O status só deve mudar para COMPLETED quando o pagamento for confirmado (via webhook)
-        
+        // O status só deve mudar para COMPLETED quando o pagamento for confirmado (via
+        // webhook)
+
         log.info("Pagamento criado com sucesso. ID: {}, Asaas ID: {}", payment.getId(), payment.getAsaasPaymentId());
 
         return mapToResponse(payment);
@@ -165,12 +168,11 @@ public class PaymentService {
             String description = "ServiJá - " + serviceRequest.getServiceName();
 
             Map<String, Object> asaasPayment = asaasService.createPayment(
-                asaasCustomerId,
-                payment.getTotalAmount(),
-                dueDate,
-                "PIX",
-                description
-            );
+                    asaasCustomerId,
+                    payment.getTotalAmount(),
+                    dueDate,
+                    "PIX",
+                    description);
 
             payment.setAsaasPaymentId((String) asaasPayment.get("id"));
 
@@ -195,7 +197,7 @@ public class PaymentService {
         // Extrair últimos 4 dígitos
         String cardNumber = cardData.getNumber().replaceAll("\\s", "");
         payment.setCardLastDigits(cardNumber.substring(cardNumber.length() - 4));
-        
+
         // Por enquanto, simular aprovação instantânea
         // TODO: Integrar com gateway de cartão de crédito do Asaas
         payment.setStatus(Payment.PaymentStatus.COMPLETED);
@@ -224,8 +226,19 @@ public class PaymentService {
         if (payments.isEmpty()) {
             throw new ResourceNotFoundException("Nenhum pagamento encontrado para esta solicitação");
         }
-        // Retornar o pagamento mais recente
-        return mapToResponse(payments.get(0));
+
+        Payment payment = payments.get(0);
+
+        // Se o pagamento não for final, verificar status no Asaas para garantir
+        // sincronia
+        if (payment.getStatus() != Payment.PaymentStatus.COMPLETED &&
+                payment.getStatus() != Payment.PaymentStatus.REFUNDED &&
+                payment.getAsaasPaymentId() != null) {
+            log.info("Sincronizando status do pagamento {} com Asaas ao buscar por solicitação", payment.getId());
+            return checkAsaasPaymentStatus(payment.getId());
+        }
+
+        return mapToResponse(payment);
     }
 
     public List<PaymentResponse> getMyPayments(String email) {
@@ -250,7 +263,7 @@ public class PaymentService {
                 .orElseThrow(() -> new ResourceNotFoundException("Pagamento não encontrado"));
 
         payment.setStatus(Payment.PaymentStatus.valueOf(status.toUpperCase()));
-        
+
         if (status.equalsIgnoreCase("COMPLETED")) {
             payment.setCompletedAt(LocalDateTime.now());
         }
@@ -270,25 +283,24 @@ public class PaymentService {
         if (payment.getAsaasPaymentId() != null) {
             try {
                 String asaasStatus = asaasService.getPaymentStatus(payment.getAsaasPaymentId());
-                
+
                 // Mapear status do Asaas para nosso sistema
                 Payment.PaymentStatus newStatus = mapAsaasStatus(asaasStatus);
-                
+
                 if (newStatus != payment.getStatus()) {
                     payment.setStatus(newStatus);
-                    
-                if (newStatus == Payment.PaymentStatus.COMPLETED) {
-                    payment.setCompletedAt(LocalDateTime.now());
-                    
-                    // Adicionar saldo pendente na carteira do freelancer
-                    walletService.addPendingBalance(
-                        payment.getFreelancer(),
-                        payment.getAmount()
-                    );
-                    
-                    log.info("Saldo adicionado à carteira do freelancer: R$ {}", payment.getAmount());
-                }
-                    
+
+                    if (newStatus == Payment.PaymentStatus.COMPLETED) {
+                        payment.setCompletedAt(LocalDateTime.now());
+
+                        // Adicionar saldo pendente na carteira do freelancer
+                        walletService.addPendingBalance(
+                                payment.getFreelancer(),
+                                payment.getAmount());
+
+                        log.info("Saldo adicionado à carteira do freelancer: R$ {}", payment.getAmount());
+                    }
+
                     payment = paymentRepository.save(payment);
                     log.info("Status do pagamento {} atualizado para {}", id, newStatus);
                 }
@@ -321,17 +333,17 @@ public class PaymentService {
         Payment payment = paymentRepository.findById(paymentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Pagamento não encontrado"));
 
-        // Se o pagamento já foi confirmado, retornar dados salvos ao invés de buscar no Asaas
+        // Se o pagamento já foi confirmado, retornar dados salvos ao invés de buscar no
+        // Asaas
         if (payment.getStatus() == Payment.PaymentStatus.COMPLETED) {
             log.info("Pagamento {} já confirmado, retornando dados salvos", paymentId);
             return Map.of(
-                "encodedImage", payment.getPixQrCode() != null ? payment.getPixQrCode() : "",
-                "payload", payment.getPixCopyPaste() != null ? payment.getPixCopyPaste() : "",
-                "expirationDate", "",
-                "description", "Pagamento já confirmado",
-                "status", "COMPLETED",
-                "message", "Este pagamento já foi confirmado e processado!"
-            );
+                    "encodedImage", payment.getPixQrCode() != null ? payment.getPixQrCode() : "",
+                    "payload", payment.getPixCopyPaste() != null ? payment.getPixCopyPaste() : "",
+                    "expirationDate", "",
+                    "description", "Pagamento já confirmado",
+                    "status", "COMPLETED",
+                    "message", "Este pagamento já foi confirmado e processado!");
         }
 
         if (payment.getAsaasPaymentId() == null) {
@@ -346,12 +358,11 @@ public class PaymentService {
             Map<String, String> pixData = asaasService.getPixQrCode(payment.getAsaasPaymentId());
 
             return Map.of(
-                "encodedImage", pixData.get("encodedImage"),
-                "payload", pixData.get("payload"),
-                "expirationDate", pixData.getOrDefault("expirationDate", ""),
-                "description", pixData.getOrDefault("description", ""),
-                "status", payment.getStatus().name()
-            );
+                    "encodedImage", pixData.get("encodedImage"),
+                    "payload", pixData.get("payload"),
+                    "expirationDate", pixData.getOrDefault("expirationDate", ""),
+                    "description", pixData.getOrDefault("description", ""),
+                    "status", payment.getStatus().name());
         } catch (Exception e) {
             log.error("Erro ao obter QR Code PIX", e);
             throw new RuntimeException("Erro ao obter QR Code PIX: " + e.getMessage());
