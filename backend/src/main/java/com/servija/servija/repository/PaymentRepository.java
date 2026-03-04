@@ -23,4 +23,17 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
      * Buscar pagamento por ID do Asaas (otimizado para webhook)
      */
     Payment findByAsaasPaymentId(String asaasPaymentId);
+
+    /**
+     * Buscar pagamento por ID da transação PIX
+     */
+    Payment findByPixTransactionId(String pixTransactionId);
+
+    /**
+     * Buscar pagamentos PIX pendentes por valor
+     */
+    List<Payment> findByPaymentMethodAndStatusInAndTotalAmount(
+            String paymentMethod,
+            List<Payment.PaymentStatus> statuses,
+            java.math.BigDecimal totalAmount);
 }

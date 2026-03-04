@@ -71,6 +71,15 @@ public class Payment {
     @Column(name = "pix_copy_paste", columnDefinition = "TEXT")
     private String pixCopyPaste;
 
+    @Column(name = "pix_transaction_id", length = 255)
+    private String pixTransactionId;
+
+    @Column(name = "pix_end_to_end_id", length = 255)
+    private String pixEndToEndId;
+
+    @Column(name = "pix_transaction_status", length = 100)
+    private String pixTransactionStatus;
+
     @Column(name = "card_last_digits", length = 4)
     private String cardLastDigits;
 
