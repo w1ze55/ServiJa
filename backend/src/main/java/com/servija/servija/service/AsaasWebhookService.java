@@ -1,5 +1,7 @@
 package com.servija.servija.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.servija.servija.dto.PixTransactionWebhookDTO;
 import com.servija.servija.model.Payment;
 import com.servija.servija.model.PaymentStatusHistory;
 import com.servija.servija.model.ServiceRequest;
@@ -13,6 +15,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -28,6 +31,7 @@ public class AsaasWebhookService {
     private final WithdrawalRequestRepository withdrawalRepository;
     private final FreelancerWalletService walletService;
     private final WebSocketService webSocketService;
+    private final ObjectMapper objectMapper;
 
     /**
      * Processa webhook recebido do Asaas
@@ -747,5 +751,273 @@ public class AsaasWebhookService {
 
         log.error("Saque falhou via webhook: {} - Motivo: {}",
                 asaasTransferId, failReason);
+    }
+
+    // ==================== PROCESSAMENTO DE TRANSAÇÕES PIX ====================
+
+    /**
+     * Processa webhook de transação PIX recebida (via QR Code estático ou chave PIX)
+     * 
+     * Status possíveis:
+     * - AWAITING_CRITICAL_ACTION_AUTHORIZATION: Aguardando autorização de ação crítica
+     * - DONE: Transação concluída com sucesso
+     * - CANCELLED: Transação cancelada
+     * - PENDING: Pendente
+     * - SCHEDULED: Agendada
+     * - IN_BANK_PROCESSING: Em processamento bancário
+     * - FAILED: Falhou
+     * - REFUNDED: Estornada
+     * - PARTIALLY_REFUNDED: Parcialmente estornada
+     */
+    @Transactional
+    public void processPixTransactionWebhook(Map<String, Object> payload) {
+        try {
+            // Converter payload para DTO
+            PixTransactionWebhookDTO pixTransaction = objectMapper.convertValue(payload, PixTransactionWebhookDTO.class);
+
+            String transactionId = pixTransaction.getId();
+            String status = pixTransaction.getStatus();
+            String originType = pixTransaction.getOriginType();
+            BigDecimal value = pixTransaction.getValue();
+            String conciliationId = pixTransaction.getConciliationIdentifier();
+            String endToEndId = pixTransaction.getEndToEndIdentifier();
+
+            log.info("🔔 Processando PIX Transaction - ID: {}, Status: {}, Origem: {}, Valor: R$ {}",
+                    transactionId, status, originType, value);
+
+            // Tentar encontrar o pagamento relacionado
+            Payment payment = findPaymentByPixTransaction(pixTransaction);
+
+            if (payment == null) {
+                log.warn("⚠️ Pagamento não encontrado para transação PIX: {} (conciliação: {})",
+                        transactionId, conciliationId);
+                log.info("📋 Dados da transação não vinculada: Origem={}, Valor=R${}, Pagador={}",
+                        originType, value,
+                        pixTransaction.getExternalAccount() != null ? pixTransaction.getExternalAccount().getName() : "N/A");
+                return;
+            }
+
+            // Atualizar informações da transação PIX no pagamento
+            payment.setPixTransactionId(transactionId);
+            payment.setPixEndToEndId(endToEndId);
+            payment.setPixTransactionStatus(status);
+
+            // Processar baseado no status
+            switch (status) {
+                case "DONE":
+                    handlePixTransactionDone(payment, pixTransaction);
+                    break;
+
+                case "AWAITING_CRITICAL_ACTION_AUTHORIZATION":
+                    handlePixTransactionAwaitingAuthorization(payment, pixTransaction);
+                    break;
+
+                case "CANCELLED":
+                    handlePixTransactionCancelled(payment, pixTransaction);
+                    break;
+
+                case "FAILED":
+                    handlePixTransactionFailed(payment, pixTransaction);
+                    break;
+
+                case "REFUNDED":
+                case "PARTIALLY_REFUNDED":
+                    handlePixTransactionRefunded(payment, pixTransaction);
+                    break;
+
+                case "PENDING":
+                case "SCHEDULED":
+                case "IN_BANK_PROCESSING":
+                    handlePixTransactionPending(payment, pixTransaction);
+                    break;
+
+                default:
+                    log.info("Status de transação PIX não tratado especificamente: {}", status);
+                    paymentRepository.save(payment);
+            }
+
+        } catch (Exception e) {
+            log.error("Erro ao processar webhook de transação PIX: {}", e.getMessage(), e);
+            throw new RuntimeException("Erro ao processar webhook de transação PIX", e);
+        }
+    }
+
+    /**
+     * Tenta encontrar o pagamento relacionado à transação PIX
+     */
+    private Payment findPaymentByPixTransaction(PixTransactionWebhookDTO pixTransaction) {
+        // 1. Buscar por pixTransactionId (se já foi vinculado antes)
+        if (pixTransaction.getId() != null) {
+            Payment byTransactionId = paymentRepository.findByPixTransactionId(pixTransaction.getId());
+            if (byTransactionId != null) {
+                return byTransactionId;
+            }
+        }
+
+        // 2. Buscar por valor e status PROCESSING/PENDING (pagamento PIX aguardando confirmação)
+        BigDecimal value = pixTransaction.getValue();
+        if (value != null) {
+            List<Payment> pendingPixPayments = paymentRepository.findByPaymentMethodAndStatusInAndTotalAmount(
+                    "pix",
+                    List.of(Payment.PaymentStatus.PROCESSING, Payment.PaymentStatus.PENDING),
+                    value);
+
+            if (pendingPixPayments.size() == 1) {
+                return pendingPixPayments.get(0);
+            } else if (pendingPixPayments.size() > 1) {
+                log.warn("Múltiplos pagamentos PIX pendentes com valor R$ {} encontrados. Não foi possível vincular automaticamente.",
+                        value);
+            }
+        }
+
+        // 3. Se tiver externalReference, tentar buscar por ela
+        String externalRef = pixTransaction.getExternalReference();
+        if (externalRef != null && !externalRef.isEmpty()) {
+            try {
+                Long paymentId = Long.parseLong(externalRef);
+                return paymentRepository.findById(paymentId).orElse(null);
+            } catch (NumberFormatException e) {
+                // externalReference não é um ID numérico
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Transação PIX concluída (DONE) - Pagamento confirmado
+     */
+    private void handlePixTransactionDone(Payment payment, PixTransactionWebhookDTO pixTransaction) {
+        log.info("✅ PIX Transaction DONE - Payment ID: {}, Valor: R$ {}",
+                payment.getId(), pixTransaction.getValue());
+
+        if (payment.getStatus() != Payment.PaymentStatus.COMPLETED) {
+            payment.setStatus(Payment.PaymentStatus.COMPLETED);
+            payment.setCompletedAt(LocalDateTime.now());
+            paymentRepository.save(payment);
+
+            // Registrar no histórico
+            saveStatusHistory(payment, Payment.PaymentStatus.COMPLETED, "PIX_TRANSACTION_DONE",
+                    "Transação PIX concluída com sucesso. ID: " + pixTransaction.getId());
+
+            // Adicionar saldo pendente na carteira do freelancer
+            walletService.addPendingBalance(
+                    payment.getFreelancer(),
+                    payment.getAmount());
+
+            log.info("💰 Saldo adicionado à carteira do freelancer: R$ {}", payment.getAmount());
+
+            // Atualizar status da solicitação e habilitar chat
+            ServiceRequest serviceRequest = payment.getServiceRequest();
+            if (serviceRequest.getStatus() != ServiceRequest.Status.COMPLETED) {
+                serviceRequest.setStatus(ServiceRequest.Status.COMPLETED);
+                serviceRequest.setChatEnabled(true);
+                serviceRequestRepository.save(serviceRequest);
+                log.info("🔓 Chat habilitado! Solicitação ID: {}", serviceRequest.getId());
+            } else if (!Boolean.TRUE.equals(serviceRequest.getChatEnabled())) {
+                serviceRequest.setChatEnabled(true);
+                serviceRequestRepository.save(serviceRequest);
+                log.info("🔓 Chat habilitado (solicitação já estava COMPLETED)");
+            }
+
+            // Notificar via WebSocket
+            webSocketService.notifyPixPaymentConfirmed(
+                    payment.getId(),
+                    payment.getContractor().getEmail());
+
+            log.info("✅ Pagamento PIX confirmado via webhook: Payment ID={}, Transaction ID={}, Valor=R$ {}",
+                    payment.getId(), pixTransaction.getId(), payment.getAmount());
+        } else {
+            paymentRepository.save(payment);
+            log.info("ℹ️ Pagamento já estava COMPLETED, apenas atualizando dados da transação PIX");
+        }
+    }
+
+    /**
+     * Transação PIX aguardando autorização de ação crítica
+     */
+    private void handlePixTransactionAwaitingAuthorization(Payment payment, PixTransactionWebhookDTO pixTransaction) {
+        log.info("⏳ PIX Transaction AWAITING_CRITICAL_ACTION_AUTHORIZATION - Payment ID: {}",
+                payment.getId());
+
+        // Manter status como PROCESSING
+        if (payment.getStatus() == Payment.PaymentStatus.PENDING) {
+            payment.setStatus(Payment.PaymentStatus.PROCESSING);
+        }
+        paymentRepository.save(payment);
+
+        saveStatusHistory(payment, payment.getStatus(), "PIX_TRANSACTION_AWAITING_AUTHORIZATION",
+                "Transação PIX aguardando autorização de ação crítica. ID: " + pixTransaction.getId());
+    }
+
+    /**
+     * Transação PIX cancelada
+     */
+    private void handlePixTransactionCancelled(Payment payment, PixTransactionWebhookDTO pixTransaction) {
+        log.warn("❌ PIX Transaction CANCELLED - Payment ID: {}", payment.getId());
+
+        payment.setStatus(Payment.PaymentStatus.CANCELLED);
+        paymentRepository.save(payment);
+
+        saveStatusHistory(payment, Payment.PaymentStatus.CANCELLED, "PIX_TRANSACTION_CANCELLED",
+                "Transação PIX cancelada. ID: " + pixTransaction.getId());
+
+        // Notificar via WebSocket
+        webSocketService.notifyPaymentFailed(
+                payment.getId(),
+                payment.getContractor().getEmail(),
+                "Transação PIX cancelada");
+    }
+
+    /**
+     * Transação PIX falhou
+     */
+    private void handlePixTransactionFailed(Payment payment, PixTransactionWebhookDTO pixTransaction) {
+        log.error("❌ PIX Transaction FAILED - Payment ID: {}, Motivo: {}",
+                payment.getId(), pixTransaction.getRefusalReason());
+
+        payment.setStatus(Payment.PaymentStatus.FAILED);
+        paymentRepository.save(payment);
+
+        saveStatusHistory(payment, Payment.PaymentStatus.FAILED, "PIX_TRANSACTION_FAILED",
+                "Transação PIX falhou. ID: " + pixTransaction.getId() +
+                        (pixTransaction.getRefusalReason() != null ? " Motivo: " + pixTransaction.getRefusalReason() : ""));
+
+        // Notificar via WebSocket
+        webSocketService.notifyPaymentFailed(
+                payment.getId(),
+                payment.getContractor().getEmail(),
+                "Transação PIX falhou" + (pixTransaction.getRefusalReason() != null ?
+                        ": " + pixTransaction.getRefusalReason() : ""));
+    }
+
+    /**
+     * Transação PIX estornada
+     */
+    private void handlePixTransactionRefunded(Payment payment, PixTransactionWebhookDTO pixTransaction) {
+        log.warn("↩️ PIX Transaction REFUNDED - Payment ID: {}, Valor estornado: R$ {}",
+                payment.getId(), pixTransaction.getRefundedValue());
+
+        payment.setStatus(Payment.PaymentStatus.REFUNDED);
+        paymentRepository.save(payment);
+
+        saveStatusHistory(payment, Payment.PaymentStatus.REFUNDED, "PIX_TRANSACTION_REFUNDED",
+                "Transação PIX estornada. ID: " + pixTransaction.getId() +
+                        " Valor estornado: R$ " + pixTransaction.getRefundedValue());
+    }
+
+    /**
+     * Transação PIX pendente/agendada/em processamento
+     */
+    private void handlePixTransactionPending(Payment payment, PixTransactionWebhookDTO pixTransaction) {
+        log.info("⏳ PIX Transaction {} - Payment ID: {}", pixTransaction.getStatus(), payment.getId());
+
+        if (payment.getStatus() == Payment.PaymentStatus.PENDING) {
+            payment.setStatus(Payment.PaymentStatus.PROCESSING);
+        }
+        paymentRepository.save(payment);
+
+        saveStatusHistory(payment, payment.getStatus(), "PIX_TRANSACTION_" + pixTransaction.getStatus(),
+                "Transação PIX " + pixTransaction.getStatus() + ". ID: " + pixTransaction.getId());
     }
 }

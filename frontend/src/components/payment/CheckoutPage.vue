@@ -141,15 +141,25 @@ const copyPixCode = () => {
   }
 };
 
-// Gerar QR Code PIX automaticamente quando o método PIX for selecionado
-watch(paymentMethod, async (newMethod) => {
+// Observar mudanças no método de pagamento
+watch(paymentMethod, async (newMethod, oldMethod) => {
+  // Se já existe um pagamento em andamento e estamos voltando para PIX, não resetar
+  if (newMethod === 'pix' && currentPaymentId.value) {
+    // Se temos um pagamento PIX existente, tentar carregar o QR Code
+    if (!pixData.value) {
+      await loadExistingPixQrCode(currentPaymentId.value);
+    }
+    return;
+  }
+  
   if (newMethod === 'pix') {
-    // Não gerar automaticamente, aguardar o CPF
+    // Novo pagamento PIX - aguardar CPF
     showPixQrCode.value = false;
     pixData.value = null;
     pixCpf.value = '';
-  } else {
-    // Limpar dados do PIX quando trocar de método
+  } else if (oldMethod === 'pix') {
+    // Trocando de PIX para outro método - limpar dados do PIX
+    // Mas manter currentPaymentId se existir um pagamento
     showPixQrCode.value = false;
     pixData.value = null;
     pixCpf.value = '';
@@ -353,34 +363,84 @@ const checkExistingPayment = async () => {
       const payment = await response.json();
       console.log('💳 Pagamento existente encontrado:', payment);
       
-      // Se o pagamento já foi completado, marcar como confirmado e não redirecionar
+      // Se o pagamento já foi completado, marcar como confirmado
       if (payment.status === 'COMPLETED') {
         console.log('✅ Pagamento já foi completado anteriormente');
         paymentConfirmed.value = true;
         currentPaymentId.value = payment.id;
-        paymentMethod.value = payment.paymentMethod;
+        paymentMethod.value = payment.paymentMethod?.toLowerCase() || 'pix';
         return;
       }
       
       // Se o pagamento ainda não foi completado, carregar os dados
       if (payment.status === 'PENDING' || payment.status === 'PROCESSING') {
         currentPaymentId.value = payment.id;
-        paymentMethod.value = payment.paymentMethod;
+        paymentMethod.value = payment.paymentMethod?.toLowerCase() || 'pix';
         
-        // Se for PIX, carregar QR Code
-        if (payment.paymentMethod === 'pix' && payment.pixQrCode) {
-          pixData.value = {
-            qrCodeImage: payment.pixQrCode,
-            payload: payment.pixCopyPaste
-          };
-          showPixQrCode.value = true;
-          console.log('✅ QR Code PIX carregado do pagamento existente');
+        // Se for PIX, buscar QR Code atualizado da API
+        if (payment.paymentMethod?.toLowerCase() === 'pix') {
+          await loadExistingPixQrCode(payment.id);
         }
       }
     }
   } catch (error) {
     // Se não encontrar pagamento, continuar normalmente
     console.log('ℹ️ Nenhum pagamento existente encontrado');
+  }
+};
+
+// Carregar QR Code de um pagamento PIX existente
+const loadExistingPixQrCode = async (paymentId: number) => {
+  try {
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+    const qrCodeResponse = await fetch(
+      `${apiUrl}/api/payments/${paymentId}/pix-qrcode`,
+      {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+      }
+    );
+
+    if (qrCodeResponse.ok) {
+      const qrCodeData = await qrCodeResponse.json();
+      
+      // Verificar se o pagamento ainda está pendente (não expirado)
+      if (qrCodeData.status === 'COMPLETED') {
+        paymentConfirmed.value = true;
+        console.log('✅ Pagamento já foi confirmado');
+        return;
+      }
+      
+      pixData.value = {
+        qrCodeImage: qrCodeData.encodedImage,
+        payload: qrCodeData.payload,
+        expirationDate: qrCodeData.expirationDate,
+      };
+      showPixQrCode.value = true;
+      console.log('✅ QR Code PIX carregado do pagamento existente');
+    } else {
+      console.warn('⚠️ Não foi possível carregar QR Code do pagamento existente');
+    }
+  } catch (error) {
+    console.error('Erro ao carregar QR Code existente:', error);
+  }
+};
+
+// Recarregar QR Code do pagamento existente (usado pelo botão na UI)
+const reloadPixQrCode = async () => {
+  if (!currentPaymentId.value) {
+    // Se não tem pagamento, voltar para tela de CPF
+    showPixQrCode.value = false;
+    pixData.value = null;
+    return;
+  }
+  
+  isLoadingPix.value = true;
+  try {
+    await loadExistingPixQrCode(currentPaymentId.value);
+  } finally {
+    isLoadingPix.value = false;
   }
 };
 
@@ -537,8 +597,34 @@ onUnmounted(() => {
             </div>
           </RadioGroup>
 
-          <!-- PIX Form -->
-          <div v-if="paymentMethod === 'pix'" class="mt-6 space-y-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+          <!-- PIX - Pagamento em andamento (sem QR Code visível) -->
+          <div v-if="paymentMethod === 'pix' && currentPaymentId && !showPixQrCode && !paymentConfirmed" class="mt-6 space-y-4 p-4 bg-yellow-50 rounded-lg border border-yellow-300">
+            <div class="flex items-start gap-3">
+              <Clock class="h-5 w-5 text-yellow-600 mt-0.5" />
+              <div class="flex-1">
+                <p class="text-sm text-[#263238] font-medium">Pagamento PIX em andamento</p>
+                <p class="text-xs text-[#435574] mt-1">
+                  Já existe um pagamento PIX aguardando confirmação para este serviço.
+                </p>
+                <p class="text-xs text-[#435574] mt-1">
+                  ID do Pagamento: <span class="font-mono font-medium">#{{ currentPaymentId }}</span>
+                </p>
+              </div>
+            </div>
+
+            <Button
+              @click="reloadPixQrCode"
+              :disabled="isLoadingPix"
+              class="w-full bg-[#286AD8] hover:bg-[#1e5bb8] text-white"
+            >
+              <Loader2 v-if="isLoadingPix" class="h-4 w-4 mr-2 animate-spin" />
+              <QrCode v-else class="h-4 w-4 mr-2" />
+              {{ isLoadingPix ? 'Carregando...' : 'Exibir QR Code PIX' }}
+            </Button>
+          </div>
+
+          <!-- PIX Form (apenas se não tem pagamento em andamento) -->
+          <div v-if="paymentMethod === 'pix' && !currentPaymentId && !showPixQrCode" class="mt-6 space-y-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
             <div class="flex items-start gap-3 mb-4">
               <Shield class="h-5 w-5 text-[#286AD8] mt-0.5" />
               <div>
@@ -712,15 +798,15 @@ onUnmounted(() => {
                 </p>
               </div>
 
-              <!-- Generate New QR Code Button -->
+              <!-- Reload QR Code Button -->
               <Button
                 v-if="!paymentConfirmed"
-                @click="() => { showPixQrCode = false; pixData = null; pixCpf = ''; currentPaymentId = null; }"
+                @click="reloadPixQrCode"
                 variant="ghost"
                 class="mt-4 text-[#435574]"
                 size="sm"
               >
-                🔄 Gerar Novo QR Code
+                🔄 Recarregar QR Code
               </Button>
             </div>
 
