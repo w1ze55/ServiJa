@@ -69,7 +69,7 @@ const getUserEmail = (): string => {
 const userEmail = getUserEmail();
 
 // Inicializar WebSocket
-const { connected: wsConnected, connect: connectWS, disconnect: disconnectWS } = usePaymentWebSocket(userEmail);
+const { connected: wsConnected, connectionError: wsError, connect: connectWS, disconnect: disconnectWS } = usePaymentWebSocket(userEmail);
 
 const paymentMethod = ref<string>('');
 const isProcessing = ref(false);
@@ -371,9 +371,15 @@ const handlePaymentNotification = (event: Event) => {
 
 // Lifecycle: Conectar WebSocket quando montar
 onMounted(async () => {
+  console.log('🚀 CheckoutPage montado');
+  console.log('📧 userEmail:', userEmail);
+  console.log('📍 VITE_API_URL:', import.meta.env.VITE_API_URL);
+  
   if (userEmail) {
     console.log('🔌 Conectando WebSocket para:', userEmail);
     connectWS();
+  } else {
+    console.warn('⚠️ userEmail vazio, WebSocket não será conectado');
   }
 
   // Verificar se já existe um pagamento para esta solicitação
@@ -510,10 +516,18 @@ onUnmounted(() => {
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <!-- WebSocket Status -->
       <div v-if="paymentMethod === 'pix' && showPixQrCode" class="lg:col-span-2">
-        <div class="mb-4 p-3 bg-gray-50 rounded-lg border flex items-center gap-2">
-          <div :class="wsConnected ? 'bg-green-500' : 'bg-gray-400'" class="w-2 h-2 rounded-full animate-pulse"></div>
-          <p class="text-xs text-[#435574]">
-            {{ wsConnected ? '🟢 Conectado - Aguardando confirmação automática' : '⚪ Desconectado - Reconectando...' }}
+        <div class="mb-4 p-3 rounded-lg border flex items-center gap-2" :class="wsConnected ? 'bg-green-50 border-green-200' : wsError ? 'bg-red-50 border-red-200' : 'bg-gray-50'">
+          <div :class="wsConnected ? 'bg-green-500' : wsError ? 'bg-red-500' : 'bg-yellow-500'" class="w-2 h-2 rounded-full animate-pulse"></div>
+          <p class="text-xs" :class="wsConnected ? 'text-green-700' : wsError ? 'text-red-700' : 'text-[#435574]'">
+            <template v-if="wsConnected">
+              🟢 Conectado - Aguardando confirmação automática
+            </template>
+            <template v-else-if="wsError">
+              🔴 Erro: {{ wsError }}
+            </template>
+            <template v-else>
+              🟡 Conectando ao servidor...
+            </template>
           </p>
         </div>
       </div>

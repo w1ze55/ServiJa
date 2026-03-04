@@ -20,11 +20,14 @@ public class WebSocketService {
      */
     public void notifyPaymentStatusChange(Long paymentId, String status, String userEmail) {
         Map<String, Object> message = new HashMap<>();
+        message.put("type", "PAYMENT_STATUS_CHANGED");
         message.put("paymentId", paymentId);
         message.put("status", status);
         message.put("timestamp", System.currentTimeMillis());
         
-        messagingTemplate.convertAndSendToUser(userEmail, "/queue/payment", message);
+        // Enviar para tópico público baseado no email (mesmo padrão das solicitações)
+        String destination = "/topic/payment/" + userEmail;
+        messagingTemplate.convertAndSend(destination, (Object) message);
         
         log.info("Notificação WebSocket enviada para {}: pagamento {} - status {}", 
                 userEmail, paymentId, status);
@@ -40,7 +43,9 @@ public class WebSocketService {
         message.put("message", "Pagamento PIX confirmado com sucesso!");
         message.put("timestamp", System.currentTimeMillis());
         
-        messagingTemplate.convertAndSendToUser(userEmail, "/queue/payment", message);
+        // Enviar para tópico público baseado no email (mesmo padrão das solicitações)
+        String destination = "/topic/payment/" + userEmail;
+        messagingTemplate.convertAndSend(destination, (Object) message);
         
         log.info("Notificação PIX confirmado enviada para {}: pagamento {}", 
                 userEmail, paymentId);
@@ -57,7 +62,9 @@ public class WebSocketService {
         message.put("reason", reason);
         message.put("timestamp", System.currentTimeMillis());
         
-        messagingTemplate.convertAndSendToUser(userEmail, "/queue/payment", message);
+        // Enviar para tópico público baseado no email (mesmo padrão das solicitações)
+        String destination = "/topic/payment/" + userEmail;
+        messagingTemplate.convertAndSend(destination, (Object) message);
         
         log.warn("Notificação de falha no pagamento enviada para {}: pagamento {} - {}", 
                 userEmail, paymentId, reason);
