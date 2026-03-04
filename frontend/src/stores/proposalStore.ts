@@ -15,7 +15,7 @@ export interface Proposal {
   budget: number;
   deadline: string;
   priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
-  status: 'pending' | 'negotiating' | 'accepted' | 'rejected' | 'completed' | 'archived';
+  status: 'pending' | 'negotiating' | 'accepted' | 'in_progress' | 'rejected' | 'completed' | 'archived';
   receivedAt: string;
   attachments?: ProposalAttachment[];
   viewed: boolean;
@@ -78,7 +78,7 @@ export interface AuditLogEntry {
 export interface ProposalStats {
   pending: number;
   negotiating: number;
-  accepted: number;
+  inProgress: number;
   completed: number;
   rejected: number;
 }
@@ -112,8 +112,8 @@ export const useProposalStore = defineStore('proposal', () => {
 
   const stats = computed<ProposalStats>(() => ({
     pending: proposals.value.filter((p) => p.status === 'pending').length,
-    negotiating: proposals.value.filter((p) => p.status === 'negotiating').length,
-    accepted: proposals.value.filter((p) => p.status === 'accepted').length,
+    negotiating: proposals.value.filter((p) => p.status === 'negotiating' || p.status === 'accepted').length,
+    inProgress: proposals.value.filter((p) => p.status === 'in_progress').length,
     completed: proposals.value.filter((p) => p.status === 'completed' || p.status === 'archived').length,
     rejected: proposals.value.filter((p) => p.status === 'rejected').length,
   }));
@@ -176,6 +176,7 @@ export const useProposalStore = defineStore('proposal', () => {
       'SENT': 'pending',
       'NEGOTIATING': 'negotiating',
       'ACCEPTED': 'accepted',
+      'IN_PROGRESS': 'in_progress',
       'REJECTED': 'rejected',
       'COMPLETED': 'completed',
       'CANCELLED': 'archived',
@@ -235,6 +236,7 @@ export const useProposalStore = defineStore('proposal', () => {
         'pending': 'PENDING',
         'negotiating': 'NEGOTIATING',
         'accepted': 'ACCEPTED',
+        'in_progress': 'IN_PROGRESS',
         'rejected': 'REJECTED',
         'completed': 'COMPLETED',
         'archived': 'CANCELLED',

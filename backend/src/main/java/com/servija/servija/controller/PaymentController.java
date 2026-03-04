@@ -94,4 +94,19 @@ public class PaymentController {
         List<Map<String, Object>> history = paymentService.getPaymentHistory(id);
         return ResponseEntity.ok(history);
     }
+
+    /**
+     * 🧪 ENDPOINT DE TESTE - REMOVER EM PRODUÇÃO
+     * Simula a confirmação de um pagamento PIX para testes locais
+     */
+    @PostMapping("/{id}/simulate-confirmation")
+    @Operation(summary = "[TESTE] Simular confirmação de pagamento", description = "Simula a confirmação de um pagamento PIX para testes. REMOVER EM PRODUÇÃO!")
+    @SecurityRequirement(name = "bearerAuth")
+    public ResponseEntity<Map<String, Object>> simulatePaymentConfirmation(@PathVariable Long id) {
+        paymentService.simulatePaymentConfirmation(id);
+        return ResponseEntity.ok(Map.of(
+            "success", true,
+            "message", "Simulação de confirmação enviada com sucesso"
+        ));
+    }
 }

@@ -478,8 +478,9 @@ const getStatusBadge = (status: string) => {
     pending: { class: 'bg-blue-100 text-blue-700', label: 'Pendente', icon: Clock },
     negotiating: { class: 'bg-purple-100 text-purple-700', label: 'Negociando', icon: MessageSquare },
     accepted: { class: 'bg-green-100 text-green-700', label: 'Aceita', icon: CheckCircle },
+    in_progress: { class: 'bg-purple-100 text-purple-700', label: 'Em Andamento', icon: Clock },
     rejected: { class: 'bg-red-100 text-red-700', label: 'Recusada', icon: XCircle },
-    completed: { class: 'bg-green-100 text-green-700', label: 'Concluída', icon: CheckCircle },
+    completed: { class: 'bg-teal-100 text-teal-700', label: 'Concluída', icon: CheckCircle },
     archived: { class: 'bg-gray-100 text-gray-700', label: 'Arquivada', icon: FileText },
   };
   return badges[status] || badges.pending;
@@ -867,7 +868,39 @@ const getStatusBadge = (status: string) => {
             </div>
 
             <!-- Message Input -->
-            <div class="mt-6 flex items-center justify-center p-6 bg-gray-50 rounded-lg border border-dashed border-gray-200">
+            <div v-if="proposal.status === 'in_progress' || proposal.status === 'completed'" class="mt-6 flex gap-2">
+              <Textarea
+                :model-value="newMessage"
+                @update:model-value="(val) => newMessage = val as string"
+                placeholder="Digite sua mensagem..."
+                :rows="2"
+                class="flex-1"
+              />
+              <div class="flex flex-col gap-2">
+                <Button
+                  @click="handleSendMessage"
+                  :disabled="!newMessage.trim()"
+                  class="bg-[#286AD8] hover:bg-[#435574]"
+                >
+                  <Send class="h-4 w-4" />
+                </Button>
+                <input
+                  ref="messageAttachmentInput"
+                  type="file"
+                  multiple
+                  @change="handleMessageAttachmentChange"
+                  class="hidden"
+                />
+                <Button
+                  @click="messageAttachmentInput?.click()"
+                  variant="outline"
+                  size="icon"
+                >
+                  <Paperclip class="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+            <div v-else class="mt-6 flex items-center justify-center p-6 bg-gray-50 rounded-lg border border-dashed border-gray-200">
               <p class="text-sm text-[#435574] flex items-center gap-2 text-center">
                 <Lock class="h-4 w-4 text-amber-500" />
                 O chat será liberado automaticamente após a confirmação do pagamento.

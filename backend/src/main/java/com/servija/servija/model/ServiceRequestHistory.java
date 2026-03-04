@@ -45,7 +45,13 @@ public class ServiceRequestHistory {
         COUNTER_PROPOSAL_ACCEPTED("Contra proposta aceita"),
         COUNTER_PROPOSAL_REJECTED("Contra proposta rejeitada"),
         BUDGET_ACCEPTED("Orçamento aceito"),
-        CANCELLED("Solicitação cancelada");
+        CANCELLED("Solicitação cancelada"),
+        PAYMENT_CREATED("Pagamento criado"),
+        PAYMENT_PENDING("Aguardando pagamento"),
+        PAYMENT_CONFIRMED("Pagamento confirmado"),
+        PAYMENT_CANCELLED("Pagamento cancelado"),
+        PAYMENT_FAILED("Pagamento falhou"),
+        SERVICE_COMPLETED("Serviço concluído");
 
         private final String label;
 

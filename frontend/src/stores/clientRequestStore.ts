@@ -48,7 +48,7 @@ export interface ServiceRequest {
     budget: number;
     deadline: string;
     priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
-    status: 'pending' | 'sent' | 'negotiating' | 'accepted' | 'rejected' | 'completed' | 'cancelled';
+    status: 'pending' | 'sent' | 'negotiating' | 'accepted' | 'in_progress' | 'rejected' | 'completed' | 'cancelled';
     createdAt: string;
     address?: string;
     desiredDate?: string;
@@ -79,7 +79,7 @@ export interface CreateServiceRequestInput {
 export interface RequestStats {
     pending: number;
     negotiating: number;
-    accepted: number;
+    inProgress: number;
     completed: number;
     cancelled: number;
 }
@@ -113,8 +113,8 @@ export const useClientRequestStore = defineStore('clientRequest', () => {
 
     const stats = computed<RequestStats>(() => ({
         pending: requests.value.filter((r) => r.status === 'pending' || r.status === 'sent').length,
-        negotiating: requests.value.filter((r) => r.status === 'negotiating').length,
-        accepted: requests.value.filter((r) => r.status === 'accepted').length,
+        negotiating: requests.value.filter((r) => r.status === 'negotiating' || r.status === 'accepted').length,
+        inProgress: requests.value.filter((r) => r.status === 'in_progress').length,
         completed: requests.value.filter((r) => r.status === 'completed').length,
         cancelled: requests.value.filter((r) => r.status === 'cancelled' || r.status === 'rejected').length,
     }));
@@ -315,6 +315,32 @@ export const useClientRequestStore = defineStore('clientRequest', () => {
         }
     };
 
+    const completeService = async (id: string): Promise<boolean> => {
+        try {
+            const request = requests.value.find((r) => r.id === id);
+            if (!request) return false;
+
+            await api.patch(`/service-requests/${id}/complete`);
+
+            request.status = 'completed';
+
+            request.auditLog = request.auditLog || [];
+            request.auditLog.unshift({
+                id: `log-${Date.now()}`,
+                action: 'Serviço concluído',
+                operationKey: 'SERVICE_COMPLETED',
+                user: 'Você (Cliente)',
+                timestamp: new Date().toISOString(),
+                details: 'Serviço marcado como concluído pelo cliente',
+            });
+
+            return true;
+        } catch (err) {
+            console.error('Erro ao concluir serviço:', err);
+            return false;
+        }
+    };
+
     const sendMessage = async (
         id: string,
         message: string,
@@ -388,6 +414,7 @@ export const useClientRequestStore = defineStore('clientRequest', () => {
         acceptFreelancerResponse,
         rejectFreelancerResponse,
         sendCounterProposal,
+        completeService,
         sendMessage,
         loadHistory,
     };

@@ -70,7 +70,7 @@ interface Quote {
   providerName: string;
   providerAvatar: string;
   serviceTitle: string;
-  status: 'pending' | 'accepted' | 'rejected' | 'completed';
+  status: 'pending' | 'accepted' | 'in_progress' | 'rejected' | 'completed';
   price?: string;
   description: string;
   date: string;
