@@ -65,30 +65,26 @@ const uploadDescription = ref('');
 // Load data
 onMounted(async () => {
   await proposalStore.loadProposals();
-  // Auto-select first active project
   if (activeProjects.value.length > 0 && !selectedProjectId.value) {
     selectedProjectId.value = activeProjects.value[0].id;
     await proposalStore.loadHistory(activeProjects.value[0].id);
   }
 });
 
-// Active projects = proposals with status 'accepted'
 const activeProjects = computed(() =>
-  proposalStore.proposals.filter((p) => p.status === 'accepted')
+  proposalStore.proposals.filter((p) => p.status === 'in_progress')
 );
 
 const selectedProject = computed(() =>
   activeProjects.value.find((p) => p.id === selectedProjectId.value) || null
 );
 
-// Watch for project selection to load history
 watch(selectedProjectId, async (newId) => {
   if (newId) {
     await proposalStore.loadHistory(newId);
   }
 });
 
-// Progress calculation based on milestones or a default
 const projectProgress = computed(() => {
   const project = selectedProject.value;
   if (!project) return 0;
@@ -97,7 +93,7 @@ const projectProgress = computed(() => {
     const completed = milestones.filter((m) => m.status === 'completed').length;
     return Math.round((completed / milestones.length) * 100);
   }
-  return 50; // Default if no milestones
+  return 50;
 });
 
 const paymentProgress = computed(() => {
@@ -641,7 +637,7 @@ const getMilestoneStatusConfig = (status: Milestone['status']) => {
 
             <!-- Activity History Card -->
             <ServiceRequestTimeline
-              :entries="selectedProject.auditLog || []"
+              :request-id="selectedProject.id"
               title="Histórico de Atividades"
             />
           </div>

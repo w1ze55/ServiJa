@@ -703,7 +703,7 @@ const getStatusLabel = (status: string) => {
 
       <ServiceRequestTimeline
         v-if="activeSection === 'history'"
-        :entries="request.auditLog || []"
+        :request-id="request.id"
         title="Histórico de Atividades"
       />
     </template>

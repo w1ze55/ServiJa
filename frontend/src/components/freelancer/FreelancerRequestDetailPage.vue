@@ -950,7 +950,7 @@ const getStatusBadge = (status: string) => {
         <!-- History Tab -->
         <TabsContent value="history" class="space-y-4">
           <ServiceRequestTimeline
-            :entries="proposal.auditLog || []"
+            :request-id="proposal.id"
             title="Histórico de Ações"
           />
         </TabsContent>

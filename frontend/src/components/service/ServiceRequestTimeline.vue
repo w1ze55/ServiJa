@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ref, computed, onMounted, watch } from 'vue';
 import {
   FileText,
   XCircle,
@@ -11,8 +12,10 @@ import {
   DollarSign,
   AlertCircle,
   CheckCircle2,
+  Loader2,
 } from 'lucide-vue-next';
 import Card from '../ui/card.vue';
+import api from '@/api/config/axios';
 
 export interface HistoryEntry {
   id: string;
@@ -24,12 +27,51 @@ export interface HistoryEntry {
 }
 
 interface Props {
-  entries: HistoryEntry[];
+  entries?: HistoryEntry[];
+  requestId?: string | number;
   title?: string;
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  title: 'Histórico de Ações',
+  title: 'Histórico de Atividades',
+});
+
+const fetchedEntries = ref<HistoryEntry[]>([]);
+const isLoading = ref(false);
+
+const resolvedEntries = computed(() => {
+  if (props.entries && props.entries.length > 0) return props.entries;
+  return fetchedEntries.value;
+});
+
+const fetchHistory = async () => {
+  if (!props.requestId) return;
+  isLoading.value = true;
+  try {
+    const response = await api.get(`/service-requests/${props.requestId}/history`);
+    fetchedEntries.value = response.data.map((entry: any) => ({
+      id: String(entry.id),
+      action: entry.operationType,
+      operationKey: entry.operationKey,
+      user: entry.userName,
+      timestamp: entry.formattedDateTime,
+      details: entry.details,
+    }));
+  } catch (err) {
+    console.error('Erro ao carregar histórico:', err);
+  } finally {
+    isLoading.value = false;
+  }
+};
+
+onMounted(() => {
+  if (props.requestId && (!props.entries || props.entries.length === 0)) {
+    fetchHistory();
+  }
+});
+
+watch(() => props.requestId, (newId) => {
+  if (newId) fetchHistory();
 });
 
 const getDotClass = (key?: string) => {
@@ -65,20 +107,24 @@ const getLabelClass = (key?: string) => {
   <Card class="p-6">
     <h3 class="text-lg font-semibold text-[#263238] mb-4">{{ title }}</h3>
 
-    <div v-if="!entries || entries.length === 0" class="text-center py-8">
+    <div v-if="isLoading" class="flex items-center justify-center py-8">
+      <Loader2 class="h-8 w-8 text-[#286AD8] animate-spin" />
+    </div>
+
+    <div v-else-if="!resolvedEntries || resolvedEntries.length === 0" class="text-center py-8">
       <Clock class="h-12 w-12 text-gray-300 mx-auto mb-3" />
       <p class="text-[#435574]">Nenhuma ação registrada</p>
     </div>
 
     <div v-else class="space-y-0">
       <div
-        v-for="(log, index) in entries"
+        v-for="(log, index) in resolvedEntries"
         :key="log.id"
         class="relative pl-10 pb-8 last:pb-0"
       >
         <!-- Timeline line -->
         <div
-          v-if="index < entries.length - 1"
+          v-if="index < resolvedEntries.length - 1"
           class="absolute left-[15px] top-8 w-0.5 h-[calc(100%-16px)] bg-gray-200"
         />
 
