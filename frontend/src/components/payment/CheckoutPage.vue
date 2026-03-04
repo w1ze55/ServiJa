@@ -365,10 +365,10 @@ const checkExistingPayment = async () => {
       // Se o pagamento ainda não foi completado, carregar os dados
       if (payment.status === 'PENDING' || payment.status === 'PROCESSING') {
         currentPaymentId.value = payment.id;
-        paymentMethod.value = payment.paymentMethod.toLowerCase();
+        paymentMethod.value = payment.paymentMethod;
         
         // Se for PIX, carregar QR Code
-        if (paymentMethod.value === 'pix' && payment.pixQrCode) {
+        if (payment.paymentMethod === 'pix' && payment.pixQrCode) {
           pixData.value = {
             qrCodeImage: payment.pixQrCode,
             payload: payment.pixCopyPaste

@@ -98,12 +98,4 @@ export const paymentService = {
     const response = await api.post(`/payments/${paymentId}/refund`, { reason });
     return response.data;
   },
-
-  /**
-   * Obtém pagamento por ID da solicitação de serviço
-   */
-  async getPaymentByRequestId(requestId: string): Promise<Payment> {
-    const response = await api.get(`/payments/service-request/${requestId}`);
-    return response.data;
-  },
 };
