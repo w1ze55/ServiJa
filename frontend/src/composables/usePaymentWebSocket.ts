@@ -25,11 +25,19 @@ export function usePaymentWebSocket(userEmail: string) {
     const apiUrl = import.meta.env.VITE_API_URL;
     const wsUrl = `${apiUrl}/ws`;
 
+    // Obter token JWT para autenticação
+    const token = localStorage.getItem('token');
+
     console.log('🔌 Conectando WebSocket em:', wsUrl);
     console.log('📧 Email do usuário:', userEmail);
+    console.log('🔑 Token presente:', !!token);
 
     const stompClient = new Client({
       webSocketFactory: () => new SockJS(wsUrl),
+      connectHeaders: {
+        Authorization: token ? `Bearer ${token}` : '',
+        token: token || '',
+      },
       debug: (str) => {
         console.log('STOMP:', str);
       },
@@ -39,13 +47,13 @@ export function usePaymentWebSocket(userEmail: string) {
     });
 
     stompClient.onConnect = () => {
-      console.log('✅ WebSocket conectado');
+      console.log('✅ WebSocket conectado e autenticado');
       connected.value = true;
 
       // Inscrever no tópico de pagamentos do usuário
       // Usar /user/queue/payment para notificações privadas
       stompClient.subscribe(`/user/queue/payment`, (message) => {
-        console.log('📨 Notificação recebida:', message.body);
+        console.log('📨 Notificação de pagamento recebida:', message.body);
         const notification: PaymentNotification = JSON.parse(message.body);
         lastNotification.value = notification;
 
@@ -54,6 +62,8 @@ export function usePaymentWebSocket(userEmail: string) {
           new CustomEvent('payment-notification', { detail: notification })
         );
       });
+
+      console.log('📡 Inscrito em /user/queue/payment');
     };
 
     stompClient.onStompError = (frame) => {

@@ -315,6 +315,9 @@ const getInitials = (name: string) => {
     .slice(0, 2);
 };
 
+// Estado para mensagens de erro/status
+const paymentError = ref<string | null>(null);
+
 // Handler para notificações de pagamento via WebSocket
 const handlePaymentNotification = (event: Event) => {
   const customEvent = event as CustomEvent;
@@ -322,13 +325,47 @@ const handlePaymentNotification = (event: Event) => {
 
   console.log('🔔 Notificação de pagamento recebida:', notification);
 
-  if (notification.type === 'PIX_CONFIRMED' && notification.paymentId === currentPaymentId.value) {
-    paymentConfirmed.value = true;
+  // Verificar se a notificação é para o pagamento atual
+  if (notification.paymentId && notification.paymentId !== currentPaymentId.value) {
+    console.log('ℹ️ Notificação ignorada - não é para o pagamento atual');
+    return;
+  }
 
-    // Redirecionar para página de sucesso após 2 segundos
-    setTimeout(() => {
-      router.push(`/payment-success?paymentId=${notification.paymentId}`);
-    }, 2000);
+  switch (notification.type) {
+    case 'PIX_CONFIRMED':
+      console.log('✅ PIX Confirmado!');
+      paymentConfirmed.value = true;
+      paymentError.value = null;
+      // Redirecionar para página de sucesso após 2 segundos
+      setTimeout(() => {
+        router.push(`/payment-success?paymentId=${notification.paymentId}`);
+      }, 2000);
+      break;
+
+    case 'PAYMENT_FAILED':
+      console.error('❌ Pagamento falhou:', notification.reason);
+      paymentError.value = notification.message || 'O pagamento falhou. Tente novamente.';
+      break;
+
+    case 'PAYMENT_CANCELLED':
+      console.warn('⚠️ Pagamento cancelado');
+      paymentError.value = 'O pagamento foi cancelado.';
+      break;
+
+    case 'PAYMENT_STATUS_CHANGED':
+      console.log('📋 Status do pagamento alterado:', notification.status);
+      if (notification.status === 'COMPLETED') {
+        paymentConfirmed.value = true;
+        setTimeout(() => {
+          router.push(`/payment-success?paymentId=${notification.paymentId}`);
+        }, 2000);
+      } else if (notification.status === 'FAILED' || notification.status === 'CANCELLED') {
+        paymentError.value = `Pagamento ${notification.status === 'FAILED' ? 'falhou' : 'foi cancelado'}.`;
+      }
+      break;
+
+    default:
+      console.log('📨 Tipo de notificação não tratado:', notification.type);
   }
 };
 
@@ -773,7 +810,7 @@ onUnmounted(() => {
               </div>
 
               <!-- Waiting for Payment -->
-              <div v-if="!paymentConfirmed" class="mt-4 p-4 bg-yellow-50 rounded-lg border-2 border-yellow-300">
+              <div v-if="!paymentConfirmed && !paymentError" class="mt-4 p-4 bg-yellow-50 rounded-lg border-2 border-yellow-300">
                 <div class="flex items-center gap-2">
                   <Loader2 class="h-4 w-4 text-yellow-700 animate-spin" />
                   <p class="text-sm text-yellow-800 font-semibold">
@@ -783,6 +820,25 @@ onUnmounted(() => {
                 <p class="text-xs text-yellow-700 mt-2">
                   Assim que o pagamento for confirmado, você será notificado automaticamente!
                 </p>
+              </div>
+
+              <!-- Payment Error -->
+              <div v-if="paymentError" class="mt-4 p-4 bg-red-50 rounded-lg border-2 border-red-300">
+                <div class="flex items-center gap-2">
+                  <svg class="h-5 w-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <p class="text-sm text-red-800 font-semibold">
+                    {{ paymentError }}
+                  </p>
+                </div>
+                <Button
+                  @click="() => { paymentError = null; reloadPixQrCode(); }"
+                  class="mt-3 bg-red-600 hover:bg-red-700 text-white"
+                  size="sm"
+                >
+                  Tentar Novamente
+                </Button>
               </div>
 
               <!-- Payment Confirmed -->
