@@ -26,7 +26,7 @@ import Avatar from '../ui/avatar.vue';
 import AvatarFallback from '../ui/avatar-fallback.vue';
 import AvatarImage from '../ui/avatar-image.vue';
 import Badge from '../ui/badge.vue';
-import PaymentTimeline from './PaymentTimeline.vue';
+import ServiceRequestTimeline from '../service/ServiceRequestTimeline.vue';
 
 interface Proposal {
   freelancerId: string;
@@ -935,10 +935,12 @@ onUnmounted(() => {
               <!-- FIM DO BOTÃO DE TESTE -->
             </div>
 
-            <!-- Payment Timeline -->
-            <div v-if="currentPaymentId" class="mt-8 pt-6 border-t border-gray-200">
-              <h4 class="text-lg font-semibold text-[#263238] mb-4">📋 Status do Pagamento</h4>
-              <PaymentTimeline :payment-id="currentPaymentId" />
+            <!-- Histórico da Solicitação -->
+            <div class="mt-8 pt-6 border-t border-gray-200">
+              <ServiceRequestTimeline
+                :request-id="props.requestId"
+                title="Histórico da Solicitação"
+              />
             </div>
           </div>
         </Card>

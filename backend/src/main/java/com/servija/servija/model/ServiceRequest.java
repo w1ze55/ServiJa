@@ -67,6 +67,9 @@ public class ServiceRequest {
     @Column(columnDefinition = "TEXT")
     private String attachments;
 
+    @Column(name = "freelancer_attachments", columnDefinition = "TEXT")
+    private String freelancerAttachments;
+
     // Freelancer response fields
     @Column(name = "response_value", precision = 10, scale = 2)
     private BigDecimal responseValue;

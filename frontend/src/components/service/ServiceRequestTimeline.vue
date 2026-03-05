@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ref, computed, onMounted, watch } from 'vue';
 import {
   FileText,
   XCircle,
@@ -11,8 +12,11 @@ import {
   DollarSign,
   AlertCircle,
   CheckCircle2,
+  Loader2,
 } from 'lucide-vue-next';
 import Card from '../ui/card.vue';
+import ScrollArea from '../ui/scroll-area.vue';
+import api from '@/api/config/axios';
 
 export interface HistoryEntry {
   id: string;
@@ -24,12 +28,53 @@ export interface HistoryEntry {
 }
 
 interface Props {
-  entries: HistoryEntry[];
+  entries?: HistoryEntry[];
+  requestId?: string | number;
   title?: string;
+  maxHeight?: string;
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  title: 'Histórico de Ações',
+  title: 'Histórico de Atividades',
+  maxHeight: '400px',
+});
+
+const fetchedEntries = ref<HistoryEntry[]>([]);
+const isLoading = ref(false);
+
+const resolvedEntries = computed(() => {
+  if (props.entries && props.entries.length > 0) return props.entries;
+  return fetchedEntries.value;
+});
+
+const fetchHistory = async () => {
+  if (!props.requestId) return;
+  isLoading.value = true;
+  try {
+    const response = await api.get(`/service-requests/${props.requestId}/history`);
+    fetchedEntries.value = response.data.map((entry: any) => ({
+      id: String(entry.id),
+      action: entry.operationType,
+      operationKey: entry.operationKey,
+      user: entry.userName,
+      timestamp: entry.formattedDateTime,
+      details: entry.details,
+    }));
+  } catch (err) {
+    console.error('Erro ao carregar histórico:', err);
+  } finally {
+    isLoading.value = false;
+  }
+};
+
+onMounted(() => {
+  if (props.requestId && (!props.entries || props.entries.length === 0)) {
+    fetchHistory();
+  }
+});
+
+watch(() => props.requestId, (newId) => {
+  if (newId) fetchHistory();
 });
 
 const getDotClass = (key?: string) => {
@@ -65,56 +110,62 @@ const getLabelClass = (key?: string) => {
   <Card class="p-6">
     <h3 class="text-lg font-semibold text-[#263238] mb-4">{{ title }}</h3>
 
-    <div v-if="!entries || entries.length === 0" class="text-center py-8">
+    <div v-if="isLoading" class="flex items-center justify-center py-8">
+      <Loader2 class="h-8 w-8 text-[#286AD8] animate-spin" />
+    </div>
+
+    <div v-else-if="!resolvedEntries || resolvedEntries.length === 0" class="text-center py-8">
       <Clock class="h-12 w-12 text-gray-300 mx-auto mb-3" />
       <p class="text-[#435574]">Nenhuma ação registrada</p>
     </div>
 
-    <div v-else class="space-y-0">
-      <div
-        v-for="(log, index) in entries"
-        :key="log.id"
-        class="relative pl-10 pb-8 last:pb-0"
-      >
-        <!-- Timeline line -->
+    <ScrollArea v-else :style="{ maxHeight: props.maxHeight }" class="overflow-auto">
+      <div class="space-y-0 pr-3 pl-1 pt-1">
         <div
-          v-if="index < entries.length - 1"
-          class="absolute left-[15px] top-8 w-0.5 h-[calc(100%-16px)] bg-gray-200"
-        />
-
-        <!-- Timeline dot with icon -->
-        <div
-          :class="[
-            'absolute left-0 top-0.5 w-8 h-8 rounded-full flex items-center justify-center shadow-sm',
-            getDotClass(log.operationKey),
-          ]"
+          v-for="(log, index) in resolvedEntries"
+          :key="log.id"
+          class="relative pl-10 pb-8 last:pb-0"
         >
-          <FileText v-if="log.operationKey === 'REQUEST_OPENED'" class="h-4 w-4 text-blue-600" />
-          <XCircle v-else-if="log.operationKey === 'REQUEST_REJECTED' || log.operationKey === 'COUNTER_PROPOSAL_REJECTED' || log.operationKey === 'CANCELLED'" class="h-4 w-4 text-red-600" />
-          <CheckCircle v-else-if="log.operationKey === 'BUDGET_ACCEPTED' || log.operationKey === 'COUNTER_PROPOSAL_ACCEPTED'" class="h-4 w-4 text-green-600" />
-          <Send v-else-if="log.operationKey === 'BUDGET_SENT'" class="h-4 w-4 text-amber-600" />
-          <FileEdit v-else-if="log.operationKey === 'COUNTER_PROPOSAL_SENT'" class="h-4 w-4 text-purple-600" />
-          <!-- Payment events -->
-          <CreditCard v-else-if="log.operationKey === 'PAYMENT_CREATED'" class="h-4 w-4 text-blue-600" />
-          <Clock v-else-if="log.operationKey === 'PAYMENT_PENDING'" class="h-4 w-4 text-yellow-600" />
-          <DollarSign v-else-if="log.operationKey === 'PAYMENT_CONFIRMED'" class="h-4 w-4 text-green-600" />
-          <AlertCircle v-else-if="log.operationKey === 'PAYMENT_CANCELLED' || log.operationKey === 'PAYMENT_FAILED'" class="h-4 w-4 text-red-600" />
-          <CheckCircle2 v-else-if="log.operationKey === 'SERVICE_COMPLETED'" class="h-4 w-4 text-green-600" />
-          <MessageSquare v-else class="h-4 w-4 text-amber-600" />
-        </div>
+          <!-- Timeline line -->
+          <div
+            v-if="index < resolvedEntries.length - 1"
+            class="absolute left-[15px] top-8 w-0.5 h-[calc(100%-16px)] bg-gray-200"
+          />
 
-        <!-- Content -->
-        <div class="min-h-[2rem]">
-          <div class="flex items-start justify-between gap-4">
-            <p :class="['font-medium text-sm', getLabelClass(log.operationKey)]">
-              {{ log.action }}
-            </p>
-            <span class="text-xs text-[#435574] whitespace-nowrap">{{ log.timestamp }}</span>
+          <!-- Timeline dot with icon -->
+          <div
+            :class="[
+              'absolute left-0 top-0.5 w-8 h-8 rounded-full flex items-center justify-center shadow-sm',
+              getDotClass(log.operationKey),
+            ]"
+          >
+            <FileText v-if="log.operationKey === 'REQUEST_OPENED'" class="h-4 w-4 text-blue-600" />
+            <XCircle v-else-if="log.operationKey === 'REQUEST_REJECTED' || log.operationKey === 'COUNTER_PROPOSAL_REJECTED' || log.operationKey === 'CANCELLED'" class="h-4 w-4 text-red-600" />
+            <CheckCircle v-else-if="log.operationKey === 'BUDGET_ACCEPTED' || log.operationKey === 'COUNTER_PROPOSAL_ACCEPTED'" class="h-4 w-4 text-green-600" />
+            <Send v-else-if="log.operationKey === 'BUDGET_SENT'" class="h-4 w-4 text-amber-600" />
+            <FileEdit v-else-if="log.operationKey === 'COUNTER_PROPOSAL_SENT'" class="h-4 w-4 text-purple-600" />
+            <!-- Payment events -->
+            <CreditCard v-else-if="log.operationKey === 'PAYMENT_CREATED'" class="h-4 w-4 text-blue-600" />
+            <Clock v-else-if="log.operationKey === 'PAYMENT_PENDING'" class="h-4 w-4 text-yellow-600" />
+            <DollarSign v-else-if="log.operationKey === 'PAYMENT_CONFIRMED'" class="h-4 w-4 text-green-600" />
+            <AlertCircle v-else-if="log.operationKey === 'PAYMENT_CANCELLED' || log.operationKey === 'PAYMENT_FAILED'" class="h-4 w-4 text-red-600" />
+            <CheckCircle2 v-else-if="log.operationKey === 'SERVICE_COMPLETED'" class="h-4 w-4 text-green-600" />
+            <MessageSquare v-else class="h-4 w-4 text-amber-600" />
           </div>
-          <p class="text-xs text-[#435574] mt-0.5">{{ log.user }}</p>
-          <p v-if="log.details" class="text-sm text-[#435574] mt-1">{{ log.details }}</p>
+
+          <!-- Content -->
+          <div class="min-h-[2rem]">
+            <div class="flex items-start justify-between gap-4">
+              <p :class="['font-medium text-sm', getLabelClass(log.operationKey)]">
+                {{ log.action }}
+              </p>
+              <span class="text-xs text-[#435574] whitespace-nowrap">{{ log.timestamp }}</span>
+            </div>
+            <p class="text-xs text-[#435574] mt-0.5">{{ log.user }}</p>
+            <p v-if="log.details" class="text-sm text-[#435574] mt-1">{{ log.details }}</p>
+          </div>
         </div>
       </div>
-    </div>
+    </ScrollArea>
   </Card>
 </template>

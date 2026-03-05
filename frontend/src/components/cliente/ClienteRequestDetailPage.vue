@@ -583,13 +583,21 @@ const getStatusLabel = (status: string) => {
             <h3 class="font-semibold text-[#263238] mb-4">Resumo</h3>
             <div class="space-y-4">
               <div>
-                <p class="text-sm text-[#435574]">Orçamento</p>
-                <p class="text-lg font-bold text-green-600">{{ formatCurrency(request.budget) }}</p>
+                <p class="text-sm text-[#435574]">
+                  {{ ['accepted', 'in_progress', 'completed'].includes(request.status) && request.freelancerResponse ? 'Valor Acordado' : 'Orçamento' }}
+                </p>
+                <p class="text-lg font-bold text-green-600">
+                  {{ formatCurrency(['accepted', 'in_progress', 'completed'].includes(request.status) && request.freelancerResponse ? request.freelancerResponse.value : request.budget) }}
+                </p>
               </div>
               <Separator />
               <div>
-                <p class="text-sm text-[#435574]">Prazo solicitado</p>
-                <p class="font-medium text-[#263238]">{{ request.deadline }}</p>
+                <p class="text-sm text-[#435574]">
+                  {{ ['accepted', 'in_progress', 'completed'].includes(request.status) && request.freelancerResponse ? 'Prazo Acordado' : 'Prazo solicitado' }}
+                </p>
+                <p class="font-medium text-[#263238]">
+                  {{ ['accepted', 'in_progress', 'completed'].includes(request.status) && request.freelancerResponse ? request.freelancerResponse.executionDays + ' dias' : request.deadline }}
+                </p>
               </div>
               <Separator />
               <div>
@@ -703,7 +711,7 @@ const getStatusLabel = (status: string) => {
 
       <ServiceRequestTimeline
         v-if="activeSection === 'history'"
-        :entries="request.auditLog || []"
+        :request-id="request.id"
         title="Histórico de Atividades"
       />
     </template>

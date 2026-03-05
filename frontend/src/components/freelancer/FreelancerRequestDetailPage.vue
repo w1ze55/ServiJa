@@ -779,10 +779,18 @@ const getStatusBadge = (status: string) => {
                 </p>
               </div>
               <div>
-                <Label class="text-sm text-[#435574]">Orçamento Estimado</Label>
-                <p class="text-[#263238] mt-1 font-semibold">{{ formatCurrency(proposal.budget) }}</p>
+                <Label class="text-sm text-[#435574]">
+                  {{ ['accepted', 'in_progress', 'completed'].includes(proposal.status) && proposal.freelancerResponse ? 'Valor Acordado' : 'Orçamento Estimado' }}
+                </Label>
+                <p class="text-[#263238] mt-1 font-semibold">
+                  {{ formatCurrency(['accepted', 'in_progress', 'completed'].includes(proposal.status) && proposal.freelancerResponse ? proposal.freelancerResponse.value : proposal.budget) }}
+                </p>
               </div>
-              <div>
+              <div v-if="['accepted', 'in_progress', 'completed'].includes(proposal.status) && proposal.freelancerResponse">
+                <Label class="text-sm text-[#435574]">Prazo Acordado</Label>
+                <p class="text-[#263238] mt-1 font-semibold">{{ proposal.freelancerResponse.executionDays }} dias</p>
+              </div>
+              <div v-else>
                 <Label class="text-sm text-[#435574]">Prioridade</Label>
                 <p class="text-[#263238] mt-1">
                   <Badge :variant="getPriorityVariant(proposal.priority || 'MEDIUM')">
@@ -950,7 +958,7 @@ const getStatusBadge = (status: string) => {
         <!-- History Tab -->
         <TabsContent value="history" class="space-y-4">
           <ServiceRequestTimeline
-            :entries="proposal.auditLog || []"
+            :request-id="proposal.id"
             title="Histórico de Ações"
           />
         </TabsContent>

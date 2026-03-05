@@ -61,34 +61,31 @@ const isUploading = ref(false);
 const uploadProgress = ref(0);
 const uploadFiles = ref<File[]>([]);
 const uploadDescription = ref('');
+const activeFileTab = ref<'client' | 'freelancer'>('freelancer');
 
 // Load data
 onMounted(async () => {
   await proposalStore.loadProposals();
-  // Auto-select first active project
   if (activeProjects.value.length > 0 && !selectedProjectId.value) {
     selectedProjectId.value = activeProjects.value[0].id;
     await proposalStore.loadHistory(activeProjects.value[0].id);
   }
 });
 
-// Active projects = proposals with status 'accepted'
 const activeProjects = computed(() =>
-  proposalStore.proposals.filter((p) => p.status === 'accepted')
+  proposalStore.proposals.filter((p) => p.status === 'in_progress')
 );
 
 const selectedProject = computed(() =>
   activeProjects.value.find((p) => p.id === selectedProjectId.value) || null
 );
 
-// Watch for project selection to load history
 watch(selectedProjectId, async (newId) => {
   if (newId) {
     await proposalStore.loadHistory(newId);
   }
 });
 
-// Progress calculation based on milestones or a default
 const projectProgress = computed(() => {
   const project = selectedProject.value;
   if (!project) return 0;
@@ -97,7 +94,21 @@ const projectProgress = computed(() => {
     const completed = milestones.filter((m) => m.status === 'completed').length;
     return Math.round((completed / milestones.length) * 100);
   }
-  return 50; // Default if no milestones
+  return 50;
+});
+
+const remainingDays = computed(() => {
+  const project = selectedProject.value;
+  if (!project) return 0;
+  const startDate = new Date(project.freelancerResponse?.sentAt || project.receivedAt);
+  startDate.setHours(0, 0, 0, 0);
+  const executionDays = project.freelancerResponse?.executionDays || parseInt(project.deadline) || 30;
+  const deadlineDate = new Date(startDate);
+  deadlineDate.setDate(deadlineDate.getDate() + executionDays);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const diffMs = deadlineDate.getTime() - today.getTime();
+  return Math.round(diffMs / (1000 * 60 * 60 * 24));
 });
 
 const paymentProgress = computed(() => {
@@ -243,13 +254,19 @@ const handleUploadFiles = async () => {
       if (uploadProgress.value < 90) uploadProgress.value += 10;
     }, 300);
 
-    await api.post('/upload/images', formData, {
+    const response = await api.post('/upload/images', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
 
     clearInterval(progressInterval);
-    uploadProgress.value = 100;
 
+    // Vincular URLs ao service request
+    const urls = response.data.urls || [];
+    if (urls.length > 0 && selectedProject.value) {
+      await api.post(`/service-requests/${selectedProject.value.id}/freelancer-attachments`, { urls });
+    }
+
+    uploadProgress.value = 100;
     toast.success('Arquivos enviados com sucesso!');
     showUploadDialog.value = false;
 
@@ -268,14 +285,22 @@ const handleViewAttachment = (url: string) => {
 };
 
 // Download attachment
-const handleDownloadAttachment = (url: string, fileName: string) => {
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = fileName;
-  link.target = '_blank';
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+const handleDownloadAttachment = async (url: string, fileName: string) => {
+  try {
+    const response = await fetch(url);
+    const blob = await response.blob();
+    const blobUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(blobUrl);
+  } catch {
+    // Fallback: abrir em nova aba
+    window.open(url, '_blank');
+  }
 };
 
 // Format date
@@ -415,7 +440,7 @@ const getMilestoneStatusConfig = (status: Milestone['status']) => {
           <div class="flex items-center justify-between text-xs text-[#435574]">
             <span class="flex items-center gap-1">
               <Calendar class="h-3 w-3" />
-              Prazo: {{ project.deadline }}
+              Prazo: {{ project.freelancerResponse?.executionDays || parseInt(project.deadline) }} dias
             </span>
             <span class="font-medium text-[#263238]">
               {{ formatCurrency(project.freelancerResponse?.value || project.budget) }}
@@ -444,7 +469,6 @@ const getMilestoneStatusConfig = (status: Milestone['status']) => {
                 </div>
               </div>
 
-              <!-- Progress Bars -->
               <div class="space-y-4 mb-6">
                 <div class="space-y-1.5">
                   <div class="flex items-center justify-between text-sm">
@@ -453,19 +477,8 @@ const getMilestoneStatusConfig = (status: Milestone['status']) => {
                   </div>
                   <Progress :value="projectProgress" class="h-2" />
                 </div>
-
-                <div class="space-y-1.5">
-                  <div class="flex items-center justify-between text-sm">
-                    <span class="text-[#435574]">Pagamento</span>
-                    <span class="text-[#263238] font-medium">
-                      {{ formatCurrency(paidAmount) }} / {{ formatCurrency(totalAmount) }}
-                    </span>
-                  </div>
-                  <Progress :value="paymentProgress" class="h-2" />
-                </div>
               </div>
 
-              <!-- Dates -->
               <div class="flex gap-8 mb-6">
                 <div>
                   <p class="text-xs text-[#435574] mb-0.5">Data de Início</p>
@@ -473,7 +486,15 @@ const getMilestoneStatusConfig = (status: Milestone['status']) => {
                 </div>
                 <div>
                   <p class="text-xs text-[#435574] mb-0.5">Prazo de Entrega</p>
-                  <p class="text-sm font-medium text-[#263238]">{{ selectedProject.deadline }}</p>
+                  <p class="text-sm font-medium text-[#263238]">{{ selectedProject.freelancerResponse?.executionDays || parseInt(selectedProject.deadline) }} dias</p>
+                </div>
+                <div>
+                  <p class="text-xs text-[#435574] mb-0.5">Tempo Restante</p>
+                  <p :class="['text-sm font-medium', remainingDays < 0 ? 'text-red-600' : remainingDays <= 7 ? 'text-amber-600' : 'text-green-600']">
+                    <template v-if="remainingDays < 0">{{ Math.abs(remainingDays) }} dias atrasado</template>
+                    <template v-else-if="remainingDays === 0">Vence hoje</template>
+                    <template v-else>{{ remainingDays }} dias restantes</template>
+                  </p>
                 </div>
               </div>
 
@@ -564,48 +585,102 @@ const getMilestoneStatusConfig = (status: Milestone['status']) => {
             <Card class="p-6">
               <div class="flex items-center justify-between mb-4">
                 <h3 class="text-lg font-semibold text-[#263238]">Arquivos do Projeto</h3>
-                <Badge v-if="selectedProject.attachments && selectedProject.attachments.length > 0" variant="secondary">
-                  {{ selectedProject.attachments.length }} arquivo{{ selectedProject.attachments.length !== 1 ? 's' : '' }}
-                </Badge>
               </div>
 
-              <div v-if="!selectedProject.attachments || selectedProject.attachments.length === 0" class="text-center py-8">
-                <FileText class="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                <p class="text-[#435574]">Nenhum arquivo anexado a este projeto</p>
-              </div>
-
-              <div v-else class="space-y-2">
-                <div
-                  v-for="attachment in selectedProject.attachments"
-                  :key="attachment.id"
-                  class="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+              <!-- Tabs -->
+              <div class="flex border-b border-gray-200 mb-4">
+                <button
+                  @click="activeFileTab = 'client'"
+                  :class="[
+                    'px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px',
+                    activeFileTab === 'client'
+                      ? 'border-[#286AD8] text-[#286AD8]'
+                      : 'border-transparent text-[#435574] hover:text-[#263238]'
+                  ]"
                 >
-                  <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
-                      <FileText class="h-5 w-5 text-[#286AD8]" />
+                  Cliente
+                  <Badge v-if="selectedProject.attachments && selectedProject.attachments.length > 0" variant="secondary" class="ml-2">
+                    {{ selectedProject.attachments.length }}
+                  </Badge>
+                </button>
+                <button
+                  @click="activeFileTab = 'freelancer'"
+                  :class="[
+                    'px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px',
+                    activeFileTab === 'freelancer'
+                      ? 'border-[#286AD8] text-[#286AD8]'
+                      : 'border-transparent text-[#435574] hover:text-[#263238]'
+                  ]"
+                >
+                  Freelancer
+                  <Badge v-if="selectedProject.freelancerAttachments && selectedProject.freelancerAttachments.length > 0" variant="secondary" class="ml-2">
+                    {{ selectedProject.freelancerAttachments.length }}
+                  </Badge>
+                </button>
+              </div>
+
+              <!-- Client Files Tab -->
+              <div v-if="activeFileTab === 'client'">
+                <div v-if="!selectedProject.attachments || selectedProject.attachments.length === 0" class="text-center py-8">
+                  <FileText class="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                  <p class="text-[#435574]">Nenhum arquivo enviado pelo cliente</p>
+                </div>
+                <div v-else class="space-y-2">
+                  <div
+                    v-for="attachment in selectedProject.attachments"
+                    :key="attachment.id"
+                    class="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                  >
+                    <div class="flex items-center gap-3">
+                      <div class="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
+                        <FileText class="h-5 w-5 text-[#286AD8]" />
+                      </div>
+                      <div>
+                        <p class="text-sm font-medium text-[#263238]">{{ attachment.name }}</p>
+                        <p v-if="attachment.size" class="text-xs text-[#435574]">{{ attachment.size }}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p class="text-sm font-medium text-[#263238]">{{ attachment.name }}</p>
-                      <p v-if="attachment.size" class="text-xs text-[#435574]">{{ attachment.size }}</p>
+                    <div class="flex gap-1">
+                      <Button @click="handleViewAttachment(attachment.url)" variant="ghost" size="icon" class="text-[#435574] hover:text-[#286AD8]">
+                        <Eye class="h-4 w-4" />
+                      </Button>
+                      <Button @click="handleDownloadAttachment(attachment.url, attachment.name)" variant="ghost" size="icon" class="text-[#435574] hover:text-[#286AD8]">
+                        <Download class="h-4 w-4" />
+                      </Button>
                     </div>
                   </div>
-                  <div class="flex gap-1">
-                    <Button
-                      @click="handleViewAttachment(attachment.url)"
-                      variant="ghost"
-                      size="icon"
-                      class="text-[#435574] hover:text-[#286AD8]"
-                    >
-                      <Eye class="h-4 w-4" />
-                    </Button>
-                    <Button
-                      @click="handleDownloadAttachment(attachment.url, attachment.name)"
-                      variant="ghost"
-                      size="icon"
-                      class="text-[#435574] hover:text-[#286AD8]"
-                    >
-                      <Download class="h-4 w-4" />
-                    </Button>
+                </div>
+              </div>
+
+              <!-- Freelancer Files Tab -->
+              <div v-if="activeFileTab === 'freelancer'">
+                <div v-if="!selectedProject.freelancerAttachments || selectedProject.freelancerAttachments.length === 0" class="text-center py-8">
+                  <FileText class="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                  <p class="text-[#435574]">Nenhum arquivo enviado pelo freelancer</p>
+                </div>
+                <div v-else class="space-y-2">
+                  <div
+                    v-for="attachment in selectedProject.freelancerAttachments"
+                    :key="attachment.id"
+                    class="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                  >
+                    <div class="flex items-center gap-3">
+                      <div class="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center">
+                        <FileText class="h-5 w-5 text-green-600" />
+                      </div>
+                      <div>
+                        <p class="text-sm font-medium text-[#263238]">{{ attachment.name }}</p>
+                        <p v-if="attachment.size" class="text-xs text-[#435574]">{{ attachment.size }}</p>
+                      </div>
+                    </div>
+                    <div class="flex gap-1">
+                      <Button @click="handleViewAttachment(attachment.url)" variant="ghost" size="icon" class="text-[#435574] hover:text-[#286AD8]">
+                        <Eye class="h-4 w-4" />
+                      </Button>
+                      <Button @click="handleDownloadAttachment(attachment.url, attachment.name)" variant="ghost" size="icon" class="text-[#435574] hover:text-[#286AD8]">
+                        <Download class="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -641,7 +716,7 @@ const getMilestoneStatusConfig = (status: Milestone['status']) => {
 
             <!-- Activity History Card -->
             <ServiceRequestTimeline
-              :entries="selectedProject.auditLog || []"
+              :request-id="selectedProject.id"
               title="Histórico de Atividades"
             />
           </div>

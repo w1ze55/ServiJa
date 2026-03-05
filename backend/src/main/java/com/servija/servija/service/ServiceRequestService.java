@@ -71,17 +71,16 @@ public class ServiceRequestService {
 
         ServiceRequest saved = serviceRequestRepository.save(request);
         historyService.record(saved, contractor, OperationType.REQUEST_OPENED);
-        
+
         // Notificar freelancer sobre nova solicitação
         if (freelancer != null) {
             webSocketService.notifyNewServiceRequest(
-                saved.getId(),
-                freelancer.getEmail(),
-                contractor.getName(),
-                dto.getServiceName()
-            );
+                    saved.getId(),
+                    freelancer.getEmail(),
+                    contractor.getName(),
+                    dto.getServiceName());
         }
-        
+
         log.info("Service request created: {} for freelancer: {}", saved.getId(),
                 freelancer != null ? freelancer.getId() : "any");
         return toResponse(saved);
@@ -169,11 +168,10 @@ public class ServiceRequestService {
 
         // Notificar contratante sobre nova proposta
         webSocketService.notifyNewProposal(
-            saved.getId(),
-            request.getContractor().getEmail(),
-            freelancer.getName(),
-            String.format("R$ %.2f", dto.getValue())
-        );
+                saved.getId(),
+                request.getContractor().getEmail(),
+                freelancer.getName(),
+                String.format("R$ %.2f", dto.getValue()));
 
         return toResponse(saved);
     }
@@ -198,11 +196,10 @@ public class ServiceRequestService {
 
         // Notificar freelancer sobre contra-proposta
         webSocketService.notifyCounterProposal(
-            saved.getId(),
-            request.getFreelancer().getEmail(),
-            contractor.getName(),
-            String.format("R$ %.2f", dto.getValue())
-        );
+                saved.getId(),
+                request.getFreelancer().getEmail(),
+                contractor.getName(),
+                String.format("R$ %.2f", dto.getValue()));
 
         return toResponse(saved);
     }
@@ -230,14 +227,13 @@ public class ServiceRequestService {
             ServiceRequest saved = serviceRequestRepository.save(request);
             String details = String.format("Contra proposta aceita. Novo valor: R$ %.2f", request.getResponseValue());
             historyService.record(saved, freelancer, OperationType.COUNTER_PROPOSAL_ACCEPTED, details);
-            
+
             // Notificar ambas as partes sobre aceitação
             webSocketService.notifyProposalAccepted(
-                saved.getId(),
-                freelancer.getEmail(),
-                request.getContractor().getEmail()
-            );
-            
+                    saved.getId(),
+                    freelancer.getEmail(),
+                    request.getContractor().getEmail());
+
             return toResponse(saved);
         }
 
@@ -292,7 +288,7 @@ public class ServiceRequestService {
         request.setStatus(Status.COMPLETED);
         ServiceRequest saved = serviceRequestRepository.save(request);
 
-        historyService.record(saved, contractor, OperationType.SERVICE_COMPLETED, 
+        historyService.record(saved, contractor, OperationType.SERVICE_COMPLETED,
                 "Serviço marcado como concluído pelo cliente");
 
         log.info("Serviço concluído - ID: {}, Contratante: {}", id, contractorEmail);
@@ -332,6 +328,33 @@ public class ServiceRequestService {
                 }
             }
         }
+    }
+
+    @Transactional
+    public ServiceRequestResponse addFreelancerAttachments(Long id, List<String> urls, String freelancerEmail) {
+        ServiceRequest request = serviceRequestRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Solicitação não encontrada"));
+
+        User freelancer = userRepository.findByEmail(freelancerEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
+
+        if (request.getFreelancer() == null || !request.getFreelancer().getId().equals(freelancer.getId())) {
+            throw new IllegalStateException("Apenas o freelancer da solicitação pode enviar arquivos");
+        }
+
+        List<String> existing = parseAttachments(request.getFreelancerAttachments());
+        existing.addAll(urls);
+
+        try {
+            request.setFreelancerAttachments(objectMapper.writeValueAsString(existing));
+        } catch (Exception e) {
+            log.error("Erro ao serializar freelancer attachments", e);
+            throw new RuntimeException("Erro ao salvar arquivos");
+        }
+
+        ServiceRequest saved = serviceRequestRepository.save(request);
+        log.info("Freelancer attachments adicionados à solicitação {}: {} arquivos", id, urls.size());
+        return toResponse(saved);
     }
 
     private List<String> parseAttachments(String json) {
@@ -379,6 +402,7 @@ public class ServiceRequestService {
                 .cancelReason(request.getCancelReason())
                 .rejectReason(request.getRejectReason())
                 .attachments(parseAttachments(request.getAttachments()))
+                .freelancerAttachments(parseAttachments(request.getFreelancerAttachments()))
                 .createdAt(request.getCreatedAt())
                 .updatedAt(request.getUpdatedAt())
                 .build();
