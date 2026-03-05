@@ -853,13 +853,13 @@ onUnmounted(() => {
               <p class="text-xs text-[#435574]">Ou copie o código PIX abaixo</p>
 
               <!-- PIX Copy/Paste Code -->
-              <div class="relative inline-block">
-                <div class="flex gap-2 max-w-md mx-auto">
-                  <Input
-                    :value="pixData.payload"
-                    readonly
-                    class="text-xs font-mono flex-1 bg-gray-100"
-                  />
+              <div class="flex gap-2 max-w-md mx-auto">
+                <Input
+                  :value="pixData.payload"
+                  readonly
+                  class="text-xs font-mono flex-1 bg-gray-100"
+                />
+                <div class="relative">
                   <Button
                     @click="copyPixCode"
                     variant="outline"
@@ -869,28 +869,31 @@ onUnmounted(() => {
                     <Copy class="h-4 w-4 mr-2" />
                     Copiar
                   </Button>
-                  <Button
-                    v-if="!paymentConfirmed"
-                    @click="reloadPixQrCode"
-                    variant="outline"
-                    size="sm"
-                    class="shrink-0 bg-white"
-                    :disabled="isLoadingPix"
-                  >
-                    <Loader2 v-if="isLoadingPix" class="h-4 w-4 mr-2 animate-spin" />
-                    <RefreshCw v-else class="h-4 w-4 mr-2" />
-                    Recarregar
-                  </Button>
+                  <transition name="fade">
+                    <div
+                      v-if="copyFeedbackVisible"
+                      class="absolute left-1/2 -translate-x-1/2 -top-12 pointer-events-none transition-opacity duration-300"
+                      :class="copyFeedbackFading ? 'opacity-0' : 'opacity-100'"
+                    >
+                      <div class="relative bg-white/95 text-green-700 border border-green-500/90 text-xs px-3 py-2 rounded-md shadow-lg whitespace-nowrap opacity-95">
+                        {{ copyFeedback }}
+                        <div class="absolute left-1/2 -bottom-1.5 -translate-x-1/2 w-3 h-3 bg-white/95 border-b border-r border-green-500/90 rotate-45 shadow-sm"></div>
+                      </div>
+                    </div>
+                  </transition>
                 </div>
-                <transition name="fade">
-                  <div
-                    v-if="copyFeedbackVisible"
-                    class="absolute left-1/2 -translate-x-1/2 -top-9 bg-green-600 text-white text-xs px-3 py-1 rounded shadow-md whitespace-nowrap pointer-events-none transition-opacity duration-300"
-                    :class="copyFeedbackFading ? 'opacity-0' : 'opacity-100'"
-                  >
-                    {{ copyFeedback }}
-                  </div>
-                </transition>
+                <Button
+                  v-if="!paymentConfirmed"
+                  @click="reloadPixQrCode"
+                  variant="outline"
+                  size="sm"
+                  class="shrink-0 bg-white"
+                  :disabled="isLoadingPix"
+                >
+                  <Loader2 v-if="isLoadingPix" class="h-4 w-4 mr-2 animate-spin" />
+                  <RefreshCw v-else class="h-4 w-4 mr-2" />
+                  Recarregar
+                </Button>
               </div>
 
               <!-- Expiration Info -->
