@@ -37,7 +37,7 @@ export const useFavoritesStore = defineStore('favorites', {
             }
         },
 
-        async toggleFavoriteFreelancer(freelancerId: number) {
+        async toggleFavoriteFreelancer(freelancerId: number | string) {
             const favoriteId = this.getFavoriteIdByFreelancer(freelancerId);
 
             if (favoriteId) {
@@ -50,7 +50,7 @@ export const useFavoritesStore = defineStore('favorites', {
                 }
             } else {
                 try {
-                    const newFavorite = await favoriteService.addFavorite({ freelancerId });
+                    const newFavorite = await favoriteService.addFavorite({ freelancerId: Number(freelancerId) });
                     this.favorites.push(newFavorite);
                     toast.success('Adicionado aos favoritos');
                 } catch (error) {
@@ -59,7 +59,7 @@ export const useFavoritesStore = defineStore('favorites', {
             }
         },
 
-        async toggleFavoriteService(serviceId: number) {
+        async toggleFavoriteService(serviceId: number | string) {
             const favoriteId = this.getFavoriteIdByService(serviceId);
 
             if (favoriteId) {
@@ -72,7 +72,7 @@ export const useFavoritesStore = defineStore('favorites', {
                 }
             } else {
                 try {
-                    const newFavorite = await favoriteService.addFavorite({ serviceId });
+                    const newFavorite = await favoriteService.addFavorite({ serviceId: Number(serviceId) });
                     this.favorites.push(newFavorite);
                     toast.success('Adicionado aos favoritos');
                 } catch (error) {

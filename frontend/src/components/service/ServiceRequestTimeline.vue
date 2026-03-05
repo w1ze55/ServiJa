@@ -107,8 +107,8 @@ const getLabelClass = (key?: string) => {
 </script>
 
 <template>
-  <Card class="p-6">
-    <h3 class="text-lg font-semibold text-[#263238] mb-4">{{ title }}</h3>
+  <Card class="p-6 text-left">
+    <h3 class="text-lg font-semibold text-[#263238] mb-4 text-left">{{ title }}</h3>
 
     <div v-if="isLoading" class="flex items-center justify-center py-8">
       <Loader2 class="h-8 w-8 text-[#286AD8] animate-spin" />
@@ -161,8 +161,8 @@ const getLabelClass = (key?: string) => {
               </p>
               <span class="text-xs text-[#435574] whitespace-nowrap">{{ log.timestamp }}</span>
             </div>
-            <p class="text-xs text-[#435574] mt-0.5">{{ log.user }}</p>
-            <p v-if="log.details" class="text-sm text-[#435574] mt-1">{{ log.details }}</p>
+            <p class="text-xs text-[#435574] mt-0.5 text-left">{{ log.user }}</p>
+            <p v-if="log.details" class="text-sm text-[#435574] mt-1 text-left">{{ log.details }}</p>
           </div>
         </div>
       </div>

@@ -78,6 +78,8 @@ const isLoading = ref(false);
 
 const proposal = ref<Proposal | null>(null);
 
+const MAX_EXECUTION_DAYS = 365;
+
 const proposalForm = ref({
   value: '',
   executionDays: '',
@@ -101,6 +103,37 @@ const messageAttachments = ref<File[]>([]);
 
 const messageAttachmentInput = ref<HTMLInputElement | null>(null);
 const proposalAttachmentInput = ref<HTMLInputElement | null>(null);
+
+const getExecutionTimeLabel = (days: number) => {
+  if (!days || days <= 0) return '';
+
+  const clamped = Math.min(days, MAX_EXECUTION_DAYS);
+  let remainingDays = clamped;
+
+  const months = Math.floor(remainingDays / 30);
+  remainingDays -= months * 30;
+  const weeks = Math.floor(remainingDays / 7);
+
+  const parts: string[] = [];
+  if (months > 0) {
+    parts.push(`${months} mês${months > 1 ? 'es' : ''}`);
+  }
+  if (weeks > 0) {
+    parts.push(`${weeks} semana${weeks > 1 ? 's' : ''}`);
+  }
+
+  if (parts.length === 0) {
+    parts.push(`${clamped} dia${clamped > 1 ? 's' : ''}`);
+  }
+
+  return parts.join(' e ');
+};
+
+const executionTimeLabel = computed(() => {
+  const days = parseInt(proposalForm.value.executionDays);
+  if (isNaN(days) || days <= 0) return '';
+  return getExecutionTimeLabel(days);
+});
 
 onMounted(async () => {
   if (proposalStore.proposals.length === 0) {
@@ -169,6 +202,62 @@ const parseCurrencyValue = (value: string): number => {
   return parseFloat(numbers) || 0;
 };
 
+const handleExecutionDaysInput = (value: string) => {
+  const clean = value.replace(/\D/g, '');
+  const digitsOnly = clean.slice(0, 3);
+
+  if (!digitsOnly) {
+    proposalForm.value.executionDays = '';
+    return;
+  }
+
+  let days = parseInt(digitsOnly, 10);
+
+  if (isNaN(days) || days <= 0) {
+    proposalForm.value.executionDays = '';
+    return;
+  }
+
+  if (days > MAX_EXECUTION_DAYS) {
+    days = MAX_EXECUTION_DAYS;
+    if (proposalForm.value.executionDays !== String(MAX_EXECUTION_DAYS)) {
+      toast.error(`O prazo máximo é de ${MAX_EXECUTION_DAYS} dias.`);
+    }
+  }
+
+  proposalForm.value.executionDays = String(days);
+};
+
+const handleExecutionDaysKeydown = (event: KeyboardEvent) => {
+  const allowedKeys = [
+    'Backspace',
+    'Tab',
+    'ArrowLeft',
+    'ArrowRight',
+    'Delete',
+    'Home',
+    'End',
+  ];
+
+  if (allowedKeys.includes(event.key)) {
+    return;
+  }
+
+  // Bloquear qualquer tecla que não seja dígito
+  if (!/^[0-9]$/.test(event.key)) {
+    event.preventDefault();
+    return;
+  }
+
+  const current = proposalForm.value.executionDays || '';
+  const digitsCount = current.replace(/\D/g, '').length;
+
+  // Impedir digitação acima de 3 dígitos
+  if (digitsCount >= 3) {
+    event.preventDefault();
+  }
+};
+
 const validateProposal = () => {
   const errors: string[] = [];
 
@@ -184,6 +273,8 @@ const validateProposal = () => {
   const days = parseInt(proposalForm.value.executionDays);
   if (isNaN(days) || days <= 0) {
     errors.push('Prazo de execução deve ser um número válido maior que zero');
+  } else if (days > MAX_EXECUTION_DAYS) {
+    errors.push(`Prazo de execução não pode ser maior que ${MAX_EXECUTION_DAYS} dias`);
   }
 
   if (milestones.value.length > 0) {
@@ -312,10 +403,16 @@ const handleConfirmSendProposal = async () => {
   if (!proposal.value) return;
 
   isLoading.value = true;
+
+  const parsedDays = parseInt(proposalForm.value.executionDays);
+  const safeExecutionDays = Math.min(
+    MAX_EXECUTION_DAYS,
+    Math.max(1, isNaN(parsedDays) ? 1 : parsedDays)
+  );
   
   const responseData = {
     value: parseCurrencyValue(proposalForm.value.value),
-    executionDays: parseInt(proposalForm.value.executionDays),
+    executionDays: safeExecutionDays,
     scope: proposalForm.value.scope,
     notes: proposalForm.value.notes || undefined,
     milestones: milestones.value.length > 0 
@@ -547,7 +644,7 @@ const getStatusBadge = (status: string) => {
             {{ proposal.freelancerResponse ? 'Atualizar Proposta' : 'Enviar Proposta' }}
           </Button>
           <Button
-            v-if="proposal.status === 'accepted'"
+            v-if="proposal.status === 'in_progress'"
             @click="showCompleteDialog = true"
             class="bg-green-600 hover:bg-green-700"
           >
@@ -990,13 +1087,25 @@ const getStatusBadge = (status: string) => {
 
             <div class="space-y-2">
               <Label for="executionDays">Prazo de Execução (dias) *</Label>
-              <Input
-                id="executionDays"
-                type="number"
-                :model-value="proposalForm.executionDays"
-                @update:model-value="(val) => proposalForm.executionDays = val as string"
-                placeholder="Ex: 15"
-              />
+              <div class="relative">
+                <Input
+                  id="executionDays"
+                  type="text"
+                  maxlength="3"
+                  inputmode="numeric"
+                  :model-value="proposalForm.executionDays"
+                  @update:model-value="(val) => handleExecutionDaysInput(val as string)"
+                  @keydown="handleExecutionDaysKeydown"
+                  placeholder="Ex: 15"
+                  class="pr-28"
+                />
+                <span
+                  v-if="executionTimeLabel"
+                  class="absolute top-1/2 right-2 -translate-y-1/2 flex items-center px-3 py-0.5 rounded-full bg-blue-50 text-[11px] font-medium text-[#286AD8] pointer-events-none whitespace-nowrap shadow-sm"
+                >
+                  {{ executionTimeLabel }}
+                </span>
+              </div>
             </div>
           </div>
 

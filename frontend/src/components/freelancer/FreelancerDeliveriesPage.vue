@@ -365,7 +365,10 @@ const getMilestoneStatusConfig = (status: Milestone['status']) => {
     </div>
 
     <!-- Empty State -->
-    <Card v-else-if="activeProjects.length === 0" class="p-12 text-center">
+    <Card
+      v-else-if="activeProjects.length === 0"
+      class="p-12 flex flex-col items-center justify-center text-center min-h-[320px]"
+    >
       <div class="inline-flex p-6 bg-gray-100 rounded-full mb-6">
         <Package class="h-16 w-16 text-gray-400" />
       </div>

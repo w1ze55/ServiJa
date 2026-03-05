@@ -170,16 +170,16 @@ const freelancerGroups = computed(() => {
 
 const totalFreelancers = computed(() => freelancerGroups.value.length);
 
-const toggleFavoriteService = (id: number) => {
+const toggleFavoriteService = (id: number | string) => {
   favoritesStore.toggleFavoriteService(id);
 };
 
-const toggleFavoriteFreelancer = (id: number) => {
+const toggleFavoriteFreelancer = (id: number | string) => {
   favoritesStore.toggleFavoriteFreelancer(id);
 };
 
-const isFavoriteService = (id: number) => favoritesStore.isFavoriteService(id);
-const isFavoriteFreelancer = (id: number) => favoritesStore.isFavoriteFreelancer(id);
+const isFavoriteService = (id: number | string) => favoritesStore.isFavoriteService(id);
+const isFavoriteFreelancer = (id: number | string) => favoritesStore.isFavoriteFreelancer(id);
 
 const handleViewProfile = (providerId: string | number) => {
   props.onNavigate('provider-profile', { providerId: Number(providerId) });
