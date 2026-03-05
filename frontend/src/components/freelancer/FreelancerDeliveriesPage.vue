@@ -97,6 +97,20 @@ const projectProgress = computed(() => {
   return 50;
 });
 
+const remainingDays = computed(() => {
+  const project = selectedProject.value;
+  if (!project) return 0;
+  const startDate = new Date(project.freelancerResponse?.sentAt || project.receivedAt);
+  startDate.setHours(0, 0, 0, 0);
+  const executionDays = project.freelancerResponse?.executionDays || parseInt(project.deadline) || 30;
+  const deadlineDate = new Date(startDate);
+  deadlineDate.setDate(deadlineDate.getDate() + executionDays);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const diffMs = deadlineDate.getTime() - today.getTime();
+  return Math.round(diffMs / (1000 * 60 * 60 * 24));
+});
+
 const paymentProgress = computed(() => {
   const project = selectedProject.value;
   if (!project) return 0;
@@ -426,7 +440,7 @@ const getMilestoneStatusConfig = (status: Milestone['status']) => {
           <div class="flex items-center justify-between text-xs text-[#435574]">
             <span class="flex items-center gap-1">
               <Calendar class="h-3 w-3" />
-              Prazo: {{ project.deadline }}
+              Prazo: {{ project.freelancerResponse?.executionDays || parseInt(project.deadline) }} dias
             </span>
             <span class="font-medium text-[#263238]">
               {{ formatCurrency(project.freelancerResponse?.value || project.budget) }}
@@ -455,7 +469,6 @@ const getMilestoneStatusConfig = (status: Milestone['status']) => {
                 </div>
               </div>
 
-              <!-- Progress Bars -->
               <div class="space-y-4 mb-6">
                 <div class="space-y-1.5">
                   <div class="flex items-center justify-between text-sm">
@@ -464,19 +477,8 @@ const getMilestoneStatusConfig = (status: Milestone['status']) => {
                   </div>
                   <Progress :value="projectProgress" class="h-2" />
                 </div>
-
-                <div class="space-y-1.5">
-                  <div class="flex items-center justify-between text-sm">
-                    <span class="text-[#435574]">Pagamento</span>
-                    <span class="text-[#263238] font-medium">
-                      {{ formatCurrency(paidAmount) }} / {{ formatCurrency(totalAmount) }}
-                    </span>
-                  </div>
-                  <Progress :value="paymentProgress" class="h-2" />
-                </div>
               </div>
 
-              <!-- Dates -->
               <div class="flex gap-8 mb-6">
                 <div>
                   <p class="text-xs text-[#435574] mb-0.5">Data de Início</p>
@@ -484,7 +486,15 @@ const getMilestoneStatusConfig = (status: Milestone['status']) => {
                 </div>
                 <div>
                   <p class="text-xs text-[#435574] mb-0.5">Prazo de Entrega</p>
-                  <p class="text-sm font-medium text-[#263238]">{{ selectedProject.deadline }}</p>
+                  <p class="text-sm font-medium text-[#263238]">{{ selectedProject.freelancerResponse?.executionDays || parseInt(selectedProject.deadline) }} dias</p>
+                </div>
+                <div>
+                  <p class="text-xs text-[#435574] mb-0.5">Tempo Restante</p>
+                  <p :class="['text-sm font-medium', remainingDays < 0 ? 'text-red-600' : remainingDays <= 7 ? 'text-amber-600' : 'text-green-600']">
+                    <template v-if="remainingDays < 0">{{ Math.abs(remainingDays) }} dias atrasado</template>
+                    <template v-else-if="remainingDays === 0">Vence hoje</template>
+                    <template v-else>{{ remainingDays }} dias restantes</template>
+                  </p>
                 </div>
               </div>
 

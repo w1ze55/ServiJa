@@ -714,11 +714,11 @@ watch(currentTab, () => {
                     <div class="flex items-center gap-4 text-sm">
                       <span class="flex items-center gap-1 font-medium text-[#263238]">
                         <DollarSign class="h-4 w-4 text-green-600" />
-                        {{ formatCurrency(proposal.budget) }}
+                        {{ formatCurrency(['accepted', 'in_progress', 'completed'].includes(proposal.status) && proposal.freelancerResponse ? proposal.freelancerResponse.value : proposal.budget) }}
                       </span>
                       <span class="flex items-center gap-1 text-[#435574]">
                         <Clock class="h-4 w-4" />
-                        Prazo: {{ proposal.deadline }}
+                        Prazo: {{ ['accepted', 'in_progress', 'completed'].includes(proposal.status) && proposal.freelancerResponse ? proposal.freelancerResponse.executionDays + ' dias' : proposal.deadline }}
                       </span>
                       <span
                         v-if="proposal.attachments && proposal.attachments.length > 0"

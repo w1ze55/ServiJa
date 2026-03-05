@@ -702,11 +702,11 @@ const getStatusLabel = (status: string) => {
                     <div class="flex items-center gap-4 text-sm flex-wrap">
                       <span class="flex items-center gap-1 font-medium text-[#263238]">
                         <DollarSign class="h-4 w-4 text-green-600" />
-                        {{ formatCurrency(request.budget) }}
+                        {{ formatCurrency(['accepted', 'in_progress', 'completed'].includes(request.status) && request.freelancerResponse ? request.freelancerResponse.value : request.budget) }}
                       </span>
                       <span class="flex items-center gap-1 text-[#435574]">
                         <Clock class="h-4 w-4" />
-                        Prazo: {{ request.deadline }}
+                        Prazo: {{ ['accepted', 'in_progress', 'completed'].includes(request.status) && request.freelancerResponse ? request.freelancerResponse.executionDays + ' dias' : request.deadline }}
                       </span>
                       <span
                         v-if="request.attachments && request.attachments.length > 0"
