@@ -547,7 +547,7 @@ const getStatusBadge = (status: string) => {
             {{ proposal.freelancerResponse ? 'Atualizar Proposta' : 'Enviar Proposta' }}
           </Button>
           <Button
-            v-if="proposal.status === 'accepted'"
+            v-if="proposal.status === 'in_progress'"
             @click="showCompleteDialog = true"
             class="bg-green-600 hover:bg-green-700"
           >
