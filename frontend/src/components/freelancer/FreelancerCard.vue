@@ -24,7 +24,7 @@ interface Props {
   freelancer: Freelancer;
   isFavorite: boolean;
   onViewProfile: (id: string | number) => void;
-  onToggleFavorite: (id: number) => void;
+  onToggleFavorite: (id: string | number) => void;
 }
 
 const props = defineProps<Props>();
@@ -38,7 +38,7 @@ const handleCardClick = () => {
 
 const handleToggleFavorite = (e: MouseEvent) => {
   e.stopPropagation();
-  props.onToggleFavorite(Number(props.freelancer.id));
+  props.onToggleFavorite(props.freelancer.id);
 };
 </script>
 

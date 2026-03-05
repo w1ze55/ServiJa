@@ -33,7 +33,7 @@ interface Props {
 
 const props = defineProps<Props>();
 
-const favoriteFreelancers = ref<string[]>([]);
+const favoriteFreelancers = ref<(string | number)[]>([]);
 
 // Mock data - substituir por dados reais da API
 const categories: Category[] = CATEGORIES.slice(0, 8).map((cat, index) => ({
@@ -118,7 +118,7 @@ const featuredFreelancers: Freelancer[] = [
   },
 ];
 
-const handleToggleFavorite = (id: string) => {
+const handleToggleFavorite = (id: string | number) => {
   if (favoriteFreelancers.value.includes(id)) {
     favoriteFreelancers.value = favoriteFreelancers.value.filter((fid) => fid !== id);
   } else {
@@ -217,10 +217,8 @@ const handleToggleFavorite = (id: string) => {
         <FreelancerCard
           v-for="freelancer in featuredFreelancers"
           :key="freelancer.id"
-          :freelancer="{
-            ...freelancer,
-            isFavorite: favoriteFreelancers.includes(freelancer.id),
-          }"
+          :freelancer="freelancer"
+          :is-favorite="favoriteFreelancers.includes(freelancer.id)"
           :on-view-profile="(id) => props.onNavigate('freelancer-profile', { id })"
           :on-toggle-favorite="handleToggleFavorite"
         />
