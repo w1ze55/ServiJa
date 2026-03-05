@@ -14,6 +14,12 @@ import {
   FileText,
   Loader2,
   CheckCircle,
+  Copy,
+  Info,
+  RefreshCw,
+  AlertTriangle,
+  Zap,
+  Star,
 } from 'lucide-vue-next';
 import Button from '../ui/button.vue';
 import Label from '../ui/label.vue';
@@ -79,6 +85,11 @@ const pixData = ref<{ qrCodeImage?: string; payload?: string; expirationDate?: s
 const pixCpf = ref<string>('');
 const currentPaymentId = ref<number | null>(null);
 const paymentConfirmed = ref(false);
+const copyFeedback = ref<string | null>(null);
+const copyFeedbackVisible = ref(false);
+const copyFeedbackFading = ref(false);
+let copyFeedbackTimeout: ReturnType<typeof setTimeout> | null = null;
+let copyFeedbackFadeTimeout: ReturnType<typeof setTimeout> | null = null;
 const cardData = ref({
   number: '',
   name: '',
@@ -134,10 +145,34 @@ const validateCpf = (cpf: string): boolean => {
   return cleaned.length === 11;
 };
 
-const copyPixCode = () => {
+const copyPixCode = async () => {
   if (pixData.value?.payload) {
-    navigator.clipboard.writeText(pixData.value.payload);
-    alert('Código PIX copiado!');
+    try {
+      if (copyFeedbackTimeout) {
+        clearTimeout(copyFeedbackTimeout);
+      }
+      if (copyFeedbackFadeTimeout) {
+        clearTimeout(copyFeedbackFadeTimeout);
+      }
+      await navigator.clipboard.writeText(pixData.value.payload);
+      copyFeedback.value = 'Copiado';
+      copyFeedbackVisible.value = true;
+      copyFeedbackFading.value = false;
+
+      copyFeedbackFadeTimeout = setTimeout(() => {
+        copyFeedbackFading.value = true;
+        copyFeedbackFadeTimeout = null;
+      }, 1500);
+
+      copyFeedbackTimeout = setTimeout(() => {
+        copyFeedback.value = null;
+        copyFeedbackVisible.value = false;
+        copyFeedbackFading.value = false;
+        copyFeedbackTimeout = null;
+      }, 2000);
+    } catch (err) {
+      console.error('Erro ao copiar o código PIX:', err);
+    }
   }
 };
 
@@ -195,7 +230,7 @@ const generatePixQrCode = async () => {
           expirationDate: qrCodeData.expirationDate,
         };
         showPixQrCode.value = true;
-        console.log('✅ QR Code PIX recarregado com sucesso');
+        console.log('QR Code PIX recarregado com sucesso');
       }
     } catch (error) {
       console.error('Erro ao recarregar QR Code:', error);
@@ -233,7 +268,7 @@ const generatePixQrCode = async () => {
       
       // Se já existe um pagamento, buscar ele ao invés de criar um novo
       if (errorData.message && errorData.message.includes('Já existe um pagamento')) {
-        console.log('ℹ️ Pagamento já existe, buscando...');
+        console.log('Pagamento já existe, buscando QR Code...');
         await checkExistingPayment();
         if (currentPaymentId.value) {
           // Tentar gerar novamente (agora vai usar o pagamento existente)
@@ -316,7 +351,7 @@ const getInitials = (name: string) => {
 };
 
 // =============================================
-// 🧪 BOTÃO DE TESTE - REMOVER EM PRODUÇÃO
+// BOTÃO DE TESTE - REMOVER EM PRODUÇÃO
 // =============================================
 const isSimulatingPayment = ref(false);
 
@@ -344,7 +379,7 @@ const simulatePaymentConfirmation = async () => {
       throw new Error('Erro ao simular confirmação');
     }
 
-    console.log('✅ Simulação de confirmação enviada!');
+    console.log('Simulação de confirmação enviada');
     alert('Simulação enviada! Aguarde a confirmação via WebSocket...');
   } catch (error) {
     console.error('Erro ao simular pagamento:', error);
@@ -363,17 +398,17 @@ const handlePaymentNotification = (event: Event) => {
   const customEvent = event as CustomEvent;
   const notification = customEvent.detail;
 
-  console.log('🔔 Notificação de pagamento recebida:', notification);
+  console.log('Notificação de pagamento recebida:', notification);
 
   // Verificar se a notificação é para o pagamento atual
   if (notification.paymentId && notification.paymentId !== currentPaymentId.value) {
-    console.log('ℹ️ Notificação ignorada - não é para o pagamento atual');
+    console.log('Notificação ignorada - não é para o pagamento atual');
     return;
   }
 
   switch (notification.type) {
     case 'PIX_CONFIRMED':
-      console.log('✅ PIX Confirmado!');
+      console.log('PIX confirmado');
       paymentConfirmed.value = true;
       paymentError.value = null;
       // Redirecionar para página de sucesso após 2 segundos
@@ -383,17 +418,17 @@ const handlePaymentNotification = (event: Event) => {
       break;
 
     case 'PAYMENT_FAILED':
-      console.error('❌ Pagamento falhou:', notification.reason);
+      console.error('Pagamento falhou:', notification.reason);
       paymentError.value = notification.message || 'O pagamento falhou. Tente novamente.';
       break;
 
     case 'PAYMENT_CANCELLED':
-      console.warn('⚠️ Pagamento cancelado');
+      console.warn('Pagamento cancelado');
       paymentError.value = 'O pagamento foi cancelado.';
       break;
 
     case 'PAYMENT_STATUS_CHANGED':
-      console.log('📋 Status do pagamento alterado:', notification.status);
+      console.log('Status do pagamento alterado:', notification.status);
       if (notification.status === 'COMPLETED') {
         paymentConfirmed.value = true;
         setTimeout(() => {
@@ -405,21 +440,21 @@ const handlePaymentNotification = (event: Event) => {
       break;
 
     default:
-      console.log('📨 Tipo de notificação não tratado:', notification.type);
+      console.log('Tipo de notificação não tratado:', notification.type);
   }
 };
 
 // Lifecycle: Conectar WebSocket quando montar
 onMounted(async () => {
-  console.log('🚀 CheckoutPage montado');
-  console.log('📧 userEmail:', userEmail);
-  console.log('📍 VITE_API_URL:', import.meta.env.VITE_API_URL);
+  console.log('CheckoutPage montado');
+  console.log('userEmail:', userEmail);
+  console.log('VITE_API_URL:', import.meta.env.VITE_API_URL);
   
   if (userEmail) {
-    console.log('🔌 Conectando WebSocket para:', userEmail);
+    console.log('Conectando WebSocket para:', userEmail);
     connectWS();
   } else {
-    console.warn('⚠️ userEmail vazio, WebSocket não será conectado');
+    console.warn('userEmail vazio, WebSocket não será conectado');
   }
 
   // Verificar se já existe um pagamento para esta solicitação
@@ -444,11 +479,11 @@ const checkExistingPayment = async () => {
 
     if (response.ok) {
       const payment = await response.json();
-      console.log('💳 Pagamento existente encontrado:', payment);
+      console.log('Pagamento existente encontrado:', payment);
       
       // Se o pagamento já foi completado, marcar como confirmado
       if (payment.status === 'COMPLETED') {
-        console.log('✅ Pagamento já foi completado anteriormente');
+        console.log('Pagamento já foi completado anteriormente');
         paymentConfirmed.value = true;
         currentPaymentId.value = payment.id;
         paymentMethod.value = payment.paymentMethod?.toLowerCase() || 'pix';
@@ -468,7 +503,7 @@ const checkExistingPayment = async () => {
     }
   } catch (error) {
     // Se não encontrar pagamento, continuar normalmente
-    console.log('ℹ️ Nenhum pagamento existente encontrado');
+    console.log('Nenhum pagamento existente encontrado');
   }
 };
 
@@ -491,7 +526,7 @@ const loadExistingPixQrCode = async (paymentId: number) => {
       // Verificar se o pagamento ainda está pendente (não expirado)
       if (qrCodeData.status === 'COMPLETED') {
         paymentConfirmed.value = true;
-        console.log('✅ Pagamento já foi confirmado');
+        console.log('Pagamento já foi confirmado');
         return;
       }
       
@@ -501,9 +536,9 @@ const loadExistingPixQrCode = async (paymentId: number) => {
         expirationDate: qrCodeData.expirationDate,
       };
       showPixQrCode.value = true;
-      console.log('✅ QR Code PIX carregado do pagamento existente');
+      console.log('QR Code PIX carregado do pagamento existente');
     } else {
-      console.warn('⚠️ Não foi possível carregar QR Code do pagamento existente');
+      console.warn('Não foi possível carregar QR Code do pagamento existente');
     }
   } catch (error) {
     console.error('Erro ao carregar QR Code existente:', error);
@@ -529,9 +564,11 @@ const reloadPixQrCode = async () => {
 
 // Lifecycle: Desconectar quando desmontar
 onUnmounted(() => {
-  console.log('🔌 Desconectando WebSocket');
+  console.log('Desconectando WebSocket');
   disconnectWS();
   window.removeEventListener('payment-notification', handlePaymentNotification);
+  if (copyFeedbackTimeout) clearTimeout(copyFeedbackTimeout);
+  if (copyFeedbackFadeTimeout) clearTimeout(copyFeedbackFadeTimeout);
 });
 </script>
 
@@ -554,36 +591,18 @@ onUnmounted(() => {
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <!-- WebSocket Status -->
-      <div v-if="paymentMethod === 'pix' && showPixQrCode" class="lg:col-span-2">
-        <div class="mb-4 p-3 rounded-lg border flex items-center gap-2" :class="wsConnected ? 'bg-green-50 border-green-200' : wsError ? 'bg-red-50 border-red-200' : 'bg-gray-50'">
-          <div :class="wsConnected ? 'bg-green-500' : wsError ? 'bg-red-500' : 'bg-yellow-500'" class="w-2 h-2 rounded-full animate-pulse"></div>
-          <p class="text-xs" :class="wsConnected ? 'text-green-700' : wsError ? 'text-red-700' : 'text-[#435574]'">
-            <template v-if="wsConnected">
-              🟢 Conectado - Aguardando confirmação automática
-            </template>
-            <template v-else-if="wsError">
-              🔴 Erro: {{ wsError }}
-            </template>
-            <template v-else>
-              🟡 Conectando ao servidor...
-            </template>
-          </p>
-        </div>
-      </div>
-
       <!-- Payment Methods -->
       <div class="lg:col-span-2 space-y-6">
         <!-- Pagamento Já Realizado -->
         <Card v-if="paymentConfirmed" class="p-6 bg-green-50 border-2 border-green-400">
           <div class="flex items-start gap-4">
-            <div class="flex-shrink-0">
-              <div class="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center">
-                <CheckCircle class="h-7 w-7 text-white" />
+              <div class="flex-shrink-0">
+                <div class="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center">
+                  <CheckCircle class="h-7 w-7 text-white" />
+                </div>
               </div>
-            </div>
-            <div class="flex-1">
-              <h3 class="text-[#263238] text-xl font-bold mb-2">✅ Pagamento Já Realizado!</h3>
+              <div class="flex-1">
+              <h3 class="text-[#263238] text-xl font-bold mb-2">Pagamento Já Realizado!</h3>
               <p class="text-[#435574] mb-4">
                 Este serviço já foi pago com sucesso. Não é necessário realizar um novo pagamento.
               </p>
@@ -810,7 +829,10 @@ onUnmounted(() => {
 
         <!-- PIX QR Code Display (Após Geração) -->
         <Card v-if="paymentMethod === 'pix' && showPixQrCode && pixData" class="p-6">
-          <h3 class="text-[#263238] mb-4">✅ QR Code PIX Gerado</h3>
+          <div class="flex items-center gap-2 mb-4">
+            <CheckCircle class="h-5 w-5 text-green-600" />
+            <h3 class="text-[#263238]">QR Code PIX Gerado</h3>
+          </div>
           
           <div class="text-center">
             <!-- QR Code Image -->
@@ -824,56 +846,63 @@ onUnmounted(() => {
 
             <!-- Instructions -->
             <div class="space-y-3">
-              <p class="text-sm text-[#263238] font-semibold">
-                📱 Escaneie o QR Code com seu app de pagamento
-              </p>
+              <div class="flex items-center justify-center gap-2 text-sm text-[#263238] font-semibold">
+                <QrCode class="h-4 w-4 text-[#286AD8]" />
+                <p>Escaneie o QR Code com seu app de pagamento</p>
+              </div>
               <p class="text-xs text-[#435574]">Ou copie o código PIX abaixo</p>
 
               <!-- PIX Copy/Paste Code -->
-              <div class="flex gap-2 max-w-md mx-auto">
-                <Input
-                  :value="pixData.payload"
-                  readonly
-                  class="text-xs font-mono flex-1 bg-gray-100"
-                />
-                <Button
-                  @click="copyPixCode"
-                  variant="outline"
-                  size="sm"
-                  class="shrink-0 bg-white"
-                >
-                  📋 Copiar
-                </Button>
+              <div class="relative inline-block">
+                <div class="flex gap-2 max-w-md mx-auto">
+                  <Input
+                    :value="pixData.payload"
+                    readonly
+                    class="text-xs font-mono flex-1 bg-gray-100"
+                  />
+                  <Button
+                    @click="copyPixCode"
+                    variant="outline"
+                    size="sm"
+                    class="shrink-0 bg-white"
+                  >
+                    <Copy class="h-4 w-4 mr-2" />
+                    Copiar
+                  </Button>
+                  <Button
+                    v-if="!paymentConfirmed"
+                    @click="reloadPixQrCode"
+                    variant="outline"
+                    size="sm"
+                    class="shrink-0 bg-white"
+                    :disabled="isLoadingPix"
+                  >
+                    <Loader2 v-if="isLoadingPix" class="h-4 w-4 mr-2 animate-spin" />
+                    <RefreshCw v-else class="h-4 w-4 mr-2" />
+                    Recarregar
+                  </Button>
+                </div>
+                <transition name="fade">
+                  <div
+                    v-if="copyFeedbackVisible"
+                    class="absolute left-1/2 -translate-x-1/2 -top-9 bg-green-600 text-white text-xs px-3 py-1 rounded shadow-md whitespace-nowrap pointer-events-none transition-opacity duration-300"
+                    :class="copyFeedbackFading ? 'opacity-0' : 'opacity-100'"
+                  >
+                    {{ copyFeedback }}
+                  </div>
+                </transition>
               </div>
 
               <!-- Expiration Info -->
               <div class="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                <p class="text-xs text-[#435574] font-medium">
-                  ⏱️ Válido até: {{ pixData.expirationDate ? new Date(pixData.expirationDate).toLocaleString('pt-BR') : 'Hoje às 23:59' }}
-                </p>
-                <p class="text-xs text-[#435574] mt-1">
-                  💡 O pagamento será confirmado automaticamente após a aprovação
-                </p>
-              </div>
-
-              <!-- Payment Value -->
-              <div class="mt-4 p-4 bg-green-50 rounded-lg border-2 border-green-300">
-                <p class="text-base text-green-800 font-bold">
-                  💰 Valor a pagar: R$ {{ totalAmount.toFixed(2).replace('.', ',') }}
-                </p>
-              </div>
-
-              <!-- Waiting for Payment -->
-              <div v-if="!paymentConfirmed && !paymentError" class="mt-4 p-4 bg-yellow-50 rounded-lg border-2 border-yellow-300">
-                <div class="flex items-center gap-2">
-                  <Loader2 class="h-4 w-4 text-yellow-700 animate-spin" />
-                  <p class="text-sm text-yellow-800 font-semibold">
-                    Aguardando confirmação do pagamento...
-                  </p>
+                <div class="flex items-center gap-2 text-xs text-[#435574] font-medium">
+                  <Clock class="h-4 w-4 text-[#286AD8]" />
+                  <p>Válido até: {{ pixData.expirationDate ? new Date(pixData.expirationDate).toLocaleString('pt-BR') : 'Hoje às 23:59' }}</p>
                 </div>
-                <p class="text-xs text-yellow-700 mt-2">
-                  Assim que o pagamento for confirmado, você será notificado automaticamente!
-                </p>
+                <div class="flex items-start gap-2 text-xs text-[#435574] mt-2">
+                  <Info class="h-4 w-4 text-[#286AD8]" />
+                  <p>O pagamento será confirmado automaticamente após a aprovação</p>
+                </div>
               </div>
 
               <!-- Payment Error -->
@@ -900,28 +929,19 @@ onUnmounted(() => {
                 <div class="flex items-center gap-2">
                   <CheckCircle class="h-5 w-5 text-green-700" />
                   <p class="text-sm text-green-800 font-bold">
-                    ✅ Pagamento Confirmado!
+                    Pagamento Confirmado!
                   </p>
                 </div>
                 <p class="text-xs text-green-700 mt-2">
                   Redirecionando para confirmação...
                 </p>
               </div>
-
-              <!-- Reload QR Code Button -->
-              <Button
-                v-if="!paymentConfirmed"
-                @click="reloadPixQrCode"
-                variant="ghost"
-                class="mt-4 text-[#435574]"
-                size="sm"
-              >
-                🔄 Recarregar QR Code
-              </Button>
-
-              <!-- 🧪 BOTÃO DE TESTE - REMOVER EM PRODUÇÃO -->
+              <!-- BOTÃO DE TESTE - REMOVER EM PRODUÇÃO -->
               <div v-if="!paymentConfirmed" class="mt-4 p-3 bg-yellow-100 border-2 border-yellow-400 border-dashed rounded-lg">
-                <p class="text-xs text-yellow-800 font-bold mb-2">🧪 MODO DE TESTE (REMOVER EM PRODUÇÃO)</p>
+                <p class="text-xs text-yellow-800 font-bold mb-2 flex items-center gap-2">
+                  <AlertTriangle class="h-4 w-4 text-yellow-700" />
+                  MODO DE TESTE (REMOVER EM PRODUÇÃO)
+                </p>
                 <Button
                   @click="simulatePaymentConfirmation"
                   :disabled="isSimulatingPayment"
@@ -929,7 +949,10 @@ onUnmounted(() => {
                   size="sm"
                 >
                   <Loader2 v-if="isSimulatingPayment" class="h-4 w-4 mr-2 animate-spin" />
-                  {{ isSimulatingPayment ? 'Simulando...' : '⚡ Simular Confirmação do Pagamento' }}
+                  <template v-else>
+                    <Zap class="h-4 w-4 mr-2" />
+                  </template>
+                  {{ isSimulatingPayment ? 'Simulando...' : 'Simular Confirmação do Pagamento' }}
                 </Button>
               </div>
               <!-- FIM DO BOTÃO DE TESTE -->
@@ -962,7 +985,7 @@ onUnmounted(() => {
             <div class="flex-1 min-w-0">
               <p class="text-[#263238] truncate">{{ proposal.freelancerName }}</p>
               <div class="flex items-center gap-1 text-sm text-[#435574]">
-                <span>⭐</span>
+                <Star class="h-4 w-4 text-yellow-500" />
                 <span>{{ proposal.freelancerRating.toFixed(1) }}</span>
               </div>
             </div>
@@ -1036,7 +1059,3 @@ onUnmounted(() => {
     </div>
   </div>
 </template>
-
-
-
-

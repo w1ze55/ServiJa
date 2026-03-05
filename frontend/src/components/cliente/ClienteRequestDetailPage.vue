@@ -14,7 +14,6 @@ import {
   FileEdit,
   Lock,
   CreditCard,
-  PartyPopper,
   Sparkles,
   Send,
   AlertCircle,
@@ -862,7 +861,7 @@ const getStatusLabel = (status: string) => {
               <div class="w-24 h-24 bg-green-200 rounded-full mx-auto"></div>
             </div>
             <div class="relative w-24 h-24 bg-gradient-to-br from-green-400 to-green-600 rounded-full mx-auto flex items-center justify-center">
-              <PartyPopper class="h-12 w-12 text-white animate-bounce" />
+              <CheckCircle class="h-12 w-12 text-white" />
             </div>
           </div>
 
