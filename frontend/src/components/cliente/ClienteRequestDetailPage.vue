@@ -341,16 +341,19 @@ const getStatusLabel = (status: string) => {
           </div>
         </div>
 
-        <!-- Payment Pending Alert (quando status é ACCEPTED) -->
+        <!-- Payment Pending Alert (quando status é ACCEPTED e pagamento não confirmado) -->
         <div 
-          v-if="request.status === 'accepted'" 
+          v-if="
+            request.status === 'accepted' &&
+            !request.auditLog?.some((log) => log.operationKey === 'PAYMENT_CONFIRMED')
+          " 
           class="mt-4 p-4 rounded-lg border-2 border-green-300 bg-gradient-to-r from-green-50 to-yellow-50 flex items-start gap-3"
         >
-          <div class="flex-shrink-0 w-10 h-10 bg-green-600 rounded-full flex items-center justify-center animate-bounce">
+          <div class="flex-shrink-0 w-10 h-10 bg-green-600 rounded-full flex items-center justify-center">
             <CreditCard class="h-5 w-5 text-white" />
           </div>
           <div class="flex-1">
-            <p class="font-semibold text-green-900 mb-1">⚡ Ação Necessária: Pagamento Pendente</p>
+            <p class="font-semibold text-green-900 mb-1">Ação Necessária: Pagamento Pendente</p>
             <p class="text-sm text-green-800 mb-3">
               Sua proposta foi aceita! Complete o pagamento agora para garantir o serviço e iniciar o trabalho com <span class="font-semibold">{{ request.freelancerName }}</span>.
             </p>
@@ -420,20 +423,6 @@ const getStatusLabel = (status: string) => {
           </button>
         </div>
         
-        <!-- Payment Button (só aparece quando status é ACCEPTED) -->
-        <Button
-          v-if="request.status === 'accepted'"
-          @click="handleGoToCheckout"
-          class="bg-green-600 hover:bg-green-700 shadow-lg hover:shadow-xl transition-all"
-          size="sm"
-        >
-          <CreditCard class="h-4 w-4 mr-2 animate-pulse" />
-          Realizar Pagamento
-          <Badge class="ml-2 bg-yellow-400 text-yellow-900 animate-bounce">
-            Pendente
-          </Badge>
-        </Button>
-
         <!-- Complete Service Button (só aparece quando status é IN_PROGRESS) -->
         <Button
           v-if="request.status === 'in_progress'"
