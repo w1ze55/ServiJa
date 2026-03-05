@@ -813,6 +813,27 @@ onUnmounted(() => {
                 />
               </div>
             </div>
+
+            <div class="pt-2">
+              <Button
+                @click="handleConfirmPayment"
+                :disabled="isProcessing"
+                class="w-full bg-[#286AD8] hover:bg-[#435574] transition-colors"
+                size="lg"
+              >
+                <span v-if="isProcessing" class="flex items-center gap-2">
+                  <span class="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+                  Processando...
+                </span>
+                <span v-else>Confirmar Pagamento</span>
+              </Button>
+              <p class="text-xs text-center text-[#435574] mt-3">
+                Ao confirmar, você concorda com os
+                <a href="#" class="text-[#286AD8] hover:underline">Termos de Serviço</a>
+                e
+                <a href="#" class="text-[#286AD8] hover:underline">Política de Privacidade</a>
+              </p>
+            </div>
           </div>
 
           <!-- Digital Wallet -->
@@ -1032,31 +1053,10 @@ onUnmounted(() => {
           <Separator class="my-4" />
 
           <!-- Total -->
-          <div class="flex justify-between mb-6">
+          <div class="flex justify-between">
             <span class="text-[#263238]">Total</span>
             <span class="text-[#263238]">R$ {{ totalAmount.toFixed(2) }}</span>
           </div>
-
-          <!-- Confirm Button -->
-          <Button
-            @click="handleConfirmPayment"
-            :disabled="!paymentMethod || isProcessing"
-            class="w-full bg-[#286AD8] hover:bg-[#435574] transition-colors"
-            size="lg"
-          >
-            <span v-if="isProcessing" class="flex items-center gap-2">
-              <span class="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
-              Processando...
-            </span>
-            <span v-else>Confirmar Pagamento</span>
-          </Button>
-
-          <p class="text-xs text-center text-[#435574] mt-4">
-            Ao confirmar, você concorda com os
-            <a href="#" class="text-[#286AD8] hover:underline">Termos de Serviço</a>
-            e
-            <a href="#" class="text-[#286AD8] hover:underline">Política de Privacidade</a>
-          </p>
         </Card>
       </div>
     </div>
