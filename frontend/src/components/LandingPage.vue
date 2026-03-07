@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ref, onMounted, onUnmounted } from 'vue';
 import { Search, Star, MessageSquare, Shield, TrendingUp, Users, CheckCircle, Sparkles, ListChecks, ShieldCheck } from 'lucide-vue-next';
 import Button from './ui/button.vue';
 import Card from './ui/card.vue';
@@ -10,12 +11,25 @@ interface Props {
 }
 
 defineProps<Props>();
+
+const isScrolled = ref(false);
+
+function handleScroll() {
+  if (window.innerWidth < 836) {
+    isScrolled.value = false;
+    return;
+  }
+  isScrolled.value = window.scrollY > 80;
+}
+
+onMounted(() => window.addEventListener('scroll', handleScroll, { passive: true }));
+onUnmounted(() => window.removeEventListener('scroll', handleScroll));
 </script>
 
 <template>
   <div class="landing-page">
     <!-- Header -->
-    <header class="header">
+    <header class="header" :class="{ scrolled: isScrolled }">
       <div class="header-content">
         <div class="logo-container">
           <div class="logo-icon">
@@ -373,13 +387,21 @@ defineProps<Props>();
 
 /* ===== Header ===== */
 .header {
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(10px);
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(12px);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   position: sticky;
   top: 0;
   z-index: 50;
   border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  transition:
+    background 0.4s ease,
+    box-shadow 0.4s ease,
+    border-color 0.4s ease,
+    margin 0.4s ease,
+    border-radius 0.4s ease,
+    top 0.4s ease,
+    width 0.4s ease;
 }
 
 .header-content {
@@ -389,6 +411,12 @@ defineProps<Props>();
   display: flex;
   align-items: center;
   justify-content: space-between;
+  transition: padding 0.4s ease;
+}
+
+.logo {
+  width: 5rem;
+  height: 5rem;
 }
 
 .logo-container {
@@ -398,14 +426,13 @@ defineProps<Props>();
 }
 
 .logo-icon {
-  width: 3rem;
-  height: 3rem;
-  border-radius: 0.75rem;
+  width: 5rem;
+  height: 5rem;
   display: flex;
+  margin: -10px;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
-  transition: transform 0.3s ease;
+  transition: transform 0.3s ease, width 0.3s ease, height 0.3s ease;
 }
 
 .logo-text {
@@ -426,12 +453,6 @@ defineProps<Props>();
 .nav-links {
   display: none;
   gap: 2rem;
-}
-
-@media (min-width: 768px) {
-  .nav-links {
-    display: flex;
-  }
 }
 
 .nav-link {
@@ -492,12 +513,6 @@ defineProps<Props>();
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-@media (min-width: 768px) {
-  .hero-section {
-    padding: 8rem 1.5rem;
-  }
 }
 
 .hero-background {
@@ -571,12 +586,6 @@ defineProps<Props>();
   color: white;
   margin-bottom: 1.5rem;
   animation: fadeInUp 1s ease-out 0.2s both;
-}
-
-@media (min-width: 768px) {
-  .hero-title {
-    font-size: 3.75rem;
-  }
 }
 
 @keyframes fadeInUp {
@@ -708,12 +717,6 @@ defineProps<Props>();
   margin-bottom: 1rem;
 }
 
-@media (min-width: 768px) {
-  .section-title {
-    font-size: 3rem;
-  }
-}
-
 .section-description {
   font-size: 1.125rem;
   color: #6b7280;
@@ -725,12 +728,6 @@ defineProps<Props>();
   display: grid;
   gap: 2rem;
   grid-template-columns: 1fr;
-}
-
-@media (min-width: 768px) {
-  .features-grid {
-    grid-template-columns: repeat(3, 1fr);
-  }
 }
 
 .feature-card {
@@ -834,13 +831,6 @@ defineProps<Props>();
   grid-template-columns: 1fr;
 }
 
-@media (min-width: 1024px) {
-  .benefits-grid {
-    grid-template-columns: 1fr 1fr;
-    gap: 4rem;
-  }
-}
-
 .benefits-title {
   font-size: 2.5rem;
   font-weight: 800;
@@ -899,13 +889,6 @@ defineProps<Props>();
   justify-content: center;
   align-items: center;
   text-align: center;
-}
-
-@media (min-width: 768px) {
-  .cta-card {
-    padding: 3rem;
-    text-align: left;
-  }
 }
 
 .cta-card-glow {
@@ -976,12 +959,6 @@ defineProps<Props>();
   align-items: center;
 }
 
-@media (min-width: 768px) {
-  .cta-benefits {
-    align-items: flex-start;
-  }
-}
-
 .cta-benefit {
   display: flex;
   align-items: center;
@@ -1043,12 +1020,6 @@ defineProps<Props>();
   margin-bottom: 1rem;
 }
 
-@media (min-width: 768px) {
-  .final-cta-title {
-    font-size: 3rem;
-  }
-}
-
 .final-cta-description {
   font-size: 1.125rem;
   color: #6b7280;
@@ -1091,12 +1062,6 @@ defineProps<Props>();
   gap: 3rem;
   margin-bottom: 3rem;
   grid-template-columns: 1fr;
-}
-
-@media (min-width: 768px) {
-  .footer-grid {
-    grid-template-columns: 2fr 1fr 1fr 1fr;
-  }
 }
 
 .footer-brand {
@@ -1158,5 +1123,96 @@ defineProps<Props>();
   text-align: center;
   color: #9ca3af;
   font-size: 0.875rem;
+}
+
+@media (min-width: 836px) {
+  .header.scrolled {
+    background: rgba(255, 255, 255, 0.92);
+    backdrop-filter: blur(20px);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+    border-bottom: none;
+    margin: 12px auto 0;
+    border-radius: 100px;
+    top: 1.5rem;
+    width: 50%;
+    min-width: 800px;
+    max-width: 95%;
+  }
+}
+
+@media (min-width: 836px) {
+  .header.scrolled .header-content {
+    padding: 0.5rem 1.25rem;
+  }
+}
+
+@media (min-width: 836px) {
+  .header.scrolled .logo-icon {
+    width: 2.25rem;
+    height: 2.25rem;
+    margin: 0px;
+  }
+}
+
+@media (min-width: 768px) {
+  .nav-links {
+    display: flex;
+  }
+}
+
+@media (min-width: 768px) {
+  .hero-section {
+    padding: 8rem 1.5rem;
+  }
+}
+
+@media (min-width: 768px) {
+  .hero-title {
+    font-size: 3.75rem;
+  }
+}
+
+@media (min-width: 768px) {
+  .section-title {
+    font-size: 3rem;
+  }
+}
+
+@media (min-width: 768px) {
+  .features-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .benefits-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 4rem;
+  }
+}
+
+@media (min-width: 768px) {
+  .cta-card {
+    padding: 3rem;
+    text-align: left;
+  }
+}
+
+@media (min-width: 768px) {
+  .cta-benefits {
+    align-items: flex-start;
+  }
+}
+
+@media (min-width: 768px) {
+  .final-cta-title {
+    font-size: 3rem;
+  }
+}
+
+@media (min-width: 768px) {
+  .footer-grid {
+    grid-template-columns: 2fr 1fr 1fr 1fr;
+  }
 }
 </style>
