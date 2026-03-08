@@ -1074,10 +1074,10 @@ onMounted(() => {
 
     <!-- Service Details Modal (Deep Link / Direct Action) -->
     <Dialog :open="selectedServiceModal !== null" @update:open="(val) => !val && handleCloseServiceModal()">
-      <DialogContent class="max-w-4xl max-h-[90vh] p-0 border-none bg-transparent" :hide-close="true">
-        <div v-if="selectedServiceModal" class="relative bg-white rounded-xl overflow-y-auto shadow-2xl max-h-[85vh]">
+      <DialogContent class="max-w-4xl max-h-[95vh] p-4 md:p-0 border-none bg-transparent" :hide-close="true">
+        <div v-if="selectedServiceModal" class="relative bg-white rounded-xl overflow-y-auto shadow-2xl max-h-[90vh] md:max-h-[85vh]">
           <!-- Gallery / Cover Image -->
-          <div class="relative h-80 bg-gray-900 overflow-hidden">
+          <div class="relative h-64 md:h-80 bg-gray-900 overflow-hidden">
             <img
               v-if="selectedServiceModal.images && selectedServiceModal.images.length > 0"
               :src="selectedServiceModal.images[selectedServiceImageIndex]"
