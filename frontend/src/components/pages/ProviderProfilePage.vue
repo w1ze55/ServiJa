@@ -1206,7 +1206,7 @@ onMounted(() => {
             <!-- Description -->
             <div class="mb-8">
               <h3 class="text-lg font-bold text-[#263238] mb-4">Sobre o Serviço</h3>
-              <p class="text-[#435574] leading-relaxed whitespace-pre-line text-lg">
+              <p class="text-[#435574] leading-relaxed whitespace-pre-line text-base sm:text-lg break-words">
                 {{ selectedServiceModal.description }}
               </p>
             </div>
