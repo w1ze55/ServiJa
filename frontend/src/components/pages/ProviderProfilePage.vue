@@ -172,18 +172,6 @@ const route = useRoute();
 const selectedServiceModal = ref<ServiceItem | null>(null);
 const selectedServiceImageIndex = ref(0);
 
-const categories = [
-  'Eletricista',
-  'Encanador',
-  'Pintor',
-  'Pedreiro',
-  'Marceneiro',
-  'Jardineiro',
-  'Mecânico',
-  'Designer Gráfico',
-  'Desenvolvedor Web',
-  'Outro',
-];
 
 const loadFreelancerData = async () => {
   isLoading.value = true;
@@ -388,7 +376,7 @@ const handleSendQuote = async () => {
   }
 
   if (!quoteCategory.value) {
-    toast.error('Por favor, selecione uma categoria');
+    toast.error('Erro: Categoria do serviço não definida. Tente selecionar o serviço novamente.');
     return;
   }
 
@@ -738,8 +726,8 @@ onMounted(() => {
 
                   <!-- Show More Button -->
                   <div v-if="hasMoreServices" class="flex justify-center mt-8">
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       @click="handleShowMoreServices"
                       class="border-[#286AD8] text-[#286AD8] hover:bg-blue-50 px-8"
                     >
@@ -1292,21 +1280,7 @@ onMounted(() => {
           <DialogTitle>Solicitar Orçamento</DialogTitle>
         </DialogHeader>
         <div class="space-y-4">
-          <div>
-            <Label class="text-[#435574] mb-2 block text-sm">
-              Categoria <span class="text-red-500">*</span>
-            </Label>
-            <Select v-model="quoteCategory">
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione a categoria" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem v-for="cat in categories" :key="cat" :value="cat">
-                  {{ cat }}
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          <!-- Categoria e Prioridade removidos conforme solicitação -->
 
           <div>
             <Label class="text-[#435574] mb-2 block text-sm">
@@ -1382,22 +1356,6 @@ onMounted(() => {
             </div>
           </div>
 
-          <div>
-            <Label class="text-[#435574] mb-2 block text-sm">
-              Prioridade <span class="text-red-500">*</span>
-            </Label>
-            <Select v-model="quotePriority">
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione a prioridade" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="LOW">Baixa</SelectItem>
-                <SelectItem value="MEDIUM">Média</SelectItem>
-                <SelectItem value="HIGH">Alta</SelectItem>
-                <SelectItem value="URGENT">Urgente</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
 
           <div>
             <Label class="text-[#435574] mb-2 block text-sm">
