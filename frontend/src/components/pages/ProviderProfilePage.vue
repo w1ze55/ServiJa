@@ -257,21 +257,21 @@ const formatPriceDisplay = (value: number): string => {
 const handleQuoteBudgetInput = (val: string) => {
   // Remove tudo que não é dígito
   let digits = val.replace(/\D/g, '');
-  
+
   if (!digits) {
     formattedQuoteBudget.value = '';
     quoteBudget.value = '';
     return;
   }
-  
+
   // Converter para centavos: últimos 2 dígitos são decimais
   let numValue = parseInt(digits) / 100;
-  
+
   // Limite de 1 milhão (R$ 1.000.000,00)
   if (numValue > 1000000) {
     numValue = 1000000;
   }
-  
+
   // Formatar para exibição
   formattedQuoteBudget.value = formatPriceDisplay(numValue);
   quoteBudget.value = numValue.toString();
@@ -281,9 +281,9 @@ const getDetailedApproximation = (totalDays: number) => {
   // Garantir máximo de 365 dias
   const d = Math.min(totalDays, 365);
   if (d <= 0) return '';
-  
+
   if (d === 365) return '1 ano';
-  
+
   if (d >= 30) {
     const months = Math.floor(d / 30);
     const rem = d % 30;
@@ -291,7 +291,7 @@ const getDetailedApproximation = (totalDays: number) => {
     if (rem > 0) str += ` e ${rem} ${rem === 1 ? 'dia' : 'dias'}`;
     return str;
   }
-  
+
   if (d >= 7) {
     const weeks = Math.floor(d / 7);
     const rem = d % 7;
@@ -299,16 +299,16 @@ const getDetailedApproximation = (totalDays: number) => {
     if (rem > 0) str += ` e ${rem} ${rem === 1 ? 'dia' : 'dias'}`;
     return str;
   }
-  
+
   return '';
 };
 
 const formatDelivery = (time: number, unit: string, showApproximation: boolean = true) => {
   // Garantir máximo de 365 dias se a unidade for dias
   const effectiveTime = unit === 'DAYS' && time > 365 ? 365 : time;
-  
+
   const unitLabel = unit === 'HOURS' ? 'hora(s)' : unit === 'DAYS' ? 'dia(s)' : 'semana(s)';
-  
+
   let approximation = '';
   if (showApproximation && unit === 'DAYS') {
     const detailed = getDetailedApproximation(effectiveTime);
@@ -316,14 +316,14 @@ const formatDelivery = (time: number, unit: string, showApproximation: boolean =
       approximation = ` =~ ${detailed}`;
     }
   }
-  
+
   return `${effectiveTime} ${unitLabel}${approximation}`;
 };
 
 const getDeadlineApproximation = (days: string) => {
   const d = parseInt(days);
   if (isNaN(d) || d <= 0) return '';
-  
+
   const detailed = getDetailedApproximation(d);
   return detailed ? `~ ${detailed}` : '';
 };
@@ -331,7 +331,7 @@ const getDeadlineApproximation = (days: string) => {
 const handleDeadlineInput = (val: string) => {
   // Apenas dígitos
   let digits = val.replace(/\D/g, '');
-  
+
   if (digits) {
     const d = parseInt(digits);
     if (d > 365) {
@@ -347,7 +347,7 @@ const handleDeadlineInput = (val: string) => {
       return;
     }
   }
-  
+
   quoteDeadline.value = digits;
 };
 
@@ -384,10 +384,10 @@ const handleSendQuote = async () => {
     return;
   }
 
-  const deadline = quoteDeadlineType.value === 'decided' 
-    ? quoteDeadlineDate.value 
+  const deadline = quoteDeadlineType.value === 'decided'
+    ? quoteDeadlineDate.value
     : `${quoteDeadline.value} dias`;
-  
+
   if (!quoteDeadline.value && quoteDeadlineType.value === 'estimated') {
     toast.error('Por favor, informe a quantidade de dias');
     return;
@@ -409,7 +409,7 @@ const handleSendQuote = async () => {
     const requestData = {
       serviceName: requestedServiceTitle.value ? `${requestedServiceTitle.value} - Solicitação` : `${quoteCategory.value} - Solicitação`,
       category: quoteCategory.value,
-      description: requestedServiceTitle.value 
+      description: requestedServiceTitle.value
         ? `[Solicitação referente ao serviço: ${requestedServiceTitle.value}]\n\n${quoteMessage.value}`
         : quoteMessage.value,
       budget: Number(quoteBudget.value),
@@ -480,7 +480,7 @@ const resetQuoteForm = () => {
 const handleServiceClick = (service: ServiceItem) => {
   selectedServiceModal.value = service;
   selectedServiceImageIndex.value = 0;
-  
+
   // Update URL to include serviceId
   router.replace({
     query: { ...route.query, serviceId: service.id }
@@ -489,11 +489,11 @@ const handleServiceClick = (service: ServiceItem) => {
 
 const handleCloseServiceModal = () => {
   selectedServiceModal.value = null;
-  
+
   // Remove serviceId from URL
   const query = { ...route.query };
   delete query.serviceId;
-  
+
   router.replace({ query });
 };
 
@@ -597,8 +597,8 @@ onMounted(() => {
                   <Button variant="outline" size="icon" @click="handleShare">
                     <Share2 class="h-4 w-4" />
                   </Button>
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     size="icon"
                     @click="handleToggleFavorite"
                     :class="isFavorite ? 'text-red-500 border-red-200 bg-red-50 hover:bg-red-100 hover:text-red-600' : 'text-gray-400 hover:text-red-500'"
@@ -658,7 +658,7 @@ onMounted(() => {
                     Disponíveis para contratação ({{ services.length }} itens)
                   </p>
                 </div>
-                
+
                 <div v-if="services.length > 0" class="grid md:grid-cols-2 gap-4">
                   <Card
                     v-for="service in services"
@@ -796,8 +796,8 @@ onMounted(() => {
                       <div v-else class="w-full h-full flex items-center justify-center">
                         <Briefcase class="h-10 w-10 text-[#286AD8]/30" />
                       </div>
-                      <Badge 
-                        v-if="project.featured" 
+                      <Badge
+                        v-if="project.featured"
                         class="absolute top-2 left-2 bg-yellow-500 hover:bg-yellow-600 text-white border-none text-[10px] px-1.5"
                       >
                         <Sparkles class="h-3 w-3 mr-1" />
@@ -869,12 +869,12 @@ onMounted(() => {
                     {{ freelancer.workModel === 'remoto' ? 'Remoto' : freelancer.workModel === 'presencial' ? 'Presencial' : freelancer.workModel === 'hibrido' ? 'Híbrido' : 'Não informado' }}
                   </Badge>
                 </div>
-                
+
                 <div v-if="freelancer.serviceType" class="flex items-center justify-between border-t pt-3">
                   <span class="text-sm text-[#435574]">Tipo:</span>
                   <span class="text-sm font-medium text-[#263238]">{{ freelancer.serviceType }}</span>
                 </div>
-                
+
                 <div v-if="(freelancer.workModel === 'presencial' || freelancer.workModel === 'hibrido') && freelancer.serviceCities?.length" class="border-t pt-3">
                   <p class="text-sm text-[#435574] mb-2">Cidades atendidas:</p>
                   <div class="flex flex-wrap gap-1">
@@ -934,8 +934,15 @@ onMounted(() => {
 
     <!-- Project Details Modal -->
     <Dialog :open="selectedProject !== null" @update:open="(val) => !val && (selectedProject = null)">
-      <DialogContent class="max-w-4xl max-h-[90vh] p-0 border-none bg-transparent">
+      <DialogContent class="max-w-4xl max-h-[90vh] p-0 border-none bg-transparent" :hide-close="true">
         <div class="relative bg-white rounded-xl overflow-hidden shadow-2xl h-[80vh]">
+          <!-- Custom Close Button -->
+          <button
+            @click="selectedProject = null"
+            class="absolute top-4 right-4 p-2 bg-black/20 hover:bg-black/40 backdrop-blur-md rounded-full text-white transition-all z-50"
+          >
+            <CloseIcon class="h-5 w-5" />
+          </button>
           <div class="grid grid-cols-1 md:grid-cols-2 h-full">
             <!-- Image Carousel -->
             <div class="relative bg-gray-900 flex items-center justify-center min-h-[300px] md:min-h-[500px]">
@@ -1020,8 +1027,8 @@ onMounted(() => {
                 </div>
 
                 <div v-if="selectedProject?.tags && selectedProject.tags.length > 0" class="flex flex-wrap gap-2">
-                  <Badge 
-                    v-for="tag in selectedProject.tags" 
+                  <Badge
+                    v-for="tag in selectedProject.tags"
                     :key="tag"
                     variant="secondary"
                     class="bg-gray-100 hover:bg-gray-200 text-[#435574] transition-colors border-none"
@@ -1054,10 +1061,10 @@ onMounted(() => {
 
     <!-- Service Details Modal (Deep Link / Direct Action) -->
     <Dialog :open="selectedServiceModal !== null" @update:open="(val) => !val && handleCloseServiceModal()">
-      <DialogContent class="max-w-4xl max-h-[90vh] p-0 border-none bg-transparent">
-        <div v-if="selectedServiceModal" class="relative bg-white rounded-xl overflow-hidden shadow-2xl h-[85vh] flex flex-col">
+      <DialogContent class="max-w-4xl max-h-[90vh] p-0 border-none bg-transparent" :hide-close="true">
+        <div v-if="selectedServiceModal" class="relative bg-white rounded-xl overflow-y-auto shadow-2xl max-h-[85vh]">
           <!-- Gallery / Cover Image -->
-          <div class="relative h-80 bg-gray-900 overflow-hidden shrink-0">
+          <div class="relative h-80 bg-gray-900 overflow-hidden">
             <img
               v-if="selectedServiceModal.images && selectedServiceModal.images.length > 0"
               :src="selectedServiceModal.images[selectedServiceImageIndex]"
@@ -1099,16 +1106,16 @@ onMounted(() => {
                 </button>
               </div>
             </template>
-            
-            <button 
-              @click="handleCloseServiceModal" 
-              class="absolute top-4 right-4 p-2 bg-black/20 hover:bg-black/40 backdrop-blur-md rounded-full text-white transition-all z-10"
+
+            <button
+              @click="handleCloseServiceModal"
+              class="absolute top-4 right-4 p-2 bg-black/20 hover:bg-black/40 backdrop-blur-md rounded-full text-white transition-all z-50"
             >
               <CloseIcon class="h-5 w-5" />
             </button>
           </div>
 
-          <div class="p-8 overflow-y-auto">
+          <div class="p-8">
             <!-- Freelancer Mini Profile -->
             <div class="flex items-center gap-4 mb-8 pb-8 border-b border-gray-100">
               <Avatar class="h-14 w-14 border-2 border-white shadow-sm">
@@ -1228,14 +1235,14 @@ onMounted(() => {
 
             <!-- Actions -->
             <div class="flex flex-col sm:flex-row gap-4 mb-4">
-              <Button 
+              <Button
                 @click="handleRequestService(selectedServiceModal)"
                 class="flex-1 bg-[#286AD8] hover:bg-[#435574] h-14 text-base font-bold shadow-lg shadow-[#286AD8]/20 transition-all active:scale-95 rounded-xl"
               >
                 <Send class="h-5 w-5 mr-2" />
                 Solicitar este serviço
               </Button>
-              <Button 
+              <Button
                 variant="outline"
                 class="bg-white border-2 border-gray-100 hover:border-[#286AD8] transition-all h-14 rounded-xl px-10 text-base font-bold text-[#435574] hover:text-[#286AD8]"
               >
@@ -1293,7 +1300,7 @@ onMounted(() => {
             <Label class="text-[#435574] mb-2 block text-sm">
               Prazo desejado <span class="text-red-500">*</span>
             </Label>
-            
+
             <div class="flex p-1 bg-gray-100 rounded-lg mb-2">
               <button
                 type="button"
@@ -1412,8 +1419,8 @@ onMounted(() => {
             </ul>
           </div>
 
-          <Button 
-            @click="handleSendQuote" 
+          <Button
+            @click="handleSendQuote"
             class="w-full bg-[#286AD8]"
             :disabled="isSendingQuote"
           >
