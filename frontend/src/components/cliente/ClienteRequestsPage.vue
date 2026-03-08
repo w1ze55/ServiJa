@@ -59,6 +59,7 @@ import Label from '../ui/label.vue';
 import { useClientRequestStore, type ServiceRequest } from '@/stores/clientRequestStore';
 import { useServiceRequestWebSocket } from '@/composables/useServiceRequestWebSocket';
 import { toast } from '@/utils/toast';
+import { getStatusLabel } from '@/utils/statusTranslations';
 
 interface Props {
   onNavigate: (page: string, params?: any) => void;
@@ -187,7 +188,7 @@ const handleServiceRequestNotification = (event: any) => {
       store.loadRequests();
       break;
     case 'SERVICE_REQUEST_STATUS_CHANGED':
-      toast.info(`Status atualizado: ${notification.status}`);
+      toast.info(`Status atualizado: ${getStatusLabel(notification.status)}`);
       store.loadRequests();
       break;
   }
@@ -204,7 +205,7 @@ const filteredRequests = computed(() => {
       currentTab.value === 'all' ||
       (currentTab.value === 'pending' && (request.status === 'pending' || request.status === 'sent')) ||
       (currentTab.value === 'negotiating' && (request.status === 'negotiating' || request.status === 'accepted')) ||
-      (currentTab.value === 'in_progress' && request.status === 'in_progress') ||
+      (currentTab.value === 'in_progress' && (request.status === 'in_progress' || request.status === 'delivered')) ||
       (currentTab.value === 'completed' && request.status === 'completed') ||
       (currentTab.value === 'cancelled' && (request.status === 'cancelled' || request.status === 'rejected'));
 
@@ -355,20 +356,6 @@ const handleRefresh = () => {
 watch(currentTab, () => {
   currentPage.value = 1;
 });
-
-const getStatusLabel = (status: string) => {
-  const labels: Record<string, string> = {
-    pending: 'Pendente',
-    sent: 'Enviada',
-    negotiating: 'Negociando',
-    accepted: 'Aceita',
-    in_progress: 'Em Andamento',
-    rejected: 'Recusada',
-    completed: 'Concluída',
-    cancelled: 'Cancelada',
-  };
-  return labels[status] || status;
-};
 </script>
 
 <template>
@@ -605,6 +592,18 @@ const getStatusLabel = (status: string) => {
                           <Badge class="bg-green-100 text-green-700 hover:bg-green-100">
                             <CheckCircle class="h-3 w-3 mr-1" />
                             Aceita
+                          </Badge>
+                        </template>
+                        <template v-else-if="request.status === 'in_progress'">
+                          <Badge class="bg-purple-100 text-purple-700 hover:bg-purple-100">
+                            <Clock class="h-3 w-3 mr-1" />
+                            Em Andamento
+                          </Badge>
+                        </template>
+                        <template v-else-if="request.status === 'delivered'">
+                          <Badge class="bg-amber-100 text-amber-700 hover:bg-amber-100">
+                            <Send class="h-3 w-3 mr-1" />
+                            Entregue
                           </Badge>
                         </template>
                         <template v-else-if="request.status === 'completed'">

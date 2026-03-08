@@ -88,6 +88,7 @@ const getDotClass = (key?: string) => {
   if (key === 'PAYMENT_PENDING') return 'bg-yellow-100 ring-2 ring-yellow-300';
   if (key === 'PAYMENT_CONFIRMED') return 'bg-green-100 ring-2 ring-green-300';
   if (key === 'PAYMENT_CANCELLED' || key === 'PAYMENT_FAILED') return 'bg-red-100 ring-2 ring-red-300';
+  if (key === 'SERVICE_DELIVERED') return 'bg-blue-100 ring-2 ring-blue-300';
   if (key === 'SERVICE_COMPLETED') return 'bg-green-100 ring-2 ring-green-300';
   return 'bg-amber-100 ring-2 ring-amber-300';
 };
@@ -101,6 +102,7 @@ const getLabelClass = (key?: string) => {
   if (key === 'PAYMENT_CREATED') return 'text-blue-700';
   if (key === 'PAYMENT_PENDING') return 'text-yellow-700';
   if (key === 'PAYMENT_CONFIRMED' || key === 'SERVICE_COMPLETED') return 'text-green-700';
+  if (key === 'SERVICE_DELIVERED') return 'text-blue-700';
   if (key === 'PAYMENT_CANCELLED' || key === 'PAYMENT_FAILED') return 'text-red-700';
   return 'text-amber-700';
 };
@@ -149,6 +151,7 @@ const getLabelClass = (key?: string) => {
             <Clock v-else-if="log.operationKey === 'PAYMENT_PENDING'" class="h-4 w-4 text-yellow-600" />
             <DollarSign v-else-if="log.operationKey === 'PAYMENT_CONFIRMED'" class="h-4 w-4 text-green-600" />
             <AlertCircle v-else-if="log.operationKey === 'PAYMENT_CANCELLED' || log.operationKey === 'PAYMENT_FAILED'" class="h-4 w-4 text-red-600" />
+            <Send v-else-if="log.operationKey === 'SERVICE_DELIVERED'" class="h-4 w-4 text-blue-600" />
             <CheckCircle2 v-else-if="log.operationKey === 'SERVICE_COMPLETED'" class="h-4 w-4 text-green-600" />
             <MessageSquare v-else class="h-4 w-4 text-amber-600" />
           </div>

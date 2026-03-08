@@ -48,7 +48,7 @@ export interface ServiceRequest {
     budget: number;
     deadline: string;
     priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
-    status: 'pending' | 'sent' | 'negotiating' | 'accepted' | 'in_progress' | 'rejected' | 'completed' | 'cancelled';
+    status: 'pending' | 'sent' | 'negotiating' | 'accepted' | 'in_progress' | 'delivered' | 'rejected' | 'completed' | 'cancelled';
     createdAt: string;
     address?: string;
     desiredDate?: string;
@@ -114,7 +114,7 @@ export const useClientRequestStore = defineStore('clientRequest', () => {
     const stats = computed<RequestStats>(() => ({
         pending: requests.value.filter((r) => r.status === 'pending' || r.status === 'sent').length,
         negotiating: requests.value.filter((r) => r.status === 'negotiating' || r.status === 'accepted').length,
-        inProgress: requests.value.filter((r) => r.status === 'in_progress').length,
+        inProgress: requests.value.filter((r) => r.status === 'in_progress' || r.status === 'delivered').length,
         completed: requests.value.filter((r) => r.status === 'completed').length,
         cancelled: requests.value.filter((r) => r.status === 'cancelled' || r.status === 'rejected').length,
     }));
@@ -130,7 +130,7 @@ export const useClientRequestStore = defineStore('clientRequest', () => {
                 id: String(req.id),
                 service: req.serviceName, // Backend usa serviceName
                 priority: req.priority || 'MEDIUM',
-                status: (req.status || 'PENDING').toLowerCase(),
+                status: mapApiStatusToLocal(req.status),
                 attachments: (req.attachments || []).map((url: string, idx: number) => ({
                     id: `att-${req.id}-${idx}`,
                     name: extractFileName(url),
@@ -164,6 +164,21 @@ export const useClientRequestStore = defineStore('clientRequest', () => {
         return requests.value.find((r) => r.id === String(id));
     };
 
+    const mapApiStatusToLocal = (status: string): ServiceRequest['status'] => {
+        const mapping: Record<string, ServiceRequest['status']> = {
+            'PENDING': 'pending',
+            'SENT': 'sent',
+            'NEGOTIATING': 'negotiating',
+            'ACCEPTED': 'accepted',
+            'IN_PROGRESS': 'in_progress',
+            'DELIVERED': 'delivered',
+            'REJECTED': 'rejected',
+            'COMPLETED': 'completed',
+            'CANCELLED': 'cancelled',
+        };
+        return mapping[status] || 'pending';
+    };
+
     const createRequest = async (input: CreateServiceRequestInput): Promise<ServiceRequest | null> => {
         try {
             // Adequar nomes de campos para o backend
@@ -185,7 +200,7 @@ export const useClientRequestStore = defineStore('clientRequest', () => {
                 id: String(response.data.id),
                 service: response.data.serviceName,
                 priority: response.data.priority || 'MEDIUM',
-                status: (response.data.status || 'PENDING').toLowerCase(),
+                status: mapApiStatusToLocal(response.data.status),
                 freelancerAvatar: response.data.freelancerAvatar,
             };
 

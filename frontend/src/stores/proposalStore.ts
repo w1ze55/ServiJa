@@ -15,7 +15,7 @@ export interface Proposal {
   budget: number;
   deadline: string;
   priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
-  status: 'pending' | 'negotiating' | 'accepted' | 'in_progress' | 'rejected' | 'completed' | 'archived';
+  status: 'pending' | 'negotiating' | 'accepted' | 'in_progress' | 'delivered' | 'rejected' | 'completed' | 'archived';
   receivedAt: string;
   attachments?: ProposalAttachment[];
   freelancerAttachments?: ProposalAttachment[];
@@ -114,7 +114,7 @@ export const useProposalStore = defineStore('proposal', () => {
   const stats = computed<ProposalStats>(() => ({
     pending: proposals.value.filter((p) => p.status === 'pending').length,
     negotiating: proposals.value.filter((p) => p.status === 'negotiating' || p.status === 'accepted').length,
-    inProgress: proposals.value.filter((p) => p.status === 'in_progress').length,
+    inProgress: proposals.value.filter((p) => p.status === 'in_progress' || p.status === 'delivered').length,
     completed: proposals.value.filter((p) => p.status === 'completed' || p.status === 'archived').length,
     rejected: proposals.value.filter((p) => p.status === 'rejected').length,
   }));
@@ -185,6 +185,7 @@ export const useProposalStore = defineStore('proposal', () => {
       'NEGOTIATING': 'negotiating',
       'ACCEPTED': 'accepted',
       'IN_PROGRESS': 'in_progress',
+      'DELIVERED': 'delivered',
       'REJECTED': 'rejected',
       'COMPLETED': 'completed',
       'CANCELLED': 'archived',
@@ -276,7 +277,19 @@ export const useProposalStore = defineStore('proposal', () => {
   };
 
   const completeProposal = async (id: string): Promise<boolean> => {
-    return updateStatus(id, 'completed');
+    try {
+      const response = await api.patch(`/service-requests/${id}/complete`);
+      const updatedReq = response.data;
+
+      const proposal = proposals.value.find((p) => p.id === id);
+      if (proposal) {
+        proposal.status = mapApiStatusToLocal(updatedReq.status);
+      }
+      return true;
+    } catch (err) {
+      console.error('Erro ao completar proposta:', err);
+      return false;
+    }
   };
 
   const archiveProposal = async (id: string): Promise<boolean> => {
