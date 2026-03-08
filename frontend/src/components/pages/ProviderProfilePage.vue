@@ -1261,13 +1261,6 @@ onMounted(() => {
                 <Send class="h-5 w-5 mr-2" />
                 Solicitar este serviço
               </Button>
-              <Button
-                variant="outline"
-                class="bg-white border-2 border-gray-100 hover:border-[#286AD8] transition-all h-14 rounded-xl px-10 text-base font-bold text-[#435574] hover:text-[#286AD8]"
-              >
-                <MessageSquare class="h-5 w-5 mr-2" />
-                Conversar
-              </Button>
             </div>
           </div>
         </div>
