@@ -138,6 +138,19 @@ const isLoading = ref(true);
 const error = ref('');
 const quoteMessage = ref('');
 const quoteCategory = ref('');
+const displayedServicesCount = ref(6);
+
+const paginatedServices = computed(() => {
+  return services.value.slice(0, displayedServicesCount.value);
+});
+
+const hasMoreServices = computed(() => {
+  return services.value.length > displayedServicesCount.value;
+});
+
+const handleShowMoreServices = () => {
+  displayedServicesCount.value += 6;
+};
 const quoteBudget = ref('');
 const formattedQuoteBudget = ref('');
 const quoteDeadline = ref('');
@@ -667,59 +680,72 @@ onMounted(() => {
                   </p>
                 </div>
 
-                <div v-if="services.length > 0" class="grid md:grid-cols-2 gap-4">
-                  <Card
-                    v-for="service in services"
-                    :key="service.id"
-                    class="overflow-hidden hover:shadow-lg hover:border-[#286AD8]/30 transition-all cursor-pointer group"
-                    @click="handleServiceClick(service)"
-                  >
-                    <!-- Service Image -->
-                    <div class="relative h-40 bg-gradient-to-br from-[#286AD8]/10 to-[#435574]/10">
-                      <img
-                        v-if="service.images && service.images.length > 0"
-                        :src="service.images[0]"
-                        :alt="service.title"
-                        class="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                      />
-                      <div v-else class="w-full h-full flex items-center justify-center">
-                        <Briefcase class="h-12 w-12 text-[#286AD8]/30" />
-                      </div>
-                      <Badge class="absolute top-3 left-3 bg-[#286AD8]/90 backdrop-blur-sm">
-                        {{ service.category }}
-                      </Badge>
-                    </div>
-
-                    <!-- Service Content -->
-                    <div class="p-4">
-                      <h3 class="font-semibold text-[#263238] mb-2 line-clamp-1 group-hover:text-[#286AD8]">
-                        {{ service.title }}
-                      </h3>
-                      <p class="text-sm text-[#435574] mb-3 line-clamp-2">{{ service.description }}</p>
-
-                      <!-- Tags -->
-                      <div v-if="service.tags && service.tags.length > 0" class="flex flex-wrap gap-1 mb-3">
-                        <Badge v-for="tag in service.tags.slice(0, 2)" :key="tag" variant="secondary" class="text-xs">
-                          {{ tag }}
-                        </Badge>
-                        <Badge v-if="service.tags.length > 2" variant="secondary" class="text-xs">
-                          +{{ service.tags.length - 2 }}
+                <div v-if="services.length > 0">
+                  <div class="grid md:grid-cols-2 gap-4 mb-8">
+                    <Card
+                      v-for="service in paginatedServices"
+                      :key="service.id"
+                      class="overflow-hidden hover:shadow-lg hover:border-[#286AD8]/30 transition-all cursor-pointer group"
+                      @click="handleServiceClick(service)"
+                    >
+                      <!-- Service Image -->
+                      <div class="relative h-40 bg-gradient-to-br from-[#286AD8]/10 to-[#435574]/10">
+                        <img
+                          v-if="service.images && service.images.length > 0"
+                          :src="service.images[0]"
+                          :alt="service.title"
+                          class="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                        />
+                        <div v-else class="w-full h-full flex items-center justify-center">
+                          <Briefcase class="h-12 w-12 text-[#286AD8]/30" />
+                        </div>
+                        <Badge class="absolute top-3 left-3 bg-[#286AD8]/90 backdrop-blur-sm">
+                          {{ service.category }}
                         </Badge>
                       </div>
 
-                      <!-- Footer -->
-                      <div class="flex items-center justify-between pt-3 border-t border-gray-100">
-                        <div class="flex items-center gap-1 text-[#286AD8]">
-                          <DollarSign class="h-4 w-4" />
-                          <span class="font-bold text-sm">{{ formatPrice(service.price, service.priceType) }}</span>
+                      <!-- Service Content -->
+                      <div class="p-4">
+                        <h3 class="font-semibold text-[#263238] mb-2 line-clamp-1 group-hover:text-[#286AD8]">
+                          {{ service.title }}
+                        </h3>
+                        <p class="text-sm text-[#435574] mb-3 line-clamp-2">{{ service.description }}</p>
+
+                        <!-- Tags -->
+                        <div v-if="service.tags && service.tags.length > 0" class="flex flex-wrap gap-1 mb-3">
+                          <Badge v-for="tag in service.tags.slice(0, 2)" :key="tag" variant="secondary" class="text-xs">
+                            {{ tag }}
+                          </Badge>
+                          <Badge v-if="service.tags.length > 2" variant="secondary" class="text-xs">
+                            +{{ service.tags.length - 2 }}
+                          </Badge>
                         </div>
-                        <div class="flex items-center gap-1 text-[#435574]">
-                          <Clock class="h-3.5 w-3.5" />
-                          <span class="text-xs">{{ formatDelivery(service.deliveryTime, service.deliveryUnit) }}</span>
+
+                        <!-- Footer -->
+                        <div class="flex items-center justify-between pt-3 border-t border-gray-100">
+                          <div class="flex items-center gap-1 text-[#286AD8]">
+                            <DollarSign class="h-4 w-4" />
+                            <span class="font-bold text-sm">{{ formatPrice(service.price, service.priceType) }}</span>
+                          </div>
+                          <div class="flex items-center gap-1 text-[#435574]">
+                            <Clock class="h-3.5 w-3.5" />
+                            <span class="text-xs">{{ formatDelivery(service.deliveryTime, service.deliveryUnit) }}</span>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </Card>
+                    </Card>
+                  </div>
+
+                  <!-- Show More Button -->
+                  <div v-if="hasMoreServices" class="flex justify-center mt-8">
+                    <Button 
+                      variant="outline" 
+                      @click="handleShowMoreServices"
+                      class="border-[#286AD8] text-[#286AD8] hover:bg-blue-50 px-8"
+                    >
+                      Ver mais serviços
+                    </Button>
+                  </div>
                 </div>
                 <Card v-else class="p-12 text-center">
                   <Briefcase class="h-12 w-12 text-[#435574]/30 mx-auto mb-4" />
@@ -858,15 +884,6 @@ onMounted(() => {
 
           <!-- Sidebar -->
           <div class="space-y-6">
-            <!-- Pricing -->
-            <Card class="p-6">
-              <h3 class="font-semibold text-[#263238] mb-3">Valor</h3>
-              <p class="text-2xl font-bold text-[#286AD8] mb-2">
-                {{ formatPrice(freelancer.hourlyRate || 0, 'HOURLY') }}
-              </p>
-              <p class="text-sm text-[#435574]">*Valores podem variar de acordo com a complexidade</p>
-            </Card>
-
             <!-- Work Model -->
             <Card class="p-6">
               <h3 class="font-semibold text-[#263238] mb-3">Modelo de trabalho</h3>
@@ -907,7 +924,7 @@ onMounted(() => {
                 </div>
                 <div class="flex items-center justify-between">
                   <span class="text-[#435574]">Trabalhos concluídos</span>
-                  <span class="text-[#263238] font-semibold">{{ freelancer.completedJobs || 0 }}</span>
+                  <span class="text-[#263238] font-semibold">{{ freelancer.completedJobs || (freelancer as any).completedProjects || 0 }}</span>
                 </div>
                 <div class="flex items-center justify-between">
                   <span class="text-[#435574]">Serviços ativos</span>
