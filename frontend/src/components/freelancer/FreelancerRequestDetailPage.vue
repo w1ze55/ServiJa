@@ -58,6 +58,7 @@ import { useProposalStore, type Proposal, type Milestone } from '@/stores/propos
 import ServiceRequestTimeline from '../service/ServiceRequestTimeline.vue';
 import { useServiceRequestWebSocket } from '@/composables/useServiceRequestWebSocket';
 import { toast } from '@/utils/toast';
+import { getStatusLabel } from '@/utils/statusTranslations';
 
 interface Props {
   onNavigate: (page: string, params?: any) => void;
@@ -206,7 +207,7 @@ const handleServiceRequestNotification = async (event: any) => {
       if (notification.status === 'COMPLETED') {
         toast.success('🎉 Serviço Concluído! O cliente confirmou a entrega.');
       } else {
-        toast.info(`Status atualizado: ${notification.status}`);
+        toast.info(`Status atualizado: ${getStatusLabel(notification.status)}`);
       }
 
       // Recarregar dados

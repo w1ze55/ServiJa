@@ -59,6 +59,7 @@ import Label from '../ui/label.vue';
 import { useClientRequestStore, type ServiceRequest } from '@/stores/clientRequestStore';
 import { useServiceRequestWebSocket } from '@/composables/useServiceRequestWebSocket';
 import { toast } from '@/utils/toast';
+import { getStatusLabel } from '@/utils/statusTranslations';
 
 interface Props {
   onNavigate: (page: string, params?: any) => void;
@@ -187,7 +188,7 @@ const handleServiceRequestNotification = (event: any) => {
       store.loadRequests();
       break;
     case 'SERVICE_REQUEST_STATUS_CHANGED':
-      toast.info(`Status atualizado: ${notification.status}`);
+      toast.info(`Status atualizado: ${getStatusLabel(notification.status)}`);
       store.loadRequests();
       break;
   }
@@ -355,21 +356,6 @@ const handleRefresh = () => {
 watch(currentTab, () => {
   currentPage.value = 1;
 });
-
-const getStatusLabel = (status: string) => {
-  const labels: Record<string, string> = {
-    pending: 'Pendente',
-    sent: 'Enviada',
-    negotiating: 'Negociando',
-    accepted: 'Aceita',
-    in_progress: 'Em Andamento',
-    delivered: 'Entregue',
-    rejected: 'Recusada',
-    completed: 'Concluída',
-    cancelled: 'Cancelada',
-  };
-  return labels[status] || status;
-};
 </script>
 
 <template>

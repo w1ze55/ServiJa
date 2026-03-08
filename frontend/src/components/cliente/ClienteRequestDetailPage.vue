@@ -46,6 +46,7 @@ import AlertDialogTitle from '../ui/alert-dialog-title.vue';
 import { useClientRequestStore, type ServiceRequest } from '@/stores/clientRequestStore';
 import ServiceRequestTimeline from '../service/ServiceRequestTimeline.vue';
 import { toast } from '@/utils/toast';
+import { getStatusLabel } from '@/utils/statusTranslations';
 
 interface Props {
   onNavigate: (page: string, params?: any) => void;
@@ -268,21 +269,6 @@ const getStatusColor = (status: string) => {
     cancelled: { bg: 'bg-gray-100', text: 'text-gray-700' },
   };
   return colors[status] || colors.pending;
-};
-
-const getStatusLabel = (status: string) => {
-  const labels: Record<string, string> = {
-    pending: 'Pendente',
-    sent: 'Enviada',
-    negotiating: 'Negociando',
-    accepted: 'Aceita',
-    in_progress: 'Em Andamento',
-    delivered: 'Entregue',
-    rejected: 'Recusada',
-    completed: 'Concluída',
-    cancelled: 'Cancelada',
-  };
-  return labels[status] || status;
 };
 </script>
 
