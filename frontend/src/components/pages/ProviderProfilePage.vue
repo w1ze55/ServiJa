@@ -530,6 +530,14 @@ const isFavorite = computed(() => {
   return favoritesStore.isFavoriteFreelancer(props.providerId);
 });
 
+const isServiceFavorite = (serviceId: number) => {
+  return favoritesStore.isFavoriteService(serviceId);
+};
+
+const handleToggleServiceFavorite = async (serviceId: number) => {
+  await favoritesStore.toggleFavoriteService(serviceId);
+};
+
 onMounted(() => {
   loadFreelancerData();
   if (!favoritesStore.initialized) {
@@ -1137,11 +1145,17 @@ onMounted(() => {
                   </div>
                 </div>
               </div>
-              <div class="hidden sm:flex gap-2">
-                <Button variant="outline" size="icon" class="rounded-full text-gray-400 border-gray-200">
-                  <Heart class="h-5 w-5" />
+              <div v-if="selectedServiceModal" class="hidden sm:flex gap-2">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  class="rounded-full"
+                  @click="handleToggleServiceFavorite(selectedServiceModal.id)"
+                  :class="isServiceFavorite(selectedServiceModal.id) ? 'text-red-500 border-red-200 bg-red-50 hover:bg-red-100 hover:text-red-600' : 'text-gray-400 border-gray-200 hover:text-red-500'"
+                >
+                  <Heart :class="['h-5 w-5', isServiceFavorite(selectedServiceModal.id) ? 'fill-red-500 text-red-500' : '']" />
                 </Button>
-                <Button variant="outline" size="icon" class="rounded-full text-gray-400 border-gray-200">
+                <Button variant="outline" size="icon" class="rounded-full text-gray-400 border-gray-200" @click="handleShare">
                   <Share2 class="h-5 w-5" />
                 </Button>
               </div>
