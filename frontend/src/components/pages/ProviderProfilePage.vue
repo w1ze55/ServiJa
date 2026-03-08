@@ -380,8 +380,8 @@ const handleSendQuote = async () => {
     return;
   }
 
-  if (!quoteBudget.value || Number(quoteBudget.value) <= 0) {
-    toast.error('Por favor, informe um orçamento válido');
+  if (!quoteBudget.value || Number(quoteBudget.value) < 5) {
+    toast.error('Por favor, informe um orçamento de no mínimo R$ 5,00');
     return;
   }
 
@@ -1297,8 +1297,12 @@ onMounted(() => {
                 :model-value="formattedQuoteBudget"
                 @update:model-value="(val: string) => handleQuoteBudgetInput(val)"
                 class="pl-10"
+                :class="{ 'border-red-500 focus-visible:ring-red-500': quoteBudget && Number(quoteBudget) < 5 }"
               />
             </div>
+            <p v-if="quoteBudget && Number(quoteBudget) < 5" class="text-[11px] text-red-500 font-medium mt-1">
+              O orçamento mínimo é R$ 5,00
+            </p>
           </div>
 
           <div class="space-y-3">

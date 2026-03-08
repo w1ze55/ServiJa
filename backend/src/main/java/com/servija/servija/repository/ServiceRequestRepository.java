@@ -18,4 +18,6 @@ public interface ServiceRequestRepository extends JpaRepository<ServiceRequest, 
     List<ServiceRequest> findByFreelancerIdAndStatus(Long freelancerId, ServiceRequest.Status status);
 
     long countByFreelancerIdAndStatus(Long freelancerId, ServiceRequest.Status status);
+
+    long countByFreelancerIdAndStatusIn(Long freelancerId, List<ServiceRequest.Status> statuses);
 }
