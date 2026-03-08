@@ -51,6 +51,7 @@ public class ServiceRequestHistory {
         PAYMENT_CONFIRMED("Pagamento confirmado"),
         PAYMENT_CANCELLED("Pagamento cancelado"),
         PAYMENT_FAILED("Pagamento falhou"),
+        SERVICE_DELIVERED("Serviço entregue pelo profissional"),
         SERVICE_COMPLETED("Serviço concluído");
 
         private final String label;

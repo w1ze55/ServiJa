@@ -56,6 +56,7 @@ import AvatarFallback from '../ui/avatar-fallback.vue';
 import AvatarImage from '../ui/avatar-image.vue';
 import { useProposalStore, type Proposal, type Milestone } from '@/stores/proposalStore';
 import ServiceRequestTimeline from '../service/ServiceRequestTimeline.vue';
+import { useServiceRequestWebSocket } from '@/composables/useServiceRequestWebSocket';
 import { toast } from '@/utils/toast';
 
 interface Props {
@@ -104,6 +105,9 @@ const messageAttachments = ref<File[]>([]);
 const messageAttachmentInput = ref<HTMLInputElement | null>(null);
 const proposalAttachmentInput = ref<HTMLInputElement | null>(null);
 
+// WebSocket
+let wsConnection: any = null;
+
 const getExecutionTimeLabel = (days: number) => {
   if (!days || days <= 0) return '';
 
@@ -139,13 +143,29 @@ onMounted(async () => {
   if (proposalStore.proposals.length === 0) {
     await proposalStore.loadProposals();
   }
-  
+
   if (props.requestId) {
     proposal.value = proposalStore.getProposalById(props.requestId) || null;
     if (proposal.value) {
       proposalStore.markAsViewed(props.requestId);
       await proposalStore.loadHistory(props.requestId);
     }
+  }
+
+  // Conectar WebSocket
+  const userEmail = getUserEmail();
+  if (userEmail) {
+    wsConnection = useServiceRequestWebSocket(userEmail);
+    wsConnection.connect();
+    window.addEventListener('service-request-notification', handleServiceRequestNotification);
+  }
+});
+
+import { onUnmounted } from 'vue';
+onUnmounted(() => {
+  window.removeEventListener('service-request-notification', handleServiceRequestNotification);
+  if (wsConnection) {
+    wsConnection.disconnect();
   }
 });
 
@@ -157,9 +177,48 @@ watch(() => props.requestId, async (newId) => {
     proposal.value = proposalStore.getProposalById(newId) || null;
     if (proposal.value) {
       proposalStore.markAsViewed(newId);
+      await proposalStore.loadHistory(newId);
     }
   }
 });
+
+// Extrair email do usuário do JWT
+const getUserEmail = () => {
+  const token = localStorage.getItem('token');
+  if (!token) return null;
+
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return payload.sub || payload.email;
+  } catch (error) {
+    console.error('Erro ao extrair email do token:', error);
+    return null;
+  }
+};
+
+// Lidar com notificações via WebSocket
+const handleServiceRequestNotification = async (event: any) => {
+  const notification = event.detail;
+
+  // Só processa se for para esta solicitação
+  if (proposal.value && String(notification.serviceRequestId) === String(proposal.value.id)) {
+    if (notification.type === 'SERVICE_REQUEST_STATUS_CHANGED') {
+      if (notification.status === 'COMPLETED') {
+        toast.success('🎉 Serviço Concluído! O cliente confirmou a entrega.');
+      } else {
+        toast.info(`Status atualizado: ${notification.status}`);
+      }
+
+      // Recarregar dados
+      const currentId = proposal.value.id;
+      await proposalStore.loadProposals();
+      proposal.value = proposalStore.getProposalById(currentId) || null;
+      if (proposal.value) {
+        await proposalStore.loadHistory(proposal.value.id);
+      }
+    }
+  }
+};
 
 const clientMessagesCount = computed(() =>
   proposal.value?.messages?.filter((m) => m.sender === 'client').length || 0
@@ -482,11 +541,11 @@ const handleCompleteProposal = async () => {
   isLoading.value = false;
 
   if (success) {
-    toast.success('Serviço marcado como concluído!');
+    toast.success('Serviço marcado como entregue! Aguardando confirmação do cliente.');
     showCompleteDialog.value = false;
     proposal.value = proposalStore.getProposalById(proposal.value.id) || null;
   } else {
-    toast.error('Erro ao marcar como concluído');
+    toast.error('Erro ao marcar como entregue');
   }
 };
 
@@ -494,7 +553,7 @@ const handleUpdateMilestoneStatus = async (milestoneId: string, status: 'pending
   if (!proposal.value) return;
 
   const success = await proposalStore.updateMilestoneStatus(proposal.value.id, milestoneId, status);
-  
+
   if (success) {
     toast.success('Marco atualizado');
     proposal.value = proposalStore.getProposalById(proposal.value.id) || null;
@@ -533,7 +592,7 @@ const handleDownloadAttachment = async (url: string, fileName: string) => {
 
 const handleAcceptCounterProposal = async () => {
   if (!proposal.value) return;
-  
+
   isLoading.value = true;
   const success = await proposalStore.acceptCounterProposal(proposal.value.id);
   isLoading.value = false;
@@ -576,6 +635,7 @@ const getStatusBadge = (status: string) => {
     negotiating: { class: 'bg-purple-100 text-purple-700', label: 'Negociando', icon: MessageSquare },
     accepted: { class: 'bg-green-100 text-green-700', label: 'Aceita', icon: CheckCircle },
     in_progress: { class: 'bg-purple-100 text-purple-700', label: 'Em Andamento', icon: Clock },
+    delivered: { class: 'bg-amber-100 text-amber-700', label: 'Entregue', icon: Send },
     rejected: { class: 'bg-red-100 text-red-700', label: 'Recusada', icon: XCircle },
     completed: { class: 'bg-teal-100 text-teal-700', label: 'Concluída', icon: CheckCircle },
     archived: { class: 'bg-gray-100 text-gray-700', label: 'Arquivada', icon: FileText },
@@ -646,16 +706,26 @@ const getStatusBadge = (status: string) => {
           <Button
             v-if="proposal.status === 'in_progress'"
             @click="showCompleteDialog = true"
-            class="bg-green-600 hover:bg-green-700"
+            class="bg-[#286AD8] hover:bg-[#435574]"
           >
             <CheckCircle class="h-4 w-4 mr-2" />
-            Marcar Concluído
+            Marcar como Entregue
           </Button>
         </div>
       </div>
 
+      <!-- Delivered Status Alert -->
+      <div v-if="proposal.status === 'delivered'"
+           class="mt-4 p-4 rounded-lg border border-amber-100 bg-amber-50 text-amber-900 flex items-start gap-3">
+        <Clock class="h-5 w-5 mt-0.5 flex-shrink-0 text-amber-600" />
+        <div>
+          <p class="font-semibold text-sm">Aguardando Confirmação</p>
+          <p class="text-sm opacity-90">Você marcou este serviço como entregue. O cliente foi notificado e deve confirmar a conclusão para finalizar o processo.</p>
+        </div>
+      </div>
+
       <!-- Rejection Reason Alert -->
-      <div v-if="proposal.status === 'rejected' && proposal.rejectReason" 
+      <div v-if="proposal.status === 'rejected' && proposal.rejectReason"
            class="mt-4 p-4 rounded-lg border border-red-100 bg-red-50 text-red-900 flex items-start gap-3">
         <AlertCircle class="h-5 w-5 mt-0.5 flex-shrink-0 text-red-600" />
         <div>
@@ -726,9 +796,9 @@ const getStatusBadge = (status: string) => {
         <div class="mt-4 p-3 bg-amber-100/50 rounded text-sm text-amber-800">
           <p>O cliente sugeriu novos termos. Você pode aceitá-los para atualizar seu orçamento ou manter sua proposta inicial.</p>
         </div>
-        
+
         <div class="mt-6 flex gap-3">
-          <Button 
+          <Button
             @click="handleAcceptCounterProposal"
             :disabled="isLoading"
             class="flex-1 bg-green-600 hover:bg-green-700"
@@ -736,7 +806,7 @@ const getStatusBadge = (status: string) => {
             <Check class="h-4 w-4 mr-2" />
             Aceitar Contra Proposta
           </Button>
-          <Button 
+          <Button
             @click="showRejectCounterDialog = true"
             variant="outline"
             :disabled="isLoading"
@@ -781,7 +851,7 @@ const getStatusBadge = (status: string) => {
           <p class="text-sm text-[#435574] mb-1">Observações</p>
           <p class="text-[#263238]">{{ proposal.freelancerResponse.notes }}</p>
         </div>
-        
+
         <!-- Milestones -->
         <div v-if="proposal.freelancerResponse.milestones && proposal.freelancerResponse.milestones.length > 0" class="mt-6">
           <h4 class="font-semibold text-[#263238] mb-3">Marcos de Entrega</h4>
@@ -891,7 +961,7 @@ const getStatusBadge = (status: string) => {
                 <Label class="text-sm text-[#435574]">Prioridade</Label>
                 <p class="text-[#263238] mt-1">
                   <Badge :variant="getPriorityVariant(proposal.priority || 'MEDIUM')">
-                    {{ 
+                    {{
                       proposal.priority === 'URGENT' ? 'Urgente' :
                       proposal.priority === 'HIGH' ? 'Alta' :
                       proposal.priority === 'MEDIUM' ? 'Média' : 'Baixa'
@@ -1393,21 +1463,21 @@ const getStatusBadge = (status: string) => {
     <AlertDialog :open="showCompleteDialog" @update:open="(val) => showCompleteDialog = val">
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Marcar como Concluído</AlertDialogTitle>
+          <AlertDialogTitle>Confirmar Entrega</AlertDialogTitle>
           <AlertDialogDescription>
-            Tem certeza que deseja marcar o serviço "{{ proposal?.service }}" como concluído?
+            Tem certeza que deseja marcar o serviço "{{ proposal?.service }}" como entregue?
             <br /><br />
-            Esta ação indica que o trabalho foi finalizado com sucesso.
+            Esta ação indica que o trabalho foi finalizado pelo seu lado. O cliente será notificado para confirmar a conclusão e liberar o processo final.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel @click="showCompleteDialog = false">Cancelar</AlertDialogCancel>
           <AlertDialogAction
             @click="handleCompleteProposal"
-            class="bg-green-600 hover:bg-green-700"
+            class="bg-[#286AD8] hover:bg-[#435574]"
             :disabled="isLoading"
           >
-            {{ isLoading ? 'Processando...' : 'Confirmar Conclusão' }}
+            {{ isLoading ? 'Enviando...' : 'Confirmar Entrega' }}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

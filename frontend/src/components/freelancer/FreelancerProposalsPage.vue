@@ -172,7 +172,7 @@ const getUserEmail = () => {
 const handleServiceRequestNotification = (event: any) => {
   const notification = event.detail;
   console.log('📩 Notificação recebida:', notification);
-  
+
   // Mostrar toast baseado no tipo de notificação
   switch (notification.type) {
     case 'NEW_SERVICE_REQUEST':
@@ -193,7 +193,11 @@ const handleServiceRequestNotification = (event: any) => {
       proposalStore.loadProposals();
       break;
     case 'SERVICE_REQUEST_STATUS_CHANGED':
-      toast.info(`Status atualizado: ${notification.status}`);
+      if (notification.status === 'COMPLETED') {
+        toast.success('Serviço Concluído! O cliente confirmou a entrega.');
+      } else {
+        toast.info(`Status atualizado: ${notification.status}`);
+      }
       proposalStore.loadProposals();
       break;
   }
@@ -203,7 +207,7 @@ const handleServiceRequestNotification = (event: any) => {
 const handlePaymentNotification = (event: any) => {
   const notification = event.detail;
   console.log('💰 Notificação de pagamento recebida:', notification);
-  
+
   switch (notification.type) {
     case 'PIX_CONFIRMED':
       toast.success('💰 Pagamento confirmado! O serviço está em andamento.');
@@ -227,7 +231,7 @@ const filteredProposals = computed(() => {
       currentTab.value === 'all' ||
       (currentTab.value === 'pending' && proposal.status === 'pending') ||
       (currentTab.value === 'negotiating' && (proposal.status === 'negotiating' || proposal.status === 'accepted')) ||
-      (currentTab.value === 'in_progress' && proposal.status === 'in_progress') ||
+      (currentTab.value === 'in_progress' && (proposal.status === 'in_progress' || proposal.status === 'delivered')) ||
       (currentTab.value === 'rejected' && proposal.status === 'rejected') ||
       (currentTab.value === 'completed' && (proposal.status === 'completed' || proposal.status === 'archived'));
     // Filtro por período
@@ -635,6 +639,12 @@ watch(currentTab, () => {
                           <Badge class="bg-purple-100 text-purple-700 hover:bg-purple-100">
                             <Clock class="h-3 w-3 mr-1" />
                             Em Andamento
+                          </Badge>
+                        </template>
+                        <template v-else-if="proposal.status === 'delivered'">
+                          <Badge class="bg-amber-100 text-amber-700 hover:bg-amber-100">
+                            <Send class="h-3 w-3 mr-1" />
+                            Entregue
                           </Badge>
                         </template>
                         <template v-else-if="proposal.status === 'rejected'">

@@ -262,6 +262,7 @@ const getStatusColor = (status: string) => {
     negotiating: { bg: 'bg-amber-100', text: 'text-amber-700' },
     accepted: { bg: 'bg-green-100', text: 'text-green-700' },
     in_progress: { bg: 'bg-purple-100', text: 'text-purple-700' },
+    delivered: { bg: 'bg-amber-100', text: 'text-amber-700' },
     completed: { bg: 'bg-teal-100', text: 'text-teal-700' },
     rejected: { bg: 'bg-red-100', text: 'text-red-700' },
     cancelled: { bg: 'bg-gray-100', text: 'text-gray-700' },
@@ -276,6 +277,7 @@ const getStatusLabel = (status: string) => {
     negotiating: 'Negociando',
     accepted: 'Aceita',
     in_progress: 'Em Andamento',
+    delivered: 'Entregue',
     rejected: 'Recusada',
     completed: 'Concluída',
     cancelled: 'Cancelada',
@@ -422,9 +424,9 @@ const getStatusLabel = (status: string) => {
           </button>
         </div>
         
-        <!-- Complete Service Button (só aparece quando status é IN_PROGRESS) -->
+        <!-- Botão de Conclusão: Só aparece quando o freelancer já entregou (DELIVERED) -->
         <Button
-          v-if="request.status === 'in_progress'"
+          v-if="request.status === 'delivered'"
           @click="showCompleteDialog = true"
           class="bg-teal-600 hover:bg-teal-700 shadow-lg hover:shadow-xl transition-all"
           size="sm"
@@ -432,6 +434,16 @@ const getStatusLabel = (status: string) => {
           <CheckCircle class="h-4 w-4 mr-2" />
           Marcar como Concluído
         </Button>
+      </div>
+
+      <!-- Info Alert: Aguardando entrega do profissional -->
+      <div v-if="request.status === 'in_progress'" 
+           class="mt-4 p-4 rounded-lg border border-blue-100 bg-blue-50 text-blue-900 flex items-start gap-3">
+        <Clock class="h-5 w-5 mt-0.5 flex-shrink-0 text-blue-600" />
+        <div>
+          <p class="font-semibold text-sm">Serviço em Andamento</p>
+          <p class="text-sm opacity-90">O profissional está trabalhando no seu pedido. Assim que ele finalizar a entrega, você poderá marcar o serviço como concluído aqui.</p>
+        </div>
       </div>
 
       <!-- Details Section -->

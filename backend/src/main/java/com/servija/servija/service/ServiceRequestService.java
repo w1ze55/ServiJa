@@ -121,6 +121,12 @@ public class ServiceRequestService {
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
         ServiceRequest.Status newStatus = ServiceRequest.Status.valueOf(status.toUpperCase());
+
+        if (newStatus == Status.DELIVERED || newStatus == Status.COMPLETED) {
+            throw new IllegalStateException(
+                    "O status " + newStatus + " deve ser alterado através do endpoint de conclusão");
+        }
+
         request.setStatus(newStatus);
 
         if (newStatus == ServiceRequest.Status.CANCELLED && reason != null) {
@@ -268,32 +274,56 @@ public class ServiceRequestService {
     }
 
     @Transactional
-    public ServiceRequestResponse completeService(Long id, String contractorEmail) {
+    public ServiceRequestResponse completeService(Long id, String userEmail) {
         ServiceRequest request = serviceRequestRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Solicitação não encontrada"));
 
-        User contractor = userRepository.findByEmail(contractorEmail)
+        User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
 
-        // Validar se é o contratante da solicitação
-        if (!request.getContractor().getId().equals(contractor.getId())) {
-            throw new IllegalStateException("Apenas o contratante pode marcar o serviço como concluído");
+        // Phase 1: Freelancer marks as Delivered
+        if (request.getFreelancer() != null && request.getFreelancer().getId().equals(user.getId())) {
+            if (request.getStatus() != Status.IN_PROGRESS) {
+                throw new IllegalStateException("O serviço só pode ser entregue quando está em andamento");
+            }
+
+            request.setStatus(Status.DELIVERED);
+            ServiceRequest saved = serviceRequestRepository.save(request);
+
+            historyService.record(saved, user, OperationType.SERVICE_DELIVERED,
+                    "Serviço marcado como entregue pelo profissional");
+
+            // Notificar o cliente sobre a entrega
+            webSocketService.notifyServiceRequestStatusChange(
+                    saved.getId(), "DELIVERED",
+                    request.getContractor().getEmail(), userEmail);
+
+            return toResponse(saved);
         }
 
-        // Validar se o status é IN_PROGRESS
-        if (request.getStatus() != Status.IN_PROGRESS) {
-            throw new IllegalStateException("O serviço só pode ser concluído quando está em andamento");
+        // Phase 2: Client marks as Completed
+        if (request.getContractor().getId().equals(user.getId())) {
+            if (request.getStatus() != Status.DELIVERED) {
+                throw new IllegalStateException("O serviço só pode ser concluído após a entrega pelo profissional");
+            }
+
+            request.setStatus(Status.COMPLETED);
+            ServiceRequest saved = serviceRequestRepository.save(request);
+
+            historyService.record(saved, user, OperationType.SERVICE_COMPLETED,
+                    "Serviço marcado como concluído pelo cliente");
+
+            log.info("Serviço concluído pelo cliente - ID: {}, Contratante: {}", id, userEmail);
+
+            // Notificar o freelancer sobre a conclusão
+            webSocketService.notifyServiceRequestStatusChange(
+                    saved.getId(), "COMPLETED",
+                    userEmail, request.getFreelancer().getEmail());
+
+            return toResponse(saved);
         }
 
-        request.setStatus(Status.COMPLETED);
-        ServiceRequest saved = serviceRequestRepository.save(request);
-
-        historyService.record(saved, contractor, OperationType.SERVICE_COMPLETED,
-                "Serviço marcado como concluído pelo cliente");
-
-        log.info("Serviço concluído - ID: {}, Contratante: {}", id, contractorEmail);
-
-        return toResponse(saved);
+        throw new IllegalStateException("Usuário não autorizado a realizar esta ação");
     }
 
     @Transactional
