@@ -38,6 +38,7 @@ public class Service {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "price_type", nullable = false)
+    @Builder.Default
     private PriceType priceType = PriceType.FIXED;
 
     @Column(name = "delivery_time", nullable = false)
@@ -45,6 +46,7 @@ public class Service {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "delivery_unit", nullable = false)
+    @Builder.Default
     private DeliveryUnit deliveryUnit = DeliveryUnit.DAYS;
 
     @Column(columnDefinition = "TEXT")
@@ -54,6 +56,7 @@ public class Service {
     private String images;
 
     @Column(name = "is_active", nullable = false)
+    @Builder.Default
     private Boolean isActive = true;
 
     @CreationTimestamp

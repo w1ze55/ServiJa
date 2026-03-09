@@ -35,6 +35,8 @@ import NotFoundPage from "@/pages/NotFound/index.vue";
 import RegisterPage from "@/pages/Register/index.vue";
 import CheckoutPage from "@/pages/Checkout/index.vue";
 import PaymentSuccessPage from "@/pages/PaymentSuccess/index.vue";
+import ClienteProjectsPage from "@/pages/ClienteProjects/index.vue";
+import ClienteDeliveryApprovalPage from "@/pages/ClienteDeliveryApproval/index.vue";
 
 const routes: RouteRecordRaw[] = [
   // ============ ROTAS PÚBLICAS ============
@@ -110,6 +112,18 @@ const routes: RouteRecordRaw[] = [
     path: "/cliente-request-detail",
     name: "cliente-request-detail",
     component: ClienteRequestDetailPage,
+    meta: { requiresAuth: true, userType: "contractor" },
+  },
+  {
+    path: "/cliente-projects",
+    name: "cliente-projects",
+    component: ClienteProjectsPage,
+    meta: { requiresAuth: true, userType: "contractor" },
+  },
+  {
+    path: "/cliente-delivery-approval",
+    name: "cliente-delivery-approval",
+    component: ClienteDeliveryApprovalPage,
     meta: { requiresAuth: true, userType: "contractor" },
   },
 

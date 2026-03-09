@@ -203,6 +203,7 @@ const menuItems = computed(() =>
         { id: "home", label: "Início", icon: Home },
         { id: "explore", label: "Explorar", icon: Compass },
         { id: "requests", label: "Minhas Solicitações", icon: FileText },
+        { id: "cliente-projects", label: "Meus Projetos", icon: Package },
         { id: "messages", label: "Mensagens", icon: MessageSquare },
         { id: "favorites", label: "Favoritos", icon: Heart },
         { id: "settings", label: "Configurações", icon: Settings },
