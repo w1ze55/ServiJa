@@ -395,7 +395,7 @@ const getStatusColor = (status: string) => {
         <!-- Botão de Aprovação de Entrega: Só aparece quando o freelancer já entregou (DELIVERED) -->
         <Button
           v-if="request.status === 'delivered'"
-          @click="() => props.onNavigate('cliente-delivery-approval', { requestId: request.id })"
+          @click="() => props.onNavigate('cliente-delivery-approval', { requestId: request?.id })"
           class="bg-green-600 hover:bg-green-700"
           size="sm"
         >
