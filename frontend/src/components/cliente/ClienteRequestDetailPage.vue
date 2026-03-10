@@ -654,7 +654,7 @@ const getStatusColor = (status: string) => {
         </div>
 
         <!-- Message Input -->
-        <div v-if="request.status === 'in_progress' || request.status === 'completed'" class="flex gap-2">
+        <div v-if="request.status === 'in_progress' || request.status === 'delivered'" class="flex gap-2">
           <Textarea
             v-model="newMessage"
             placeholder="Digite sua mensagem..."
