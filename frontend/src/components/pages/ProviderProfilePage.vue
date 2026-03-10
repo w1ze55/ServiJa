@@ -1215,20 +1215,20 @@ onMounted(() => {
             <div class="mb-10">
               <h3 class="text-lg font-bold text-[#263238] mb-4">O que está incluído</h3>
               <div class="grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-8">
-                <div class="flex items-center gap-3 text-[#435574]">
-                  <CheckCircle class="h-5 w-5 text-green-500" />
+                <div class="flex items-center gap-3 text-[#435574] leading-tight">
+                  <CheckCircle class="h-5 w-5 text-green-500 flex-shrink-0" />
                   <span>Atendimento profissional e especializado</span>
                 </div>
-                <div class="flex items-center gap-3 text-[#435574]">
-                  <CheckCircle class="h-5 w-5 text-green-500" />
+                <div class="flex items-center gap-3 text-[#435574] leading-tight">
+                  <CheckCircle class="h-5 w-5 text-green-500 flex-shrink-0" />
                   <span>Materiais e ferramentas inclusas</span>
                 </div>
-                <div class="flex items-center gap-3 text-[#435574]">
-                  <CheckCircle class="h-5 w-5 text-green-500" />
+                <div class="flex items-center gap-3 text-[#435574] leading-tight">
+                  <CheckCircle class="h-5 w-5 text-green-500 flex-shrink-0" />
                   <span>Garantia de qualidade e suporte</span>
                 </div>
-                <div class="flex items-center gap-3 text-[#435574]">
-                  <CheckCircle class="h-5 w-5 text-green-500" />
+                <div class="flex items-center gap-3 text-[#435574] leading-tight">
+                  <CheckCircle class="h-5 w-5 text-green-500 flex-shrink-0" />
                   <span>Agendamento flexível de acordo com sua necessidade</span>
                 </div>
               </div>

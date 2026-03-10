@@ -38,6 +38,8 @@ export const clientRoutes: Record<string, string> = {
   'requests': '/my-requests',
   'my-requests': '/my-requests',
   'cliente-request-detail': '/cliente-request-detail',
+  'cliente-projects': '/cliente-projects',
+  'cliente-delivery-approval': '/cliente-delivery-approval',
   'favorites': '/favorites',
   'contracts': '/contracts',
   'messages': '/messages',

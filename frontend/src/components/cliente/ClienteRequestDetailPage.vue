@@ -70,8 +70,6 @@ const counterNotes = ref('');
 const isSubmittingCounter = ref(false);
 const activeSection = ref<'details' | 'messages' | 'history'>('details');
 const showCelebrationModal = ref(false);
-const showCompleteDialog = ref(false);
-const isCompletingService = ref(false);
 
 const handleOpenCounterProposalDialog = () => {
   if (!request.value || !request.value.freelancerResponse) return;
@@ -86,22 +84,6 @@ const loadData = async () => {
   request.value = store.getRequestById(props.requestId) || null;
   if (request.value) {
     await store.loadHistory(props.requestId);
-  }
-};
-
-const handleCompleteService = async () => {
-  if (!request.value) return;
-  
-  isCompletingService.value = true;
-  const success = await store.completeService(request.value.id);
-  isCompletingService.value = false;
-  
-  if (success) {
-    toast.success('Serviço marcado como concluído!');
-    showCompleteDialog.value = false;
-    await loadData();
-  } else {
-    toast.error('Erro ao concluir o serviço');
   }
 };
 
@@ -410,15 +392,15 @@ const getStatusColor = (status: string) => {
           </button>
         </div>
         
-        <!-- Botão de Conclusão: Só aparece quando o freelancer já entregou (DELIVERED) -->
+        <!-- Botão de Aprovação de Entrega: Só aparece quando o freelancer já entregou (DELIVERED) -->
         <Button
           v-if="request.status === 'delivered'"
-          @click="showCompleteDialog = true"
-          class="bg-teal-600 hover:bg-teal-700 shadow-lg hover:shadow-xl transition-all"
+          @click="() => props.onNavigate('cliente-delivery-approval', { requestId: request.id })"
+          class="bg-green-600 hover:bg-green-700"
           size="sm"
         >
           <CheckCircle class="h-4 w-4 mr-2" />
-          Marcar como Concluído
+          Aprovar Entrega
         </Button>
       </div>
 
@@ -809,41 +791,6 @@ const getStatusColor = (status: string) => {
             :disabled="isSubmittingCounter"
           >
             {{ isSubmittingCounter ? 'Enviando...' : 'Enviar Contra Proposta' }}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-
-    <!-- Complete Service Dialog -->
-    <Dialog :open="showCompleteDialog" @update:open="(val) => showCompleteDialog = val">
-      <DialogContent class="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Confirmar Conclusão do Serviço</DialogTitle>
-          <DialogDescription>
-            Você está prestes a marcar este serviço como concluído. Isso indica que o freelancer finalizou o trabalho e você está satisfeito com o resultado.
-          </DialogDescription>
-        </DialogHeader>
-        <div class="bg-green-50 border border-green-200 rounded-lg p-4 my-4">
-          <div class="flex items-start gap-3">
-            <CheckCircle class="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
-            <div class="text-sm text-green-800">
-              <p class="font-medium mb-1">Ao confirmar:</p>
-              <ul class="list-disc list-inside space-y-1 text-green-700">
-                <li>O serviço será marcado como concluído</li>
-                <li>O freelancer poderá receber a avaliação</li>
-                <li>Você poderá contratar novos serviços</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-        <DialogFooter>
-          <Button @click="showCompleteDialog = false" variant="outline">Cancelar</Button>
-          <Button 
-            @click="handleCompleteService" 
-            class="bg-teal-600 hover:bg-teal-700"
-            :disabled="isCompletingService"
-          >
-            {{ isCompletingService ? 'Processando...' : 'Confirmar Conclusão' }}
           </Button>
         </DialogFooter>
       </DialogContent>

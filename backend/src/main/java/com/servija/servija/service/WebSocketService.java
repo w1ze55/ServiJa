@@ -189,4 +189,21 @@ public class WebSocketService {
         
         log.info("Notificação de cancelamento enviada: solicitação {}", serviceRequestId);
     }
+
+    /**
+     * Notifica sobre atualizações gerais de solicitação de serviço
+     */
+    public void notifyServiceRequestUpdate(String userEmail, Long serviceRequestId, String eventType, String message, String actorName) {
+        Map<String, Object> notification = new HashMap<>();
+        notification.put("type", eventType);
+        notification.put("serviceRequestId", serviceRequestId);
+        notification.put("message", message);
+        notification.put("actorName", actorName);
+        notification.put("timestamp", System.currentTimeMillis());
+        
+        String destination = "/topic/service-request/" + userEmail;
+        messagingTemplate.convertAndSend(destination, (Object) notification);
+        
+        log.info("Notificação {} enviada para {}: solicitação {}", eventType, userEmail, serviceRequestId);
+    }
 }

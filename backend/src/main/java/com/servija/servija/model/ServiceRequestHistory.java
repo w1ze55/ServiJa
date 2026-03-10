@@ -52,7 +52,9 @@ public class ServiceRequestHistory {
         PAYMENT_CANCELLED("Pagamento cancelado"),
         PAYMENT_FAILED("Pagamento falhou"),
         SERVICE_DELIVERED("Serviço entregue pelo profissional"),
-        SERVICE_COMPLETED("Serviço concluído");
+        SERVICE_COMPLETED("Serviço concluído"),
+        ADJUSTMENTS_REQUESTED("Ajustes solicitados"),
+        ADJUSTMENT_STATUS_UPDATED("Status do ajuste atualizado");
 
         private final String label;
 
