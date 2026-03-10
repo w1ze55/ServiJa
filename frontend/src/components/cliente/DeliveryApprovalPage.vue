@@ -330,7 +330,7 @@ const canPreview = (file: DeliveryFile) => {
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+          <AlertDialogCancel @click="showApprovalDialog = false">Cancelar</AlertDialogCancel>
           <AlertDialogAction @click="handleApprove" class="bg-green-600 hover:bg-green-700">
             Sim, Aprovar Entrega
           </AlertDialogAction>
@@ -358,7 +358,7 @@ const canPreview = (file: DeliveryFile) => {
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Voltar e Revisar</AlertDialogCancel>
+          <AlertDialogCancel @click="showAdjustmentConfirmDialog = false">Voltar e Revisar</AlertDialogCancel>
           <AlertDialogAction @click="handleRequestAdjustments" class="bg-yellow-600 hover:bg-yellow-700">
             Sim, Enviar Solicitação
           </AlertDialogAction>
