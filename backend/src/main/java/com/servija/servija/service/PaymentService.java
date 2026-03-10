@@ -410,6 +410,20 @@ public class PaymentService {
     }
 
     /**
+     * Obtém URL do recibo/comprovante de pagamento via Asaas
+     */
+    public Map<String, String> getReceiptUrl(Long paymentId) {
+        Payment payment = paymentRepository.findById(paymentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Pagamento não encontrado"));
+
+        if (payment.getAsaasPaymentId() == null) {
+            throw new IllegalStateException("Pagamento não possui integração com Asaas");
+        }
+
+        return asaasService.getPaymentReceiptUrl(payment.getAsaasPaymentId());
+    }
+
+    /**
      * 🧪 MÉTODO DE TESTE - REMOVER EM PRODUÇÃO
      * Simula a confirmação de um pagamento PIX para testes locais
      */

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { CheckCircle, FileText, Download, ArrowRight } from 'lucide-vue-next';
+import { CheckCircle, Download, Loader2 } from 'lucide-vue-next';
 import Button from '@/components/ui/button.vue';
 import Card from '@/components/ui/card.vue';
 import Separator from '@/components/ui/separator.vue';
@@ -13,6 +13,7 @@ const router = useRouter();
 const paymentId = ref<string>('');
 const paymentData = ref<any>(null);
 const isLoading = ref(true);
+const isDownloadingReceipt = ref(false);
 
 onMounted(async () => {
   paymentId.value = route.query.paymentId as string;
@@ -32,28 +33,26 @@ onMounted(async () => {
   }
 });
 
-const handleViewContract = () => {
-  router.push('/contracts');
-};
-
 const handleBackToDashboard = () => {
   router.push('/cliente-dashboard');
 };
 
 const handleDownloadReceipt = async () => {
+  isDownloadingReceipt.value = true;
   try {
-    const blob = await paymentService.downloadReceiptPdf(paymentId.value);
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `recibo-${paymentId.value}.pdf`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
+    const receiptData = await paymentService.getReceiptUrl(paymentId.value);
+    const url = receiptData.transactionReceiptUrl || receiptData.invoiceUrl;
+
+    if (url) {
+      window.open(url, '_blank');
+    } else {
+      alert('O recibo ainda não está disponível para este pagamento. Tente novamente em alguns instantes.');
+    }
   } catch (err) {
-    console.error('Erro ao baixar recibo:', err);
-    alert('Erro ao baixar recibo. Tente novamente.');
+    console.error('Erro ao obter recibo:', err);
+    alert('Erro ao obter recibo. Tente novamente.');
+  } finally {
+    isDownloadingReceipt.value = false;
   }
 };
 </script>
@@ -119,7 +118,7 @@ const handleDownloadReceipt = async () => {
             </li>
             <li class="flex items-start gap-2">
               <span class="text-[#286AD8] mt-0.5">•</span>
-              <span>Você pode acompanhar o progresso na página de contratos</span>
+              <span>Você pode acompanhar o progresso na área de acompanhamento do serviço</span>
             </li>
             <li class="flex items-start gap-2">
               <span class="text-[#286AD8] mt-0.5">•</span>
@@ -131,29 +130,21 @@ const handleDownloadReceipt = async () => {
         <!-- Actions -->
         <div class="space-y-3">
           <Button
-            @click="handleViewContract"
+            @click="handleDownloadReceipt"
+            :disabled="isDownloadingReceipt"
             class="w-full bg-[#286AD8] hover:bg-[#435574]"
             size="lg"
           >
-            <FileText class="h-5 w-5 mr-2" />
-            Ver Contratos
-            <ArrowRight class="h-5 w-5 ml-2" />
-          </Button>
-
-          <Button
-            @click="handleDownloadReceipt"
-            variant="outline"
-            class="w-full"
-            size="lg"
-          >
-            <Download class="h-5 w-5 mr-2" />
-            Baixar Recibo
+            <Loader2 v-if="isDownloadingReceipt" class="h-5 w-5 mr-2 animate-spin" />
+            <Download v-else class="h-5 w-5 mr-2" />
+            {{ isDownloadingReceipt ? 'Obtendo recibo...' : 'Baixar Recibo' }}
           </Button>
 
           <Button
             @click="handleBackToDashboard"
-            variant="ghost"
+            variant="outline"
             class="w-full"
+            size="lg"
           >
             Voltar ao Dashboard
           </Button>

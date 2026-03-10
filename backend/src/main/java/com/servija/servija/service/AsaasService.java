@@ -269,6 +269,49 @@ public class AsaasService {
     }
 
     /**
+     * Obtém URLs de recibo/comprovante de um pagamento no Asaas
+     * Consulta GET /v3/payments/{id} e extrai transactionReceiptUrl e invoiceUrl
+     */
+    public Map<String, String> getPaymentReceiptUrl(String asaasPaymentId) {
+        try {
+            HttpHeaders headers = createHeaders();
+            HttpEntity<?> request = new HttpEntity<>(headers);
+
+            ResponseEntity<String> response = restTemplate.exchange(
+                    asaasApiUrl + "/v3/payments/" + asaasPaymentId,
+                    HttpMethod.GET,
+                    request,
+                    String.class);
+
+            if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
+                JsonNode jsonNode = objectMapper.readTree(response.getBody());
+
+                Map<String, String> result = new HashMap<>();
+
+                if (jsonNode.has("transactionReceiptUrl") && !jsonNode.get("transactionReceiptUrl").isNull()) {
+                    result.put("transactionReceiptUrl", jsonNode.get("transactionReceiptUrl").asText());
+                }
+
+                if (jsonNode.has("invoiceUrl") && !jsonNode.get("invoiceUrl").isNull()) {
+                    result.put("invoiceUrl", jsonNode.get("invoiceUrl").asText());
+                }
+
+                log.info("URLs de recibo obtidas para pagamento {}: receipt={}, invoice={}",
+                        asaasPaymentId,
+                        result.getOrDefault("transactionReceiptUrl", "N/A"),
+                        result.getOrDefault("invoiceUrl", "N/A"));
+
+                return result;
+            }
+
+            throw new RuntimeException("Erro ao consultar pagamento no Asaas");
+        } catch (Exception e) {
+            log.error("Erro ao obter URLs de recibo do pagamento: {}", asaasPaymentId, e);
+            throw new RuntimeException("Erro ao obter recibo do pagamento: " + e.getMessage());
+        }
+    }
+
+    /**
      * Cria headers para requisição ao Asaas
      */
     private HttpHeaders createHeaders() {
