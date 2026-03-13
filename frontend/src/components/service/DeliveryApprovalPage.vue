@@ -12,6 +12,7 @@ import {
   AlertCircle,
   Eye,
 } from 'lucide-vue-next';
+import FileAttachment from '../shared/FileAttachment.vue';
 import Button from '../ui/button.vue';
 import Card from '../ui/card.vue';
 import Textarea from '../ui/textarea.vue';
@@ -151,52 +152,15 @@ const canPreview = (file: DeliveryFile) => {
     <Card class="p-6">
       <h3 class="text-[#263238] mb-4">Arquivos Entregues ({{ props.files.length }})</h3>
 
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div
-          v-for="file in props.files"
-          :key="file.id"
-          class="border border-gray-200 rounded-lg p-4 hover:border-[#286AD8] transition-colors"
-        >
-          <!-- File Preview -->
-          <div v-if="file.thumbnail" class="mb-3 bg-gray-100 rounded-lg overflow-hidden aspect-video flex items-center justify-center">
-            <img :src="file.thumbnail" :alt="file.name" class="w-full h-full object-cover" />
-          </div>
-
-          <!-- File Info -->
-          <div class="flex items-start gap-3">
-            <div class="flex-shrink-0 mt-1">
-              <component :is="getFileIcon(file.type)" class="h-5 w-5 text-blue-600" />
-            </div>
-            <div class="flex-1 min-w-0">
-              <p class="text-sm text-[#263238] truncate mb-1">{{ file.name }}</p>
-              <p class="text-xs text-[#435574]">{{ file.size }}</p>
-            </div>
-          </div>
-
-          <!-- File Actions -->
-          <div class="flex gap-2 mt-3">
-            <Button
-              v-if="canPreview(file)"
-              @click="previewFile = file"
-              variant="outline"
-              size="sm"
-              class="flex-1"
-            >
-              <Eye class="h-3 w-3 mr-1" />
-              Visualizar
-            </Button>
-            <Button
-              @click="() => win.open(file.url, '_blank')"
-              variant="outline"
-              size="sm"
-              class="flex-1"
-            >
-              <Download class="h-3 w-3 mr-1" />
-              Download
-            </Button>
-          </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FileAttachment
+            v-for="file in props.files"
+            :key="file.id"
+            :name="file.name"
+            :url="file.url"
+            :size="file.size"
+          />
         </div>
-      </div>
 
       <!-- Download All -->
       <div class="mt-4 pt-4 border-t">

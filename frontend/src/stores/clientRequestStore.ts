@@ -16,6 +16,8 @@ export interface FreelancerResponse {
     scope: string;
     notes?: string;
     sentAt: string;
+    milestones?: any[];
+    attachments?: ServiceRequestAttachment[];
 }
 
 export interface RequestMessage {
@@ -144,7 +146,15 @@ export const useClientRequestStore = defineStore('clientRequest', () => {
                     executionDays: req.responseDays,
                     scope: req.responseScope,
                     notes: req.responseNotes,
-                    sentAt: req.respondedAt
+                    sentAt: req.respondedAt,
+                    milestones: req.milestones,
+                    attachments: (req.responseAttachments || []).map((url: string, idx: number) => ({
+                        id: `ratt-${req.id}-${idx}`,
+                        name: extractFileName(url),
+                        size: '',
+                        url,
+                        type: getFileType(url),
+                    }))
                 } : undefined,
                 counterValue: req.counterValue,
                 counterDays: req.counterDays,

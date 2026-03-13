@@ -155,6 +155,14 @@ export const useProposalStore = defineStore('proposal', () => {
           scope: req.responseScope,
           notes: req.responseNotes,
           sentAt: req.respondedAt,
+          milestones: req.milestones,
+          attachments: (req.responseAttachments || []).map((url: string, idx: number) => ({
+            id: `ratt-${req.id}-${idx}`,
+            name: extractFileName(url),
+            size: '',
+            url,
+            type: getFileType(url),
+          }))
         } : undefined,
         counterValue: req.counterValue,
         counterDays: req.counterDays,
@@ -216,6 +224,8 @@ export const useProposalStore = defineStore('proposal', () => {
         executionDays: response.executionDays,
         scope: response.scope,
         notes: response.notes,
+        milestones: response.milestones,
+        attachments: response.attachments?.map(a => a.url)
       });
 
       const proposal = proposals.value.find((p) => p.id === id);
