@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { ref, onMounted, watch, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { MapPin, Navigation, ArrowLeft, Star, MessageSquare, Phone, Filter, Search } from 'lucide-vue-next'
@@ -24,7 +24,6 @@ interface Provider {
   longitude: number
   distance?: number
   available: boolean
-  hourlyRate?: number
   category?: string
 }
 
@@ -234,7 +233,6 @@ const loadNearbyProviders = async () => {
         longitude: Number(p.longitude),
         distance: p.distance || 0,
         available: p.available ?? true,
-        hourlyRate: p.hourlyRate ? Number(p.hourlyRate) : undefined,
         category: p.category || ''
       }))
       
@@ -304,7 +302,6 @@ const updateProviderMarkers = () => {
           <span>${provider.rating.toFixed(1)}</span>
           <span class="text-gray-400">(${provider.totalReviews})</span>
         </div>
-        ${provider.hourlyRate ? `<p class="text-blue-600 font-semibold mt-1">R$ ${provider.hourlyRate}/h</p>` : ''}
       </div>
     `)
     
@@ -520,9 +517,6 @@ onMounted(async () => {
                     <p>Aproximadamente</p>
                     {{ formatDistance(provider.distance || 0) }}
                   </div>
-                  <span v-if="provider.hourlyRate" class="font-semibold text-blue-600">
-                    R$ {{ provider.hourlyRate }}/h
-                  </span>
                 </div>
               </div>
             </div>

@@ -68,7 +68,6 @@ interface FreelancerData {
   profession: string;
   category: string;
   bio: string;
-  hourlyRate: number;
   profilePhoto: string;
   serviceType: string;
   workModel: string;

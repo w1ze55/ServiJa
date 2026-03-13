@@ -86,9 +86,6 @@ public class FreelancerService {
         }
 
         // Atualizar configurações de serviço
-        if (request.getHourlyRate() != null) {
-            freelancer.setHourlyRate(java.math.BigDecimal.valueOf(request.getHourlyRate()));
-        }
         if (request.getServiceType() != null) {
             freelancer.setServiceType(request.getServiceType());
         }
@@ -237,7 +234,6 @@ public class FreelancerService {
                 .profession(freelancer.getProfessionalTitle())
                 .category(freelancer.getCategory())
                 .bio(freelancer.getBio())
-                .hourlyRate(freelancer.getHourlyRate() != null ? freelancer.getHourlyRate().doubleValue() : null)
                 .profilePhoto(freelancer.getAvatarUrl())
                 .serviceType(freelancer.getServiceType())
                 .workModel(freelancer.getWorkModel() != null ? freelancer.getWorkModel().name().toLowerCase() : null)
@@ -332,7 +328,6 @@ public class FreelancerService {
                 .longitude(freelancer.getLongitude())
                 .distance(Math.round(distance * 100.0) / 100.0) // Arredondar para 2 casas decimais
                 .available(freelancer.getAvailable())
-                .hourlyRate(freelancer.getHourlyRate())
                 .category(freelancer.getCategory())
                 .build();
     }

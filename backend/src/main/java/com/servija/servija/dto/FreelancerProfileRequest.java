@@ -1,6 +1,5 @@
 package com.servija.servija.dto;
 
-import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -26,9 +25,6 @@ public class FreelancerProfileRequest {
     
     @Size(max = 1000, message = "Bio deve ter no máximo 1000 caracteres")
     private String bio;
-    
-    @DecimalMin(value = "0.0", message = "Valor por hora deve ser positivo")
-    private Double hourlyRate;
     
     private String avatarUrl;
     
