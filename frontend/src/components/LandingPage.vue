@@ -513,6 +513,8 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll));
   display: flex;
   align-items: center;
   justify-content: center;
+  position: sticky;
+  top: 0;
 }
 
 .hero-background {
@@ -685,6 +687,7 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll));
   padding: 6rem 1.5rem;
   min-height: 96vh;
   background: white;
+  position: relative;
 }
 
 .features-content {
@@ -817,6 +820,7 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll));
   padding: 6rem 1.5rem;
   background: linear-gradient(to bottom, #f9fafb 0%, white 100%);
   min-height: 96vh;
+  position: relative;
 }
 
 .benefits-content {
@@ -890,6 +894,7 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll));
   align-items: center;
   text-align: center;
 }
+
 
 .cta-card-glow {
   position: absolute;
@@ -1050,6 +1055,7 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll));
   background: #111827;
   color: white;
   padding: 4rem 1.5rem 2rem;
+  position: relative;
 }
 
 .footer-content {
