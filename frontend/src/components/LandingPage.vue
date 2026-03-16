@@ -220,6 +220,42 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll));
               </Button>
             </div>
           </div>
+
+          <div id="contratantes-cta" class="cta-cardC">
+            <div class="cta-card-glow"></div>
+            <div class="cta-card-content">
+              <div class="cta-badge">
+                <Sparkles :size="16" />
+                <span>Seja um Contratante</span>
+              </div>
+
+              <h3 class="cta-title">Encontre o profissional ideal</h3>
+              <p class="cta-description">
+                O melhor profissional para o seu serviço a apenas alguns cliques de distância.
+              </p>
+
+              <ul class="cta-benefits">
+                <li class="cta-benefit">
+                  <CheckCircle :size="20" />
+                  <span>Busca simplificada por categoria</span>
+                </li>
+                <li class="cta-benefit">
+                  <CheckCircle :size="20" />
+                  <span>Histórico e avaliações reais</span>
+                </li>
+                <li class="cta-benefit">
+                  <CheckCircle :size="20" />
+                  <span>Contratação direta e segura</span>
+                </li>
+              </ul>
+
+              <Button variant="secondary" class="cta-button" @click="$props.onSignup">
+                Cadastre-se como Contratante
+              </Button>
+            </div>
+          </div>
+
+
         </div>
       </div>
     </section>
@@ -835,6 +871,11 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll));
   grid-template-columns: 1fr;
 }
 
+.benefits-list {
+  position: sticky;
+  top: 6rem;
+}
+
 .benefits-title {
   font-size: 2.5rem;
   font-weight: 800;
@@ -893,17 +934,22 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll));
   justify-content: center;
   align-items: center;
   text-align: center;
+  position: sticky;
+  top: 7rem;
 }
 
-
-.cta-card-glow {
-  position: absolute;
-  inset: -2px;
-  background: linear-gradient(135deg, #286ad8 0%, #143774 100%);
+.cta-cardC {
+  position: relative;
   border-radius: 2rem;
-  opacity: 0;
-  transition: opacity 0.3s ease;
-  animation: glow 3s ease-in-out infinite;
+  overflow: hidden;
+  background: linear-gradient(135deg, #286ad8 0%, #143774 100%);
+  padding: 2rem;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  grid-column: 2;
+  margin-top: 30rem;
 }
 
 @keyframes glow {
