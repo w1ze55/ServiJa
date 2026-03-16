@@ -18,6 +18,7 @@ import {
   FileText,
   Eye,
   Download,
+  Sparkles,
 } from 'lucide-vue-next';
 import FileAttachment from '../shared/FileAttachment.vue';
 import Button from '../ui/button.vue';
@@ -71,6 +72,7 @@ const counterNotes = ref('');
 const isSubmittingCounter = ref(false);
 const activeSection = ref<'details' | 'messages' | 'history' | 'attachments'>('details');
 const showCelebrationModal = ref(false);
+const activeFileTab = ref<'client' | 'freelancer'>('client');
 
 const handleOpenCounterProposalDialog = () => {
   if (!request.value || !request.value.freelancerResponse) return;
@@ -536,24 +538,6 @@ const getStatusColor = (status: string) => {
               </div>
             </div>
           </Card>
-
-          <!-- Attachments -->
-          <Card v-if="request.attachments && request.attachments.length > 0" class="p-6">
-            <h3 class="font-semibold text-[#263238] mb-3">Anexos</h3>
-            <div class="space-y-2">
-              <div
-                v-for="attachment in request.attachments"
-                :key="attachment.id"
-                class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg"
-              >
-                <FileText class="h-5 w-5 text-[#286AD8]" />
-                <div class="flex-1 min-w-0">
-                  <p class="text-sm font-medium text-[#263238] truncate">{{ attachment.name }}</p>
-                  <p class="text-xs text-[#435574]">{{ attachment.size }}</p>
-                </div>
-              </div>
-            </div>
-          </Card>
         </div>
 
         <!-- Sidebar -->
@@ -696,35 +680,78 @@ const getStatusColor = (status: string) => {
 
       <!-- Attachments Section -->
       <Card v-if="activeSection === 'attachments'" class="p-6">
-        <h3 class="font-semibold text-[#263238] mb-4">Anexos</h3>
-        
-        <div v-if="(!request.attachments || request.attachments.length === 0) && (!request.freelancerResponse?.attachments || request.freelancerResponse.attachments.length === 0)" class="text-center py-8">
-          <FileText class="h-10 w-10 text-gray-300 mx-auto mb-3" />
-          <p class="text-[#435574]">Nenhum anexo encontrado</p>
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-lg font-semibold text-[#263238]">Arquivos do Projeto</h3>
         </div>
 
-        <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <!-- Cliente Attachments -->
-          <FileAttachment
-            v-for="attachment in request.attachments"
-            :key="attachment.id"
-            :name="attachment.name"
-            :url="attachment.url"
-            :size="attachment.size"
-            sender-info="Enviado por você"
-            variant="blue"
-          />
+        <!-- Tabs -->
+        <div class="flex border-b border-gray-200 mb-4">
+          <button
+            @click="activeFileTab = 'client'"
+            :class="[
+              'px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px',
+              activeFileTab === 'client'
+                ? 'border-[#286AD8] text-[#286AD8]'
+                : 'border-transparent text-[#435574] hover:text-[#263238]'
+            ]"
+          >
+            Cliente
+            <Badge v-if="request.attachments && request.attachments.length > 0" variant="secondary" class="ml-2">
+              {{ request.attachments.length }}
+            </Badge>
+          </button>
+          <button
+            @click="activeFileTab = 'freelancer'"
+            :class="[
+              'px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px',
+              activeFileTab === 'freelancer'
+                ? 'border-[#286AD8] text-[#286AD8]'
+                : 'border-transparent text-[#435574] hover:text-[#263238]'
+            ]"
+          >
+            Freelancer
+            <Badge v-if="request.freelancerResponse?.attachments && request.freelancerResponse.attachments.length > 0" variant="secondary" class="ml-2">
+              {{ request.freelancerResponse.attachments.length }}
+            </Badge>
+          </button>
+        </div>
 
-          <!-- Freelancer Proposal Attachments -->
-          <FileAttachment
-            v-for="attachment in request.freelancerResponse?.attachments"
-            :key="attachment.id"
-            :name="attachment.name"
-            :url="attachment.url"
-            :size="attachment.size"
-            sender-info="Enviado pelo profissional"
-            variant="amber"
-          />
+        <!-- Client Files Tab -->
+        <div v-if="activeFileTab === 'client'">
+          <div v-if="!request.attachments || request.attachments.length === 0" class="text-center py-8">
+            <FileText class="h-12 w-12 text-gray-300 mx-auto mb-3" />
+            <p class="text-[#435574]">Nenhum arquivo enviado pelo cliente</p>
+          </div>
+          <div v-else class="space-y-2">
+            <FileAttachment
+              v-for="attachment in request.attachments"
+              :key="attachment.id"
+              :name="attachment.name"
+              :url="attachment.url"
+              :size="attachment.size"
+              sender-info="Enviado por você"
+              variant="blue"
+            />
+          </div>
+        </div>
+
+        <!-- Freelancer Files Tab -->
+        <div v-if="activeFileTab === 'freelancer'">
+          <div v-if="!request.freelancerResponse?.attachments || request.freelancerResponse.attachments.length === 0" class="text-center py-8">
+            <FileText class="h-12 w-12 text-gray-300 mx-auto mb-3" />
+            <p class="text-[#435574]">Nenhum arquivo enviado pelo freelancer</p>
+          </div>
+          <div v-else class="space-y-2">
+            <FileAttachment
+              v-for="attachment in request.freelancerResponse.attachments"
+              :key="attachment.id"
+              :name="attachment.name"
+              :url="attachment.url"
+              :size="attachment.size"
+              sender-info="Enviado pelo profissional"
+              variant="amber"
+            />
+          </div>
         </div>
       </Card>
     </template>
