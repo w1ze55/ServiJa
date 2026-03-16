@@ -17,16 +17,17 @@ import {
   MessageSquare,
   Milestone as MilestoneIcon,
   Upload,
-  X,
-  Eye,
-  Paperclip,
-  XCircle,
   Phone,
   Mail,
   Check,
   FileEdit,
   Lock,
+  Eye,
+  Paperclip,
+  XCircle,
+  X,
 } from 'lucide-vue-next';
+import FileAttachment from '../shared/FileAttachment.vue';
 import Button from '../ui/button.vue';
 import Input from '../ui/input.vue';
 import Label from '../ui/label.vue';
@@ -59,6 +60,7 @@ import ServiceRequestTimeline from '../service/ServiceRequestTimeline.vue';
 import { useServiceRequestWebSocket } from '@/composables/useServiceRequestWebSocket';
 import { toast } from '@/utils/toast';
 import { getStatusLabel } from '@/utils/statusTranslations';
+import api from '@/api/config/axios';
 
 interface Props {
   onNavigate: (page: string, params?: any) => void;
@@ -498,47 +500,72 @@ const handleConfirmSendProposal = async () => {
 
   isLoading.value = true;
 
-  const parsedDays = parseInt(proposalForm.value.executionDays);
-  const safeExecutionDays = Math.min(
-    MAX_EXECUTION_DAYS,
-    Math.max(1, isNaN(parsedDays) ? 1 : parsedDays)
-  );
-  
-  const responseData = {
-    value: parseCurrencyValue(proposalForm.value.value),
-    executionDays: safeExecutionDays,
-    scope: proposalForm.value.scope,
-    notes: proposalForm.value.notes || undefined,
-    milestones: milestones.value.length > 0 
-      ? milestones.value.map(m => ({
-          ...m,
-          status: 'pending' as const,
-        }))
-      : undefined,
-  };
+  try {
+    let attachmentUrls: string[] = [];
 
-  const success = await proposalStore.sendResponse(proposal.value.id, responseData);
-  
-  isLoading.value = false;
+    // 1. Upload de arquivos se existirem
+    if (proposalForm.value.attachments.length > 0) {
+      const formData = new FormData();
+      proposalForm.value.attachments.forEach((file) => formData.append('files', file));
 
-  if (success) {
-    toast.success('Proposta enviada com sucesso!');
-    showConfirmDialog.value = false;
-    showSendProposalDialog.value = false;
+      const uploadResponse = await api.post('/upload/images', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      attachmentUrls = uploadResponse.data.urls || [];
+    }
+
+    const parsedDays = parseInt(proposalForm.value.executionDays);
+    const safeExecutionDays = Math.min(
+      MAX_EXECUTION_DAYS,
+      Math.max(1, isNaN(parsedDays) ? 1 : parsedDays)
+    );
     
-    proposalForm.value = {
-      value: '',
-      executionDays: '',
-      scope: '',
-      notes: '',
-      attachments: [],
-      attachmentUrls: [],
+    const responseData = {
+      value: parseCurrencyValue(proposalForm.value.value),
+      executionDays: safeExecutionDays,
+      scope: proposalForm.value.scope,
+      notes: proposalForm.value.notes || undefined,
+      milestones: milestones.value.length > 0 
+        ? milestones.value.map(m => ({
+            ...m,
+            status: 'pending' as const,
+          }))
+        : undefined,
+      attachments: attachmentUrls.map((url, idx) => ({
+        id: `att-new-${Date.now()}-${idx}`,
+        name: proposalForm.value.attachments[idx]?.name || 'Arquivo',
+        url,
+        size: '',
+        type: 'image/jpeg' // Simplificado para upload de imagens
+      }))
     };
-    milestones.value = [];
+
+    const success = await proposalStore.sendResponse(proposal.value.id, responseData as any);
     
-    proposal.value = proposalStore.getProposalById(proposal.value.id) || null;
-  } else {
-    toast.error('Erro ao enviar proposta');
+    if (success) {
+      toast.success('Proposta enviada com sucesso!');
+      showConfirmDialog.value = false;
+      showSendProposalDialog.value = false;
+      
+      proposalForm.value = {
+        value: '',
+        executionDays: '',
+        scope: '',
+        notes: '',
+        attachments: [],
+        attachmentUrls: [],
+      };
+      milestones.value = [];
+      
+      proposal.value = proposalStore.getProposalById(proposal.value.id) || null;
+    } else {
+      toast.error('Erro ao enviar proposta');
+    }
+  } catch (err) {
+    console.error('Erro ao enviar proposta:', err);
+    toast.error('Erro ao processar anexos ou enviar proposta');
+  } finally {
+    isLoading.value = false;
   }
 };
 
@@ -601,27 +628,6 @@ const handleMessageAttachmentChange = (e: Event) => {
   const target = e.target as HTMLInputElement;
   if (target.files) {
     messageAttachments.value = [...messageAttachments.value, ...Array.from(target.files)];
-  }
-};
-
-const handleViewAttachment = (url: string) => {
-  window.open(url, '_blank');
-};
-
-const handleDownloadAttachment = async (url: string, fileName: string) => {
-  try {
-    const response = await fetch(url);
-    const blob = await response.blob();
-    const blobUrl = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = blobUrl;
-    link.download = fileName;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(blobUrl);
-  } catch {
-    window.open(url, '_blank');
   }
 };
 
@@ -1051,17 +1057,15 @@ const getStatusBadge = (status: string) => {
                   >
                     <p class="mb-1">{{ msg.message }}</p>
                     <div v-if="msg.attachments && msg.attachments.length > 0" class="mt-3 space-y-2">
-                      <div
+                      <FileAttachment
                         v-for="att in msg.attachments"
                         :key="att.id"
-                        :class="`flex items-center gap-2 p-2 rounded ${
-                          msg.sender === 'freelancer' ? 'bg-[#435574]' : 'bg-white'
-                        }`"
-                      >
-                        <Paperclip class="h-4 w-4" />
-                        <span class="text-sm flex-1">{{ att.name }}</span>
-                        <span class="text-xs opacity-70">{{ att.size }}</span>
-                      </div>
+                        :name="att.name"
+                        :url="att.url"
+                        :size="att.size"
+                        variant="compact"
+                        class="bg-white/10 border-white/20 text-white"
+                      />
                     </div>
                   </div>
                   <p class="text-xs text-[#435574] mt-1">
@@ -1128,31 +1132,14 @@ const getStatusBadge = (status: string) => {
               <p class="text-[#435574]">Nenhum anexo enviado pelo cliente</p>
             </div>
             <div v-else class="space-y-3">
-              <div
+              <FileAttachment
                 v-for="att in proposal.attachments"
                 :key="att.id"
-                class="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
-              >
-                <div class="flex items-center gap-3">
-                  <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                    <FileText class="h-5 w-5 text-blue-600" />
-                  </div>
-                  <div>
-                    <p class="font-medium text-[#263238]">{{ att.name }}</p>
-                    <p class="text-sm text-[#435574]">{{ att.size }}</p>
-                  </div>
-                </div>
-                <div class="flex gap-2">
-                  <Button size="sm" variant="outline" @click="handleViewAttachment(att.url)">
-                    <Eye class="h-4 w-4 mr-2" />
-                    Visualizar
-                  </Button>
-                  <Button size="sm" variant="outline" @click="handleDownloadAttachment(att.url, att.name)">
-                    <Download class="h-4 w-4 mr-2" />
-                    Baixar
-                  </Button>
-                </div>
-              </div>
+                :name="att.name"
+                :url="att.url"
+                :size="att.size"
+                variant="blue"
+              />
             </div>
           </Card>
         </TabsContent>

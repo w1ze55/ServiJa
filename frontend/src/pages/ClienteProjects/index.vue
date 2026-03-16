@@ -215,7 +215,7 @@ const handleBack = () => {
 };
 
 const handleViewProject = (projectId: string) => {
-  router.push(`/cliente-request-detail?requestId=${projectId}`);
+  router.push(`/cliente-project-detail?requestId=${projectId}`);
 };
 
 const handleApproveDelivery = (projectId: string) => {

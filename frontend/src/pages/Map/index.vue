@@ -206,7 +206,7 @@ const loadUserAddressFromProfile = async () => {
   }
 }
 
-// Carregar profissionais prÃ³ximos
+// Carregar profissionais próximos
 const loadNearbyProviders = async () => {
   isLoading.value = true
   nearbyProviders.value = []
@@ -366,7 +366,7 @@ onMounted(async () => {
             <ArrowLeft class="h-5 w-5" />
           </Button>
           <div>
-            <h1 class="text-lg font-semibold text-[#263238]">Profissionais PrÃ³ximos</h1>
+            <h1 class="text-lg font-semibold text-[#263238]">Profissionais Próximos</h1>
             <p class="text-sm text-[#435574]">{{ userLocation.city }}, {{ userLocation.state }}</p>
           </div>
         </div>
@@ -418,7 +418,7 @@ onMounted(async () => {
           
           <label class="flex items-center gap-2 px-3 py-1.5 text-sm border rounded-lg bg-white cursor-pointer">
             <input type="checkbox" v-model="onlyAvailable" class="rounded" />
-            Apenas disponÃ­veis
+            Apenas disponíveis
           </label>
         </div>
       </div>
