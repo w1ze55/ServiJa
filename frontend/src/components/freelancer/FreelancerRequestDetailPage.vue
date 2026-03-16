@@ -140,6 +140,40 @@ const executionTimeLabel = computed(() => {
   return getExecutionTimeLabel(days);
 });
 
+const normalizeDisplayValue = (value?: string | null) => {
+  if (typeof value !== 'string') return '';
+
+  const trimmedValue = value.trim();
+  if (!trimmedValue) return '';
+
+  const loweredValue = trimmedValue.toLowerCase();
+  if (['null', 'undefined', 'invalid date'].includes(loweredValue)) {
+    return '';
+  }
+
+  return trimmedValue;
+};
+
+const formatValidDate = (value?: string | null) => {
+  const normalizedValue = normalizeDisplayValue(value);
+  if (!normalizedValue) return null;
+
+  const parsedDate = new Date(normalizedValue);
+  if (Number.isNaN(parsedDate.getTime())) return null;
+
+  return parsedDate.toLocaleDateString('pt-BR');
+};
+
+const requestedDateDisplay = computed(() => {
+  const formattedDesiredDate = formatValidDate(proposal.value?.desiredDate);
+  if (formattedDesiredDate) return formattedDesiredDate;
+
+  const normalizedDeadline = normalizeDisplayValue(proposal.value?.deadline);
+  if (!normalizedDeadline) return 'Não informada';
+
+  return formatValidDate(normalizedDeadline) || normalizedDeadline;
+});
+
 onMounted(async () => {
   if (proposalStore.proposals.length === 0) {
     await proposalStore.loadProposals();
@@ -943,7 +977,7 @@ const getStatusBadge = (status: string) => {
               <div>
                 <Label class="text-sm text-[#435574]">Data Desejada</Label>
                 <p class="text-[#263238] mt-1">
-                  {{ proposal.desiredDate ? new Date(proposal.desiredDate).toLocaleDateString('pt-BR') : 'Não informada' }}
+                  {{ requestedDateDisplay }}
                 </p>
               </div>
               <div>
