@@ -62,7 +62,6 @@ interface ProfessionalLink {
 
 interface ProfessionalProfile {
   workModel: 'presencial' | 'remoto' | 'hibrido'
-  hourlyRate: string
   serviceType: string
   bio: string
   serviceCities: ServiceCity[]
@@ -118,7 +117,6 @@ const isSaving = ref(false)
 // Profile data
 const profileData = ref<ProfessionalProfile>({
   workModel: 'presencial',
-  hourlyRate: '',
   serviceType: '',
   bio: '',
   serviceCities: [],
@@ -182,7 +180,6 @@ const loadProfileData = async () => {
 
     profileData.value = {
       workModel: data.workModel || 'presencial',
-      hourlyRate: data.hourlyRate?.toString() || '',
       serviceType: data.serviceType || data.category || '',
       bio: data.bio || '',
       serviceCities: mappedCities,
@@ -196,7 +193,6 @@ const loadProfileData = async () => {
       const user = JSON.parse(userString)
       profileData.value = {
         workModel: user.workModel || 'presencial',
-        hourlyRate: user.hourlyRate?.toString() || '',
         serviceType: user.serviceType || user.category || '',
         bio: user.bio || '',
         serviceCities: [],
@@ -211,17 +207,6 @@ const loadProfileData = async () => {
 
 // Work Model & Service Type
 const handleSaveWorkModel = async () => {
-  if (!editedData.value.hourlyRate) {
-    toast.error('Preço base por hora é obrigatório')
-    return
-  }
-
-  const hourlyRateNum = parseFloat(editedData.value.hourlyRate.replace(',', '.'))
-  if (isNaN(hourlyRateNum) || hourlyRateNum <= 0) {
-    toast.error('Preço base deve ser um número válido maior que zero')
-    return
-  }
-
   if (!editedData.value.serviceType) {
     toast.error('Tipo de serviço é obrigatório')
     return
@@ -231,13 +216,11 @@ const handleSaveWorkModel = async () => {
   try {
     await api.put('/freelancer/profile', {
       workModel: editedData.value.workModel,
-      hourlyRate: hourlyRateNum,
       serviceType: editedData.value.serviceType,
       category: editedData.value.serviceType,
     })
 
     profileData.value.workModel = editedData.value.workModel
-    profileData.value.hourlyRate = editedData.value.hourlyRate
     profileData.value.serviceType = editedData.value.serviceType
     isEditingWorkModel.value = false
     toast.success('Configurações de trabalho atualizadas!')
@@ -251,7 +234,6 @@ const handleSaveWorkModel = async () => {
 
 const handleCancelWorkModel = () => {
   editedData.value.workModel = profileData.value.workModel
-  editedData.value.hourlyRate = profileData.value.hourlyRate
   editedData.value.serviceType = profileData.value.serviceType
   isEditingWorkModel.value = false
 }
@@ -646,22 +628,6 @@ const getWorkModelLabel = (value: string) => {
                 </SelectContent>
               </Select>
             </div>
-
-            <!-- Preço Base por Hora -->
-            <div class="space-y-2">
-              <Label for="hourlyRate">Preço Base por Hora *</Label>
-              <div class="relative">
-                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-[#435574]">R$</span>
-                <Input
-                  id="hourlyRate"
-                  :model-value="editedData.hourlyRate"
-                  @update:model-value="(val) => editedData.hourlyRate = val as string"
-                  placeholder="0,00"
-                  class="pl-10"
-                />
-              </div>
-              <p class="text-xs text-[#435574]">Este é o preço base. Você pode ajustar em cada orçamento.</p>
-            </div>
           </div>
 
           <!-- Tipo de Serviço -->
@@ -698,21 +664,12 @@ const getWorkModelLabel = (value: string) => {
           </div>
         </div>
 
-        <div v-else class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <p class="text-sm text-[#435574] mb-1">Modelo de Trabalho</p>
             <div class="flex items-center gap-2">
               <Briefcase class="h-4 w-4 text-[#286AD8]" />
               <Badge variant="secondary">{{ getWorkModelLabel(profileData.workModel) }}</Badge>
-            </div>
-          </div>
-          <div>
-            <p class="text-sm text-[#435574] mb-1">Preço Base por Hora</p>
-            <div class="flex items-center gap-2">
-              <DollarSign class="h-4 w-4 text-green-600" />
-              <span class="text-[#263238] font-semibold">
-                R$ {{ profileData.hourlyRate || '0,00' }}
-              </span>
             </div>
           </div>
           <div>

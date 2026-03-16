@@ -11,6 +11,8 @@ import { useNavigation } from '@/utils/navigation';
 import { toast } from '@/utils/toast';
 import { getStatusLabel } from '@/utils/statusTranslations';
 
+const adjustmentStore = useDeliveryAdjustmentStore();
+
 interface DeliveryFile {
   id: string;
   name: string;
@@ -34,6 +36,10 @@ let wsConnection: any = null;
 const request = computed(() => {
   if (!requestId.value) return null;
   return store.getRequestById(requestId.value);
+});
+
+const adjustmentAlreadyUsed = computed(() => {
+  return adjustmentStore.adjustments.length > 0;
 });
 
 // Converter attachments para o formato esperado pelo componente
@@ -100,19 +106,23 @@ const handleApprove = async () => {
 const handleRequestAdjustments = async (reason: string) => {
   if (!requestId.value) return;
   
-  const success = await useDeliveryAdjustmentStore().requestAdjustment(
+  const success = await adjustmentStore.requestAdjustment(
     parseInt(requestId.value),
     reason
   );
   
   if (success) {
     toast.success('Solicitação de ajustes enviada ao freelancer.');
-    setTimeout(() => {
-      router.push('/cliente-request-detail?requestId=' + requestId.value);
-    }, 1500);
+    // Reload adjustments para atualizar o estado
+    await adjustmentStore.getAdjustmentsByServiceRequest(parseInt(requestId.value));
   } else {
     toast.error('Erro ao enviar solicitação. Tente novamente.');
   }
+};
+
+const handleGoToChat = () => {
+  if (!requestId.value) return;
+  router.push('/cliente-request-detail?requestId=' + requestId.value + '&tab=chat');
 };
 
 const handleNavigate = (page: string, params?: any) => {
@@ -170,7 +180,7 @@ const handleServiceRequestNotification = (event: any) => {
   }
 };
 
-onMounted(() => {
+onMounted(async () => {
   const userData = localStorage.getItem('user');
   if (userData) {
     user.value = JSON.parse(userData);
@@ -195,6 +205,9 @@ onMounted(() => {
     router.push('/cliente-projects');
     return;
   }
+  
+  // Carregar ajustes já existentes para saber se o limite foi atingido
+  await adjustmentStore.getAdjustmentsByServiceRequest(parseInt(requestId.value));
   
   // Conectar WebSocket
   const userEmail = getUserEmail();
@@ -254,9 +267,12 @@ onUnmounted(() => {
       :delivery-description="request.description || 'Entrega final do serviço'"
       :delivery-date="formatDate(request.createdAt)"
       :files="deliveryFiles"
+      :adjustment-already-used="adjustmentAlreadyUsed"
+      :is-loading="adjustmentStore.isLoading"
       :on-back="handleBack"
       :on-approve="handleApprove"
       :on-request-adjustments="handleRequestAdjustments"
+      :on-go-to-chat="handleGoToChat"
     />
   </MainLayout>
 </template>

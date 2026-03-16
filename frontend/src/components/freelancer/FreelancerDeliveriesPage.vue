@@ -43,6 +43,7 @@ import Label from '../ui/label.vue';
 import Textarea from '../ui/textarea.vue';
 import ServiceRequestTimeline from '../service/ServiceRequestTimeline.vue';
 import { useProposalStore, type Proposal, type Milestone } from '@/stores/proposalStore';
+import { useDeliveryAdjustmentStore } from '@/stores/deliveryAdjustmentStore';
 import { toast } from '@/utils/toast';
 import api from '@/api/config/axios';
 
@@ -52,11 +53,14 @@ interface Props {
 
 const props = defineProps<Props>();
 const proposalStore = useProposalStore();
+const adjustmentStore = useDeliveryAdjustmentStore();
 
 const selectedProjectId = ref<string | null>(null);
 const showCompleteDialog = ref(false);
+const showCompleteAdjustmentDialog = ref(false);
 const showUploadDialog = ref(false);
 const isCompleting = ref(false);
+const isCompletingAdjustment = ref(false);
 const isUploading = ref(false);
 const uploadProgress = ref(0);
 const uploadFiles = ref<File[]>([]);
@@ -65,7 +69,11 @@ const activeFileTab = ref<'client' | 'freelancer'>('freelancer');
 
 // Load data
 onMounted(async () => {
-  await proposalStore.loadProposals();
+  await Promise.all([
+    proposalStore.loadProposals(),
+    adjustmentStore.getReceived()
+  ]);
+  
   if (activeProjects.value.length > 0 && !selectedProjectId.value) {
     selectedProjectId.value = activeProjects.value[0].id;
     await proposalStore.loadHistory(activeProjects.value[0].id);
@@ -73,12 +81,22 @@ onMounted(async () => {
 });
 
 const activeProjects = computed(() =>
-  proposalStore.proposals.filter((p) => p.status === 'in_progress')
+  proposalStore.proposals.filter((p) => 
+    p.status === 'in_progress' || p.status === 'delivered'
+  )
 );
 
 const selectedProject = computed(() =>
   activeProjects.value.find((p) => p.id === selectedProjectId.value) || null
 );
+
+const pendingAdjustmentForSelectedProject = computed(() => {
+  if (!selectedProject.value) return null;
+  return adjustmentStore.adjustments.find(a => 
+    a.serviceRequestId.toString() === selectedProject.value!.id && 
+    (a.status === 'PENDING' || a.status === 'ACKNOWLEDGED')
+  );
+});
 
 watch(selectedProjectId, async (newId) => {
   if (newId) {
@@ -190,6 +208,43 @@ const handleCompleteDelivery = async () => {
     toast.error('Erro ao concluir a entrega. Tente novamente.');
   } finally {
     isCompleting.value = false;
+  }
+};
+
+// Handle complete delivery (novo envio pós-ajuste)
+const handleCompleteAdjustment = async () => {
+  if (!selectedProject.value) return;
+  const pendingAdjustment = pendingAdjustmentForSelectedProject.value;
+  if (!pendingAdjustment) return;
+
+  isCompletingAdjustment.value = true;
+  try {
+    // 1. Marcar o ajuste como concluído (responded)
+    // Usando IN_PROGRESS ou COMPLETED na store? A store ClientDeliveryApprovalPage trata isso?
+    // O correto para "enviei novamente" é que o ajuste está "resolvido", ou seja, COMPLETED.
+    // E o status do request volta pra DELIVERED aguardando nova aprovação.
+    const successAdjustment = await adjustmentStore.updateStatus(pendingAdjustment.id, 'COMPLETED', 'Ajustes realizados e nova entrega enviada.');
+    
+    if (successAdjustment) {
+      // 2. Chamar o endpoint que conclui a proposta de novo para forçar o status DELIVERED
+      await proposalStore.completeProposal(selectedProject.value.id);
+      
+      toast.success('Ajustes finalizados e enviados ao cliente para nova avaliação!');
+      showCompleteAdjustmentDialog.value = false;
+      
+      // Reload to update the list
+      await Promise.all([
+        proposalStore.loadProposals(),
+        adjustmentStore.getReceived()
+      ]);
+      
+    } else {
+      toast.error('Erro ao finalizar ajuste. Tente novamente.');
+    }
+  } catch {
+    toast.error('Erro ao finalizar ajuste. Tente novamente.');
+  } finally {
+    isCompletingAdjustment.value = false;
   }
 };
 
@@ -314,12 +369,26 @@ const formatDate = (dateString: string) => {
 
 // Get status badge config for project cards
 const getProjectStatusConfig = (project: Proposal) => {
+  // Verificar se há ajustes pendentes
+  const pendingAdjustment = adjustmentStore.adjustments.find(a => 
+    a.serviceRequestId.toString() === project.id && 
+    (a.status === 'PENDING' || a.status === 'ACKNOWLEDGED')
+  );
+
+  if (pendingAdjustment) {
+    return { label: 'Ajustes Solicitados', class: 'bg-yellow-100 text-yellow-700 hover:bg-yellow-100', icon: AlertCircle };
+  }
+
+  if (project.status === 'delivered') {
+    return { label: 'Aguardando Aprovação', class: 'bg-emerald-100 text-emerald-700 hover:bg-emerald-100', icon: CheckCircle };
+  }
+
   // Check milestones for more nuanced status
   const milestones = project.freelancerResponse?.milestones;
   if (milestones && milestones.length > 0) {
     const allCompleted = milestones.every((m) => m.status === 'completed');
     if (allCompleted) {
-      return { label: 'Revisão Solicitada', class: 'bg-orange-100 text-orange-700 hover:bg-orange-100', icon: AlertCircle };
+      return { label: 'Revisão Interna', class: 'bg-orange-100 text-orange-700 hover:bg-orange-100', icon: AlertCircle };
     }
     const hasInProgress = milestones.some((m) => m.status === 'in_progress');
     if (hasInProgress) {
@@ -472,6 +541,17 @@ const getMilestoneStatusConfig = (status: Milestone['status']) => {
                 </div>
               </div>
 
+              <!-- Adjustment Alert -->
+              <div v-if="pendingAdjustmentForSelectedProject" class="mb-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <div class="flex items-start gap-3">
+                  <AlertCircle class="h-5 w-5 text-yellow-600 mt-0.5" />
+                  <div>
+                    <h4 class="text-sm font-semibold text-yellow-800 mb-1">O cliente solicitou ajustes na entrega</h4>
+                    <p class="text-sm text-yellow-700 whitespace-pre-wrap">{{ pendingAdjustmentForSelectedProject.reason }}</p>
+                  </div>
+                </div>
+              </div>
+
               <div class="space-y-4 mb-6">
                 <div class="space-y-1.5">
                   <div class="flex items-center justify-between text-sm">
@@ -511,12 +591,23 @@ const getMilestoneStatusConfig = (status: Milestone['status']) => {
                   <MessageSquare class="h-4 w-4 mr-2" />
                   Mensagem
                 </Button>
+                <!-- Botão de Concluir Entrega (1a vez) -->
                 <Button
+                  v-if="selectedProject.status !== 'delivered' && !pendingAdjustmentForSelectedProject"
                   @click="showCompleteDialog = true"
                   class="bg-[#286AD8] hover:bg-[#435574]"
                 >
                   <Check class="h-4 w-4 mr-2" />
-                  Concluir
+                  Concluir Entrega
+                </Button>
+                <!-- Botão de Finalizar Ajustes (se houver ajuste pendente) -->
+                <Button
+                  v-if="pendingAdjustmentForSelectedProject"
+                  @click="showCompleteAdjustmentDialog = true"
+                  class="bg-yellow-600 hover:bg-yellow-700 text-white"
+                >
+                  <CheckCircle class="h-4 w-4 mr-2" />
+                  Finalizar Ajustes
                 </Button>
               </div>
             </Card>
@@ -754,6 +845,39 @@ const getMilestoneStatusConfig = (status: Milestone['status']) => {
             <Loader2 v-if="isCompleting" class="h-4 w-4 mr-2 animate-spin" />
             <Check v-else class="h-4 w-4 mr-2" />
             {{ isCompleting ? 'Concluindo...' : 'Confirmar Conclusão' }}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+
+    <!-- Complete Adjustment Confirmation Dialog -->
+    <AlertDialog :open="showCompleteAdjustmentDialog" @update:open="(val) => (showCompleteAdjustmentDialog = val)">
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Finalizar e Reenviar Projeto</AlertDialogTitle>
+          <AlertDialogDescription>
+            <template v-if="selectedProject">
+              Você está prestes a finalizar os ajustes do projeto
+              <strong>"{{ selectedProject.service }}"</strong>.
+              <br /><br />
+              Certifique-se de que todas as correções solicitadas pelo cliente foram realizadas e que 
+              você fez o <strong class="text-blue-600">upload dos novos arquivos</strong> (caso necessário) 
+              antes de confirmar.
+              <br /><br />
+              O projeto será novamente enviado para avaliação e aprovação final do cliente.
+            </template>
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel @click="showCompleteAdjustmentDialog = false" :disabled="isCompletingAdjustment">Cancelar</AlertDialogCancel>
+          <AlertDialogAction
+            @click="handleCompleteAdjustment"
+            :disabled="isCompletingAdjustment"
+            class="bg-yellow-600 hover:bg-yellow-700 text-white"
+          >
+            <Loader2 v-if="isCompletingAdjustment" class="h-4 w-4 mr-2 animate-spin" />
+            <CheckCircle v-else class="h-4 w-4 mr-2" />
+            {{ isCompletingAdjustment ? 'Finalizando...' : 'Confirmar Envio' }}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

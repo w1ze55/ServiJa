@@ -26,7 +26,6 @@ interface Freelancer {
   location: string;
   rating: number;
   reviewCount: number;
-  hourlyRate: number;
   skills: string[];
   isAvailable: boolean;
 }
@@ -53,7 +52,6 @@ const favorites = ref<Freelancer[]>([
     location: 'São Paulo, SP',
     rating: 4.9,
     reviewCount: 127,
-    hourlyRate: 85,
     skills: ['Instalação', 'Manutenção', 'Automação'],
     isAvailable: true,
   },
@@ -66,7 +64,6 @@ const favorites = ref<Freelancer[]>([
     location: 'Rio de Janeiro, RJ',
     rating: 5.0,
     reviewCount: 89,
-    hourlyRate: 120,
     skills: ['Branding', 'UI/UX', 'Ilustração'],
     isAvailable: true,
   },
@@ -79,7 +76,6 @@ const favorites = ref<Freelancer[]>([
     location: 'São Paulo, SP',
     rating: 4.8,
     reviewCount: 156,
-    hourlyRate: 75,
     skills: ['Hidráulica', 'Desentupimento', 'Instalação'],
     isAvailable: false,
   },
@@ -92,7 +88,6 @@ const favorites = ref<Freelancer[]>([
     location: 'Belo Horizonte, MG',
     rating: 4.9,
     reviewCount: 203,
-    hourlyRate: 150,
     skills: ['React', 'Node.js', 'TypeScript'],
     isAvailable: true,
   },
@@ -105,7 +100,6 @@ const favorites = ref<Freelancer[]>([
     location: 'Curitiba, PR',
     rating: 4.7,
     reviewCount: 98,
-    hourlyRate: 60,
     skills: ['Pintura', 'Textura', 'Acabamento'],
     isAvailable: true,
   },
@@ -118,7 +112,6 @@ const favorites = ref<Freelancer[]>([
     location: 'São Paulo, SP',
     rating: 5.0,
     reviewCount: 145,
-    hourlyRate: 200,
     skills: ['Eventos', 'Retratos', 'Edição'],
     isAvailable: true,
   },
@@ -285,12 +278,8 @@ const handleViewProfile = (freelancerId: string) => {
             </Badge>
           </div>
 
-          <!-- Price and Availability -->
+          <!-- Availability -->
           <div class="flex items-center justify-between mb-4 pb-4 border-b">
-            <div>
-              <p class="text-xs text-[#435574]">A partir de</p>
-              <p class="text-[#263238]">R$ {{ freelancer.hourlyRate }}/hora</p>
-            </div>
             <Badge
               :class="
                 freelancer.isAvailable

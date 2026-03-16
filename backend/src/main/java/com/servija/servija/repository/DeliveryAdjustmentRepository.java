@@ -10,6 +10,8 @@ import java.util.List;
 public interface DeliveryAdjustmentRepository extends JpaRepository<DeliveryAdjustment, Long> {
     
     List<DeliveryAdjustment> findByServiceRequestIdOrderByCreatedAtDesc(Long serviceRequestId);
+
+    boolean existsByServiceRequestId(Long serviceRequestId);
     
     List<DeliveryAdjustment> findByServiceRequestFreelancerEmailOrderByCreatedAtDesc(String freelancerEmail);
     

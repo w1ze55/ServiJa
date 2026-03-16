@@ -42,7 +42,6 @@ interface OnboardingData {
   profession: string;
   category: string;
   bio: string;
-  hourlyRate: string;
   skills: string[];
   portfolioItems: Array<{
     id: string;
@@ -102,7 +101,6 @@ const data = ref<OnboardingData>({
   profession: '',
   category: '',
   bio: '',
-  hourlyRate: '',
   skills: [],
   portfolioItems: [],
   workingDays: [],
@@ -181,7 +179,7 @@ const validateStep = (step: number): boolean => {
       return true;
 
     case 2:
-      if (!data.value.profession || !data.value.category || !data.value.bio || !data.value.hourlyRate) {
+      if (!data.value.profession || !data.value.category || !data.value.bio) {
         toast.error('Preencha todos os campos obrigatórios');
         return false;
       }
@@ -436,22 +434,6 @@ const handleServiceAreaKeyPress = (e: KeyboardEvent) => {
               :rows="4"
             />
             <p class="text-xs text-[#435574]">{{ data.bio.length }}/500 caracteres</p>
-          </div>
-
-          <div class="space-y-2">
-            <Label for="hourlyRate">Preço Base por Hora *</Label>
-            <div class="relative">
-              <span class="absolute left-3 top-1/2 -translate-y-1/2 text-[#435574]">
-                R$
-              </span>
-              <Input
-                id="hourlyRate"
-                :model-value="data.hourlyRate"
-                @update:model-value="(val) => data.hourlyRate = val as string"
-                placeholder="0,00"
-                class="pl-10"
-              />
-            </div>
           </div>
 
           <div class="space-y-2">

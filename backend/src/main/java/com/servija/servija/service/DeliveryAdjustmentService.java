@@ -50,6 +50,11 @@ public class DeliveryAdjustmentService {
             throw new RuntimeException("Só é possível solicitar ajustes quando o serviço foi entregue");
         }
 
+        // Verificar se já existe um ajuste para esta solicitação
+        if (adjustmentRepository.existsByServiceRequestId(serviceRequestId)) {
+            throw new RuntimeException("Já existe uma solicitação de ajuste para este serviço. Apenas uma é permitida.");
+        }
+
         // Criar ajuste
         DeliveryAdjustment adjustment = DeliveryAdjustment.builder()
                 .serviceRequest(serviceRequest)

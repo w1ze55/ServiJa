@@ -14,11 +14,12 @@ import {
   FileEdit,
   Lock,
   CreditCard,
-  Sparkles,
-  Send,
   AlertCircle,
   FileText,
+  Eye,
+  Download,
 } from 'lucide-vue-next';
+import FileAttachment from '../shared/FileAttachment.vue';
 import Button from '../ui/button.vue';
 import Input from '../ui/input.vue';
 import Card from '../ui/card.vue';
@@ -68,7 +69,7 @@ const counterValue = ref(0);
 const counterDays = ref(0);
 const counterNotes = ref('');
 const isSubmittingCounter = ref(false);
-const activeSection = ref<'details' | 'messages' | 'history'>('details');
+const activeSection = ref<'details' | 'messages' | 'history' | 'attachments'>('details');
 const showCelebrationModal = ref(false);
 
 const handleOpenCounterProposalDialog = () => {
@@ -390,12 +391,22 @@ const getStatusColor = (status: string) => {
           >
             Histórico
           </button>
+          <button
+            @click="activeSection = 'attachments'"
+            :class="`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              activeSection === 'attachments'
+                ? 'border-[#286AD8] text-[#286AD8]'
+                : 'border-transparent text-[#435574] hover:text-[#263238]'
+            }`"
+          >
+            Anexo
+          </button>
         </div>
         
         <!-- Botão de Aprovação de Entrega: Só aparece quando o freelancer já entregou (DELIVERED) -->
         <Button
           v-if="request.status === 'delivered'"
-          @click="() => props.onNavigate('cliente-delivery-approval', { requestId: request.id })"
+          @click="() => props.onNavigate('cliente-delivery-approval', { requestId: request?.id })"
           class="bg-green-600 hover:bg-green-700"
           size="sm"
         >
@@ -654,7 +665,7 @@ const getStatusColor = (status: string) => {
         </div>
 
         <!-- Message Input -->
-        <div v-if="request.status === 'in_progress' || request.status === 'completed'" class="flex gap-2">
+        <div v-if="request.status === 'in_progress' || request.status === 'delivered'" class="flex gap-2">
           <Textarea
             v-model="newMessage"
             placeholder="Digite sua mensagem..."
@@ -682,6 +693,40 @@ const getStatusColor = (status: string) => {
         :request-id="request.id"
         title="Histórico de Atividades"
       />
+
+      <!-- Attachments Section -->
+      <Card v-if="activeSection === 'attachments'" class="p-6">
+        <h3 class="font-semibold text-[#263238] mb-4">Anexos</h3>
+        
+        <div v-if="(!request.attachments || request.attachments.length === 0) && (!request.freelancerResponse?.attachments || request.freelancerResponse.attachments.length === 0)" class="text-center py-8">
+          <FileText class="h-10 w-10 text-gray-300 mx-auto mb-3" />
+          <p class="text-[#435574]">Nenhum anexo encontrado</p>
+        </div>
+
+        <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <!-- Cliente Attachments -->
+          <FileAttachment
+            v-for="attachment in request.attachments"
+            :key="attachment.id"
+            :name="attachment.name"
+            :url="attachment.url"
+            :size="attachment.size"
+            sender-info="Enviado por você"
+            variant="blue"
+          />
+
+          <!-- Freelancer Proposal Attachments -->
+          <FileAttachment
+            v-for="attachment in request.freelancerResponse?.attachments"
+            :key="attachment.id"
+            :name="attachment.name"
+            :url="attachment.url"
+            :size="attachment.size"
+            sender-info="Enviado pelo profissional"
+            variant="amber"
+          />
+        </div>
+      </Card>
     </template>
 
     <!-- Cancel Dialog -->

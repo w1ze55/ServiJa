@@ -60,9 +60,6 @@ public class Freelancer extends User {
     @Column(length = 100)
     private String category;
 
-    @Column(precision = 10, scale = 2)
-    private BigDecimal hourlyRate;
-
     @Column(length = 50)
     private String serviceType;
     
