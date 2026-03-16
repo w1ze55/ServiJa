@@ -70,6 +70,9 @@ public class ServiceRequest {
     @Column(name = "freelancer_attachments", columnDefinition = "TEXT")
     private String freelancerAttachments;
 
+    @Column(name = "response_attachments", columnDefinition = "TEXT")
+    private String responseAttachments;
+
     // Freelancer response fields
     @Column(name = "response_value", precision = 10, scale = 2)
     private BigDecimal responseValue;

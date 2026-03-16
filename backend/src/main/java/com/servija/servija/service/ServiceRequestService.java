@@ -168,6 +168,14 @@ public class ServiceRequestService {
         request.setRespondedAt(LocalDateTime.now());
         request.setStatus(ServiceRequest.Status.NEGOTIATING);
 
+        if (dto.getAttachments() != null && !dto.getAttachments().isEmpty()) {
+            try {
+                request.setResponseAttachments(objectMapper.writeValueAsString(dto.getAttachments()));
+            } catch (Exception e) {
+                throw new RuntimeException("Error serializing attachments", e);
+            }
+        }
+
         ServiceRequest saved = serviceRequestRepository.save(request);
         String details = String.format("Valor: R$ %.2f | Prazo: %d dias", dto.getValue(), dto.getExecutionDays());
         historyService.record(saved, freelancer, OperationType.BUDGET_SENT, details);
@@ -433,6 +441,7 @@ public class ServiceRequestService {
                 .rejectReason(request.getRejectReason())
                 .attachments(parseAttachments(request.getAttachments()))
                 .freelancerAttachments(parseAttachments(request.getFreelancerAttachments()))
+                .responseAttachments(parseAttachments(request.getResponseAttachments()))
                 .createdAt(request.getCreatedAt())
                 .updatedAt(request.getUpdatedAt())
                 .build();
