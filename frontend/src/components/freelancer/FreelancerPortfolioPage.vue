@@ -441,7 +441,7 @@ const handleTagKeyPress = (e: KeyboardEvent) => {
             </SelectContent>
           </Select>
 
-          <div class="flex border rounded-lg">
+          <div class="hidden sm:flex border rounded-lg">
             <Button
               @click="viewMode = 'grid'"
               variant="ghost"
@@ -533,7 +533,10 @@ const handleTagKeyPress = (e: KeyboardEvent) => {
             <h3 class="text-[#263238] line-clamp-2">{{ project.title }}</h3>
           </div>
 
-          <p class="text-sm text-[#435574] mb-3 line-clamp-2">{{ project.description }}</p>
+          <p
+            class="text-sm text-[#435574] mb-3"
+            style="display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: break-word;"
+          >{{ project.description }}</p>
 
           <div class="flex flex-wrap gap-1 mb-3">
             <Badge
@@ -575,17 +578,20 @@ const handleTagKeyPress = (e: KeyboardEvent) => {
           </div>
 
           <!-- Info -->
-          <div class="flex-1">
+          <div class="flex-1 min-w-0">
             <div class="flex items-start justify-between mb-2">
-              <div class="flex-1">
+              <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-2 mb-1">
-                  <h3 class="text-[#263238]">{{ project.title }}</h3>
+                  <h3 class="text-[#263238] truncate">{{ project.title }}</h3>
                   <Badge v-if="project.featured" class="bg-yellow-500 hover:bg-yellow-600">
                     <Tag class="h-3 w-3 mr-1" />
                     Destaque
                   </Badge>
                 </div>
-                <p class="text-sm text-[#435574] mb-2">{{ project.description }}</p>
+                <p
+                  class="text-sm text-[#435574] mb-2"
+                  style="display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: break-word;"
+                >{{ project.description }}</p>
                 <div class="flex flex-wrap gap-1">
                   <Badge v-for="tag in project.tags" :key="tag" variant="secondary" class="text-xs">
                     {{ tag }}
@@ -837,43 +843,41 @@ const handleTagKeyPress = (e: KeyboardEvent) => {
       <DialogContent class="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
         <template v-if="viewingProject">
           <DialogHeader>
-            <div class="flex items-start justify-between">
-              <div class="flex-1">
-                <DialogTitle class="mb-2">{{ viewingProject.title }}</DialogTitle>
-                <div class="flex items-center gap-3 text-sm text-[#435574]">
-                  <Badge variant="secondary">{{ viewingProject.category }}</Badge>
-                  <span class="flex items-center gap-1">
-                    <Calendar class="h-4 w-4" />
-                    {{ new Date(viewingProject.completedDate).toLocaleDateString('pt-BR') }}
-                  </span>
-                  <span v-if="viewingProject.client">Cliente: {{ viewingProject.client }}</span>
-                </div>
-              </div>
-              <Badge v-if="viewingProject.featured" class="bg-yellow-500 hover:bg-yellow-600">
+            <div class="flex items-center gap-2 mb-2">
+              <DialogTitle>{{ viewingProject.title }}</DialogTitle>
+              <Badge v-if="viewingProject.featured" class="bg-yellow-500 hover:bg-yellow-600 flex-shrink-0">
                 <Tag class="h-3 w-3 mr-1" />
                 Destaque
               </Badge>
             </div>
+            <div class="flex items-center gap-3 text-sm text-[#435574] flex-wrap">
+              <Badge variant="secondary">{{ viewingProject.category }}</Badge>
+              <span class="flex items-center gap-1">
+                <Calendar class="h-4 w-4" />
+                {{ new Date(viewingProject.completedDate).toLocaleDateString('pt-BR') }}
+              </span>
+              <span v-if="viewingProject.client">Cliente: {{ viewingProject.client }}</span>
+            </div>
           </DialogHeader>
 
-          <div class="space-y-6">
+          <div class="space-y-6 overflow-hidden">
             <!-- Image Gallery -->
-            <div class="space-y-4">
-              <div class="relative aspect-video rounded-lg overflow-hidden bg-gray-100">
+            <div class="space-y-4 overflow-hidden">
+              <div class="rounded-lg bg-gray-100 flex justify-center items-center h-[350px] overflow-hidden">
                 <img
                   :src="viewingProject.images[selectedImageIndex]?.url"
                   :alt="viewingProject.images[selectedImageIndex]?.caption || viewingProject.title"
-                  class="w-full h-full object-cover"
+                  class="max-w-full max-h-full object-contain"
                 />
               </div>
 
-              <div v-if="viewingProject.images.length > 1" class="grid grid-cols-6 gap-2">
+              <div v-if="viewingProject.images.length > 1" class="flex gap-3 overflow-x-auto pb-2">
                 <button
                   v-for="(img, idx) in viewingProject.images"
                   :key="img.id"
                   @click="selectedImageIndex = idx"
-                  :class="`aspect-video rounded-lg overflow-hidden ${
-                    selectedImageIndex === idx ? 'ring-2 ring-[#286AD8]' : ''
+                  :class="`relative flex-shrink-0 w-24 h-16 rounded-lg overflow-hidden transition-all mt-2 ml-1 mr-1 ${
+                    selectedImageIndex === idx ? 'ring-2 ring-[#286AD8] ring-offset-2' : 'hover:opacity-80'
                   }`"
                 >
                   <img :src="img.url" :alt="img.caption || ''" class="w-full h-full object-cover" />
@@ -891,7 +895,7 @@ const handleTagKeyPress = (e: KeyboardEvent) => {
             <!-- Description -->
             <div>
               <h4 class="text-[#263238] mb-2">Descrição do Projeto</h4>
-              <p class="text-[#435574]">{{ viewingProject.description }}</p>
+              <p class="text-[#435574] whitespace-pre-wrap break-words">{{ viewingProject.description }}</p>
             </div>
 
             <!-- Tags -->
