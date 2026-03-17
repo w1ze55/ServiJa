@@ -26,6 +26,9 @@ import {
   Paperclip,
   XCircle,
   X,
+  Sparkles,
+  History,
+  CreditCard,
 } from 'lucide-vue-next';
 import FileAttachment from '../shared/FileAttachment.vue';
 import Button from '../ui/button.vue';
@@ -48,13 +51,10 @@ import AlertDialogDescription from '../ui/alert-dialog-description.vue';
 import AlertDialogFooter from '../ui/alert-dialog-footer.vue';
 import AlertDialogHeader from '../ui/alert-dialog-header.vue';
 import AlertDialogTitle from '../ui/alert-dialog-title.vue';
-import Tabs from '../ui/tabs.vue';
-import TabsContent from '../ui/tabs-content.vue';
-import TabsList from '../ui/tabs-list.vue';
-import TabsTrigger from '../ui/tabs-trigger.vue';
 import Avatar from '../ui/avatar.vue';
 import AvatarFallback from '../ui/avatar-fallback.vue';
 import AvatarImage from '../ui/avatar-image.vue';
+import Separator from '../ui/separator.vue';
 import { useProposalStore, type Proposal, type Milestone } from '@/stores/proposalStore';
 import ServiceRequestTimeline from '../service/ServiceRequestTimeline.vue';
 import { useServiceRequestWebSocket } from '@/composables/useServiceRequestWebSocket';
@@ -70,7 +70,8 @@ interface Props {
 const props = defineProps<Props>();
 const proposalStore = useProposalStore();
 
-const activeTab = ref('details');
+const activeSection = ref<'details' | 'messages' | 'history' | 'attachments'>('details');
+const activeFileTab = ref<'client' | 'freelancer'>('client');
 const showSendProposalDialog = ref(false);
 const showConfirmDialog = ref(false);
 const showRejectDialog = ref(false);
@@ -676,7 +677,7 @@ const getStatusBadge = (status: string) => {
     negotiating: { class: 'bg-purple-100 text-purple-700', label: 'Negociando', icon: MessageSquare },
     accepted: { class: 'bg-green-100 text-green-700', label: 'Aceita', icon: CheckCircle },
     in_progress: { class: 'bg-purple-100 text-purple-700', label: 'Em Andamento', icon: Clock },
-    delivered: { class: 'bg-amber-100 text-amber-700', label: 'Entregue', icon: Send },
+    delivered: { class: 'bg-blue-100 text-blue-700', label: 'Entregue', icon: Send },
     rejected: { class: 'bg-red-100 text-red-700', label: 'Recusada', icon: XCircle },
     completed: { class: 'bg-teal-100 text-teal-700', label: 'Concluída', icon: CheckCircle },
     archived: { class: 'bg-gray-100 text-gray-700', label: 'Arquivada', icon: FileText },
@@ -686,472 +687,569 @@ const getStatusBadge = (status: string) => {
 </script>
 
 <template>
-  <div class="max-w-7xl mx-auto space-y-6">
+  <div class="max-w-5xl mx-auto space-y-6">
+    <!-- Back Button -->
+    <Button @click="props.onNavigate('freelancer-proposals')" variant="ghost" class="mb-2">
+      <ArrowLeft class="h-4 w-4 mr-2" />
+      Voltar às Solicitações
+    </Button>
+
+    <!-- Loading -->
+    <div v-if="proposalStore.isLoading" class="flex justify-center py-12">
+      <div class="animate-spin h-8 w-8 border-4 border-[#286AD8] border-t-transparent rounded-full"></div>
+    </div>
+
     <!-- Not Found State -->
-    <Card v-if="!proposal" class="p-12 text-center">
-      <AlertCircle class="h-12 w-12 text-gray-400 mx-auto mb-4" />
+    <Card v-else-if="!proposal" class="p-12 text-center">
+      <FileText class="h-12 w-12 text-gray-400 mx-auto mb-4" />
       <h3 class="text-lg font-semibold text-[#263238] mb-2">Solicitação não encontrada</h3>
-      <p class="text-[#435574] mb-6">A solicitação que você está procurando não existe ou foi removida.</p>
-      <Button @click="props.onNavigate('freelancer-proposals')" class="bg-[#286AD8] hover:bg-[#435574]">
-        <ArrowLeft class="h-4 w-4 mr-2" />
-        Voltar para Solicitações
-      </Button>
+      <p class="text-[#435574]">A solicitação que você procura não existe ou foi removida.</p>
+      <Button @click="props.onNavigate('freelancer-proposals')" variant="outline" class="mt-4">Voltar</Button>
     </Card>
 
     <template v-else>
-      <!-- Header -->
-      <div class="flex items-center justify-between">
-        <div class="flex items-center gap-4">
-          <Button
-            @click="props.onNavigate('freelancer-proposals')"
-            variant="ghost"
-            size="icon"
-          >
-            <ArrowLeft class="h-5 w-5" />
-          </Button>
-          <div>
-            <div class="flex items-center gap-3 mb-1">
+      <!-- Header Card -->
+      <Card class="p-6">
+        <div class="flex items-start justify-between flex-wrap gap-4">
+          <div class="flex-1">
+            <div class="flex items-center gap-3 mb-2 flex-wrap">
               <h1 class="text-2xl font-bold text-[#263238]">{{ proposal.service }}</h1>
               <Badge :class="`${getStatusBadge(proposal.status).class} hover:${getStatusBadge(proposal.status).class}`">
                 <component :is="getStatusBadge(proposal.status).icon" class="h-3 w-3 mr-1" />
                 {{ getStatusBadge(proposal.status).label }}
               </Badge>
             </div>
-            <div class="flex items-center gap-3 text-sm text-[#435574]">
+            <div class="flex items-center gap-4 text-sm text-[#435574] flex-wrap">
               <Badge variant="secondary">{{ proposal.category }}</Badge>
               <span class="flex items-center gap-1">
                 <Calendar class="h-4 w-4" />
                 Recebido em {{ new Date(proposal.receivedAt).toLocaleDateString('pt-BR') }}
               </span>
+              <span v-if="proposal.address" class="flex items-center gap-1">
+                <MapPin class="h-4 w-4" />
+                {{ proposal.address }}
+              </span>
             </div>
           </div>
+          <div class="flex items-center gap-2">
+            <Button
+              v-if="proposal.status === 'pending'"
+              @click="handleOpenRejectDialog"
+              variant="outline"
+              class="text-red-600 border-red-200 hover:bg-red-50"
+            >
+              <XCircle class="h-4 w-4 mr-2" />
+              Recusar
+            </Button>
+            <Button
+              v-if="(proposal.status === 'pending' || proposal.status === 'negotiating') && !proposal.freelancerResponse"
+              @click="showSendProposalDialog = true"
+              class="bg-[#286AD8] hover:bg-[#435574]"
+            >
+              <Send class="h-4 w-4 mr-2" />
+              {{ proposal.freelancerResponse ? 'Atualizar Proposta' : 'Enviar Proposta' }}
+            </Button>
+            <Button
+              v-if="proposal.status === 'in_progress'"
+              @click="showCompleteDialog = true"
+              class="bg-green-600 hover:bg-green-700"
+            >
+              <CheckCircle class="h-4 w-4 mr-2" />
+              Marcar como Entregue
+            </Button>
+          </div>
         </div>
-        <div class="flex items-center gap-2">
-          <Button
-            v-if="proposal.status === 'pending'"
-            @click="handleOpenRejectDialog"
-            variant="outline"
-            class="text-red-600 border-red-200 hover:bg-red-50"
-          >
-            <XCircle class="h-4 w-4 mr-2" />
-            Recusar
-          </Button>
-          <Button
-            v-if="(proposal.status === 'pending' || proposal.status === 'negotiating') && !proposal.freelancerResponse"
-            @click="showSendProposalDialog = true"
-            class="bg-[#286AD8] hover:bg-[#435574]"
-          >
-            <Send class="h-4 w-4 mr-2" />
-            {{ proposal.freelancerResponse ? 'Atualizar Proposta' : 'Enviar Proposta' }}
-          </Button>
-          <Button
-            v-if="proposal.status === 'in_progress'"
-            @click="showCompleteDialog = true"
-            class="bg-[#286AD8] hover:bg-[#435574]"
-          >
-            <CheckCircle class="h-4 w-4 mr-2" />
-            Marcar como Entregue
-          </Button>
+
+        <!-- Delivered Status Alert -->
+        <div v-if="proposal.status === 'delivered'"
+             class="mt-4 p-4 rounded-lg border border-blue-100 bg-blue-50 text-blue-900 flex items-start gap-3">
+          <Clock class="h-5 w-5 mt-0.5 flex-shrink-0 text-blue-600" />
+          <div>
+            <p class="font-semibold text-sm">Aguardando Confirmação</p>
+            <p class="text-sm opacity-90">Você marcou este serviço como entregue. O cliente foi notificado e deve confirmar a conclusão para finalizar o processo.</p>
+          </div>
         </div>
+
+        <!-- Rejection Reason Alert -->
+        <div v-if="proposal.status === 'rejected' && proposal.rejectReason"
+             class="mt-4 p-4 rounded-lg border border-red-100 bg-red-50 text-red-900 flex items-start gap-3">
+          <AlertCircle class="h-5 w-5 mt-0.5 flex-shrink-0 text-red-600" />
+          <div>
+            <p class="font-semibold text-sm">Motivo da Recusa</p>
+            <p class="text-sm opacity-90 italic">"{{ proposal.rejectReason }}"</p>
+          </div>
+        </div>
+      </Card>
+
+      <!-- Navigation Tabs -->
+      <div class="flex gap-2 border-b border-gray-200 pb-0">
+        <button
+          @click="activeSection = 'details'"
+          :class="`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            activeSection === 'details'
+              ? 'border-[#286AD8] text-[#286AD8]'
+              : 'border-transparent text-[#435574] hover:text-[#263238]'
+          }`"
+        >
+          Detalhes
+        </button>
+        <button
+          @click="activeSection = 'messages'"
+          :class="`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            activeSection === 'messages'
+              ? 'border-[#286AD8] text-[#286AD8]'
+              : 'border-transparent text-[#435574] hover:text-[#263238]'
+          }`"
+        >
+          Mensagens
+          <Badge
+            v-if="clientMessagesCount > 0"
+            class="ml-1 bg-[#286AD8] text-white text-xs"
+          >
+            {{ clientMessagesCount }}
+          </Badge>
+        </button>
+        <button
+          @click="activeSection = 'history'"
+          :class="`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            activeSection === 'history'
+              ? 'border-[#286AD8] text-[#286AD8]'
+              : 'border-transparent text-[#435574] hover:text-[#263238]'
+          }`"
+        >
+          Histórico
+        </button>
+        <button
+          @click="activeSection = 'attachments'"
+          :class="`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            activeSection === 'attachments'
+              ? 'border-[#286AD8] text-[#286AD8]'
+              : 'border-transparent text-[#435574] hover:text-[#263238]'
+          }`"
+        >
+          Anexos
+        </button>
       </div>
 
-      <!-- Delivered Status Alert -->
-      <div v-if="proposal.status === 'delivered'"
-           class="mt-4 p-4 rounded-lg border border-amber-100 bg-amber-50 text-amber-900 flex items-start gap-3">
-        <Clock class="h-5 w-5 mt-0.5 flex-shrink-0 text-amber-600" />
-        <div>
-          <p class="font-semibold text-sm">Aguardando Confirmação</p>
-          <p class="text-sm opacity-90">Você marcou este serviço como entregue. O cliente foi notificado e deve confirmar a conclusão para finalizar o processo.</p>
-        </div>
-      </div>
+      <!-- Details Section -->
+      <div v-if="activeSection === 'details'" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Main Info -->
+        <div class="lg:col-span-2 space-y-6">
 
-      <!-- Rejection Reason Alert -->
-      <div v-if="proposal.status === 'rejected' && proposal.rejectReason"
-           class="mt-4 p-4 rounded-lg border border-red-100 bg-red-50 text-red-900 flex items-start gap-3">
-        <AlertCircle class="h-5 w-5 mt-0.5 flex-shrink-0 text-red-600" />
-        <div>
-          <p class="font-semibold text-sm">Motivo da Recusa</p>
-          <p class="text-sm opacity-90 italic">"{{ proposal.rejectReason }}"</p>
-        </div>
-      </div>
+          <!-- Description -->
+          <Card class="p-6">
+            <h3 class="font-semibold text-[#263238] mb-3">Descrição do Serviço</h3>
+            <p class="text-[#435574] whitespace-pre-line">{{ proposal.description }}</p>
+          </Card>
 
-      <!-- Client Info -->
-      <Card class="p-6">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-4">
-            <Avatar class="h-16 w-16">
-              <AvatarImage :src="proposal.clientAvatar" :alt="proposal.clientName" />
-              <AvatarFallback class="bg-[#286AD8] text-white text-lg">
-                {{ getInitials(proposal.clientName) }}
-              </AvatarFallback>
-            </Avatar>
-            <div>
-              <h3 class="text-lg font-semibold text-[#263238] mb-1">{{ proposal.clientName }}</h3>
-              <div class="flex items-center gap-4 text-sm text-[#435574]">
-                <span class="flex items-center gap-1">
-                  <MapPin class="h-4 w-4" />
-                  {{ proposal.clientLocation }}
-                </span>
-                <span v-if="proposal.clientEmail" class="flex items-center gap-1">
-                  <Mail class="h-4 w-4" />
-                  {{ proposal.clientEmail }}
-                </span>
-                <span v-if="proposal.clientPhone" class="flex items-center gap-1">
-                  <Phone class="h-4 w-4" />
-                  {{ proposal.clientPhone }}
-                </span>
+          <!-- Counter Proposal from Client -->
+          <Card v-if="proposal.counterValue" class="p-6 border-blue-200 bg-blue-50/30">
+            <div class="flex items-center gap-2 mb-4">
+              <FileEdit class="h-5 w-5 text-blue-600" />
+              <h3 class="font-semibold text-[#263238]">Contra Proposta do Cliente</h3>
+            </div>
+            
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+              <div class="bg-white rounded-lg p-4 border">
+                <p class="text-sm text-[#435574] mb-1">Novo Valor Proposto</p>
+                <p class="text-xl font-bold text-green-600">
+                  {{ formatCurrency(proposal.counterValue) }}
+                </p>
+              </div>
+              <div class="bg-white rounded-lg p-4 border">
+                <p class="text-sm text-[#435574] mb-1">Novo Prazo Proposto</p>
+                <p class="text-xl font-bold text-[#263238]">
+                  {{ proposal.counterDays }} dias
+                </p>
               </div>
             </div>
-          </div>
-          <Button variant="outline" @click="activeTab = 'messages'">
-            <MessageSquare class="h-4 w-4 mr-2" />
-            Enviar Mensagem
-          </Button>
-        </div>
-      </Card>
+            
+            <div v-if="proposal.counterNotes" class="mb-4">
+              <p class="text-sm font-medium text-[#263238] mb-1">Observações do Cliente:</p>
+              <p class="text-sm text-[#435574] italic">"{{ proposal.counterNotes }}"</p>
+            </div>
+            
+            <div class="mb-4 p-3 bg-blue-100/50 rounded text-sm text-blue-800">
+              <p>O cliente sugeriu novos termos. Você pode aceitá-los para atualizar seu orçamento ou manter sua proposta inicial.</p>
+            </div>
 
-      <!-- Counter Proposal from Client -->
-      <Card v-if="proposal.counterValue" class="p-6 border-l-4 border-l-amber-500 bg-amber-50/30">
-        <div class="flex items-center gap-2 mb-4">
-          <FileEdit class="h-5 w-5 text-amber-600" />
-          <h3 class="text-lg font-semibold text-[#263238]">Contra Proposta do Cliente</h3>
-        </div>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-          <div class="bg-white p-3 rounded border border-amber-200">
-            <p class="text-sm text-[#435574]">Novo Valor Proposto</p>
-            <p class="text-xl font-bold text-green-600">
-              {{ formatCurrency(proposal.counterValue) }}
-            </p>
-          </div>
-          <div class="bg-white p-3 rounded border border-amber-200">
-            <p class="text-sm text-[#435574]">Novo Prazo Proposto</p>
-            <p class="text-xl font-bold text-[#263238]">
-              {{ proposal.counterDays }} dias
-            </p>
-          </div>
-        </div>
-        <div v-if="proposal.counterNotes">
-          <p class="text-sm font-medium text-[#263238] mb-1">Observações do Cliente:</p>
-          <p class="text-sm text-[#435574] italic">"{{ proposal.counterNotes }}"</p>
-        </div>
-        <div class="mt-4 p-3 bg-amber-100/50 rounded text-sm text-amber-800">
-          <p>O cliente sugeriu novos termos. Você pode aceitá-los para atualizar seu orçamento ou manter sua proposta inicial.</p>
-        </div>
+            <div class="flex gap-3 flex-wrap">
+              <Button
+                @click="handleAcceptCounterProposal"
+                :disabled="isLoading"
+                class="flex-1 min-w-[150px] bg-green-600 hover:bg-green-700"
+              >
+                <Check class="h-4 w-4 mr-2" />
+                Aceitar Contra Proposta
+              </Button>
+              <Button
+                @click="showRejectCounterDialog = true"
+                variant="outline"
+                :disabled="isLoading"
+                class="flex-1 min-w-[150px] border-[#286AD8] text-[#286AD8] hover:bg-blue-50"
+              >
+                <XCircle class="h-4 w-4 mr-2" />
+                Manter Proposta Inicial
+              </Button>
+            </div>
+          </Card>
 
-        <div class="mt-6 flex gap-3">
-          <Button
-            @click="handleAcceptCounterProposal"
-            :disabled="isLoading"
-            class="flex-1 bg-green-600 hover:bg-green-700"
-          >
-            <Check class="h-4 w-4 mr-2" />
-            Aceitar Contra Proposta
-          </Button>
-          <Button
-            @click="showRejectCounterDialog = true"
-            variant="outline"
-            :disabled="isLoading"
-            class="flex-1 border-amber-500 text-amber-700 hover:bg-amber-50"
-          >
-            <XCircle class="h-4 w-4 mr-2" />
-            Manter Proposta Inicial
-          </Button>
-        </div>
-      </Card>
+          <!-- My Proposal (if sent) -->
+          <Card v-if="proposal.freelancerResponse" class="p-6 border-blue-200 bg-blue-50/30">
+            <div class="flex items-center gap-2 mb-4">
+              <Send class="h-5 w-5 text-blue-600" />
+              <h3 class="font-semibold text-[#263238]">Sua Proposta Enviada</h3>
+            </div>
+            
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+              <div class="bg-white rounded-lg p-4 border">
+                <p class="text-sm text-[#435574] mb-1">Valor proposto</p>
+                <p class="text-xl font-bold text-green-600">
+                  {{ formatCurrency(proposal.freelancerResponse.value) }}
+                </p>
+              </div>
+              <div class="bg-white rounded-lg p-4 border">
+                <p class="text-sm text-[#435574] mb-1">Prazo de execução</p>
+                <p class="text-xl font-bold text-[#263238]">
+                  {{ proposal.freelancerResponse.executionDays }} dias
+                </p>
+              </div>
+            </div>
 
-      <!-- My Proposal (if sent) -->
-      <Card v-if="proposal.freelancerResponse" class="p-6 border-l-4 border-l-[#286AD8]">
-        <h3 class="text-lg font-semibold text-[#263238] mb-4">Sua Proposta Enviada</h3>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-          <div>
-            <p class="text-sm text-[#435574]">Valor Proposto</p>
-            <p class="text-xl font-bold text-green-600">
-              {{ formatCurrency(proposal.freelancerResponse.value) }}
-            </p>
-          </div>
-          <div>
-            <p class="text-sm text-[#435574]">Prazo de Execução</p>
-            <p class="text-xl font-bold text-[#263238]">
-              {{ proposal.freelancerResponse.executionDays }} dias
-            </p>
-          </div>
-          <div>
-            <p class="text-sm text-[#435574]">Enviada em</p>
-            <p class="text-[#263238]">
-              {{ new Date(proposal.freelancerResponse.sentAt).toLocaleDateString('pt-BR', {
+            <div class="mb-4">
+              <p class="text-sm font-medium text-[#263238] mb-2">Escopo do trabalho</p>
+              <p class="text-sm text-[#435574] whitespace-pre-line">
+                {{ proposal.freelancerResponse.scope }}
+              </p>
+            </div>
+
+            <div v-if="proposal.freelancerResponse.notes" class="mb-4">
+              <p class="text-sm font-medium text-[#263238] mb-2">Observações</p>
+              <p class="text-sm text-[#435574]">{{ proposal.freelancerResponse.notes }}</p>
+            </div>
+
+            <p class="text-xs text-[#435574] mb-4">
+              Enviada em {{ new Date(proposal.freelancerResponse.sentAt).toLocaleDateString('pt-BR', {
                 day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
               }) }}
             </p>
-          </div>
-        </div>
-        <div class="mb-4">
-          <p class="text-sm text-[#435574] mb-1">Escopo do Trabalho</p>
-          <p class="text-[#263238] whitespace-pre-wrap">{{ proposal.freelancerResponse.scope }}</p>
-        </div>
-        <div v-if="proposal.freelancerResponse.notes">
-          <p class="text-sm text-[#435574] mb-1">Observações</p>
-          <p class="text-[#263238]">{{ proposal.freelancerResponse.notes }}</p>
-        </div>
 
-        <!-- Milestones -->
-        <div v-if="proposal.freelancerResponse.milestones && proposal.freelancerResponse.milestones.length > 0" class="mt-6">
-          <h4 class="font-semibold text-[#263238] mb-3">Marcos de Entrega</h4>
-          <div class="space-y-3">
-            <Card
-              v-for="milestone in proposal.freelancerResponse.milestones"
-              :key="milestone.id"
-              class="p-4 bg-gray-50"
-            >
-              <div class="flex items-start justify-between">
-                <div class="flex-1">
-                  <div class="flex items-center gap-2 mb-1">
-                    <MilestoneIcon class="h-4 w-4 text-[#286AD8]" />
-                    <h5 class="font-medium text-[#263238]">{{ milestone.title }}</h5>
-                    <Badge
-                      :class="
-                        milestone.status === 'completed' ? 'bg-green-100 text-green-700' :
-                        milestone.status === 'in_progress' ? 'bg-blue-100 text-blue-700' :
-                        'bg-gray-100 text-gray-700'
-                      "
-                    >
-                      {{ milestone.status === 'completed' ? 'Concluído' :
-                         milestone.status === 'in_progress' ? 'Em andamento' : 'Pendente' }}
-                    </Badge>
+            <!-- Milestones -->
+            <div v-if="proposal.freelancerResponse.milestones && proposal.freelancerResponse.milestones.length > 0" class="pt-4 border-t">
+              <h4 class="font-semibold text-[#263238] mb-3">Marcos de Entrega</h4>
+              <div class="space-y-3">
+                <Card
+                  v-for="milestone in proposal.freelancerResponse.milestones"
+                  :key="milestone.id"
+                  class="p-4 bg-white"
+                >
+                  <div class="flex items-start justify-between">
+                    <div class="flex-1">
+                      <div class="flex items-center gap-2 mb-1">
+                        <MilestoneIcon class="h-4 w-4 text-[#286AD8]" />
+                        <h5 class="font-medium text-[#263238]">{{ milestone.title }}</h5>
+                        <Badge
+                          :class="
+                            milestone.status === 'completed' ? 'bg-green-100 text-green-700' :
+                            milestone.status === 'in_progress' ? 'bg-blue-100 text-blue-700' :
+                            'bg-gray-100 text-gray-700'
+                          "
+                        >
+                          {{ milestone.status === 'completed' ? 'Concluído' :
+                             milestone.status === 'in_progress' ? 'Em andamento' : 'Pendente' }}
+                        </Badge>
+                      </div>
+                      <p v-if="milestone.description" class="text-sm text-[#435574] mb-2">
+                        {{ milestone.description }}
+                      </p>
+                      <div class="flex items-center gap-4 text-sm text-[#435574]">
+                        <span class="flex items-center gap-1">
+                          <Calendar class="h-4 w-4" />
+                          {{ new Date(milestone.deadline).toLocaleDateString('pt-BR') }}
+                        </span>
+                        <span class="flex items-center gap-1">
+                          <DollarSign class="h-4 w-4" />
+                          {{ formatCurrency(milestone.value) }}
+                        </span>
+                      </div>
+                    </div>
+                    <div v-if="proposal.status === 'accepted' || proposal.status === 'in_progress'" class="flex gap-2">
+                      <Button
+                        v-if="milestone.status === 'pending'"
+                        @click="handleUpdateMilestoneStatus(milestone.id, 'in_progress')"
+                        size="sm"
+                        variant="outline"
+                      >
+                        Iniciar
+                      </Button>
+                      <Button
+                        v-if="milestone.status === 'in_progress'"
+                        @click="handleUpdateMilestoneStatus(milestone.id, 'completed')"
+                        size="sm"
+                        class="bg-green-600 hover:bg-green-700"
+                      >
+                        <Check class="h-3 w-3 mr-1" />
+                        Concluir
+                      </Button>
+                    </div>
                   </div>
-                  <p v-if="milestone.description" class="text-sm text-[#435574] mb-2">
-                    {{ milestone.description }}
-                  </p>
-                  <div class="flex items-center gap-4 text-sm text-[#435574]">
-                    <span class="flex items-center gap-1">
-                      <Calendar class="h-4 w-4" />
-                      {{ new Date(milestone.deadline).toLocaleDateString('pt-BR') }}
-                    </span>
-                    <span class="flex items-center gap-1">
-                      <DollarSign class="h-4 w-4" />
-                      {{ formatCurrency(milestone.value) }}
-                    </span>
-                  </div>
-                </div>
-                <div v-if="proposal.status === 'accepted'" class="flex gap-2">
-                  <Button
-                    v-if="milestone.status === 'pending'"
-                    @click="handleUpdateMilestoneStatus(milestone.id, 'in_progress')"
-                    size="sm"
-                    variant="outline"
-                  >
-                    <Play class="h-3 w-3 mr-1" />
-                    Iniciar
-                  </Button>
-                  <Button
-                    v-if="milestone.status === 'in_progress'"
-                    @click="handleUpdateMilestoneStatus(milestone.id, 'completed')"
-                    size="sm"
-                    class="bg-green-600 hover:bg-green-700"
-                  >
-                    <Check class="h-3 w-3 mr-1" />
-                    Concluir
-                  </Button>
-                </div>
+                </Card>
               </div>
-            </Card>
-          </div>
+            </div>
+          </Card>
         </div>
-      </Card>
 
-      <!-- Tabs -->
-      <Tabs :model-value="activeTab" @update:model-value="(val: string) => activeTab = val">
-        <TabsList class="grid w-full grid-cols-4">
-          <TabsTrigger value="details">Detalhes</TabsTrigger>
-          <TabsTrigger value="messages">
-            Mensagens
-            <Badge v-if="clientMessagesCount > 0" class="ml-2 bg-red-500 text-white">
-              {{ clientMessagesCount }}
-            </Badge>
-          </TabsTrigger>
-          <TabsTrigger value="attachments">
-            Anexos ({{ proposal.attachments?.length || 0 }})
-          </TabsTrigger>
-          <TabsTrigger value="history">Histórico</TabsTrigger>
-        </TabsList>
-
-        <!-- Details Tab -->
-        <TabsContent value="details" class="space-y-6">
+        <!-- Sidebar -->
+        <div class="space-y-6">
           <Card class="p-6">
-            <h3 class="text-lg font-semibold text-[#263238] mb-4">Informações da Solicitação</h3>
-
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <h3 class="font-semibold text-[#263238] mb-4">Resumo</h3>
+            <div class="space-y-4">
               <div>
-                <Label class="text-sm text-[#435574]">Data Desejada</Label>
-                <p class="text-[#263238] mt-1">
-                  {{ requestedDateDisplay }}
-                </p>
-              </div>
-              <div>
-                <Label class="text-sm text-[#435574]">
+                <p class="text-sm text-[#435574]">
                   {{ ['accepted', 'in_progress', 'completed'].includes(proposal.status) && proposal.freelancerResponse ? 'Valor Acordado' : 'Orçamento Estimado' }}
-                </Label>
-                <p class="text-[#263238] mt-1 font-semibold">
+                </p>
+                <p class="text-lg font-bold text-green-600">
                   {{ formatCurrency(['accepted', 'in_progress', 'completed'].includes(proposal.status) && proposal.freelancerResponse ? proposal.freelancerResponse.value : proposal.budget) }}
                 </p>
               </div>
-              <div v-if="['accepted', 'in_progress', 'completed'].includes(proposal.status) && proposal.freelancerResponse">
-                <Label class="text-sm text-[#435574]">Prazo Acordado</Label>
-                <p class="text-[#263238] mt-1 font-semibold">{{ proposal.freelancerResponse.executionDays }} dias</p>
-              </div>
-              <div v-else>
-                <Label class="text-sm text-[#435574]">Prioridade</Label>
-                <p class="text-[#263238] mt-1">
-                  <Badge :variant="getPriorityVariant(proposal.priority || 'MEDIUM')">
-                    {{
-                      proposal.priority === 'URGENT' ? 'Urgente' :
-                      proposal.priority === 'HIGH' ? 'Alta' :
-                      proposal.priority === 'MEDIUM' ? 'Média' : 'Baixa'
-                    }}
-                  </Badge>
+              <Separator />
+              <div>
+                <p class="text-sm text-[#435574]">
+                  {{ ['accepted', 'in_progress', 'completed'].includes(proposal.status) && proposal.freelancerResponse ? 'Prazo Acordado' : 'Prazo Desejado' }}
+                </p>
+                <p class="font-medium text-[#263238]">
+                  {{ ['accepted', 'in_progress', 'completed'].includes(proposal.status) && proposal.freelancerResponse ? proposal.freelancerResponse.executionDays + ' dias' : requestedDateDisplay }}
                 </p>
               </div>
-            </div>
-
-            <div v-if="proposal.address" class="mb-6">
-              <Label class="text-sm text-[#435574]">Endereço do Serviço</Label>
-              <p class="text-[#263238] mt-1 flex items-start gap-2">
-                <MapPin class="h-4 w-4 mt-1 flex-shrink-0" />
-                {{ proposal.address }}
-              </p>
-            </div>
-
-            <div>
-              <Label class="text-sm text-[#435574] mb-2 block">Descrição Detalhada</Label>
-              <div class="bg-gray-50 rounded-lg p-4 whitespace-pre-wrap text-[#263238]">
-                {{ proposal.description }}
+              <Separator />
+              <div>
+                <p class="text-sm text-[#435574]">Categoria</p>
+                <p class="font-medium text-[#263238]">{{ proposal.category }}</p>
+              </div>
+              <Separator />
+              <div>
+                <p class="text-sm text-[#435574]">Prioridade</p>
+                <Badge
+                  :class="
+                    proposal.priority === 'URGENT'
+                      ? 'bg-red-200 text-red-900'
+                      : proposal.priority === 'HIGH'
+                      ? 'bg-red-100 text-red-700'
+                      : proposal.priority === 'MEDIUM'
+                      ? 'bg-yellow-100 text-yellow-700'
+                      : 'bg-gray-100 text-gray-700'
+                  "
+                >
+                  {{ 
+                    proposal.priority === 'URGENT' ? 'Urgente' :
+                    proposal.priority === 'HIGH' ? 'Alta' :
+                    proposal.priority === 'MEDIUM' ? 'Média' : 'Baixa'
+                  }}
+                </Badge>
               </div>
             </div>
           </Card>
-        </TabsContent>
-
-        <!-- Messages Tab -->
-        <TabsContent value="messages" class="space-y-4">
-          <Card class="p-6">
-            <div class="space-y-4 mb-6 max-h-[500px] overflow-y-auto">
-              <div v-if="!proposal.messages || proposal.messages.length === 0" class="text-center py-8">
-                <MessageSquare class="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                <p class="text-[#435574]">Nenhuma mensagem ainda</p>
-              </div>
-              <div
-                v-for="msg in proposal.messages"
-                :key="msg.id"
-                :class="`flex gap-3 ${msg.sender === 'freelancer' ? 'flex-row-reverse' : ''}`"
-              >
-                <Avatar class="h-8 w-8 flex-shrink-0">
-                  <AvatarFallback :class="msg.sender === 'freelancer' ? 'bg-[#286AD8] text-white' : 'bg-gray-300'">
-                    {{ getInitials(msg.senderName) }}
-                  </AvatarFallback>
-                </Avatar>
-                <div :class="`flex-1 ${msg.sender === 'freelancer' ? 'text-right' : ''}`">
-                  <div
-                    :class="`inline-block max-w-[70%] ${
-                      msg.sender === 'freelancer'
-                        ? 'bg-[#286AD8] text-white'
-                        : 'bg-gray-100 text-[#263238]'
-                    } rounded-lg p-4`"
-                  >
-                    <p class="mb-1">{{ msg.message }}</p>
-                    <div v-if="msg.attachments && msg.attachments.length > 0" class="mt-3 space-y-2">
-                      <FileAttachment
-                        v-for="att in msg.attachments"
-                        :key="att.id"
-                        :name="att.name"
-                        :url="att.url"
-                        :size="att.size"
-                        variant="compact"
-                        class="bg-white/10 border-white/20 text-white"
-                      />
-                    </div>
-                  </div>
-                  <p class="text-xs text-[#435574] mt-1">
-                    {{ msg.senderName }} •
-                    {{ new Date(msg.timestamp).toLocaleString('pt-BR', {
-                      day: '2-digit',
-                      month: '2-digit',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    }) }}
-                  </p>
+                    <!-- Client Info Card -->
+                    <Card class="p-6">
+            <h3 class="font-semibold text-[#263238] mb-4">Cliente</h3>
+            <div class="flex items-center gap-4">
+              <Avatar class="h-16 w-16">
+                <AvatarImage :src="proposal.clientAvatar" :alt="proposal.clientName" />
+                <AvatarFallback class="bg-[#286AD8] text-white text-lg">
+                  {{ getInitials(proposal.clientName) }}
+                </AvatarFallback>
+              </Avatar>
+              <div class="flex-1">
+                <h3 class="text-lg font-semibold text-[#263238] mb-1">{{ proposal.clientName }}</h3>
+                <div class="flex items-center gap-4 text-sm text-[#435574] flex-wrap">
+                  <span class="flex items-center gap-1">
+                    <MapPin class="h-4 w-4" />
+                    {{ proposal.clientLocation }}
+                  </span>
+                  <span v-if="proposal.clientEmail" class="flex items-center gap-1">
+                    <Mail class="h-4 w-4" />
+                    {{ proposal.clientEmail }}
+                  </span>
+                  <span v-if="proposal.clientPhone" class="flex items-center gap-1">
+                    <Phone class="h-4 w-4" />
+                    {{ proposal.clientPhone }}
+                  </span>
                 </div>
               </div>
             </div>
+          </Card>
+        </div>
+      </div>
 
-            <!-- Message Input -->
-            <div v-if="proposal.status === 'in_progress' || proposal.status === 'completed'" class="mt-6 flex gap-2">
-              <Textarea
-                :model-value="newMessage"
-                @update:model-value="(val) => newMessage = val as string"
-                placeholder="Digite sua mensagem..."
-                :rows="2"
-                class="flex-1"
-              />
-              <div class="flex flex-col gap-2">
-                <Button
-                  @click="handleSendMessage"
-                  :disabled="!newMessage.trim()"
-                  class="bg-[#286AD8] hover:bg-[#435574]"
-                >
-                  <Send class="h-4 w-4" />
-                </Button>
-                <input
-                  ref="messageAttachmentInput"
-                  type="file"
-                  multiple
-                  @change="handleMessageAttachmentChange"
-                  class="hidden"
+      <!-- Messages Section -->
+      <Card v-if="activeSection === 'messages'" class="p-6">
+        <h3 class="font-semibold text-[#263238] mb-4">Mensagens</h3>
+
+        <div v-if="!proposal.messages || proposal.messages.length === 0" class="text-center py-8">
+          <MessageSquare class="h-10 w-10 text-gray-300 mx-auto mb-3" />
+          <p class="text-[#435574]">Nenhuma mensagem ainda</p>
+        </div>
+
+        <div v-else class="space-y-4 max-h-96 overflow-y-auto mb-4">
+          <div
+            v-for="msg in proposal.messages"
+            :key="msg.id"
+            :class="`flex ${msg.sender === 'freelancer' ? 'justify-end' : 'justify-start'}`"
+          >
+            <div
+              :class="`max-w-[80%] rounded-lg p-3 ${
+                msg.sender === 'freelancer'
+                  ? 'bg-[#286AD8] text-white'
+                  : 'bg-gray-100 text-[#263238]'
+              }`"
+            >
+              <p class="text-xs font-medium mb-1 opacity-80">{{ msg.senderName }}</p>
+              <p class="text-sm">{{ msg.message }}</p>
+              <div v-if="msg.attachments && msg.attachments.length > 0" class="mt-3 space-y-2">
+                <FileAttachment
+                  v-for="att in msg.attachments"
+                  :key="att.id"
+                  :name="att.name"
+                  :url="att.url"
+                  :size="att.size"
+                  variant="compact"
+                  class="bg-white/10 border-white/20 text-white"
                 />
-                <Button
-                  @click="messageAttachmentInput?.click()"
-                  variant="outline"
-                  size="icon"
-                >
-                  <Paperclip class="h-4 w-4" />
-                </Button>
               </div>
+              <p class="text-xs mt-1 opacity-60">{{ new Date(msg.timestamp).toLocaleString('pt-BR', {
+                day: '2-digit',
+                month: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+              }) }}</p>
             </div>
-            <div v-else class="mt-6 flex items-center justify-center p-6 bg-gray-50 rounded-lg border border-dashed border-gray-200">
-              <p class="text-sm text-[#435574] flex items-center gap-2 text-center">
-                <Lock class="h-4 w-4 text-amber-500" />
-                O chat será liberado automaticamente após a confirmação do pagamento.
-              </p>
-            </div>
-          </Card>
-        </TabsContent>
+          </div>
+        </div>
 
-        <!-- Attachments Tab -->
-        <TabsContent value="attachments" class="space-y-4">
-          <Card class="p-6">
-            <h3 class="text-lg font-semibold text-[#263238] mb-4">Anexos do Cliente</h3>
-            <div v-if="!proposal.attachments || proposal.attachments.length === 0" class="text-center py-8">
-              <FileText class="h-12 w-12 text-gray-300 mx-auto mb-3" />
-              <p class="text-[#435574]">Nenhum anexo enviado pelo cliente</p>
-            </div>
-            <div v-else class="space-y-3">
-              <FileAttachment
-                v-for="att in proposal.attachments"
-                :key="att.id"
-                :name="att.name"
-                :url="att.url"
-                :size="att.size"
-                variant="blue"
-              />
-            </div>
-          </Card>
-        </TabsContent>
-
-        <!-- History Tab -->
-        <TabsContent value="history" class="space-y-4">
-          <ServiceRequestTimeline
-            :request-id="proposal.id"
-            title="Histórico de Ações"
+        <!-- Message Input -->
+        <div v-if="proposal.status === 'in_progress' || proposal.status === 'delivered'" class="flex gap-2">
+          <Textarea
+            :model-value="newMessage"
+            @update:model-value="(val) => newMessage = val as string"
+            placeholder="Digite sua mensagem..."
+            :rows="2"
+            class="flex-1"
           />
-        </TabsContent>
-      </Tabs>
+          <div class="flex flex-col gap-2">
+            <Button
+              @click="handleSendMessage"
+              :disabled="!newMessage.trim()"
+              class="bg-[#286AD8] hover:bg-[#435574]"
+            >
+              <Send class="h-4 w-4" />
+            </Button>
+            <input
+              ref="messageAttachmentInput"
+              type="file"
+              multiple
+              @change="handleMessageAttachmentChange"
+              class="hidden"
+            />
+            <Button
+              @click="messageAttachmentInput?.click()"
+              variant="outline"
+              size="icon"
+            >
+              <Paperclip class="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+        <div v-else class="flex items-center justify-center p-4 bg-gray-50 rounded-lg border border-dashed border-gray-200">
+          <p class="text-sm text-[#435574] flex items-center gap-2 text-center">
+            <Lock class="h-4 w-4 text-[#286AD8]" />
+            O chat será liberado automaticamente após a confirmação do pagamento.
+          </p>
+        </div>
+      </Card>
+
+      <!-- History Section -->
+      <ServiceRequestTimeline
+        v-if="activeSection === 'history'"
+        :request-id="proposal.id"
+        title="Histórico de Atividades"
+      />
+
+      <!-- Attachments Section -->
+      <Card v-if="activeSection === 'attachments'" class="p-6">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-lg font-semibold text-[#263238]">Arquivos do Projeto</h3>
+        </div>
+
+        <!-- Tabs -->
+        <div class="flex border-b border-gray-200 mb-4">
+          <button
+            @click="activeFileTab = 'client'"
+            :class="[
+              'px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px',
+              activeFileTab === 'client'
+                ? 'border-[#286AD8] text-[#286AD8]'
+                : 'border-transparent text-[#435574] hover:text-[#263238]'
+            ]"
+          >
+            Cliente
+            <Badge v-if="proposal.attachments && proposal.attachments.length > 0" variant="secondary" class="ml-2">
+              {{ proposal.attachments.length }}
+            </Badge>
+          </button>
+          <button
+            @click="activeFileTab = 'freelancer'"
+            :class="[
+              'px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px',
+              activeFileTab === 'freelancer'
+                ? 'border-[#286AD8] text-[#286AD8]'
+                : 'border-transparent text-[#435574] hover:text-[#263238]'
+            ]"
+          >
+            Freelancer
+            <Badge v-if="proposal.freelancerResponse?.attachments && proposal.freelancerResponse.attachments.length > 0" variant="secondary" class="ml-2">
+              {{ proposal.freelancerResponse.attachments.length }}
+            </Badge>
+          </button>
+        </div>
+
+        <!-- Client Files Tab -->
+        <div v-if="activeFileTab === 'client'">
+          <div v-if="!proposal.attachments || proposal.attachments.length === 0" class="text-center py-8">
+            <FileText class="h-12 w-12 text-gray-300 mx-auto mb-3" />
+            <p class="text-[#435574]">Nenhum arquivo enviado pelo cliente</p>
+          </div>
+          <div v-else class="space-y-2">
+            <FileAttachment
+              v-for="attachment in proposal.attachments"
+              :key="attachment.id"
+              :name="attachment.name"
+              :url="attachment.url"
+              :size="attachment.size"
+              sender-info="Enviado pelo cliente"
+              variant="blue"
+            />
+          </div>
+        </div>
+
+        <!-- Freelancer Files Tab -->
+        <div v-if="activeFileTab === 'freelancer'">
+          <div v-if="!proposal.freelancerResponse?.attachments || proposal.freelancerResponse.attachments.length === 0" class="text-center py-8">
+            <FileText class="h-12 w-12 text-gray-300 mx-auto mb-3" />
+            <p class="text-[#435574]">Nenhum arquivo enviado por você</p>
+          </div>
+          <div v-else class="space-y-2">
+            <FileAttachment
+              v-for="attachment in proposal.freelancerResponse.attachments"
+              :key="attachment.id"
+              :name="attachment.name"
+              :url="attachment.url"
+              :size="attachment.size"
+              sender-info="Enviado por você"
+              variant="blue"
+            />
+          </div>
+        </div>
+      </Card>
     </template>
 
     <!-- Send Proposal Dialog -->
@@ -1474,7 +1572,7 @@ const getStatusBadge = (status: string) => {
           <Button @click="showRejectCounterDialog = false" variant="outline">
             Cancelar
           </Button>
-          <Button @click="handleRejectCounterProposal" class="bg-amber-600 hover:bg-amber-700 text-white" :disabled="isLoading">
+          <Button @click="handleRejectCounterProposal" class="bg-[#286AD8] hover:bg-[#435574] text-white" :disabled="isLoading">
             {{ isLoading ? 'Enviando...' : 'Confirmar e Manter Inicial' }}
           </Button>
         </DialogFooter>

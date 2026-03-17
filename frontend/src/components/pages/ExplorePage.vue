@@ -44,6 +44,7 @@ interface ServiceItem {
   priceType: string;
   deliveryTime: number;
   deliveryUnit: string;
+  workModel?: string | null;
   freelancerProfilePhoto?: string;
   tags: string[];
   images: string[];

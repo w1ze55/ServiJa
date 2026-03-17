@@ -47,6 +47,7 @@ import Dialog from '../ui/dialog.vue';
 import DialogContent from '../ui/dialog-content.vue';
 import DialogHeader from '../ui/dialog-header.vue';
 import DialogTitle from '../ui/dialog-title.vue';
+import ScrollArea from '../ui/scroll-area.vue';
 import Select from '../ui/select.vue';
 import SelectContent from '../ui/select-content.vue';
 import SelectItem from '../ui/select-item.vue';
@@ -70,7 +71,6 @@ interface FreelancerData {
   bio: string;
   profilePhoto: string;
   serviceType: string;
-  workModel: string;
   location: string;
   rating: number;
   totalReviews: number;
@@ -97,6 +97,7 @@ interface ServiceItem {
   priceType: string;
   deliveryTime: number;
   deliveryUnit: string;
+  workModel?: string | null;
   tags: string[];
   images: string[];
   isActive: boolean;
@@ -128,6 +129,61 @@ interface Props {
   onNavigate: (page: string, params?: any) => void;
 }
 
+interface QuoteServiceAddress {
+  zipCode: string;
+  street: string;
+  number: string;
+  complement: string;
+  neighborhood: string;
+  city: string;
+  state: string;
+}
+
+interface QuoteAddressErrors {
+  zipCode: string;
+  street: string;
+  number: string;
+  neighborhood: string;
+  city: string;
+  state: string;
+}
+
+type WorkModel = 'presencial' | 'remoto' | 'hibrido';
+
+const createEmptyQuoteAddress = (): QuoteServiceAddress => ({
+  zipCode: '',
+  street: '',
+  number: '',
+  complement: '',
+  neighborhood: '',
+  city: '',
+  state: '',
+});
+
+const createEmptyQuoteAddressErrors = (): QuoteAddressErrors => ({
+  zipCode: '',
+  street: '',
+  number: '',
+  neighborhood: '',
+  city: '',
+  state: '',
+});
+
+const normalizeWorkModel = (value?: string | null): WorkModel | null => {
+  const normalized = value?.toUpperCase();
+  if (normalized === 'PRESENCIAL') return 'presencial';
+  if (normalized === 'HIBRIDO') return 'hibrido';
+  if (normalized === 'REMOTO') return 'remoto';
+  return null;
+};
+
+const getWorkModelLabel = (value?: WorkModel | null) => {
+  if (value === 'presencial') return 'Presencial';
+  if (value === 'hibrido') return 'Híbrido';
+  if (value === 'remoto') return 'Remoto';
+  return 'Não informado';
+};
+
 const props = defineProps<Props>();
 
 const freelancer = ref<FreelancerData | null>(null);
@@ -156,11 +212,16 @@ const quoteDeadline = ref('');
 const quoteDeadlineDate = ref('');
 const quoteDeadlineType = ref<'estimated' | 'decided'>('estimated');
 const quotePriority = ref('MEDIUM');
+const requestedServiceId = ref<number | null>(null);
 const requestedServiceTitle = ref('');
+const requestedServiceWorkModel = ref<WorkModel | null>(null);
 const showQuoteDialog = ref(false);
 const activeTab = ref('services');
 const isSendingQuote = ref(false);
 const quoteAttachments = ref<File[]>([]);
+const quoteServiceAddress = ref<QuoteServiceAddress>(createEmptyQuoteAddress());
+const quoteAddressErrors = ref<QuoteAddressErrors>(createEmptyQuoteAddressErrors());
+const isLoadingQuoteCEP = ref(false);
 const favoritesStore = useFavoritesStore();
 const router = useRouter();
 const fileInputRef = ref<HTMLInputElement | null>(null);
@@ -170,6 +231,36 @@ const selectedImageIndex = ref(0);
 const route = useRoute();
 const selectedServiceModal = ref<ServiceItem | null>(null);
 const selectedServiceImageIndex = ref(0);
+const effectiveWorkModels = computed<WorkModel[]>(() => {
+  const serviceModels = Array.from(
+    new Set(
+      services.value
+        .map((service) => normalizeWorkModel(service.workModel))
+        .filter((value): value is WorkModel => value !== null)
+    )
+  );
+
+  if (serviceModels.length > 0) {
+    return serviceModels;
+  }
+  return [];
+});
+
+const workModelSummary = computed(() => {
+  if (!effectiveWorkModels.value.length) {
+    return 'Não informado';
+  }
+
+  return effectiveWorkModels.value.map((value) => getWorkModelLabel(value)).join(' / ');
+});
+
+const hasOnsiteServices = computed(() =>
+  effectiveWorkModels.value.some((value) => value === 'presencial' || value === 'hibrido')
+);
+
+const serviceRequiresAddress = computed(
+  () => requestedServiceWorkModel.value === 'presencial' || requestedServiceWorkModel.value === 'hibrido'
+);
 
 
 const loadFreelancerData = async () => {
@@ -183,7 +274,10 @@ const loadFreelancerData = async () => {
 
     // Buscar serviços do freelancer
     const servicesResponse = await api.get(`/services/public/freelancer/${props.providerId}`);
-    services.value = servicesResponse.data;
+    services.value = (servicesResponse.data || []).map((service: ServiceItem) => ({
+      ...service,
+      workModel: normalizeWorkModel(service.workModel),
+    }));
 
     // Buscar portfólio do freelancer
     try {
@@ -351,6 +445,117 @@ const handleDeadlineInput = (val: string) => {
   quoteDeadline.value = digits;
 };
 
+const clearQuoteAddressErrors = () => {
+  quoteAddressErrors.value = createEmptyQuoteAddressErrors();
+};
+
+const formatCEP = (value: string) => {
+  const numbers = value.replace(/\D/g, '').slice(0, 8);
+  return numbers.replace(/(\d{5})(\d{0,3})/, '$1-$2');
+};
+
+const fetchQuoteAddressByCEP = async (cep: string) => {
+  const cleanCEP = cep.replace(/\D/g, '');
+  if (cleanCEP.length !== 8) return;
+
+  isLoadingQuoteCEP.value = true;
+
+  try {
+    const response = await fetch(`https://viacep.com.br/ws/${cleanCEP}/json/`);
+    const data = await response.json();
+
+    if (data.erro) {
+      toast.error('CEP não encontrado');
+      return;
+    }
+
+    quoteServiceAddress.value = {
+      ...quoteServiceAddress.value,
+      zipCode: formatCEP(cleanCEP),
+      street: data.logradouro || '',
+      neighborhood: data.bairro || '',
+      city: data.localidade || '',
+      state: data.uf || '',
+      complement: quoteServiceAddress.value.complement || data.complemento || '',
+    };
+  } catch (error) {
+    console.error('Erro ao buscar CEP:', error);
+    toast.error('Não foi possível buscar o endereço pelo CEP informado');
+  } finally {
+    isLoadingQuoteCEP.value = false;
+  }
+};
+
+const handleQuoteCEPInput = (value: string) => {
+  const formatted = formatCEP(value);
+  quoteServiceAddress.value.zipCode = formatted;
+  quoteAddressErrors.value.zipCode = '';
+
+  const cleanCEP = formatted.replace(/\D/g, '');
+  if (cleanCEP.length === 8) {
+    fetchQuoteAddressByCEP(cleanCEP);
+  }
+};
+
+const validateQuoteAddress = () => {
+  clearQuoteAddressErrors();
+
+  if (!serviceRequiresAddress.value) {
+    return true;
+  }
+
+  let isValid = true;
+  const cleanCEP = quoteServiceAddress.value.zipCode.replace(/\D/g, '');
+
+  if (!cleanCEP) {
+    quoteAddressErrors.value.zipCode = 'CEP é obrigatório';
+    isValid = false;
+  } else if (cleanCEP.length !== 8) {
+    quoteAddressErrors.value.zipCode = 'CEP deve ter 8 dígitos';
+    isValid = false;
+  }
+
+  if (!quoteServiceAddress.value.street.trim()) {
+    quoteAddressErrors.value.street = 'Rua é obrigatória';
+    isValid = false;
+  }
+
+  if (!quoteServiceAddress.value.number.trim()) {
+    quoteAddressErrors.value.number = 'Número é obrigatório';
+    isValid = false;
+  }
+
+  if (!quoteServiceAddress.value.neighborhood.trim()) {
+    quoteAddressErrors.value.neighborhood = 'Bairro é obrigatório';
+    isValid = false;
+  }
+
+  if (!quoteServiceAddress.value.city.trim()) {
+    quoteAddressErrors.value.city = 'Cidade é obrigatória';
+    isValid = false;
+  }
+
+  if (!quoteServiceAddress.value.state.trim()) {
+    quoteAddressErrors.value.state = 'Estado é obrigatório';
+    isValid = false;
+  } else if (quoteServiceAddress.value.state.trim().length !== 2) {
+    quoteAddressErrors.value.state = 'Use a sigla do estado';
+    isValid = false;
+  }
+
+  return isValid;
+};
+
+const buildQuoteAddress = () => {
+  const address = quoteServiceAddress.value;
+  const streetLine = [
+    `${address.street.trim()}, ${address.number.trim()}`,
+    address.complement.trim(),
+  ].filter(Boolean).join(', ');
+
+  return `${streetLine} - ${address.neighborhood.trim()} - ${address.city.trim()}/${address.state.trim().toUpperCase()} - CEP: ${address.zipCode.trim()}`;
+};
+
 const handleViewProject = (project: PortfolioProject) => {
   selectedProject.value = project;
   selectedImageIndex.value = 0;
@@ -397,6 +602,14 @@ const handleSendQuote = async () => {
     return;
   }
 
+  if (!validateQuoteAddress()) {
+    const firstAddressError = Object.values(quoteAddressErrors.value).find(Boolean);
+    toast.error(firstAddressError || 'Informe a localização do serviço');
+    return;
+  }
+
+  const serviceAddress = serviceRequiresAddress.value ? buildQuoteAddress() : null;
+
   isSendingQuote.value = true;
   try {
     // Upload attachments to S3 first if any
@@ -415,7 +628,8 @@ const handleSendQuote = async () => {
       budget: Number(quoteBudget.value),
       deadline: deadline,
       priority: quotePriority.value,
-      address: '',
+      address: serviceAddress,
+      serviceId: requestedServiceId.value,
       freelancerId: Number(props.providerId),
       attachments: attachmentUrls,
     };
@@ -472,9 +686,15 @@ const resetQuoteForm = () => {
   formattedQuoteBudget.value = '';
   quoteDeadline.value = '';
   quoteDeadlineDate.value = '';
+  quoteDeadlineType.value = 'estimated';
   quotePriority.value = 'MEDIUM';
+  requestedServiceId.value = null;
   requestedServiceTitle.value = '';
+  requestedServiceWorkModel.value = null;
   quoteAttachments.value = [];
+  quoteServiceAddress.value = createEmptyQuoteAddress();
+  clearQuoteAddressErrors();
+  isLoadingQuoteCEP.value = false;
 };
 
 const handleServiceClick = (service: ServiceItem) => {
@@ -498,12 +718,11 @@ const handleCloseServiceModal = () => {
 };
 
 const handleRequestService = (service: ServiceItem) => {
+  resetQuoteForm();
+  requestedServiceId.value = service.id;
   quoteCategory.value = service.category;
   requestedServiceTitle.value = service.title;
-  quoteDeadlineType.value = 'estimated';
-  quoteDeadlineDate.value = '';
-  quoteDeadline.value = ''; // Clear previous estimate
-  quotePriority.value = 'MEDIUM';
+  requestedServiceWorkModel.value = normalizeWorkModel(service.workModel);
   selectedServiceModal.value = null;
   showQuoteDialog.value = true;
 };
@@ -696,6 +915,11 @@ onMounted(() => {
                         <h3 class="font-semibold text-[#263238] mb-2 line-clamp-1 group-hover:text-[#286AD8]">
                           {{ service.title }}
                         </h3>
+                        <div v-if="service.workModel" class="mb-3">
+                          <Badge variant="outline" class="bg-white text-[#435574]">
+                            {{ getWorkModelLabel(normalizeWorkModel(service.workModel)) }}
+                          </Badge>
+                        </div>
                         <p class="text-sm text-[#435574] mb-3 line-clamp-2">{{ service.description }}</p>
 
                         <!-- Tags -->
@@ -748,7 +972,7 @@ onMounted(() => {
                   <p v-else class="text-[#435574] mb-6">Nenhuma descrição disponível.</p>
 
                   <!-- Service Cities -->
-                  <div v-if="freelancer.serviceCities && freelancer.serviceCities.length > 0" class="mb-6">
+                  <div v-if="hasOnsiteServices && freelancer.serviceCities && freelancer.serviceCities.length > 0" class="mb-6">
                     <h3 class="font-semibold text-[#263238] mb-3">Cidades atendidas</h3>
                     <div class="flex flex-wrap gap-2">
                       <Badge v-for="city in freelancer.serviceCities" :key="city.id" variant="secondary">
@@ -878,7 +1102,7 @@ onMounted(() => {
                 <div class="flex items-center justify-between">
                   <span class="text-sm text-[#435574]">Modo:</span>
                   <Badge variant="secondary" class="text-sm">
-                    {{ freelancer.workModel === 'remoto' ? 'Remoto' : freelancer.workModel === 'presencial' ? 'Presencial' : freelancer.workModel === 'hibrido' ? 'Híbrido' : 'Não informado' }}
+                    {{ workModelSummary }}
                   </Badge>
                 </div>
 
@@ -887,7 +1111,7 @@ onMounted(() => {
                   <span class="text-sm font-medium text-[#263238]">{{ freelancer.serviceType }}</span>
                 </div>
 
-                <div v-if="(freelancer.workModel === 'presencial' || freelancer.workModel === 'hibrido') && freelancer.serviceCities?.length" class="border-t pt-3">
+                <div v-if="hasOnsiteServices && freelancer.serviceCities?.length" class="border-t pt-3">
                   <p class="text-sm text-[#435574] mb-2">Cidades atendidas:</p>
                   <div class="flex flex-wrap gap-1">
                     <Badge v-for="city in freelancer.serviceCities.slice(0, 3)" :key="city.id" variant="outline" class="text-[10px] bg-white text-gray-600">
@@ -1171,6 +1395,13 @@ onMounted(() => {
                 <Badge class="bg-blue-50 text-[#286AD8] border-none font-bold uppercase tracking-wider text-[10px] px-3">
                   {{ selectedServiceModal.category }}
                 </Badge>
+                <Badge
+                  v-if="selectedServiceModal.workModel"
+                  variant="outline"
+                  class="bg-white text-[#435574] border-gray-200"
+                >
+                  {{ getWorkModelLabel(normalizeWorkModel(selectedServiceModal.workModel)) }}
+                </Badge>
               </div>
               <h2 class="text-3xl font-bold text-[#263238] leading-tight">{{ selectedServiceModal.title }}</h2>
             </div>
@@ -1267,12 +1498,12 @@ onMounted(() => {
     </Dialog>
     <!-- Quote Dialog -->
     <Dialog v-model:open="showQuoteDialog">
-      <DialogContent class="max-w-md">
-        <DialogHeader>
-          <DialogTitle>Solicitar Orçamento</DialogTitle>
-        </DialogHeader>
-        <div class="space-y-4">
-          <!-- Categoria e Prioridade removidos conforme solicitação -->
+      <DialogContent class="max-w-md max-h-[90vh] overflow-hidden p-0 gap-0">
+        <ScrollArea class="mt-10 max-h-[calc(90vh-2.5rem)]">
+        <div class="space-y-4 px-6 pb-6 pr-8">
+          <DialogHeader class="pr-6">
+            <DialogTitle>Solicitar Orçamento</DialogTitle>
+          </DialogHeader>
 
           <div>
             <Label class="text-[#435574] mb-2 block text-sm">
@@ -1365,6 +1596,126 @@ onMounted(() => {
             />
           </div>
 
+          <div v-if="serviceRequiresAddress" class="space-y-3 rounded-lg border border-blue-100 bg-blue-50/40 p-4">
+            <div class="flex items-start gap-2">
+              <MapPin class="h-4 w-4 text-[#286AD8] mt-0.5" />
+              <div>
+                <Label class="text-[#435574] mb-1 block text-sm">
+                  Localização do serviço <span class="text-red-500">*</span>
+                </Label>
+                <p class="text-xs text-[#435574]">
+                  Digite o CEP para buscar o endereço e complete os demais dados do local.
+                </p>
+              </div>
+            </div>
+
+            <div class="space-y-1">
+              <Label for="quote-service-zipcode" class="text-sm text-[#435574]">CEP *</Label>
+              <div class="relative">
+                <Input
+                  id="quote-service-zipcode"
+                  :model-value="quoteServiceAddress.zipCode"
+                  @update:model-value="(val) => handleQuoteCEPInput(val as string)"
+                  placeholder="00000-000"
+                  maxlength="9"
+                  :disabled="isLoadingQuoteCEP"
+                  :class="{ 'border-red-500 focus-visible:ring-red-500': quoteAddressErrors.zipCode }"
+                />
+                <div v-if="isLoadingQuoteCEP" class="absolute right-3 top-1/2 -translate-y-1/2">
+                  <Loader2 class="h-4 w-4 animate-spin text-[#286AD8]" />
+                </div>
+              </div>
+              <p v-if="quoteAddressErrors.zipCode" class="text-[11px] text-red-500">
+                {{ quoteAddressErrors.zipCode }}
+              </p>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div class="sm:col-span-2 space-y-1">
+                <Label for="quote-service-street" class="text-sm text-[#435574]">Rua *</Label>
+                <Input
+                  id="quote-service-street"
+                  :model-value="quoteServiceAddress.street"
+                  @update:model-value="(val) => { quoteServiceAddress.street = val as string; quoteAddressErrors.street = '' }"
+                  placeholder="Nome da rua"
+                  :class="{ 'border-red-500 focus-visible:ring-red-500': quoteAddressErrors.street }"
+                />
+                <p v-if="quoteAddressErrors.street" class="text-[11px] text-red-500">
+                  {{ quoteAddressErrors.street }}
+                </p>
+              </div>
+
+              <div class="space-y-1">
+                <Label for="quote-service-number" class="text-sm text-[#435574]">Número *</Label>
+                <Input
+                  id="quote-service-number"
+                  :model-value="quoteServiceAddress.number"
+                  @update:model-value="(val) => { quoteServiceAddress.number = val as string; quoteAddressErrors.number = '' }"
+                  placeholder="123"
+                  :class="{ 'border-red-500 focus-visible:ring-red-500': quoteAddressErrors.number }"
+                />
+                <p v-if="quoteAddressErrors.number" class="text-[11px] text-red-500">
+                  {{ quoteAddressErrors.number }}
+                </p>
+              </div>
+            </div>
+
+            <div class="space-y-1">
+              <Label for="quote-service-complement" class="text-sm text-[#435574]">Complemento</Label>
+              <Input
+                id="quote-service-complement"
+                :model-value="quoteServiceAddress.complement"
+                @update:model-value="(val) => quoteServiceAddress.complement = val as string"
+                placeholder="Apto, bloco, referência..."
+              />
+            </div>
+
+            <div class="space-y-1">
+              <Label for="quote-service-neighborhood" class="text-sm text-[#435574]">Bairro *</Label>
+              <Input
+                id="quote-service-neighborhood"
+                :model-value="quoteServiceAddress.neighborhood"
+                @update:model-value="(val) => { quoteServiceAddress.neighborhood = val as string; quoteAddressErrors.neighborhood = '' }"
+                placeholder="Nome do bairro"
+                :class="{ 'border-red-500 focus-visible:ring-red-500': quoteAddressErrors.neighborhood }"
+              />
+              <p v-if="quoteAddressErrors.neighborhood" class="text-[11px] text-red-500">
+                {{ quoteAddressErrors.neighborhood }}
+              </p>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div class="sm:col-span-2 space-y-1">
+                <Label for="quote-service-city" class="text-sm text-[#435574]">Cidade *</Label>
+                <Input
+                  id="quote-service-city"
+                  :model-value="quoteServiceAddress.city"
+                  @update:model-value="(val) => { quoteServiceAddress.city = val as string; quoteAddressErrors.city = '' }"
+                  placeholder="Cidade"
+                  :class="{ 'border-red-500 focus-visible:ring-red-500': quoteAddressErrors.city }"
+                />
+                <p v-if="quoteAddressErrors.city" class="text-[11px] text-red-500">
+                  {{ quoteAddressErrors.city }}
+                </p>
+              </div>
+
+              <div class="space-y-1">
+                <Label for="quote-service-state" class="text-sm text-[#435574]">Estado *</Label>
+                <Input
+                  id="quote-service-state"
+                  :model-value="quoteServiceAddress.state"
+                  @update:model-value="(val) => { quoteServiceAddress.state = (val as string).toUpperCase().slice(0, 2); quoteAddressErrors.state = '' }"
+                  placeholder="SP"
+                  maxlength="2"
+                  :class="{ 'border-red-500 focus-visible:ring-red-500': quoteAddressErrors.state }"
+                />
+                <p v-if="quoteAddressErrors.state" class="text-[11px] text-red-500">
+                  {{ quoteAddressErrors.state }}
+                </p>
+              </div>
+            </div>
+          </div>
+
           <!-- Attachments -->
           <div>
             <Label class="text-[#435574] mb-2 block text-sm">
@@ -1414,8 +1765,7 @@ onMounted(() => {
             {{ isSendingQuote ? 'Enviando...' : 'Enviar Solicitação' }}
           </Button>
         </div>
+        </ScrollArea>
       </DialogContent>
     </Dialog>
 </template>
-
-```

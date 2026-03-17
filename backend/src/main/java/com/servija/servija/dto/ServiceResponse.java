@@ -24,6 +24,7 @@ public class ServiceResponse {
     private String priceType;
     private Integer deliveryTime;
     private String deliveryUnit;
+    private String workModel;
     private List<String> tags;
     private List<String> images;
     private Boolean isActive;

@@ -49,6 +49,10 @@ public class Service {
     @Builder.Default
     private DeliveryUnit deliveryUnit = DeliveryUnit.DAYS;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "work_model", nullable = false, length = 20)
+    private WorkModel workModel;
+
     @Column(columnDefinition = "TEXT")
     private String tags;
 
@@ -73,5 +77,9 @@ public class Service {
 
     public enum DeliveryUnit {
         DAYS, WEEKS, MONTHS
+    }
+
+    public enum WorkModel {
+        PRESENCIAL, REMOTO, HIBRIDO
     }
 }
