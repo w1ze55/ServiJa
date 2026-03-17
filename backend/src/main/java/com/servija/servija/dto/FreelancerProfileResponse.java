@@ -21,7 +21,6 @@ public class FreelancerProfileResponse {
     private String bio;
     private String profilePhoto;
     private String serviceType;
-    private String workModel;
     private String location;
     private List<String> cities;
     private List<ServiceCityResponse> serviceCities;

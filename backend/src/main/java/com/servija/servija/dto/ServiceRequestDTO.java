@@ -23,5 +23,6 @@ public class ServiceRequestDTO {
     private String address;
     private String desiredDate;
     private List<String> attachments;
+    private Long serviceId;
     private Long freelancerId;
 }

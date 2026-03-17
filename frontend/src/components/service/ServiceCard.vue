@@ -14,6 +14,7 @@ interface ServiceItem {
   priceType: string;
   deliveryTime: number;
   deliveryUnit: string;
+  workModel?: string | null;
   freelancerProfilePhoto?: string;
   images: string[];
 }
@@ -36,6 +37,14 @@ const formatPrice = (price: number, priceType: string) => {
 const formatDelivery = (time: number, unit: string) => {
   const unitLabel = unit === 'HOURS' ? 'hora(s)' : unit === 'DAYS' ? 'dia(s)' : 'semana(s)';
   return `${time} ${unitLabel}`;
+};
+
+const formatWorkModel = (value?: string | null) => {
+  const normalized = value?.toUpperCase();
+  if (normalized === 'PRESENCIAL') return 'Presencial';
+  if (normalized === 'HIBRIDO') return 'Híbrido';
+  if (normalized === 'REMOTO') return 'Remoto';
+  return null;
 };
 
 const getInitials = (name: string) =>
@@ -91,6 +100,9 @@ const handleFavoriteClick = (e: MouseEvent) => {
       <h3 class="font-semibold text-[#263238] mb-1 line-clamp-1 group-hover:text-[#286AD8] transition-colors">
         {{ service.title }}
       </h3>
+      <Badge v-if="formatWorkModel(service.workModel)" variant="outline" class="mb-2 bg-white text-[#435574]">
+        {{ formatWorkModel(service.workModel) }}
+      </Badge>
 
       <!-- Freelancer -->
       <div class="flex items-center gap-2 mb-3">

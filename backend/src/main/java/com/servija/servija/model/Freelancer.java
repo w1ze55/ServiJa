@@ -62,10 +62,6 @@ public class Freelancer extends User {
 
     @Column(length = 50)
     private String serviceType;
-    
-    @Enumerated(EnumType.STRING)
-    @Column(length = 20)
-    private WorkModel workModel;
 
     @Column(columnDefinition = "TEXT")
     private String cities;
@@ -90,11 +86,5 @@ public class Freelancer extends User {
     @OneToMany(mappedBy = "freelancer", cascade = CascadeType.ALL, orphanRemoval = true)
     @lombok.Builder.Default
     private List<PortfolioProject> portfolioProjects = new ArrayList<>();
-
-    public enum WorkModel {
-        PRESENCIAL,
-        REMOTO,
-        HIBRIDO
-    }
 }
 

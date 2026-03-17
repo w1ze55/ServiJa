@@ -89,6 +89,7 @@ public class ServiceService {
                 .deliveryTime(request.getDeliveryTime())
                 .deliveryUnit(
                         parseEnum(Service.DeliveryUnit.class, request.getDeliveryUnit(), Service.DeliveryUnit.DAYS))
+                .workModel(parseEnum(Service.WorkModel.class, request.getWorkModel(), Service.WorkModel.REMOTO))
                 .tags(toJson(request.getTags()))
                 .images(toJson(request.getImages()))
                 .isActive(request.getIsActive() != null ? request.getIsActive() : true)
@@ -137,6 +138,9 @@ public class ServiceService {
         if (request.getDeliveryUnit() != null) {
             service.setDeliveryUnit(
                     parseEnum(Service.DeliveryUnit.class, request.getDeliveryUnit(), service.getDeliveryUnit()));
+        }
+        if (request.getWorkModel() != null) {
+            service.setWorkModel(parseEnum(Service.WorkModel.class, request.getWorkModel(), service.getWorkModel()));
         }
         if (request.getTags() != null) {
             service.setTags(toJson(request.getTags()));
@@ -297,6 +301,7 @@ public class ServiceService {
                 .priceType(service.getPriceType().name())
                 .deliveryTime(service.getDeliveryTime())
                 .deliveryUnit(service.getDeliveryUnit().name())
+                .workModel(service.getWorkModel() != null ? service.getWorkModel().name() : null)
                 .tags(fromJson(service.getTags()))
                 .images(fromJson(service.getImages()))
                 .isActive(service.getIsActive())

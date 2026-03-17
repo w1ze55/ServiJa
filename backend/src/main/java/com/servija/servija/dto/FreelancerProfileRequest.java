@@ -31,8 +31,6 @@ public class FreelancerProfileRequest {
     @Size(max = 20, message = "Tipo de serviço deve ter no máximo 20 caracteres")
     private String serviceType;
     
-    private String workModel; // PRESENCIAL, REMOTO, HIBRIDO
-    
     @Size(max = 20, message = "Máximo de 20 cidades permitidas")
     private List<String> cities;
     

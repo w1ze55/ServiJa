@@ -89,9 +89,6 @@ public class FreelancerService {
         if (request.getServiceType() != null) {
             freelancer.setServiceType(request.getServiceType());
         }
-        if (request.getWorkModel() != null) {
-            freelancer.setWorkModel(Freelancer.WorkModel.valueOf(request.getWorkModel().toUpperCase()));
-        }
         if (request.getCities() != null) {
             try {
                 freelancer.setCities(objectMapper.writeValueAsString(request.getCities()));
@@ -236,7 +233,6 @@ public class FreelancerService {
                 .bio(freelancer.getBio())
                 .profilePhoto(freelancer.getAvatarUrl())
                 .serviceType(freelancer.getServiceType())
-                .workModel(freelancer.getWorkModel() != null ? freelancer.getWorkModel().name().toLowerCase() : null)
                 .location(location)
                 .cities(cities)
                 .serviceCities(serviceCityResponses)

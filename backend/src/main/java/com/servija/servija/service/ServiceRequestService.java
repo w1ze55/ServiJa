@@ -10,6 +10,7 @@ import com.servija.servija.exception.ResourceNotFoundException;
 import com.servija.servija.model.ServiceRequest;
 import com.servija.servija.model.ServiceRequest.Status;
 import com.servija.servija.model.ServiceRequestHistory.OperationType;
+import com.servija.servija.repository.ServiceRepository;
 import com.servija.servija.model.User;
 import com.servija.servija.repository.ServiceRequestRepository;
 import com.servija.servija.repository.UserRepository;
@@ -17,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -30,6 +32,7 @@ public class ServiceRequestService {
 
     private final ServiceRequestRepository serviceRequestRepository;
     private final UserRepository userRepository;
+    private final ServiceRepository serviceRepository;
     private final FileStorageService fileStorageService;
     private final ServiceRequestHistoryService historyService;
     private final WebSocketService webSocketService;
@@ -40,10 +43,33 @@ public class ServiceRequestService {
         User contractor = userRepository.findByEmail(contractorEmail)
                 .orElseThrow(() -> new RuntimeException("Contractor not found"));
 
+        com.servija.servija.model.Service selectedService = null;
         User freelancer = null;
-        if (dto.getFreelancerId() != null) {
+
+        if (dto.getServiceId() != null) {
+            selectedService = serviceRepository.findById(dto.getServiceId())
+                    .orElseThrow(() -> new RuntimeException("Service not found"));
+            freelancer = selectedService.getFreelancer();
+        } else if (dto.getFreelancerId() != null) {
             freelancer = userRepository.findById(dto.getFreelancerId())
                     .orElseThrow(() -> new RuntimeException("Freelancer not found"));
+        }
+
+        if (selectedService != null && dto.getFreelancerId() != null
+                && !selectedService.getFreelancer().getId().equals(dto.getFreelancerId())) {
+            throw new IllegalArgumentException("O serviço selecionado não pertence ao freelancer informado");
+        }
+
+        String normalizedAddress = StringUtils.hasText(dto.getAddress()) ? dto.getAddress().trim() : null;
+
+        com.servija.servija.model.Service.WorkModel requestWorkModel = resolveServiceWorkModel(selectedService);
+        if (requestWorkModel == com.servija.servija.model.Service.WorkModel.PRESENCIAL
+                || requestWorkModel == com.servija.servija.model.Service.WorkModel.HIBRIDO) {
+            if (!StringUtils.hasText(normalizedAddress)) {
+                throw new IllegalArgumentException("Informe o local onde o serviço será realizado");
+            }
+        } else {
+            normalizedAddress = null;
         }
 
         String attachmentsJson = null;
@@ -64,7 +90,7 @@ public class ServiceRequestService {
                 .budget(dto.getBudget())
                 .deadline(dto.getDeadline())
                 .priority(ServiceRequest.Priority.valueOf(dto.getPriority().toUpperCase()))
-                .address(dto.getAddress())
+                .address(normalizedAddress)
                 .desiredDate(dto.getDesiredDate() != null ? LocalDate.parse(dto.getDesiredDate()) : null)
                 .attachments(attachmentsJson)
                 .build();
@@ -409,6 +435,15 @@ public class ServiceRequestService {
 
     private boolean isS3Url(String url) {
         return url != null && url.contains(".s3.") && url.contains("amazonaws.com");
+    }
+
+    private com.servija.servija.model.Service.WorkModel resolveServiceWorkModel(
+            com.servija.servija.model.Service service) {
+        if (service == null) {
+            return null;
+        }
+
+        return service.getWorkModel();
     }
 
     private ServiceRequestResponse toResponse(ServiceRequest request) {
