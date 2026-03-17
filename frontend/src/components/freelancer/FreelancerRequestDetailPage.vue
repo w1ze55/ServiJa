@@ -835,35 +835,6 @@ const getStatusBadge = (status: string) => {
       <div v-if="activeSection === 'details'" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <!-- Main Info -->
         <div class="lg:col-span-2 space-y-6">
-          <!-- Client Info Card -->
-          <Card class="p-6">
-            <h3 class="font-semibold text-[#263238] mb-4">Cliente</h3>
-            <div class="flex items-center gap-4">
-              <Avatar class="h-16 w-16">
-                <AvatarImage :src="proposal.clientAvatar" :alt="proposal.clientName" />
-                <AvatarFallback class="bg-[#286AD8] text-white text-lg">
-                  {{ getInitials(proposal.clientName) }}
-                </AvatarFallback>
-              </Avatar>
-              <div class="flex-1">
-                <h3 class="text-lg font-semibold text-[#263238] mb-1">{{ proposal.clientName }}</h3>
-                <div class="flex items-center gap-4 text-sm text-[#435574] flex-wrap">
-                  <span class="flex items-center gap-1">
-                    <MapPin class="h-4 w-4" />
-                    {{ proposal.clientLocation }}
-                  </span>
-                  <span v-if="proposal.clientEmail" class="flex items-center gap-1">
-                    <Mail class="h-4 w-4" />
-                    {{ proposal.clientEmail }}
-                  </span>
-                  <span v-if="proposal.clientPhone" class="flex items-center gap-1">
-                    <Phone class="h-4 w-4" />
-                    {{ proposal.clientPhone }}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </Card>
 
           <!-- Description -->
           <Card class="p-6">
@@ -1075,6 +1046,35 @@ const getStatusBadge = (status: string) => {
                     proposal.priority === 'MEDIUM' ? 'Média' : 'Baixa'
                   }}
                 </Badge>
+              </div>
+            </div>
+          </Card>
+                    <!-- Client Info Card -->
+                    <Card class="p-6">
+            <h3 class="font-semibold text-[#263238] mb-4">Cliente</h3>
+            <div class="flex items-center gap-4">
+              <Avatar class="h-16 w-16">
+                <AvatarImage :src="proposal.clientAvatar" :alt="proposal.clientName" />
+                <AvatarFallback class="bg-[#286AD8] text-white text-lg">
+                  {{ getInitials(proposal.clientName) }}
+                </AvatarFallback>
+              </Avatar>
+              <div class="flex-1">
+                <h3 class="text-lg font-semibold text-[#263238] mb-1">{{ proposal.clientName }}</h3>
+                <div class="flex items-center gap-4 text-sm text-[#435574] flex-wrap">
+                  <span class="flex items-center gap-1">
+                    <MapPin class="h-4 w-4" />
+                    {{ proposal.clientLocation }}
+                  </span>
+                  <span v-if="proposal.clientEmail" class="flex items-center gap-1">
+                    <Mail class="h-4 w-4" />
+                    {{ proposal.clientEmail }}
+                  </span>
+                  <span v-if="proposal.clientPhone" class="flex items-center gap-1">
+                    <Phone class="h-4 w-4" />
+                    {{ proposal.clientPhone }}
+                  </span>
+                </div>
               </div>
             </div>
           </Card>
