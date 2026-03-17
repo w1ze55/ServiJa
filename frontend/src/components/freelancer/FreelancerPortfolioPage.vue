@@ -441,7 +441,7 @@ const handleTagKeyPress = (e: KeyboardEvent) => {
             </SelectContent>
           </Select>
 
-          <div class="flex border rounded-lg">
+          <div class="hidden sm:flex border rounded-lg">
             <Button
               @click="viewMode = 'grid'"
               variant="ghost"
@@ -533,7 +533,10 @@ const handleTagKeyPress = (e: KeyboardEvent) => {
             <h3 class="text-[#263238] line-clamp-2">{{ project.title }}</h3>
           </div>
 
-          <p class="text-sm text-[#435574] mb-3 line-clamp-2">{{ project.description }}</p>
+          <p
+            class="text-sm text-[#435574] mb-3"
+            style="display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: break-word;"
+          >{{ project.description }}</p>
 
           <div class="flex flex-wrap gap-1 mb-3">
             <Badge
@@ -575,17 +578,20 @@ const handleTagKeyPress = (e: KeyboardEvent) => {
           </div>
 
           <!-- Info -->
-          <div class="flex-1">
+          <div class="flex-1 min-w-0">
             <div class="flex items-start justify-between mb-2">
-              <div class="flex-1">
+              <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-2 mb-1">
-                  <h3 class="text-[#263238]">{{ project.title }}</h3>
+                  <h3 class="text-[#263238] truncate">{{ project.title }}</h3>
                   <Badge v-if="project.featured" class="bg-yellow-500 hover:bg-yellow-600">
                     <Tag class="h-3 w-3 mr-1" />
                     Destaque
                   </Badge>
                 </div>
-                <p class="text-sm text-[#435574] mb-2">{{ project.description }}</p>
+                <p
+                  class="text-sm text-[#435574] mb-2"
+                  style="display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: break-word;"
+                >{{ project.description }}</p>
                 <div class="flex flex-wrap gap-1">
                   <Badge v-for="tag in project.tags" :key="tag" variant="secondary" class="text-xs">
                     {{ tag }}

@@ -244,13 +244,13 @@ const handleDeleteNotification = (notificationId: string, e: MouseEvent) => {
 <template>
   <div class="max-w-4xl mx-auto space-y-6">
     <!-- Header -->
-    <div class="flex items-start justify-between">
+    <div class="flex flex-wrap items-start justify-between gap-3">
       <div>
         <h1 class="text-[#263238] mb-2">Notificações</h1>
         <p class="text-[#435574]">Acompanhe atualizações sobre seus serviços e mensagens</p>
       </div>
 
-      <div v-if="notifications.length > 0" class="flex gap-2">
+      <div v-if="notifications.length > 0" class="flex flex-wrap gap-2">
         <Button v-if="unreadCount > 0" @click="handleMarkAllAsRead" variant="outline" size="sm">
           <CheckCircle class="h-4 w-4 mr-2" />
           Marcar Todas como Lidas
@@ -285,23 +285,25 @@ const handleDeleteNotification = (notificationId: string, e: MouseEvent) => {
 
     <!-- Tabs -->
     <Tabs :model-value="activeTab" @update:model-value="(val) => activeTab = val as string">
-      <TabsList class="grid w-full grid-cols-5">
-        <TabsTrigger value="all">
-          Todas
-          <Badge v-if="notifications.length > 0" variant="secondary" class="ml-2">
-            {{ notifications.length }}
-          </Badge>
-        </TabsTrigger>
-        <TabsTrigger value="unread">
-          Não Lidas
-          <Badge v-if="unreadCount > 0" class="ml-2 bg-[#286AD8] hover:bg-[#286AD8]">
-            {{ unreadCount }}
-          </Badge>
-        </TabsTrigger>
-        <TabsTrigger value="financial">Financeiro</TabsTrigger>
-        <TabsTrigger value="message">Mensagens</TabsTrigger>
-        <TabsTrigger value="system">Sistema</TabsTrigger>
-      </TabsList>
+      <div class="overflow-x-auto -mx-1 px-1">
+        <TabsList class="flex w-max min-w-full">
+          <TabsTrigger value="all" class="flex-shrink-0 text-xs sm:text-sm">
+            Todas
+            <Badge v-if="notifications.length > 0" variant="secondary" class="ml-2">
+              {{ notifications.length }}
+            </Badge>
+          </TabsTrigger>
+          <TabsTrigger value="unread" class="flex-shrink-0 text-xs sm:text-sm">
+            Não Lidas
+            <Badge v-if="unreadCount > 0" class="ml-2 bg-[#286AD8] hover:bg-[#286AD8]">
+              {{ unreadCount }}
+            </Badge>
+          </TabsTrigger>
+          <TabsTrigger value="financial" class="flex-shrink-0 text-xs sm:text-sm">Financeiro</TabsTrigger>
+          <TabsTrigger value="message" class="flex-shrink-0 text-xs sm:text-sm">Mensagens</TabsTrigger>
+          <TabsTrigger value="system" class="flex-shrink-0 text-xs sm:text-sm">Sistema</TabsTrigger>
+        </TabsList>
+      </div>
 
       <TabsContent :value="activeTab" class="space-y-3 mt-6">
         <Card v-if="filteredNotifications.length === 0" class="p-12 text-center">
@@ -348,21 +350,21 @@ const handleDeleteNotification = (notificationId: string, e: MouseEvent) => {
 
             <!-- Content -->
             <div class="flex-1 min-w-0">
-              <div class="flex items-start justify-between mb-1">
-                <div class="flex items-center gap-2 flex-1">
+              <div class="flex items-start justify-between gap-2 mb-1">
+                <div class="flex flex-wrap items-center gap-x-2 gap-y-1 flex-1 min-w-0">
                   <h3
                     :class="`${
                       !notification.isRead ? 'text-[#263238]' : 'text-[#435574]'
-                    } truncate`"
+                    } truncate max-w-full`"
                   >
                     {{ notification.title }}
                   </h3>
-                  <Badge variant="secondary" class="text-xs">
+                  <Badge variant="secondary" class="text-xs flex-shrink-0">
                     {{ getNotificationLabel(notification.type) }}
                   </Badge>
                 </div>
-                <div class="flex items-center gap-2 ml-2">
-                  <span class="text-xs text-[#435574] whitespace-nowrap">
+                <div class="flex items-center gap-1 flex-shrink-0 ml-1">
+                  <span class="text-xs text-[#435574] whitespace-nowrap hidden sm:inline">
                     {{ formatTimestamp(notification.timestamp) }}
                   </span>
                   <Button
@@ -375,6 +377,9 @@ const handleDeleteNotification = (notificationId: string, e: MouseEvent) => {
                   </Button>
                 </div>
               </div>
+              <span class="text-xs text-[#435574] sm:hidden block mb-1">
+                {{ formatTimestamp(notification.timestamp) }}
+              </span>
               <p class="text-sm text-[#435574]">{{ notification.message }}</p>
 
               <Button

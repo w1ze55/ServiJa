@@ -390,12 +390,12 @@ watch(currentTab, () => {
 <template>
   <div class="max-w-7xl mx-auto space-y-6">
     <!-- Header -->
-    <div class="flex items-start justify-between">
+    <div class="flex flex-wrap items-start justify-between gap-3">
       <div>
         <h1 class="text-2xl font-bold text-[#263238] mb-2">Solicitações Recebidas</h1>
         <p class="text-[#435574]">Gerencie as propostas enviadas pelos clientes</p>
       </div>
-      <Button @click="handleRefresh" variant="outline" :disabled="proposalStore.isLoading">
+      <Button @click="handleRefresh" variant="outline" :disabled="proposalStore.isLoading" class="self-start">
         <RefreshCw :class="`h-4 w-4 mr-2 ${proposalStore.isLoading ? 'animate-spin' : ''}`" />
         Atualizar
       </Button>
@@ -466,8 +466,8 @@ watch(currentTab, () => {
 
     <!-- Filters -->
     <Card class="p-4">
-      <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div class="relative">
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="relative col-span-2 md:col-span-1">
           <Search class="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-[#435574]" />
           <Input
             placeholder="Buscar solicitações..."
@@ -539,16 +539,18 @@ watch(currentTab, () => {
 
     <!-- Tabs -->
     <Tabs :model-value="currentTab" @update:model-value="(val: string) => currentTab = val">
-      <TabsList class="grid w-full grid-cols-6">
-        <TabsTrigger value="all">Todas ({{ proposalStore.proposals.length }})</TabsTrigger>
-        <TabsTrigger value="pending">
-          Pendentes ({{ proposalStore.stats.pending }})
-        </TabsTrigger>
-        <TabsTrigger value="negotiating">Negociando ({{ proposalStore.stats.negotiating }})</TabsTrigger>
-        <TabsTrigger value="in_progress">Em Andamento ({{ proposalStore.stats.inProgress }})</TabsTrigger>
-        <TabsTrigger value="rejected">Recusadas ({{ proposalStore.stats.rejected }})</TabsTrigger>
-        <TabsTrigger value="completed">Concluídas ({{ proposalStore.stats.completed }})</TabsTrigger>
-      </TabsList>
+      <div class="overflow-x-auto -mx-1 px-1">
+        <TabsList class="flex w-max min-w-full">
+          <TabsTrigger value="all" class="flex-shrink-0 text-xs sm:text-sm">Todas ({{ proposalStore.proposals.length }})</TabsTrigger>
+          <TabsTrigger value="pending" class="flex-shrink-0 text-xs sm:text-sm">
+            Pendentes ({{ proposalStore.stats.pending }})
+          </TabsTrigger>
+          <TabsTrigger value="negotiating" class="flex-shrink-0 text-xs sm:text-sm">Negociando ({{ proposalStore.stats.negotiating }})</TabsTrigger>
+          <TabsTrigger value="in_progress" class="flex-shrink-0 text-xs sm:text-sm">Em Andamento ({{ proposalStore.stats.inProgress }})</TabsTrigger>
+          <TabsTrigger value="rejected" class="flex-shrink-0 text-xs sm:text-sm">Recusadas ({{ proposalStore.stats.rejected }})</TabsTrigger>
+          <TabsTrigger value="completed" class="flex-shrink-0 text-xs sm:text-sm">Concluídas ({{ proposalStore.stats.completed }})</TabsTrigger>
+        </TabsList>
+      </div>
 
       <TabsContent :value="currentTab" class="mt-6">
         <!-- Loading State -->
@@ -579,8 +581,8 @@ watch(currentTab, () => {
                 !proposal.viewed ? 'border-l-4 border-l-[#286AD8] bg-blue-50/30' : ''
               }`"
             >
-              <div class="flex items-start gap-4">
-                <Avatar class="h-12 w-12 cursor-pointer" @click="handleViewDetails(proposal)">
+              <div class="flex items-start gap-3">
+                <Avatar class="h-10 w-10 sm:h-12 sm:w-12 cursor-pointer flex-shrink-0" @click="handleViewDetails(proposal)">
                   <AvatarImage :src="proposal.clientAvatar" :alt="proposal.clientName" />
                   <AvatarFallback class="bg-[#286AD8] text-white">
                     {{ getInitials(proposal.clientName) }}
@@ -588,15 +590,15 @@ watch(currentTab, () => {
                 </Avatar>
 
                 <div class="flex-1 min-w-0">
-                  <div class="flex items-start justify-between mb-2">
-                    <div class="flex-1 cursor-pointer" @click="handleViewDetails(proposal)">
-                      <div class="flex items-center gap-2 mb-1">
-                        <h3 class="font-semibold text-[#263238] hover:text-[#286AD8]">{{ proposal.service }}</h3>
-                        <Badge v-if="!proposal.viewed" class="bg-[#286AD8] hover:bg-[#286AD8] text-xs">
+                  <div class="flex items-start justify-between gap-2 mb-2">
+                    <div class="flex-1 min-w-0 cursor-pointer" @click="handleViewDetails(proposal)">
+                      <div class="flex flex-wrap items-center gap-2 mb-1">
+                        <h3 class="font-semibold text-[#263238] hover:text-[#286AD8] truncate">{{ proposal.service }}</h3>
+                        <Badge v-if="!proposal.viewed" class="bg-[#286AD8] hover:bg-[#286AD8] text-xs flex-shrink-0">
                           Novo
                         </Badge>
                       </div>
-                      <div class="flex items-center gap-3 text-sm text-[#435574]">
+                      <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-[#435574]">
                         <span class="flex items-center gap-1">
                           <Avatar class="h-4 w-4">
                             <AvatarFallback class="bg-gray-300 text-[10px]">
@@ -721,8 +723,8 @@ watch(currentTab, () => {
                     {{ proposal.description }}
                   </p>
 
-                  <div class="flex items-center justify-between">
-                    <div class="flex items-center gap-4 text-sm">
+                  <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
                       <span class="flex items-center gap-1 font-medium text-[#263238]">
                         <DollarSign class="h-4 w-4 text-green-600" />
                         {{ formatCurrency(['accepted', 'in_progress', 'completed'].includes(proposal.status) && proposal.freelancerResponse ? proposal.freelancerResponse.value : proposal.budget) }}
@@ -744,6 +746,7 @@ watch(currentTab, () => {
                       @click="handleViewDetails(proposal)"
                       variant="outline"
                       size="sm"
+                      class="flex-shrink-0"
                     >
                       <Eye class="h-4 w-4 mr-2" />
                       Ver Detalhes
