@@ -161,9 +161,25 @@ public class PaymentService {
                 com.servija.servija.model.ServiceRequestHistory.OperationType.PAYMENT_CREATED,
                 "Pagamento de R$ " + String.format("%.2f", totalAmount) + " criado via " + request.getPaymentMethod().toUpperCase());
 
-        // NÃO atualizar status da solicitação aqui!
-        // O status só deve mudar para COMPLETED quando o pagamento for confirmado (via
-        // webhook)
+        // Para pagamento com cartão (aprovação instantânea), atualizar status e notificar
+        if (payment.getStatus() == Payment.PaymentStatus.COMPLETED) {
+            serviceRequest.setStatus(ServiceRequest.Status.IN_PROGRESS);
+            serviceRequest.setChatEnabled(true);
+            serviceRequestRepository.save(serviceRequest);
+
+            serviceRequestHistoryService.record(
+                    serviceRequest,
+                    contractor,
+                    com.servija.servija.model.ServiceRequestHistory.OperationType.PAYMENT_CONFIRMED,
+                    "Pagamento de R$ " + String.format("%.2f", payment.getTotalAmount()) + " confirmado via cartão de crédito");
+
+            webSocketService.notifyPixPaymentConfirmed(payment.getId(), contractor.getEmail());
+            if (serviceRequest.getFreelancer() != null) {
+                webSocketService.notifyPixPaymentConfirmed(payment.getId(), serviceRequest.getFreelancer().getEmail());
+            }
+
+            log.info("Pagamento com cartão confirmado e notificações enviadas. ID: {}", payment.getId());
+        }
 
         log.info("Pagamento criado com sucesso. ID: {}, Asaas ID: {}", payment.getId(), payment.getAsaasPaymentId());
 

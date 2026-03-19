@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import {
   Package,
   Upload,
@@ -44,6 +44,7 @@ import Textarea from '../ui/textarea.vue';
 import ServiceRequestTimeline from '../service/ServiceRequestTimeline.vue';
 import { useProposalStore, type Proposal, type Milestone } from '@/stores/proposalStore';
 import { useDeliveryAdjustmentStore } from '@/stores/deliveryAdjustmentStore';
+import { useServiceRequestWebSocket, type ServiceRequestNotification } from '@/composables/useServiceRequestWebSocket';
 import { toast } from '@/utils/toast';
 import api from '@/api/config/axios';
 
@@ -67,6 +68,56 @@ const uploadFiles = ref<File[]>([]);
 const uploadDescription = ref('');
 const activeFileTab = ref<'client' | 'freelancer'>('freelancer');
 
+// WebSocket
+let wsConnection: ReturnType<typeof useServiceRequestWebSocket> | null = null;
+
+const getUserEmail = () => {
+  const token = localStorage.getItem('token');
+  if (!token) return null;
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return payload.sub || payload.email;
+  } catch {
+    return null;
+  }
+};
+
+const handleServiceRequestNotification = (event: Event) => {
+  const notification = (event as CustomEvent<ServiceRequestNotification>).detail;
+
+  switch (notification.type) {
+    case 'SERVICE_REQUEST_STATUS_CHANGED':
+      if (notification.status?.toLowerCase() === 'completed') {
+        toast.success('O cliente aprovou a entrega! Serviço concluído.');
+      } else if (notification.status?.toLowerCase() === 'cancelled') {
+        toast.warning('Uma solicitação de serviço foi cancelada.');
+      }
+      proposalStore.loadProposals();
+      break;
+    case 'SERVICE_COMPLETED_REVIEW_PENDING':
+      toast.success('Serviço concluído! Avalie o cliente.');
+      proposalStore.loadProposals();
+      break;
+    case 'ADJUSTMENTS_REQUESTED':
+      toast.warning('O cliente solicitou ajustes na entrega.');
+      adjustmentStore.getReceived();
+      proposalStore.loadProposals();
+      break;
+    case 'ADJUSTMENT_STATUS_CHANGED':
+      adjustmentStore.getReceived();
+      break;
+    case 'ADJUSTMENT_DELETED':
+      toast.info('O cliente removeu a solicitação de ajuste.');
+      adjustmentStore.getReceived();
+      proposalStore.loadProposals();
+      break;
+    case 'SERVICE_REQUEST_CANCELLED':
+      toast.warning('Projeto cancelado pelo cliente.');
+      proposalStore.loadProposals();
+      break;
+  }
+};
+
 // Load data
 onMounted(async () => {
   await Promise.all([
@@ -77,6 +128,21 @@ onMounted(async () => {
   if (activeProjects.value.length > 0 && !selectedProjectId.value) {
     selectedProjectId.value = activeProjects.value[0].id;
     await proposalStore.loadHistory(activeProjects.value[0].id);
+  }
+
+  // Conectar WebSocket
+  const userEmail = getUserEmail();
+  if (userEmail) {
+    wsConnection = useServiceRequestWebSocket(userEmail);
+    wsConnection.connect();
+    window.addEventListener('service-request-notification', handleServiceRequestNotification);
+  }
+});
+
+onUnmounted(() => {
+  window.removeEventListener('service-request-notification', handleServiceRequestNotification);
+  if (wsConnection) {
+    wsConnection.disconnect();
   }
 });
 

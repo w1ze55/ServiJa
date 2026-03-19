@@ -3,7 +3,7 @@ import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 
 export interface ServiceRequestNotification {
-  type: 'NEW_SERVICE_REQUEST' | 'SERVICE_REQUEST_STATUS_CHANGED' | 'NEW_PROPOSAL' | 'COUNTER_PROPOSAL' | 'PROPOSAL_ACCEPTED' | 'SERVICE_REQUEST_CANCELLED' | 'NEW_REVIEW' | 'SERVICE_COMPLETED_REVIEW_PENDING';
+  type: 'NEW_SERVICE_REQUEST' | 'SERVICE_REQUEST_STATUS_CHANGED' | 'NEW_PROPOSAL' | 'COUNTER_PROPOSAL' | 'PROPOSAL_ACCEPTED' | 'SERVICE_REQUEST_CANCELLED' | 'NEW_REVIEW' | 'SERVICE_COMPLETED_REVIEW_PENDING' | 'COUNTER_PROPOSAL_REJECTED' | 'ADJUSTMENTS_REQUESTED' | 'ADJUSTMENT_STATUS_CHANGED' | 'ADJUSTMENT_DELETED';
   serviceRequestId: number;
   contractorName?: string;
   freelancerName?: string;
@@ -15,9 +15,11 @@ export interface ServiceRequestNotification {
   reviewId?: number;
   reviewerName?: string;
   rating?: number;
+  actorName?: string;
   message: string;
   timestamp: number;
 }
+
 
 export function useServiceRequestWebSocket(userEmail: string) {
   const client = ref<Client | null>(null);

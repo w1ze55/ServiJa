@@ -312,6 +312,11 @@ public class AsaasWebhookService {
             saveStatusHistory(payment, Payment.PaymentStatus.OVERDUE, "PAYMENT_OVERDUE",
                     "Pagamento vencido");
 
+            webSocketService.notifyPaymentFailed(
+                    payment.getId(),
+                    payment.getContractor().getEmail(),
+                    "Pagamento vencido");
+
             log.info("Status do pagamento atualizado para OVERDUE: {}", asaasPaymentId);
         }
     }
@@ -521,6 +526,11 @@ public class AsaasWebhookService {
             saveStatusHistory(payment, Payment.PaymentStatus.CANCELLED, "PAYMENT_DELETED",
                     "Pagamento deletado/cancelado");
 
+            webSocketService.notifyPaymentFailed(
+                    payment.getId(),
+                    payment.getContractor().getEmail(),
+                    "Pagamento cancelado/deletado");
+
             log.info("Pagamento deletado: {}", asaasPaymentId);
         }
     }
@@ -699,6 +709,13 @@ public class AsaasWebhookService {
         saveStatusHistory(payment, Payment.PaymentStatus.REFUNDED, "PAYMENT_REFUNDED",
                 "Pagamento reembolsado/estornado");
 
+        webSocketService.notifyPaymentStatusChange(
+                payment.getId(), "REFUNDED", payment.getContractor().getEmail());
+        if (payment.getFreelancer() != null) {
+            webSocketService.notifyPaymentStatusChange(
+                    payment.getId(), "REFUNDED", payment.getFreelancer().getEmail());
+        }
+
         log.info("Pagamento reembolsado via webhook: {}", asaasPaymentId);
     }
 
@@ -762,6 +779,12 @@ public class AsaasWebhookService {
         walletService.addPendingBalance(
                 withdrawal.getFreelancer(),
                 withdrawal.getAmount());
+
+        // Notificar freelancer sobre falha no saque
+        webSocketService.notifyPaymentFailed(
+                null,
+                withdrawal.getFreelancer().getEmail(),
+                "Falha no saque" + (failReason != null ? ": " + failReason : ""));
 
         log.error("Saque falhou via webhook: {} - Motivo: {}",
                 asaasTransferId, failReason);
