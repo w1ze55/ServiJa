@@ -354,6 +354,13 @@ public class ServiceRequestService {
                     saved.getId(), "COMPLETED",
                     userEmail, request.getFreelancer().getEmail());
 
+            // Notificar ambos que a avaliação está pendente
+            webSocketService.notifyReviewPending(
+                    saved.getId(),
+                    userEmail,
+                    request.getFreelancer().getEmail(),
+                    saved.getServiceName());
+
             return toResponse(saved);
         }
 
