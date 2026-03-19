@@ -55,10 +55,13 @@ import DialogTitle from '../ui/dialog-title.vue';
 import Textarea from '../ui/textarea.vue';
 import Label from '../ui/label.vue';
 import { useProposalStore, type Proposal } from '@/stores/proposalStore';
+import { useRouter } from 'vue-router';
 import { useServiceRequestWebSocket } from '@/composables/useServiceRequestWebSocket';
 import { usePaymentWebSocket } from '@/composables/usePaymentWebSocket';
 import { toast } from '@/utils/toast';
 import { getStatusLabel } from '@/utils/statusTranslations';
+
+const router = useRouter();
 
 interface Props {
   onNavigate: (page: string, params?: any) => void;
@@ -200,6 +203,15 @@ const handleServiceRequestNotification = (event: any) => {
         toast.info(`Status atualizado: ${getStatusLabel(notification.status)}`);
       }
       proposalStore.loadProposals();
+      break;
+    case 'SERVICE_COMPLETED_REVIEW_PENDING':
+      toast.success('Serviço concluído! Avalie o cliente.');
+      setTimeout(() => {
+        router.push('/rate-client?requestId=' + notification.serviceRequestId);
+      }, 2000);
+      break;
+    case 'NEW_REVIEW':
+      toast.info(notification.reviewerName + ' enviou uma avaliação!');
       break;
   }
 };

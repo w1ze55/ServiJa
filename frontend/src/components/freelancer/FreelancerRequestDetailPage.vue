@@ -57,10 +57,13 @@ import AvatarImage from '../ui/avatar-image.vue';
 import Separator from '../ui/separator.vue';
 import { useProposalStore, type Proposal, type Milestone } from '@/stores/proposalStore';
 import ServiceRequestTimeline from '../service/ServiceRequestTimeline.vue';
+import { useRouter } from 'vue-router';
 import { useServiceRequestWebSocket } from '@/composables/useServiceRequestWebSocket';
 import { toast } from '@/utils/toast';
 import { getStatusLabel } from '@/utils/statusTranslations';
 import api from '@/api/config/axios';
+
+const router = useRouter();
 
 interface Props {
   onNavigate: (page: string, params?: any) => void;
@@ -254,6 +257,17 @@ const handleServiceRequestNotification = async (event: any) => {
       if (proposal.value) {
         await proposalStore.loadHistory(proposal.value.id);
       }
+    }
+
+    if (notification.type === 'SERVICE_COMPLETED_REVIEW_PENDING') {
+      toast.success('Serviço concluído! Avalie o cliente.');
+      setTimeout(() => {
+        router.push('/rate-client?requestId=' + notification.serviceRequestId);
+      }, 2000);
+    }
+
+    if (notification.type === 'NEW_REVIEW') {
+      toast.info(notification.reviewerName + ' enviou uma avaliação!');
     }
   }
 };

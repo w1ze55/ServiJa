@@ -275,6 +275,13 @@ const handleServiceRequestNotification = (event: any) => {
       toast.warning('Projeto cancelado');
       store.loadRequests();
       break;
+    case 'SERVICE_COMPLETED_REVIEW_PENDING':
+      toast.success('Serviço concluído! Avalie o freelancer.');
+      router.push('/rate-freelancer?requestId=' + notification.serviceRequestId);
+      break;
+    case 'NEW_REVIEW':
+      toast.info(notification.reviewerName + ' enviou uma avaliação!');
+      break;
   }
 };
 

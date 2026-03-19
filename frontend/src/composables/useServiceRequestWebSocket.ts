@@ -3,7 +3,7 @@ import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 
 export interface ServiceRequestNotification {
-  type: 'NEW_SERVICE_REQUEST' | 'SERVICE_REQUEST_STATUS_CHANGED' | 'NEW_PROPOSAL' | 'COUNTER_PROPOSAL' | 'PROPOSAL_ACCEPTED' | 'SERVICE_REQUEST_CANCELLED';
+  type: 'NEW_SERVICE_REQUEST' | 'SERVICE_REQUEST_STATUS_CHANGED' | 'NEW_PROPOSAL' | 'COUNTER_PROPOSAL' | 'PROPOSAL_ACCEPTED' | 'SERVICE_REQUEST_CANCELLED' | 'NEW_REVIEW' | 'SERVICE_COMPLETED_REVIEW_PENDING';
   serviceRequestId: number;
   contractorName?: string;
   freelancerName?: string;
@@ -12,6 +12,9 @@ export interface ServiceRequestNotification {
   proposalAmount?: string;
   counterProposalAmount?: string;
   reason?: string;
+  reviewId?: number;
+  reviewerName?: string;
+  rating?: number;
   message: string;
   timestamp: number;
 }

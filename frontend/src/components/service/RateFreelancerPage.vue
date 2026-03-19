@@ -16,7 +16,7 @@ interface Props {
   freelancerName: string;
   freelancerAvatar?: string;
   onBack: () => void;
-  onSubmitReview: (review: { rating: number; comment: string; tags: string[] }) => void;
+  onSubmitReview: (review: { rating: number; comment: string; tags: string[] }) => void | Promise<void>;
 }
 
 const props = defineProps<Props>();
@@ -82,16 +82,18 @@ const handleSubmit = async () => {
 
   isSubmitting.value = true;
 
-  // Simular processamento
-  setTimeout(() => {
-    props.onSubmitReview({
+  try {
+    await props.onSubmitReview({
       rating: rating.value,
       comment: comment.value,
       tags: selectedTags.value,
     });
-    isSubmitting.value = false;
     submitted.value = true;
-  }, 2000);
+  } catch {
+    // Erro tratado pelo componente pai
+  } finally {
+    isSubmitting.value = false;
+  }
 };
 </script>
 
@@ -134,10 +136,10 @@ const handleSubmit = async () => {
             v-for="star in [1, 2, 3, 4, 5]"
             :key="star"
             :class="`h-5 w-5 ${
-              star <= rating.value ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'
+              star <= rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'
             }`"
           />
-          <span class="text-[#263238] ml-2">{{ getRatingLabel(rating.value) }}</span>
+          <span class="text-[#263238] ml-2">{{ getRatingLabel(rating) }}</span>
         </div>
         <div v-if="selectedTags.length > 0" class="flex flex-wrap gap-2 mb-2">
           <Badge

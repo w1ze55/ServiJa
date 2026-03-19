@@ -191,6 +191,12 @@ const handleServiceRequestNotification = (event: any) => {
       toast.info(`Status atualizado: ${getStatusLabel(notification.status)}`);
       store.loadRequests();
       break;
+    case 'SERVICE_COMPLETED_REVIEW_PENDING':
+      toast.success('Serviço concluído! Avalie o freelancer.');
+      break;
+    case 'NEW_REVIEW':
+      toast.info(notification.reviewerName + ' enviou uma avaliação!');
+      break;
   }
 };
 
