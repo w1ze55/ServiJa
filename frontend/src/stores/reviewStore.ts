@@ -1,11 +1,16 @@
 import { defineStore } from 'pinia';
-import { ref } from 'vue';
-import reviewService, { type ReviewData, type ReviewResponse } from '@/api/services/reviewService';
+import { ref, computed } from 'vue';
+import reviewService, { type ReviewData, type ReviewResponse, type PendingReview } from '@/api/services/reviewService';
 
 export const useReviewStore = defineStore('review', () => {
   const reviews = ref<ReviewResponse[]>([]);
+  const pendingReviews = ref<PendingReview[]>([]);
   const isLoading = ref(false);
   const isSubmitting = ref(false);
+  const pendingLoaded = ref(false);
+
+  const hasPendingReviews = computed(() => pendingReviews.value.length > 0);
+  const pendingCount = computed(() => pendingReviews.value.length);
 
   const submitReview = async (
     serviceRequestId: string | number,
@@ -53,13 +58,35 @@ export const useReviewStore = defineStore('review', () => {
     }
   };
 
+  const loadPendingReviews = async (): Promise<void> => {
+    try {
+      pendingReviews.value = await reviewService.getPendingReviews();
+      pendingLoaded.value = true;
+    } catch (err) {
+      console.error('Erro ao carregar avaliações pendentes:', err);
+      pendingReviews.value = [];
+    }
+  };
+
+  const removePendingReview = (serviceRequestId: number) => {
+    pendingReviews.value = pendingReviews.value.filter(
+      (p) => p.serviceRequestId !== serviceRequestId
+    );
+  };
+
   return {
     reviews,
+    pendingReviews,
     isLoading,
     isSubmitting,
+    pendingLoaded,
+    hasPendingReviews,
+    pendingCount,
     submitReview,
     loadReviews,
     checkCanReview,
     getMyReview,
+    loadPendingReviews,
+    removePendingReview,
   };
 });

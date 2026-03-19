@@ -41,6 +41,7 @@ const handleSubmitReview = async (review: { rating: number; comment: string; tag
       comment: review.comment,
       tags: review.tags,
     });
+    reviewStore.removePendingReview(parseInt(requestId.value));
     toast.success('Avaliação enviada com sucesso!');
   } catch (err: any) {
     const message = err.response?.data?.message || 'Erro ao enviar avaliação.';

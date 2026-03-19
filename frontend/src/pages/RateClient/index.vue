@@ -92,6 +92,7 @@ const handleSubmit = async () => {
       comment: comment.value,
       tags: selectedTags.value,
     });
+    reviewStore.removePendingReview(parseInt(requestId.value));
     submitted.value = true;
     toast.success('Avaliação enviada com sucesso!');
   } catch (err: any) {

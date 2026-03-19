@@ -39,6 +39,7 @@ import DropdownMenuTrigger from "../ui/dropdown-menu-trigger.vue";
 import logo from "@/assets/favicon-32x32.png";
 import api from "@/api/config/axios";
 import { useUserStore } from "@/stores/userStore";
+import PendingReviewBanner from "../shared/PendingReviewBanner.vue";
 
 const router = useRouter();
 const userStore = useUserStore();
@@ -617,6 +618,9 @@ const getInitials = (name: string) => {
           </div>
         </div>
       </header>
+
+      <!-- Pending Review Banner -->
+      <PendingReviewBanner />
 
       <!-- Page Content -->
       <main class="p-6">
