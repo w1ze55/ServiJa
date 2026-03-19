@@ -1,5 +1,6 @@
 package com.servija.servija.controller;
 
+import com.servija.servija.dto.PendingReviewResponse;
 import com.servija.servija.dto.ReviewRequest;
 import com.servija.servija.dto.ReviewResponse;
 import com.servija.servija.service.ReviewService;
@@ -42,6 +43,13 @@ public class ReviewController {
         String userEmail = authentication.getName();
         boolean canReview = reviewService.canReview(serviceRequestId, userEmail);
         return ResponseEntity.ok(Map.of("canReview", canReview));
+    }
+
+    @GetMapping("/pending")
+    public ResponseEntity<List<PendingReviewResponse>> getPendingReviews(Authentication authentication) {
+        String userEmail = authentication.getName();
+        List<PendingReviewResponse> pending = reviewService.getPendingReviews(userEmail);
+        return ResponseEntity.ok(pending);
     }
 
     @GetMapping("/my-review/{serviceRequestId}")

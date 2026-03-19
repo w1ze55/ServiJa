@@ -1,5 +1,6 @@
 package com.servija.servija.service;
 
+import com.servija.servija.dto.PendingReviewResponse;
 import com.servija.servija.dto.ReviewRequest;
 import com.servija.servija.dto.ReviewResponse;
 import com.servija.servija.exception.ResourceNotFoundException;
@@ -135,6 +136,39 @@ public class ReviewService {
         return reviewRepository.findByServiceRequestIdAndReviewerId(serviceRequestId, user.getId())
                 .map(this::toResponse)
                 .orElse(null);
+    }
+
+    public List<PendingReviewResponse> getPendingReviews(String userEmail) {
+        User user = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
+
+        List<ServiceRequest> completedRequests;
+
+        if (user.getUserType() == User.UserType.CONTRACTOR) {
+            completedRequests = serviceRequestRepository.findByContractorIdAndStatus(
+                    user.getId(), ServiceRequest.Status.COMPLETED);
+        } else {
+            completedRequests = serviceRequestRepository.findByFreelancerIdAndStatus(
+                    user.getId(), ServiceRequest.Status.COMPLETED);
+        }
+
+        return completedRequests.stream()
+                .filter(sr -> !reviewRepository.existsByServiceRequestIdAndReviewerId(sr.getId(), user.getId()))
+                .map(sr -> {
+                    boolean isContractor = sr.getContractor().getId().equals(user.getId());
+                    User target = isContractor ? sr.getFreelancer() : sr.getContractor();
+                    String targetType = isContractor ? "FREELANCER" : "CONTRACTOR";
+
+                    return PendingReviewResponse.builder()
+                            .serviceRequestId(sr.getId())
+                            .serviceName(sr.getServiceName())
+                            .targetName(target != null ? target.getName() : "Usuário")
+                            .targetAvatar(target != null ? target.getAvatarUrl() : null)
+                            .targetType(targetType)
+                            .completedAt(sr.getUpdatedAt())
+                            .build();
+                })
+                .collect(Collectors.toList());
     }
 
     private void updateFreelancerRating(Freelancer freelancer) {
