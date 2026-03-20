@@ -384,6 +384,12 @@ const handleOpenCancelDialog = (request: ServiceRequest) => {
 
 const handleCancelRequest = async () => {
   if (!selectedRequest.value) return;
+
+  if (!cancelReason.value.trim()) {
+    toast.error('Informe o motivo do cancelamento');
+    return;
+  }
+
   const success = await store.cancelRequest(selectedRequest.value.id, cancelReason.value);
   if (success) {
     toast.success('Solicitação cancelada');
@@ -948,7 +954,7 @@ watch(currentTab, () => {
         </DialogHeader>
         <div class="space-y-4">
           <div class="space-y-2">
-            <Label for="cancel-reason">Motivo (opcional)</Label>
+            <Label for="cancel-reason">Motivo do cancelamento *</Label>
             <Textarea
               id="cancel-reason"
               :model-value="cancelReason"

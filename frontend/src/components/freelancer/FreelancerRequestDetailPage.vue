@@ -277,6 +277,12 @@ const clientMessagesCount = computed(() =>
   proposal.value?.messages?.filter((m) => m.sender === 'client').length || 0
 );
 
+const isClientCancelled = computed(
+  () => proposal.value?.status === 'archived' && !!proposal.value?.cancelReason?.trim()
+);
+
+const cancellationReason = computed(() => proposal.value?.cancelReason?.trim() || '');
+
 const getInitials = (name: string) => {
   return name
     .split(' ')
@@ -686,7 +692,7 @@ const getPriorityVariant = (priority: string) => {
   return 'outline';
 };
 
-const getStatusBadge = (status: string) => {
+const getStatusBadge = (currentProposal: Proposal) => {
   const badges: Record<string, { class: string; label: string; icon: any }> = {
     pending: { class: 'bg-blue-100 text-blue-700', label: 'Pendente', icon: Clock },
     negotiating: { class: 'bg-purple-100 text-purple-700', label: 'Negociando', icon: MessageSquare },
@@ -697,7 +703,16 @@ const getStatusBadge = (status: string) => {
     completed: { class: 'bg-teal-100 text-teal-700', label: 'Concluída', icon: CheckCircle },
     archived: { class: 'bg-gray-100 text-gray-700', label: 'Arquivada', icon: FileText },
   };
-  return badges[status] || badges.pending;
+
+  if (currentProposal.status === 'archived' && currentProposal.cancelReason?.trim()) {
+    return {
+      class: 'bg-gray-100 text-gray-700',
+      label: 'Cancelada',
+      icon: XCircle,
+    };
+  }
+
+  return badges[currentProposal.status] || badges.pending;
 };
 </script>
 
@@ -729,9 +744,9 @@ const getStatusBadge = (status: string) => {
           <div class="flex-1">
             <div class="flex items-center gap-3 mb-2 flex-wrap">
               <h1 class="text-2xl font-bold text-[#263238]">{{ proposal.service }}</h1>
-              <Badge :class="`${getStatusBadge(proposal.status).class} hover:${getStatusBadge(proposal.status).class}`">
-                <component :is="getStatusBadge(proposal.status).icon" class="h-3 w-3 mr-1" />
-                {{ getStatusBadge(proposal.status).label }}
+              <Badge :class="getStatusBadge(proposal).class">
+                <component :is="getStatusBadge(proposal).icon" class="h-3 w-3 mr-1" />
+                {{ getStatusBadge(proposal).label }}
               </Badge>
             </div>
             <div class="flex items-center gap-4 text-sm text-[#435574] flex-wrap">
@@ -792,6 +807,17 @@ const getStatusBadge = (status: string) => {
           <div>
             <p class="font-semibold text-sm">Motivo da Recusa</p>
             <p class="text-sm opacity-90 italic">"{{ proposal.rejectReason }}"</p>
+          </div>
+        </div>
+
+        <div
+          v-if="isClientCancelled"
+          class="mt-4 p-4 rounded-lg border border-gray-200 bg-gray-50 text-gray-900 flex items-start gap-3"
+        >
+          <AlertCircle class="h-5 w-5 mt-0.5 flex-shrink-0 text-gray-600" />
+          <div>
+            <p class="font-semibold text-sm">Solicitação cancelada pelo cliente</p>
+            <p v-if="cancellationReason" class="text-sm opacity-90 italic">"{{ cancellationReason }}"</p>
           </div>
         </div>
       </Card>

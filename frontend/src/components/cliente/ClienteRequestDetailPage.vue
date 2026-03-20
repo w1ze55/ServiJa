@@ -241,6 +241,11 @@ const handleRejectResponse = async () => {
 const handleCancelRequest = async () => {
   if (!request.value) return;
 
+  if (!cancelReason.value.trim()) {
+    toast.error('Informe o motivo do cancelamento');
+    return;
+  }
+
   const success = await store.cancelRequest(request.value.id, cancelReason.value);
   if (success) {
     toast.success('Solicitação cancelada');
@@ -776,7 +781,7 @@ const getStatusColor = (status: string) => {
         </DialogHeader>
         <div class="space-y-4">
           <div class="space-y-2">
-            <Label for="cancel-reason-detail">Motivo (opcional)</Label>
+            <Label for="cancel-reason-detail">Motivo do cancelamento *</Label>
             <Textarea
               id="cancel-reason-detail"
               :model-value="cancelReason"

@@ -117,6 +117,15 @@ const getEmptyMessage = () => {
   return messages[currentTab.value as keyof typeof messages] || 'Nenhuma solicitação encontrada';
 };
 
+const isClientCancelled = (proposal: Proposal) =>
+  proposal.status === 'archived' && !!proposal.cancelReason?.trim();
+
+const getArchivedStatusLabel = (proposal: Proposal) =>
+  isClientCancelled(proposal) ? 'Cancelada' : 'Arquivada';
+
+const getArchivedStatusIcon = (proposal: Proposal) =>
+  isClientCancelled(proposal) ? XCircle : Archive;
+
 onMounted(() => {
   proposalStore.loadProposals();
 
@@ -193,7 +202,11 @@ const handleServiceRequestNotification = (event: any) => {
       proposalStore.loadProposals();
       break;
     case 'SERVICE_REQUEST_CANCELLED':
-      toast.warning('Solicitação cancelada');
+      toast.warning(
+        notification.reason
+          ? `Solicitação cancelada pelo cliente. Motivo: ${notification.reason}`
+          : 'Solicitação cancelada pelo cliente.'
+      );
       proposalStore.loadProposals();
       break;
     case 'SERVICE_REQUEST_STATUS_CHANGED':
@@ -677,9 +690,9 @@ watch(currentTab, () => {
                           </Badge>
                         </template>
                         <template v-else-if="proposal.status === 'archived'">
-                          <Badge variant="secondary">
-                            <Archive class="h-3 w-3 mr-1" />
-                            Arquivada
+                          <Badge class="bg-gray-100 text-gray-700 hover:bg-gray-100">
+                            <component :is="getArchivedStatusIcon(proposal)" class="h-3 w-3 mr-1" />
+                            {{ getArchivedStatusLabel(proposal) }}
                           </Badge>
                         </template>
 
@@ -736,6 +749,14 @@ watch(currentTab, () => {
                   <p class="text-sm text-[#435574] mb-3 line-clamp-2">
                     {{ proposal.description }}
                   </p>
+
+                  <div
+                    v-if="isClientCancelled(proposal)"
+                    class="mb-3 rounded-lg border border-gray-200 bg-gray-50 p-3"
+                  >
+                    <p class="text-sm font-semibold text-[#263238]">Cancelada pelo cliente</p>
+                    <p class="text-sm text-[#435574] italic">"{{ proposal.cancelReason }}"</p>
+                  </div>
 
                   <div class="flex flex-wrap items-center justify-between gap-2">
                     <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">

@@ -26,6 +26,7 @@ export interface Proposal {
   counterValue?: number;
   counterDays?: number;
   counterNotes?: string;
+  cancelReason?: string;
   rejectReason?: string;
   messages?: ProposalMessage[];
   auditLog?: AuditLogEntry[];
@@ -167,6 +168,7 @@ export const useProposalStore = defineStore('proposal', () => {
         counterValue: req.counterValue,
         counterDays: req.counterDays,
         counterNotes: req.counterNotes,
+        cancelReason: req.cancelReason,
         rejectReason: req.rejectReason,
         freelancerAttachments: (req.freelancerAttachments || []).map((url: string, idx: number) => ({
           id: `fatt-${req.id}-${idx}`,

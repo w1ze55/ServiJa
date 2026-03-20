@@ -17,6 +17,7 @@ export const STATUS_LABELS: Record<string, string> = {
     'REJECTED': 'Recusada',
     'completed': 'Concluída',
     'COMPLETED': 'Concluída',
+    'cancelled': 'Cancelada',
     'archived': 'Arquivada',
     'CANCELLED': 'Cancelada',
 
