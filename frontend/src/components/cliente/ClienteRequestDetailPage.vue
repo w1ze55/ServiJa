@@ -570,11 +570,9 @@ const getStatusColor = (status: string) => {
               </div>
               <Separator />
               <div>
-                <p class="text-sm text-[#435574]">
-                  {{ ['accepted', 'in_progress', 'completed'].includes(request.status) && request.freelancerResponse ? 'Prazo Acordado' : 'Prazo solicitado' }}
-                </p>
+                <p class="text-sm text-[#435574]">Data desejada</p>
                 <p class="font-medium text-[#263238]">
-                  {{ ['accepted', 'in_progress', 'completed'].includes(request.status) && request.freelancerResponse ? request.freelancerResponse.executionDays + ' dias' : request.deadline }}
+                  {{ request.desiredDate ? formatShortDate(request.desiredDate) : request.deadline }}
                 </p>
               </div>
               <Separator />
@@ -587,13 +585,6 @@ const getStatusColor = (status: string) => {
                 <p class="text-sm text-[#435574]">Modelo de trabalho</p>
                 <WorkModelBadge :work-model="request.workModel" />
               </div>
-              <template v-if="request.desiredDate">
-                <Separator />
-                <div>
-                  <p class="text-sm text-[#435574]">Data desejada</p>
-                  <p class="font-medium text-[#263238]">{{ formatShortDate(request.desiredDate) }}</p>
-                </div>
-              </template>
             </div>
           </Card>
 
