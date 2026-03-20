@@ -55,6 +55,7 @@ import Avatar from '../ui/avatar.vue';
 import AvatarFallback from '../ui/avatar-fallback.vue';
 import AvatarImage from '../ui/avatar-image.vue';
 import Separator from '../ui/separator.vue';
+import WorkModelBadge from '../shared/WorkModelBadge.vue';
 import { useProposalStore, type Proposal, type Milestone } from '@/stores/proposalStore';
 import ServiceRequestTimeline from '../service/ServiceRequestTimeline.vue';
 import { useRouter } from 'vue-router';
@@ -685,13 +686,6 @@ const handleRejectCounterProposal = async () => {
   }
 };
 
-const getPriorityVariant = (priority: string) => {
-  if (priority === 'URGENT') return 'destructive';
-  if (priority === 'HIGH') return 'default';
-  if (priority === 'MEDIUM') return 'secondary';
-  return 'outline';
-};
-
 const getStatusBadge = (currentProposal: Proposal) => {
   const badges: Record<string, { class: string; label: string; icon: any }> = {
     pending: { class: 'bg-blue-100 text-blue-700', label: 'Pendente', icon: Clock },
@@ -1069,24 +1063,8 @@ const getStatusBadge = (currentProposal: Proposal) => {
               </div>
               <Separator />
               <div>
-                <p class="text-sm text-[#435574]">Prioridade</p>
-                <Badge
-                  :class="
-                    proposal.priority === 'URGENT'
-                      ? 'bg-red-200 text-red-900'
-                      : proposal.priority === 'HIGH'
-                      ? 'bg-red-100 text-red-700'
-                      : proposal.priority === 'MEDIUM'
-                      ? 'bg-yellow-100 text-yellow-700'
-                      : 'bg-gray-100 text-gray-700'
-                  "
-                >
-                  {{ 
-                    proposal.priority === 'URGENT' ? 'Urgente' :
-                    proposal.priority === 'HIGH' ? 'Alta' :
-                    proposal.priority === 'MEDIUM' ? 'Média' : 'Baixa'
-                  }}
-                </Badge>
+                <p class="text-sm text-[#435574]">Modelo de trabalho</p>
+                <WorkModelBadge :work-model="proposal.workModel" />
               </div>
             </div>
           </Card>

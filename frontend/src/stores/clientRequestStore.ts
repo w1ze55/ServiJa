@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import api from '@/api/config/axios';
+import { normalizeWorkModel, type WorkModelValue } from '@/utils/workModel';
 
 export interface ServiceRequestAttachment {
     id: string;
@@ -49,7 +50,7 @@ export interface ServiceRequest {
     description: string;
     budget: number;
     deadline: string;
-    priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+    workModel?: WorkModelValue | null;
     status: 'pending' | 'sent' | 'negotiating' | 'accepted' | 'in_progress' | 'delivered' | 'rejected' | 'completed' | 'cancelled';
     createdAt: string;
     address?: string;
@@ -72,7 +73,7 @@ export interface CreateServiceRequestInput {
     description: string;
     budget: number;
     deadline: string;
-    priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+    workModel: WorkModelValue;
     address?: string;
     desiredDate?: string;
     attachments?: File[];
@@ -131,7 +132,7 @@ export const useClientRequestStore = defineStore('clientRequest', () => {
                 ...req,
                 id: String(req.id),
                 service: req.serviceName, // Backend usa serviceName
-                priority: req.priority || 'MEDIUM',
+                workModel: normalizeWorkModel(req.workModel),
                 status: mapApiStatusToLocal(req.status),
                 attachments: (req.attachments || []).map((url: string, idx: number) => ({
                     id: `att-${req.id}-${idx}`,
@@ -198,7 +199,7 @@ export const useClientRequestStore = defineStore('clientRequest', () => {
                 description: input.description,
                 budget: input.budget,
                 deadline: input.deadline,
-                priority: input.priority,
+                workModel: input.workModel,
                 address: input.address,
                 desiredDate: input.desiredDate,
                 freelancerId: input.freelancerId
@@ -209,7 +210,7 @@ export const useClientRequestStore = defineStore('clientRequest', () => {
                 ...response.data,
                 id: String(response.data.id),
                 service: response.data.serviceName,
-                priority: response.data.priority || 'MEDIUM',
+                workModel: normalizeWorkModel(response.data.workModel),
                 status: mapApiStatusToLocal(response.data.status),
                 freelancerAvatar: response.data.freelancerAvatar,
             };

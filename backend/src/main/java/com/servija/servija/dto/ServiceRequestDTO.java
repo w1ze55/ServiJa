@@ -33,8 +33,8 @@ public class ServiceRequestDTO {
     @Size(max = 50, message = "O prazo deve ter no máximo 50 caracteres")
     private String deadline;
 
-    @Pattern(regexp = "^(LOW|MEDIUM|HIGH|URGENT)$", message = "Prioridade inválida")
-    private String priority;
+    @Pattern(regexp = "^(PRESENCIAL|REMOTO|HIBRIDO)$", message = "Modelo de trabalho inválido")
+    private String workModel;
 
     @Size(max = 500, message = "O endereço deve ter no máximo 500 caracteres")
     private String address;

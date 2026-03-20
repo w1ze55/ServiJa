@@ -25,11 +25,15 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
 
 @Service
 @Slf4j
 @RequiredArgsConstructor
 public class ServiceRequestService {
+
+    private static final Pattern LEGACY_SERVICE_DESCRIPTION_PREFIX = Pattern.compile(
+            "^\\[Solicitação referente ao serviço: [^\\]]+\\]");
 
     private final ServiceRequestRepository serviceRequestRepository;
     private final UserRepository userRepository;
@@ -63,14 +67,19 @@ public class ServiceRequestService {
 
         String normalizedAddress = StringUtils.hasText(dto.getAddress()) ? dto.getAddress().trim() : null;
 
-        com.servija.servija.model.Service.WorkModel requestWorkModel = resolveServiceWorkModel(selectedService);
-        if (requestWorkModel == com.servija.servija.model.Service.WorkModel.PRESENCIAL
-                || requestWorkModel == com.servija.servija.model.Service.WorkModel.HIBRIDO) {
+        ServiceRequest.WorkModel requestWorkModel = resolveRequestWorkModel(dto, selectedService);
+        if (requestWorkModel == ServiceRequest.WorkModel.PRESENCIAL
+                || requestWorkModel == ServiceRequest.WorkModel.HIBRIDO) {
             if (!StringUtils.hasText(normalizedAddress)) {
                 throw new IllegalArgumentException("Informe o local onde o serviço será realizado");
             }
         } else {
             normalizedAddress = null;
+        }
+
+        String normalizedDescription = normalizeRequestDescription(dto.getDescription());
+        if (!StringUtils.hasText(normalizedDescription)) {
+            throw new IllegalArgumentException("A descrição é obrigatória");
         }
 
         String attachmentsJson = null;
@@ -132,10 +141,10 @@ public class ServiceRequestService {
                 .freelancer(freelancer)
                 .serviceName(dto.getServiceName())
                 .category(dto.getCategory())
-                .description(dto.getDescription())
+                .description(normalizedDescription)
                 .budget(dto.getBudget())
                 .deadline(dto.getDeadline())
-                .priority(ServiceRequest.Priority.valueOf(dto.getPriority().toUpperCase()))
+                .workModel(requestWorkModel)
                 .address(normalizedAddress)
                 .desiredDate(parsedDesiredDate)
                 .attachments(attachmentsJson)
@@ -497,13 +506,22 @@ public class ServiceRequestService {
         return url != null && url.contains(".s3.") && url.contains("amazonaws.com");
     }
 
-    private com.servija.servija.model.Service.WorkModel resolveServiceWorkModel(
+    private ServiceRequest.WorkModel resolveRequestWorkModel(
+            ServiceRequestDTO dto,
             com.servija.servija.model.Service service) {
-        if (service == null) {
-            return null;
+        if (service != null && service.getWorkModel() != null) {
+            return ServiceRequest.WorkModel.valueOf(service.getWorkModel().name());
         }
 
-        return service.getWorkModel();
+        if (!StringUtils.hasText(dto.getWorkModel())) {
+            throw new IllegalArgumentException("Informe o modelo de trabalho");
+        }
+
+        try {
+            return ServiceRequest.WorkModel.valueOf(dto.getWorkModel().trim().toUpperCase());
+        } catch (IllegalArgumentException ex) {
+            throw new IllegalArgumentException("Modelo de trabalho inválido");
+        }
     }
 
     private ServiceRequestResponse toResponse(ServiceRequest request) {
@@ -517,10 +535,10 @@ public class ServiceRequestService {
                 .freelancerAvatar(request.getFreelancer() != null ? request.getFreelancer().getAvatarUrl() : null)
                 .serviceName(request.getServiceName())
                 .category(request.getCategory())
-                .description(request.getDescription())
+                .description(normalizeRequestDescription(request.getDescription()))
                 .budget(request.getBudget())
                 .deadline(request.getDeadline())
-                .priority(request.getPriority().name())
+                .workModel(request.getWorkModel() != null ? request.getWorkModel().name() : null)
                 .status(request.getStatus().name())
                 .address(request.getAddress())
                 .desiredDate(request.getDesiredDate())
@@ -540,5 +558,14 @@ public class ServiceRequestService {
                 .createdAt(request.getCreatedAt())
                 .updatedAt(request.getUpdatedAt())
                 .build();
+    }
+
+    private String normalizeRequestDescription(String description) {
+        if (!StringUtils.hasText(description)) {
+            return description;
+        }
+
+        String withoutLegacyPrefix = LEGACY_SERVICE_DESCRIPTION_PREFIX.matcher(description).replaceFirst("");
+        return withoutLegacyPrefix.stripLeading();
     }
 }

@@ -12,7 +12,6 @@ import {
   CheckCircle,
   XCircle,
   Archive,
-  AlertCircle,
   Trash2,
   MoreVertical,
   RefreshCw,
@@ -54,6 +53,7 @@ import DialogHeader from '../ui/dialog-header.vue';
 import DialogTitle from '../ui/dialog-title.vue';
 import Textarea from '../ui/textarea.vue';
 import Label from '../ui/label.vue';
+import WorkModelBadge from '../shared/WorkModelBadge.vue';
 import { useProposalStore, type Proposal } from '@/stores/proposalStore';
 import { useRouter } from 'vue-router';
 import { useServiceRequestWebSocket } from '@/composables/useServiceRequestWebSocket';
@@ -94,7 +94,6 @@ const categories = ['Eletricista', 'Encanador', 'Pintor', 'Pedreiro', 'Designer'
 // Mapeamento de valores de ordenação para português
 const sortOptions = {
   recent: 'Mais recentes',
-  priority: 'Prioridade',
   'budget-high': 'Maior orçamento',
   'budget-low': 'Menor orçamento'
 };
@@ -310,9 +309,6 @@ const filteredProposals = computed(() => {
     filtered.sort((a, b) => b.budget - a.budget);
   } else if (sortBy.value === 'Menor orçamento') {
     filtered.sort((a, b) => a.budget - b.budget);
-  } else if (sortBy.value === 'Prioridade') {
-    const priorityOrder = { HIGH: 3, MEDIUM: 2, LOW: 1, URGENT: 4 };
-    filtered.sort((a, b) => (priorityOrder[b.priority] ?? 0) - (priorityOrder[a.priority] ?? 0));
   }
 
   return filtered;
@@ -536,7 +532,6 @@ watch(currentTab, () => {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="Mais recentes">Mais recentes</SelectItem>
-            <SelectItem value="Prioridade">Prioridade</SelectItem>
             <SelectItem value="Maior orçamento">Maior orçamento</SelectItem>
             <SelectItem value="Menor orçamento">Menor orçamento</SelectItem>
           </SelectContent>
@@ -696,21 +691,7 @@ watch(currentTab, () => {
                           </Badge>
                         </template>
 
-                        <!-- Priority Badge -->
-                        <template v-if="proposal.priority === 'HIGH' || proposal.priority === 'URGENT'">
-                          <Badge class="bg-red-100 text-red-700 hover:bg-red-100">
-                            <AlertCircle class="h-3 w-3 mr-1" />
-                            Alta
-                          </Badge>
-                        </template>
-                        <template v-else-if="proposal.priority === 'MEDIUM'">
-                          <Badge class="bg-yellow-100 text-yellow-700 hover:bg-yellow-100">
-                            Média
-                          </Badge>
-                        </template>
-                        <template v-else-if="proposal.priority === 'LOW'">
-                          <Badge variant="secondary">Baixa</Badge>
-                        </template>
+                        <WorkModelBadge v-if="proposal.workModel" :work-model="proposal.workModel" />
                       </div>
 
                       <!-- Actions Menu -->

@@ -37,6 +37,7 @@ import DialogDescription from '../ui/dialog-description.vue';
 import DialogFooter from '../ui/dialog-footer.vue';
 import DialogHeader from '../ui/dialog-header.vue';
 import DialogTitle from '../ui/dialog-title.vue';
+import WorkModelBadge from '../shared/WorkModelBadge.vue';
 import AlertDialog from '../ui/alert-dialog.vue';
 import AlertDialogAction from '../ui/alert-dialog-action.vue';
 import AlertDialogCancel from '../ui/alert-dialog-cancel.vue';
@@ -583,24 +584,8 @@ const getStatusColor = (status: string) => {
               </div>
               <Separator />
               <div>
-                <p class="text-sm text-[#435574]">Prioridade</p>
-                <Badge
-                  :class="
-                    request.priority === 'URGENT'
-                      ? 'bg-red-200 text-red-900'
-                      : request.priority === 'HIGH'
-                      ? 'bg-red-100 text-red-700'
-                      : request.priority === 'MEDIUM'
-                      ? 'bg-yellow-100 text-yellow-700'
-                      : 'bg-gray-100 text-gray-700'
-                  "
-                >
-                  {{ 
-                    request.priority === 'URGENT' ? 'Urgente' :
-                    request.priority === 'HIGH' ? 'Alta' :
-                    request.priority === 'MEDIUM' ? 'Média' : 'Baixa'
-                  }}
-                </Badge>
+                <p class="text-sm text-[#435574]">Modelo de trabalho</p>
+                <WorkModelBadge :work-model="request.workModel" />
               </div>
               <template v-if="request.desiredDate">
                 <Separator />

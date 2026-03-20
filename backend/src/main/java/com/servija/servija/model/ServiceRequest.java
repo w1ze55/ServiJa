@@ -48,9 +48,9 @@ public class ServiceRequest {
     private String deadline;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
+    @Column(name = "work_model", nullable = false, length = 20)
     @Builder.Default
-    private Priority priority = Priority.MEDIUM;
+    private WorkModel workModel = WorkModel.REMOTO;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
@@ -120,8 +120,8 @@ public class ServiceRequest {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
-    public enum Priority {
-        LOW, MEDIUM, HIGH, URGENT
+    public enum WorkModel {
+        PRESENCIAL, REMOTO, HIBRIDO
     }
 
     public enum Status {

@@ -211,7 +211,6 @@ const formattedQuoteBudget = ref('');
 const quoteDeadline = ref('');
 const quoteDeadlineDate = ref('');
 const quoteDeadlineType = ref<'estimated' | 'decided'>('estimated');
-const quotePriority = ref('MEDIUM');
 const requestedServiceId = ref<number | null>(null);
 const requestedServiceTitle = ref('');
 const requestedServiceWorkModel = ref<WorkModel | null>(null);
@@ -725,12 +724,10 @@ const handleSendQuote = async () => {
     const requestData = {
       serviceName: requestedServiceTitle.value ? `${requestedServiceTitle.value} - Solicitação` : `${quoteCategory.value} - Solicitação`,
       category: quoteCategory.value,
-      description: requestedServiceTitle.value
-        ? `[Solicitação referente ao serviço: ${requestedServiceTitle.value}]\n\n${quoteMessage.value}`
-        : quoteMessage.value,
+      description: quoteMessage.value,
       budget: Number(quoteBudget.value),
       deadline: deadline,
-      priority: quotePriority.value,
+      workModel: requestedServiceWorkModel.value?.toUpperCase(),
       address: serviceAddress,
       serviceId: requestedServiceId.value,
       freelancerId: Number(props.providerId),
@@ -790,7 +787,6 @@ const resetQuoteForm = () => {
   quoteDeadline.value = '';
   quoteDeadlineDate.value = '';
   quoteDeadlineType.value = 'estimated';
-  quotePriority.value = 'MEDIUM';
   requestedServiceId.value = null;
   requestedServiceTitle.value = '';
   requestedServiceWorkModel.value = null;

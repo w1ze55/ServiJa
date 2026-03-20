@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import api from '@/api/config/axios';
+import { normalizeWorkModel, type WorkModelValue } from '@/utils/workModel';
 
 export interface Proposal {
   id: string;
@@ -14,7 +15,7 @@ export interface Proposal {
   description: string;
   budget: number;
   deadline: string;
-  priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+  workModel?: WorkModelValue | null;
   status: 'pending' | 'negotiating' | 'accepted' | 'in_progress' | 'delivered' | 'rejected' | 'completed' | 'archived';
   receivedAt: string;
   attachments?: ProposalAttachment[];
@@ -137,7 +138,7 @@ export const useProposalStore = defineStore('proposal', () => {
         description: req.description,
         budget: Number(req.budget),
         deadline: req.deadline,
-        priority: req.priority || 'MEDIUM',
+        workModel: normalizeWorkModel(req.workModel),
         status: mapApiStatusToLocal(req.status),
         receivedAt: req.createdAt,
         attachments: (req.attachments || []).map((url: string, idx: number) => ({
