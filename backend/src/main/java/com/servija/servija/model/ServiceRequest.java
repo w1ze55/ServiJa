@@ -1,6 +1,7 @@
 package com.servija.servija.model;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
@@ -38,6 +39,8 @@ public class ServiceRequest {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String description;
 
+    @DecimalMin(value = "5.00", message = "O orçamento mínimo é R$ 5,00")
+    @DecimalMax(value = "1000000.00", message = "O orçamento máximo é R$ 1.000.000,00")
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal budget;
 
@@ -74,9 +77,13 @@ public class ServiceRequest {
     private String responseAttachments;
 
     // Freelancer response fields
+    @DecimalMin(value = "5.00", message = "O valor mínimo é R$ 5,00")
+    @DecimalMax(value = "1000000.00", message = "O valor máximo é R$ 1.000.000,00")
     @Column(name = "response_value", precision = 10, scale = 2)
     private BigDecimal responseValue;
 
+    @Min(value = 1, message = "O prazo mínimo é de 1 dia")
+    @Max(value = 365, message = "O prazo máximo é de 365 dias")
     @Column(name = "response_days")
     private Integer responseDays;
 

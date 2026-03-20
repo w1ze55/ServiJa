@@ -325,6 +325,18 @@ const handleCreateRequest = async () => {
     return;
   }
 
+  // Validar que a data desejada não é no passado
+  if (newRequest.value.desiredDate) {
+    const selectedDate = new Date(newRequest.value.desiredDate);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Remove hora para comparar apenas a data
+    
+    if (selectedDate < today) {
+      toast.error('A data desejada não pode ser anterior à data atual');
+      return;
+    }
+  }
+
   isCreating.value = true;
   const result = await store.createRequest({
     service: newRequest.value.service,
@@ -874,6 +886,7 @@ watch(currentTab, () => {
               <Input
                 id="desiredDate"
                 type="date"
+                :min="new Date().toISOString().split('T')[0]"
                 :model-value="newRequest.desiredDate"
                 @update:model-value="(val) => newRequest.desiredDate = val as string"
               />

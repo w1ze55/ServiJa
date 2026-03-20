@@ -20,6 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -81,6 +82,51 @@ public class ServiceRequestService {
             }
         }
 
+        // Validar orçamento (budget)
+        if (dto.getBudget() != null) {
+            BigDecimal minBudget = new BigDecimal("5.00");
+            BigDecimal maxBudget = new BigDecimal("1000000.00");
+            
+            if (dto.getBudget().compareTo(minBudget) < 0) {
+                throw new IllegalArgumentException("O orçamento mínimo é R$ 5,00");
+            }
+            if (dto.getBudget().compareTo(maxBudget) > 0) {
+                throw new IllegalArgumentException("O orçamento máximo é R$ 1.000.000,00");
+            }
+        }
+
+        // Validar prazo estimado (deadline)
+        if (dto.getDeadline() != null && !dto.getDeadline().isEmpty()) {
+            // Se for prazo estimado (ex: "30 dias"), extrair número e validar
+            String deadlineStr = dto.getDeadline().replaceAll("[^0-9]", "");
+            if (!deadlineStr.isEmpty()) {
+                try {
+                    int days = Integer.parseInt(deadlineStr);
+                    if (days < 1) {
+                        throw new IllegalArgumentException("O prazo mínimo é de 1 dia");
+                    }
+                    if (days > 365) {
+                        throw new IllegalArgumentException("O prazo máximo é de 365 dias");
+                    }
+                } catch (NumberFormatException e) {
+                    // Se não for número, pode ser uma data - ignorar validação de dias
+                }
+            }
+        }
+
+        // Validar desiredDate - não pode ser no passado
+        LocalDate parsedDesiredDate = null;
+        if (dto.getDesiredDate() != null) {
+            try {
+                parsedDesiredDate = LocalDate.parse(dto.getDesiredDate());
+                if (parsedDesiredDate.isBefore(LocalDate.now())) {
+                    throw new IllegalArgumentException("A data desejada não pode ser anterior à data atual");
+                }
+            } catch (java.time.format.DateTimeParseException e) {
+                throw new IllegalArgumentException("Formato de data inválido. Use o formato AAAA-MM-DD");
+            }
+        }
+
         ServiceRequest request = ServiceRequest.builder()
                 .contractor(contractor)
                 .freelancer(freelancer)
@@ -91,7 +137,7 @@ public class ServiceRequestService {
                 .deadline(dto.getDeadline())
                 .priority(ServiceRequest.Priority.valueOf(dto.getPriority().toUpperCase()))
                 .address(normalizedAddress)
-                .desiredDate(dto.getDesiredDate() != null ? LocalDate.parse(dto.getDesiredDate()) : null)
+                .desiredDate(parsedDesiredDate)
                 .attachments(attachmentsJson)
                 .build();
 

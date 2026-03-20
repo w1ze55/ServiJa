@@ -358,15 +358,92 @@ const handleQuoteBudgetInput = (val: string) => {
     return;
   }
 
-  // Converter para centavos: últimos 2 dígitos são decimais
+  // Limitar a 9 dígitos (100.000.000 centavos = R$ 1.000.000,00)
+  if (digits.length > 9) {
+    digits = digits.slice(0, 9);
+  }
+
+  // Converter para reais: últimos 2 dígitos são decimais
   let numValue = parseInt(digits) / 100;
 
   // Limite de 1 milhão (R$ 1.000.000,00)
   if (numValue > 1000000) {
     numValue = 1000000;
+    digits = '100000000';
   }
 
   // Formatar para exibição
+  formattedQuoteBudget.value = formatPriceDisplay(numValue);
+  quoteBudget.value = numValue.toString();
+};
+
+const blockNonNumericKeys = (event: KeyboardEvent) => {
+  // Permitir teclas de controle: Backspace, Delete, Tab, Escape, Enter, setas
+  const allowedKeys = [
+    'Backspace', 'Delete', 'Tab', 'Escape', 'Enter',
+    'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown',
+    'Home', 'End'
+  ];
+  
+  if (allowedKeys.includes(event.key)) {
+    return;
+  }
+  
+  // Permitir Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X
+  if (event.ctrlKey || event.metaKey) {
+    return;
+  }
+  
+  // Bloquear tudo que não é número
+  if (!/^[0-9]$/.test(event.key)) {
+    event.preventDefault();
+  }
+};
+
+const blockBudgetExceedingMax = (event: KeyboardEvent) => {
+  // Permitir teclas de controle
+  const allowedKeys = [
+    'Backspace', 'Delete', 'Tab', 'Escape', 'Enter',
+    'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown',
+    'Home', 'End'
+  ];
+  
+  if (allowedKeys.includes(event.key)) {
+    return;
+  }
+  
+  // Permitir Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X
+  if (event.ctrlKey || event.metaKey) {
+    return;
+  }
+  
+  // Bloquear tudo que não é número
+  if (!/^[0-9]$/.test(event.key)) {
+    event.preventDefault();
+    return;
+  }
+  
+  // Verificar se já atingiu o valor máximo (R$ 1.000.000,00)
+  const currentDigits = formattedQuoteBudget.value.replace(/\D/g, '');
+  if (currentDigits.length >= 9 || Number(quoteBudget.value) >= 1000000) {
+    event.preventDefault();
+  }
+};
+
+const handleBudgetPaste = (event: ClipboardEvent) => {
+  const pastedText = event.clipboardData?.getData('text') || '';
+  const digits = pastedText.replace(/\D/g, '');
+  
+  if (!digits) {
+    return;
+  }
+
+  let numValue = parseInt(digits) / 100;
+  
+  if (numValue > 1000000) {
+    numValue = 1000000;
+  }
+
   formattedQuoteBudget.value = formatPriceDisplay(numValue);
   quoteBudget.value = numValue.toString();
 };
@@ -443,6 +520,20 @@ const handleDeadlineInput = (val: string) => {
   }
 
   quoteDeadline.value = digits;
+};
+
+const handleDeadlinePaste = (event: ClipboardEvent) => {
+  const pastedText = event.clipboardData?.getData('text') || '';
+  const digits = pastedText.replace(/\D/g, '');
+  
+  if (digits) {
+    const d = parseInt(digits);
+    if (d > 365) {
+      quoteDeadline.value = '365';
+    } else {
+      quoteDeadline.value = digits;
+    }
+  }
 };
 
 const clearQuoteAddressErrors = () => {
@@ -600,6 +691,18 @@ const handleSendQuote = async () => {
   if (!quoteDeadlineDate.value && quoteDeadlineType.value === 'decided') {
     toast.error('Por favor, selecione uma data');
     return;
+  }
+
+  // Validar que a data decidida não é no passado
+  if (quoteDeadlineType.value === 'decided' && quoteDeadlineDate.value) {
+    const selectedDate = new Date(quoteDeadlineDate.value);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Remove hora para comparar apenas a data
+    
+    if (selectedDate < today) {
+      toast.error('A data desejada não pode ser anterior à data atual');
+      return;
+    }
   }
 
   if (!validateQuoteAddress()) {
@@ -1519,12 +1622,20 @@ onMounted(() => {
                 placeholder="0,00"
                 :model-value="formattedQuoteBudget"
                 @update:model-value="(val: string) => handleQuoteBudgetInput(val)"
+                @keydown="blockBudgetExceedingMax"
+                @paste.prevent="handleBudgetPaste"
                 class="pl-10"
-                :class="{ 'border-red-500 focus-visible:ring-red-500': quoteBudget && Number(quoteBudget) < 5 }"
+                :class="{ 
+                  'border-red-500 focus-visible:ring-red-500': quoteBudget && Number(quoteBudget) < 5,
+                  'border-amber-500 focus-visible:ring-amber-500': Number(quoteBudget) >= 1000000
+                }"
               />
             </div>
             <p v-if="quoteBudget && Number(quoteBudget) < 5" class="text-[11px] text-red-500 font-medium mt-1">
               O orçamento mínimo é R$ 5,00
+            </p>
+            <p v-else-if="Number(quoteBudget) >= 1000000" class="text-[11px] text-amber-600 font-medium mt-1">
+              Valor máximo atingido: R$ 1.000.000,00
             </p>
           </div>
 
@@ -1564,6 +1675,8 @@ onMounted(() => {
                   placeholder="Quantidade de dias"
                   :model-value="quoteDeadline"
                   @update:model-value="handleDeadlineInput"
+                  @keydown="blockNonNumericKeys"
+                  @paste.prevent="handleDeadlinePaste"
                   class="pr-24"
                 />
                 <div class="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2 pointer-events-none">
@@ -1578,6 +1691,7 @@ onMounted(() => {
               <Input
                 type="date"
                 v-model="quoteDeadlineDate"
+                :min="new Date().toISOString().split('T')[0]"
                 class="w-full"
               />
             </div>
