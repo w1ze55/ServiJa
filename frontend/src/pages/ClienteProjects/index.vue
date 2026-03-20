@@ -249,11 +249,15 @@ const getUserEmail = () => {
 const handleServiceRequestNotification = (event: any) => {
   const notification = event.detail;
   console.log('📩 Notificação recebida em Projetos:', notification);
-  
+
   // Mostrar toast baseado no tipo de notificação
   switch (notification.type) {
     case 'NEW_PROPOSAL':
       toast.success(`${notification.freelancerName} enviou uma proposta!`);
+      store.loadRequests();
+      break;
+    case 'COUNTER_PROPOSAL_REJECTED':
+      toast.info(`${notification.freelancerName} recusou sua contra-proposta`);
       store.loadRequests();
       break;
     case 'SERVICE_REQUEST_STATUS_CHANGED':

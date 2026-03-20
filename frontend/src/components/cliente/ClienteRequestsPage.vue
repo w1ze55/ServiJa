@@ -181,6 +181,10 @@ const handleServiceRequestNotification = (event: any) => {
       // Recarregar lista de solicitações
       store.loadRequests();
       break;
+    case 'COUNTER_PROPOSAL_REJECTED':
+      toast.info(`${notification.freelancerName} recusou sua contra-proposta`);
+      store.loadRequests();
+      break;
     case 'PROPOSAL_ACCEPTED':
       toast.success(notification.message);
       store.loadRequests();

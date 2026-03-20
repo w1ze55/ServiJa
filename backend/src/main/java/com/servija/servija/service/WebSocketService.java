@@ -148,6 +148,29 @@ public class WebSocketService {
     }
 
     /**
+     * Notifica sobre rejeição de contra-proposta pelo freelancer
+     */
+    public void notifyCounterProposalRejected(Long serviceRequestId, String contractorEmail, String freelancerName, String reason) {
+        Map<String, Object> message = new HashMap<>();
+        message.put("type", "COUNTER_PROPOSAL_REJECTED");
+        message.put("serviceRequestId", serviceRequestId);
+        message.put("freelancerName", freelancerName);
+        message.put("reason", reason);
+        String messageText = freelancerName + " recusou sua contra-proposta";
+        if (reason != null && !reason.trim().isEmpty()) {
+            messageText += ". Motivo: " + reason;
+        }
+        message.put("message", messageText);
+        message.put("timestamp", System.currentTimeMillis());
+        
+        String destination = "/topic/service-request/" + contractorEmail;
+        messagingTemplate.convertAndSend(destination, (Object) message);
+        
+        log.info("Notificação de contra-proposta recusada enviada para {}: solicitação {}", 
+                contractorEmail, serviceRequestId);
+    }
+
+    /**
      * Notifica sobre proposta aceita
      */
     public void notifyProposalAccepted(Long serviceRequestId, String freelancerEmail, String contractorEmail) {

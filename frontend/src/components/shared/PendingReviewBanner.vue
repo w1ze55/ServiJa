@@ -173,7 +173,7 @@ onUnmounted(() => {
                 :style="{ animationDelay: `${i * 100}ms` }"
               />
             </div>
-            <h2 class="text-xl font-bold text-[#263238]">Avalie seu servico!</h2>
+            <h2 class="text-xl font-bold text-[#263238]">Avalie seu serviço!</h2>
             <p class="text-sm text-[#435574] mt-1">
               Sua avaliacao ajuda outros usuarios a encontrar os melhores profissionais
             </p>

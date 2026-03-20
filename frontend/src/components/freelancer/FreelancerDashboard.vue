@@ -225,6 +225,9 @@ const handleNotification = (event: any) => {
     case 'NEW_SERVICE_REQUEST':
       toast.success(`Nova solicitação: ${notification.serviceName} - ${notification.contractorName}`);
       break;
+    case 'COUNTER_PROPOSAL':
+      toast.info(`${notification.contractorName} fez uma contra-proposta de ${notification.counterProposalAmount}`);
+      break;
     case 'PROPOSAL_ACCEPTED':
       toast.success(`Proposta aceita por ${notification.contractorName}!`);
       break;

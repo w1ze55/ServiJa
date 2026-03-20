@@ -350,6 +350,13 @@ public class ServiceRequestService {
         }
         historyService.record(saved, freelancer, OperationType.COUNTER_PROPOSAL_REJECTED, details);
 
+        // Notificar contratante sobre rejeição da contra proposta
+        webSocketService.notifyCounterProposalRejected(
+                saved.getId(),
+                request.getContractor().getEmail(),
+                freelancer.getName(),
+                reason);
+
         return toResponse(saved);
     }
 

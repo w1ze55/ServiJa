@@ -161,7 +161,8 @@ const handleServiceRequestNotification = (event: any) => {
     switch (notification.type) {
       case 'SERVICE_REQUEST_STATUS_CHANGED':
         if (notification.status?.toLowerCase() === 'completed') {
-          toast.success('✅ Serviço concluído! Avalie o freelancer.');
+          // Não mostrar toast aqui, pois handleApprove já mostra
+          // Apenas redirecionar após um delay
           setTimeout(() => {
             router.push('/rate-freelancer?requestId=' + requestId.value);
           }, 2000);
@@ -171,7 +172,8 @@ const handleServiceRequestNotification = (event: any) => {
         }
         break;
       case 'SERVICE_COMPLETED_REVIEW_PENDING':
-        toast.success('Serviço concluído! Avalie o freelancer.');
+        // Não mostrar toast aqui, pois handleApprove já mostra
+        // Apenas redirecionar após um delay
         setTimeout(() => {
           router.push('/rate-freelancer?requestId=' + requestId.value);
         }, 1500);
