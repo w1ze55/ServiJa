@@ -202,11 +202,11 @@ const handleImageUploadClick = () => {
 const handleImageUpload = async (e: Event) => {
   const target = e.target as HTMLInputElement;
   if (target.files && target.files.length > 0) {
-    // Validar tamanho dos arquivos (5MB max)
+    // Validar tamanho dos arquivos (10MB max)
     const files = Array.from(target.files);
-    const oversizedFiles = files.filter((file) => file.size > 5 * 1024 * 1024);
+    const oversizedFiles = files.filter((file) => file.size > 10 * 1024 * 1024);
     if (oversizedFiles.length > 0) {
-      toast.error('Cada imagem deve ter no máximo 5MB');
+      toast.error('Cada imagem deve ter no máximo 10MB');
       target.value = ''; // Limpar input
       return;
     }
@@ -751,7 +751,7 @@ const handleTagKeyPress = (e: KeyboardEvent) => {
               <template v-if="!isUploading">
                 <Upload class="h-12 w-12 text-gray-400 mx-auto mb-4" />
                 <p class="text-[#263238] mb-2">Clique para fazer upload ou arraste as imagens</p>
-                <p class="text-sm text-[#435574] mb-4">PNG, JPG até 5MB cada</p>
+                <p class="text-sm text-[#435574] mb-4">PNG, JPG até 10MB cada</p>
                 <input
                   type="file"
                   multiple
