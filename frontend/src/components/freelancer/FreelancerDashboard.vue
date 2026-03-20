@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue';
+import { useServiceRequestWebSocket, type ServiceRequestNotification } from '@/composables/useServiceRequestWebSocket';
 import {
   TrendingUp,
   DollarSign,
@@ -24,6 +25,7 @@ import Avatar from '../ui/avatar.vue';
 import AvatarImage from '../ui/avatar-image.vue';
 import AvatarFallback from '../ui/avatar-fallback.vue';
 import Progress from '../ui/progress.vue';
+import { toast } from '@/utils/toast';
 // Gráficos removidos - recharts não está instalado
 // Para usar gráficos, instale: npm install recharts
 
@@ -32,6 +34,8 @@ interface Props {
 }
 
 const props = defineProps<Props>();
+
+let wsConnection: ReturnType<typeof useServiceRequestWebSocket> | null = null;
 
 const selectedPeriod = ref<'week' | 'month' | 'year'>('month');
 
@@ -201,6 +205,71 @@ const getInitials = (name: string) => {
     .toUpperCase()
     .slice(0, 2);
 };
+
+const getUserEmail = () => {
+  const token = localStorage.getItem('token');
+  if (!token) return null;
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return payload.sub || payload.email;
+  } catch {
+    return null;
+  }
+};
+
+const handleNotification = (event: any) => {
+  const notification: ServiceRequestNotification = event.detail;
+  console.log('📩 Notificação recebida no Dashboard:', notification);
+
+  switch (notification.type) {
+    case 'NEW_SERVICE_REQUEST':
+      toast.success(`Nova solicitação: ${notification.serviceName} - ${notification.contractorName}`);
+      break;
+    case 'PROPOSAL_ACCEPTED':
+      toast.success(`Proposta aceita por ${notification.contractorName}!`);
+      break;
+    case 'SERVICE_REQUEST_STATUS_CHANGED':
+      if (notification.status === 'IN_PROGRESS') {
+        toast.success('Pagamento confirmado! Serviço em andamento');
+      } else {
+        toast.info(notification.message || `Status alterado para ${notification.status}`);
+      }
+      break;
+    case 'SERVICE_REQUEST_CANCELLED':
+      toast.info(`Solicitação cancelada: ${notification.message}`);
+      break;
+    case 'NEW_REVIEW':
+      toast.success(`${notification.reviewerName} avaliou seu serviço com ${notification.rating} estrelas`);
+      break;
+    default:
+      toast.info(notification.message);
+  }
+};
+
+onMounted(async () => {
+  const userEmail = getUserEmail();
+  if (userEmail) {
+    console.log('🔌 Inicializando WebSocket no Dashboard para:', userEmail);
+    wsConnection = useServiceRequestWebSocket(userEmail);
+    try {
+      await wsConnection.connect();
+      console.log('✅ WebSocket conectado com sucesso no Dashboard');
+    } catch (error) {
+      console.error('❌ Erro ao conectar WebSocket no Dashboard:', error);
+    }
+    window.addEventListener('service-request-notification', handleNotification);
+  } else {
+    console.warn('⚠️ Email do usuário não encontrado para WebSocket');
+  }
+});
+
+onUnmounted(() => {
+  console.log('🔌 Desconectando WebSocket do Dashboard');
+  window.removeEventListener('service-request-notification', handleNotification);
+  if (wsConnection) {
+    wsConnection.disconnect();
+  }
+});
 </script>
 
 <template>

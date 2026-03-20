@@ -253,6 +253,13 @@ public class AsaasWebhookService {
                         payment.getContractor(),
                         ServiceRequestHistory.OperationType.PAYMENT_CONFIRMED,
                         "Pagamento de R$ " + String.format("%.2f", payment.getTotalAmount()) + " confirmado");
+                
+                // Notificar mudança de status da solicitação para ambas as partes
+                webSocketService.notifyServiceRequestStatusChange(
+                        serviceRequest.getId(),
+                        "IN_PROGRESS",
+                        payment.getContractor().getEmail(),
+                        payment.getFreelancer().getEmail());
             } else if (!Boolean.TRUE.equals(serviceRequest.getChatEnabled())) {
                 // Se já estava em andamento mas chat não estava habilitado
                 serviceRequest.setChatEnabled(true);
@@ -260,7 +267,7 @@ public class AsaasWebhookService {
                 log.info("🔓 Chat habilitado (solicitação já estava {}))", serviceRequest.getStatus());
             }
 
-            // Enviar notificação WebSocket para o cliente E FREELANCER
+            // Enviar notificação WebSocket de pagamento para o cliente E FREELANCER
             webSocketService.notifyPixPaymentConfirmed(
                     payment.getId(),
                     payment.getContractor().getEmail());
@@ -959,13 +966,20 @@ public class AsaasWebhookService {
                         payment.getContractor(),
                         ServiceRequestHistory.OperationType.PAYMENT_CONFIRMED,
                         "Pagamento PIX de R$ " + String.format("%.2f", payment.getTotalAmount()) + " confirmado");
+                
+                // Notificar mudança de status da solicitação
+                webSocketService.notifyServiceRequestStatusChange(
+                        serviceRequest.getId(),
+                        "IN_PROGRESS",
+                        payment.getContractor().getEmail(),
+                        payment.getFreelancer().getEmail());
             } else if (!Boolean.TRUE.equals(serviceRequest.getChatEnabled())) {
                 serviceRequest.setChatEnabled(true);
                 serviceRequestRepository.save(serviceRequest);
                 log.info("🔓 Chat habilitado (solicitação já estava {})", serviceRequest.getStatus());
             }
 
-            // Notificar via WebSocket - CLIENTE E FREELANCER
+            // Notificar pagamento confirmado via WebSocket - CLIENTE E FREELANCER
             webSocketService.notifyPixPaymentConfirmed(
                     payment.getId(),
                     payment.getContractor().getEmail());

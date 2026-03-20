@@ -173,6 +173,14 @@ public class PaymentService {
                     com.servija.servija.model.ServiceRequestHistory.OperationType.PAYMENT_CONFIRMED,
                     "Pagamento de R$ " + String.format("%.2f", payment.getTotalAmount()) + " confirmado via cartão de crédito");
 
+            // Notificar mudança de status da solicitação
+            webSocketService.notifyServiceRequestStatusChange(
+                    serviceRequest.getId(),
+                    "IN_PROGRESS",
+                    contractor.getEmail(),
+                    serviceRequest.getFreelancer().getEmail());
+            
+            // Notificar pagamento confirmado
             webSocketService.notifyPixPaymentConfirmed(payment.getId(), contractor.getEmail());
             if (serviceRequest.getFreelancer() != null) {
                 webSocketService.notifyPixPaymentConfirmed(payment.getId(), serviceRequest.getFreelancer().getEmail());
@@ -491,10 +499,17 @@ public class PaymentService {
                     com.servija.servija.model.ServiceRequestHistory.OperationType.PAYMENT_CONFIRMED,
                     "🧪 Pagamento simulado de R$ " + String.format("%.2f", payment.getTotalAmount()) + " confirmado");
 
+            // Notificar mudança de status da solicitação
+            webSocketService.notifyServiceRequestStatusChange(
+                    serviceRequest.getId(),
+                    "IN_PROGRESS",
+                    payment.getContractor().getEmail(),
+                    payment.getFreelancer().getEmail());
+
             log.info("🧪 Solicitação atualizada para IN_PROGRESS, chat habilitado");
         }
 
-        // Notificar via WebSocket - CLIENTE E FREELANCER
+        // Notificar pagamento confirmado via WebSocket - CLIENTE E FREELANCER
         webSocketService.notifyPixPaymentConfirmed(
                 payment.getId(),
                 payment.getContractor().getEmail());
