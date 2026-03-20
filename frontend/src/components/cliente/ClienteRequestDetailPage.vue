@@ -49,6 +49,7 @@ import { useClientRequestStore, type ServiceRequest } from '@/stores/clientReque
 import ServiceRequestTimeline from '../service/ServiceRequestTimeline.vue';
 import { toast } from '@/utils/toast';
 import { getStatusLabel } from '@/utils/statusTranslations';
+import { validateValueRange, extractApiErrorMessage } from '@/utils/valueValidation';
 
 interface Props {
   onNavigate: (page: string, params?: any) => void;
@@ -98,20 +99,28 @@ const handleSendCounterProposal = async () => {
     return;
   }
 
-  isSubmittingCounter.value = true;
-  const success = await store.sendCounterProposal(
-    request.value.id,
-    counterValue.value,
-    counterDays.value,
-    counterNotes.value
-  );
-  isSubmittingCounter.value = false;
+  const rangeError = validateValueRange(counterValue.value);
+  if (rangeError) {
+    toast.error(rangeError);
+    return;
+  }
 
-  if (success) {
+  isSubmittingCounter.value = true;
+  try {
+    await store.sendCounterProposal(
+      request.value.id,
+      counterValue.value,
+      counterDays.value,
+      counterNotes.value
+    );
     toast.success('Contra proposta enviada com sucesso!');
     showCounterProposalDialog.value = false;
-  } else {
-    toast.error('Erro ao enviar contra proposta');
+  } catch (err: any) {
+    console.error('Erro ao enviar contra proposta:', err);
+    const backendMsg = extractApiErrorMessage(err);
+    toast.error(backendMsg || 'Erro ao enviar contra proposta. Verifique os dados e tente novamente.');
+  } finally {
+    isSubmittingCounter.value = false;
   }
 };
 

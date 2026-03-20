@@ -62,6 +62,7 @@ import { useServiceRequestWebSocket } from '@/composables/useServiceRequestWebSo
 import { toast } from '@/utils/toast';
 import { getStatusLabel } from '@/utils/statusTranslations';
 import api from '@/api/config/axios';
+import { validateValueRange, extractApiErrorMessage } from '@/utils/valueValidation';
 
 const router = useRouter();
 
@@ -379,6 +380,9 @@ const validateProposal = () => {
   const value = parseCurrencyValue(proposalForm.value.value);
   if (isNaN(value) || value <= 0) {
     errors.push('Valor da proposta deve ser um número válido maior que zero');
+  } else {
+    const rangeError = validateValueRange(value);
+    if (rangeError) errors.push(rangeError);
   }
 
   const days = parseInt(proposalForm.value.executionDays);
@@ -555,30 +559,27 @@ const handleConfirmSendProposal = async () => {
       }))
     };
 
-    const success = await proposalStore.sendResponse(proposal.value.id, responseData as any);
+    await proposalStore.sendResponse(proposal.value.id, responseData as any);
     
-    if (success) {
-      toast.success('Proposta enviada com sucesso!');
-      showConfirmDialog.value = false;
-      showSendProposalDialog.value = false;
-      
-      proposalForm.value = {
-        value: '',
-        executionDays: '',
-        scope: '',
-        notes: '',
-        attachments: [],
-        attachmentUrls: [],
-      };
-      milestones.value = [];
-      
-      proposal.value = proposalStore.getProposalById(proposal.value.id) || null;
-    } else {
-      toast.error('Erro ao enviar proposta');
-    }
-  } catch (err) {
+    toast.success('Proposta enviada com sucesso!');
+    showConfirmDialog.value = false;
+    showSendProposalDialog.value = false;
+    
+    proposalForm.value = {
+      value: '',
+      executionDays: '',
+      scope: '',
+      notes: '',
+      attachments: [],
+      attachmentUrls: [],
+    };
+    milestones.value = [];
+    
+    proposal.value = proposalStore.getProposalById(proposal.value.id) || null;
+  } catch (err: any) {
     console.error('Erro ao enviar proposta:', err);
-    toast.error('Erro ao processar anexos ou enviar proposta');
+    const backendMsg = extractApiErrorMessage(err);
+    toast.error(backendMsg || 'Erro ao enviar proposta. Verifique os dados e tente novamente.');
   } finally {
     isLoading.value = false;
   }

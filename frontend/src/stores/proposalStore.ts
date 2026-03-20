@@ -218,30 +218,25 @@ export const useProposalStore = defineStore('proposal', () => {
     id: string,
     response: Omit<FreelancerResponse, 'sentAt'>
   ): Promise<boolean> => {
-    try {
-      await api.patch(`/service-requests/${id}/respond`, {
-        value: response.value,
-        executionDays: response.executionDays,
-        scope: response.scope,
-        notes: response.notes,
-        milestones: response.milestones,
-        attachments: response.attachments?.map(a => a.url)
-      });
+    await api.patch(`/service-requests/${id}/respond`, {
+      value: response.value,
+      executionDays: response.executionDays,
+      scope: response.scope,
+      notes: response.notes,
+      milestones: response.milestones,
+      attachments: response.attachments?.map(a => a.url)
+    });
 
-      const proposal = proposals.value.find((p) => p.id === id);
-      if (proposal) {
-        proposal.freelancerResponse = {
-          ...response,
-          sentAt: new Date().toISOString(),
-        };
-        proposal.status = 'negotiating';
-      }
-
-      return true;
-    } catch (err) {
-      console.error('Erro ao enviar resposta:', err);
-      return false;
+    const proposal = proposals.value.find((p) => p.id === id);
+    if (proposal) {
+      proposal.freelancerResponse = {
+        ...response,
+        sentAt: new Date().toISOString(),
+      };
+      proposal.status = 'negotiating';
     }
+
+    return true;
   };
 
   const updateStatus = async (

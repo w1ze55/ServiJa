@@ -60,6 +60,7 @@ import { useClientRequestStore, type ServiceRequest } from '@/stores/clientReque
 import { useServiceRequestWebSocket } from '@/composables/useServiceRequestWebSocket';
 import { toast } from '@/utils/toast';
 import { getStatusLabel } from '@/utils/statusTranslations';
+import { validateValueRange, extractApiErrorMessage } from '@/utils/valueValidation';
 
 interface Props {
   onNavigate: (page: string, params?: any) => void;
@@ -329,11 +330,17 @@ const handleCreateRequest = async () => {
     return;
   }
 
+  const rangeError = validateValueRange(newRequest.value.budget);
+  if (rangeError) {
+    toast.error(rangeError);
+    return;
+  }
+
   // Validar que a data desejada não é no passado
   if (newRequest.value.desiredDate) {
     const selectedDate = new Date(newRequest.value.desiredDate);
     const today = new Date();
-    today.setHours(0, 0, 0, 0); // Remove hora para comparar apenas a data
+    today.setHours(0, 0, 0, 0);
     
     if (selectedDate < today) {
       toast.error('A data desejada não pode ser anterior à data atual');
@@ -342,23 +349,30 @@ const handleCreateRequest = async () => {
   }
 
   isCreating.value = true;
-  const result = await store.createRequest({
-    service: newRequest.value.service,
-    category: newRequest.value.category,
-    description: newRequest.value.description,
-    budget: newRequest.value.budget,
-    deadline: newRequest.value.deadline,
-    priority: newRequest.value.priority,
-    address: newRequest.value.address,
-    desiredDate: newRequest.value.desiredDate,
-  });
-  isCreating.value = false;
+  try {
+    const result = await store.createRequest({
+      service: newRequest.value.service,
+      category: newRequest.value.category,
+      description: newRequest.value.description,
+      budget: newRequest.value.budget,
+      deadline: newRequest.value.deadline,
+      priority: newRequest.value.priority,
+      address: newRequest.value.address,
+      desiredDate: newRequest.value.desiredDate,
+    });
 
-  if (result) {
-    toast.success('Solicitação criada com sucesso!');
-    showCreateDialog.value = false;
-  } else {
-    toast.error('Erro ao criar solicitação');
+    if (result) {
+      toast.success('Solicitação criada com sucesso!');
+      showCreateDialog.value = false;
+    } else {
+      toast.error('Erro ao criar solicitação');
+    }
+  } catch (err: any) {
+    console.error('Erro ao criar solicitação:', err);
+    const backendMsg = extractApiErrorMessage(err);
+    toast.error(backendMsg || 'Erro ao criar solicitação. Verifique os dados e tente novamente.');
+  } finally {
+    isCreating.value = false;
   }
 };
 

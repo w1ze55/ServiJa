@@ -308,36 +308,31 @@ export const useClientRequestStore = defineStore('clientRequest', () => {
         executionDays: number,
         notes: string
     ): Promise<boolean> => {
-        try {
-            const request = requests.value.find((r) => r.id === id);
-            if (!request) return false;
+        const request = requests.value.find((r) => r.id === id);
+        if (!request) return false;
 
-            const response = await api.patch(`/service-requests/${id}/counter-proposal`, {
-                value,
-                executionDays,
-                notes
-            });
+        const response = await api.patch(`/service-requests/${id}/counter-proposal`, {
+            value,
+            executionDays,
+            notes
+        });
 
-            const updatedReq = response.data;
-            request.status = 'negotiating';
-            request.counterValue = updatedReq.counterValue;
-            request.counterDays = updatedReq.counterDays;
-            request.counterNotes = updatedReq.counterNotes;
+        const updatedReq = response.data;
+        request.status = 'negotiating';
+        request.counterValue = updatedReq.counterValue;
+        request.counterDays = updatedReq.counterDays;
+        request.counterNotes = updatedReq.counterNotes;
 
-            request.auditLog = request.auditLog || [];
-            request.auditLog.unshift({
-                id: `log-${Date.now()}`,
-                action: 'Contra proposta enviada',
-                user: 'Você (Cliente)',
-                timestamp: new Date().toISOString(),
-                details: `Valor proposto: R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} | Prazo: ${executionDays} dias`,
-            });
+        request.auditLog = request.auditLog || [];
+        request.auditLog.unshift({
+            id: `log-${Date.now()}`,
+            action: 'Contra proposta enviada',
+            user: 'Você (Cliente)',
+            timestamp: new Date().toISOString(),
+            details: `Valor proposto: R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} | Prazo: ${executionDays} dias`,
+        });
 
-            return true;
-        } catch (err) {
-            console.error('Erro ao enviar contra proposta:', err);
-            return false;
-        }
+        return true;
     };
 
     const completeService = async (id: string): Promise<boolean> => {
