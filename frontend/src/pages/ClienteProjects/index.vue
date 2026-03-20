@@ -307,7 +307,9 @@ onMounted(() => {
   
   if (userEmail) {
     wsConnection = useServiceRequestWebSocket(userEmail);
-    wsConnection.connect();
+    wsConnection.connect().catch(error => {
+      console.error('❌ Erro ao conectar WebSocket de projetos:', error);
+    });
     
     console.log('✅ WebSocket inicializado para projetos (Cliente)');
     

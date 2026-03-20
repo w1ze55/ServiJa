@@ -13,7 +13,10 @@ import com.servija.servija.model.Freelancer;
 import com.servija.servija.model.User;
 import com.servija.servija.repository.ContractorRepository;
 import com.servija.servija.repository.FreelancerRepository;
+import com.servija.servija.repository.ReviewRepository;
 import com.servija.servija.repository.UserRepository;
+
+import java.math.BigDecimal;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,6 +32,7 @@ public class UserService {
     private final UserRepository userRepository;
     private final ContractorRepository contractorRepository;
     private final FreelancerRepository freelancerRepository;
+    private final ReviewRepository reviewRepository;
     private final PasswordEncoder passwordEncoder;
     private final EntityManager entityManager;
     private final FileStorageService fileStorageService;
@@ -230,12 +234,17 @@ public class UserService {
                     .build());
         } else if (user instanceof Freelancer) {
             Freelancer freelancer = (Freelancer) user;
+            
+            // Calcular média das avaliações e total de reviews a partir da tabela reviews
+            Double averageRating = reviewRepository.findAverageRatingByReviewedId(freelancer.getId());
+            long totalReviewsCount = reviewRepository.countByReviewedId(freelancer.getId());
+            
             builder.freelancerProfile(ProfileResponse.FreelancerProfile.builder()
                     .bio(freelancer.getBio())
                     .professionalTitle(freelancer.getProfessionalTitle())
                     .location(freelancer.getLocation())
-                    .rating(freelancer.getRating())
-                    .totalReviews(freelancer.getTotalReviews())
+                    .rating(averageRating != null ? BigDecimal.valueOf(averageRating) : null)
+                    .totalReviews((int) totalReviewsCount)
                     .completedJobs(freelancer.getCompletedJobs())
                     .activeJobs(freelancer.getActiveJobs())
                     .kycCompleted(freelancer.getKycCompleted())

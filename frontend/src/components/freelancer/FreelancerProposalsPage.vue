@@ -199,6 +199,8 @@ const handleServiceRequestNotification = (event: any) => {
     case 'SERVICE_REQUEST_STATUS_CHANGED':
       if (notification.status === 'COMPLETED') {
         toast.success('Serviço Concluído! O cliente confirmou a entrega.');
+      } else if (notification.status === 'IN_PROGRESS') {
+        toast.success('Pagamento confirmado! O serviço está em andamento');
       } else {
         toast.info(`Status atualizado: ${getStatusLabel(notification.status)}`);
       }

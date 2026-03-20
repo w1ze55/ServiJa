@@ -13,6 +13,7 @@ import com.servija.servija.repository.AddressRepository;
 import com.servija.servija.repository.FreelancerRepository;
 import com.servija.servija.repository.UserRepository;
 import com.servija.servija.repository.ServiceRequestRepository;
+import com.servija.servija.repository.ReviewRepository;
 import com.servija.servija.model.ServiceRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -41,6 +42,7 @@ public class FreelancerService {
     private final UserRepository userRepository;
     private final AddressRepository addressRepository;
     private final ServiceRequestRepository serviceRequestRepository;
+    private final ReviewRepository reviewRepository;
     private final ObjectMapper objectMapper;
 
     @Transactional(readOnly = true)
@@ -224,6 +226,10 @@ public class FreelancerService {
         long completedJobsCount = serviceRequestRepository.countByFreelancerIdAndStatus(freelancer.getId(),
                 ServiceRequest.Status.COMPLETED);
 
+        // Calcular média das avaliações e total de reviews a partir da tabela reviews
+        Double averageRating = reviewRepository.findAverageRatingByReviewedId(freelancer.getId());
+        long totalReviewsCount = reviewRepository.countByReviewedId(freelancer.getId());
+
         return FreelancerProfileResponse.builder()
                 .id(freelancer.getId())
                 .name(freelancer.getName())
@@ -238,8 +244,8 @@ public class FreelancerService {
                 .serviceCities(serviceCityResponses)
                 .professionalLinks(professionalLinkResponses)
                 .socialLinks(socialLinks)
-                .rating(freelancer.getRating())
-                .totalReviews(freelancer.getTotalReviews())
+                .rating(averageRating != null ? BigDecimal.valueOf(averageRating) : null)
+                .totalReviews((int) totalReviewsCount)
                 .completedJobs((int) completedJobsCount)
                 .available(freelancer.getAvailable())
                 .build();
@@ -312,13 +318,17 @@ public class FreelancerService {
     }
 
     private NearbyFreelancerResponse mapToNearbyResponse(Freelancer freelancer, Double distance) {
+        // Calcular média das avaliações e total de reviews a partir da tabela reviews
+        Double averageRating = reviewRepository.findAverageRatingByReviewedId(freelancer.getId());
+        long totalReviewsCount = reviewRepository.countByReviewedId(freelancer.getId());
+
         return NearbyFreelancerResponse.builder()
                 .id(freelancer.getId())
                 .name(freelancer.getName())
                 .avatar(freelancer.getAvatarUrl())
                 .professionalTitle(freelancer.getProfessionalTitle())
-                .rating(freelancer.getRating())
-                .totalReviews(freelancer.getTotalReviews())
+                .rating(averageRating != null ? BigDecimal.valueOf(averageRating) : null)
+                .totalReviews((int) totalReviewsCount)
                 .location(freelancer.getLocation())
                 .latitude(freelancer.getLatitude())
                 .longitude(freelancer.getLongitude())

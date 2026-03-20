@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch } from 'vue';
-import { useRouter } from 'vue-router';
+import { ref, onMounted, onUnmounted, watch, computed } from 'vue';
+import { useRouter, useRoute } from 'vue-router';
 import { useReviewStore } from '@/stores/reviewStore';
+import type { PendingReview } from '@/api/services/reviewService';
 import { Star, X, ArrowRight } from 'lucide-vue-next';
 import Button from '../ui/button.vue';
 import Avatar from '../ui/avatar.vue';
@@ -9,7 +10,13 @@ import AvatarFallback from '../ui/avatar-fallback.vue';
 import AvatarImage from '../ui/avatar-image.vue';
 
 const router = useRouter();
+const route = useRoute();
 const reviewStore = useReviewStore();
+
+const isOnRatingPage = computed(() => {
+  const path = route.path;
+  return path === '/rate-freelancer' || path === '/rate-client';
+});
 
 const showBanner = ref(true);
 const showModal = ref(false);
@@ -19,7 +26,7 @@ let reminderInterval: ReturnType<typeof setInterval> | null = null;
 const REMINDER_INTERVAL_MS = 120_000; // 2 minutos
 const SNOOZE_KEY = 'pending_review_snoozed_until';
 
-const currentPending = ref(reviewStore.pendingReviews[0] || null);
+const currentPending = ref<PendingReview | null>(reviewStore.pendingReviews[0] || null);
 
 watch(
   () => reviewStore.pendingReviews,
@@ -33,6 +40,15 @@ watch(
     }
   },
   { deep: true }
+);
+
+watch(
+  () => route.path,
+  () => {
+    if (isOnRatingPage.value) {
+      showModal.value = false;
+    }
+  }
 );
 
 const getInitials = (name: string) => {
@@ -51,7 +67,7 @@ const isSnoozed = (): boolean => {
 };
 
 const checkAndShowModal = () => {
-  if (reviewStore.hasPendingReviews && !isSnoozed()) {
+  if (reviewStore.hasPendingReviews && !isSnoozed() && !isOnRatingPage.value) {
     showModal.value = true;
   }
 };
@@ -103,9 +119,9 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <!-- Banner fixo no topo -->
+  <!-- Banner fixo no topo (esconde na página de avaliação) -->
   <div
-    v-if="reviewStore.hasPendingReviews && showBanner"
+    v-if="reviewStore.hasPendingReviews && showBanner && !isOnRatingPage"
     class="bg-gradient-to-r from-amber-50 to-yellow-50 border-b border-amber-200 px-4 py-3"
   >
     <div class="max-w-7xl mx-auto flex items-center justify-between gap-4">

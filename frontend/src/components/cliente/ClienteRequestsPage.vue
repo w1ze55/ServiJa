@@ -134,7 +134,9 @@ onMounted(() => {
   
   if (userEmail) {
     wsConnection = useServiceRequestWebSocket(userEmail);
-    wsConnection.connect();
+    wsConnection.connect().catch(error => {
+      console.error('❌ Erro ao conectar WebSocket:', error);
+    });
     
     console.log('✅ WebSocket inicializado para solicitações (Cliente)');
     
@@ -188,7 +190,15 @@ const handleServiceRequestNotification = (event: any) => {
       store.loadRequests();
       break;
     case 'SERVICE_REQUEST_STATUS_CHANGED':
-      toast.info(`Status atualizado: ${getStatusLabel(notification.status)}`);
+      if (notification.status === 'DELIVERED') {
+        toast.success('Serviço entregue! O freelancer marcou o serviço como concluído');
+      } else if (notification.status === 'IN_PROGRESS') {
+        toast.success('Pagamento confirmado! O serviço está em andamento');
+      } else if (notification.status === 'COMPLETED') {
+        toast.success('Serviço concluído com sucesso!');
+      } else {
+        toast.info(`Status atualizado: ${getStatusLabel(notification.status)}`);
+      }
       store.loadRequests();
       break;
     case 'SERVICE_COMPLETED_REVIEW_PENDING':
