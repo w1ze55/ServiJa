@@ -37,6 +37,7 @@ import DialogDescription from '../ui/dialog-description.vue';
 import DialogFooter from '../ui/dialog-footer.vue';
 import DialogHeader from '../ui/dialog-header.vue';
 import DialogTitle from '../ui/dialog-title.vue';
+import WorkModelBadge from '../shared/WorkModelBadge.vue';
 import AlertDialog from '../ui/alert-dialog.vue';
 import AlertDialogAction from '../ui/alert-dialog-action.vue';
 import AlertDialogCancel from '../ui/alert-dialog-cancel.vue';
@@ -49,6 +50,7 @@ import { useClientRequestStore, type ServiceRequest } from '@/stores/clientReque
 import ServiceRequestTimeline from '../service/ServiceRequestTimeline.vue';
 import { toast } from '@/utils/toast';
 import { getStatusLabel } from '@/utils/statusTranslations';
+import { validateValueRange, extractApiErrorMessage } from '@/utils/valueValidation';
 
 interface Props {
   onNavigate: (page: string, params?: any) => void;
@@ -98,20 +100,28 @@ const handleSendCounterProposal = async () => {
     return;
   }
 
-  isSubmittingCounter.value = true;
-  const success = await store.sendCounterProposal(
-    request.value.id,
-    counterValue.value,
-    counterDays.value,
-    counterNotes.value
-  );
-  isSubmittingCounter.value = false;
+  const rangeError = validateValueRange(counterValue.value);
+  if (rangeError) {
+    toast.error(rangeError);
+    return;
+  }
 
-  if (success) {
+  isSubmittingCounter.value = true;
+  try {
+    await store.sendCounterProposal(
+      request.value.id,
+      counterValue.value,
+      counterDays.value,
+      counterNotes.value
+    );
     toast.success('Contra proposta enviada com sucesso!');
     showCounterProposalDialog.value = false;
-  } else {
-    toast.error('Erro ao enviar contra proposta');
+  } catch (err: any) {
+    console.error('Erro ao enviar contra proposta:', err);
+    const backendMsg = extractApiErrorMessage(err);
+    toast.error(backendMsg || 'Erro ao enviar contra proposta. Verifique os dados e tente novamente.');
+  } finally {
+    isSubmittingCounter.value = false;
   }
 };
 
@@ -231,6 +241,11 @@ const handleRejectResponse = async () => {
 
 const handleCancelRequest = async () => {
   if (!request.value) return;
+
+  if (!cancelReason.value.trim()) {
+    toast.error('Informe o motivo do cancelamento');
+    return;
+  }
 
   const success = await store.cancelRequest(request.value.id, cancelReason.value);
   if (success) {
@@ -569,24 +584,8 @@ const getStatusColor = (status: string) => {
               </div>
               <Separator />
               <div>
-                <p class="text-sm text-[#435574]">Prioridade</p>
-                <Badge
-                  :class="
-                    request.priority === 'URGENT'
-                      ? 'bg-red-200 text-red-900'
-                      : request.priority === 'HIGH'
-                      ? 'bg-red-100 text-red-700'
-                      : request.priority === 'MEDIUM'
-                      ? 'bg-yellow-100 text-yellow-700'
-                      : 'bg-gray-100 text-gray-700'
-                  "
-                >
-                  {{ 
-                    request.priority === 'URGENT' ? 'Urgente' :
-                    request.priority === 'HIGH' ? 'Alta' :
-                    request.priority === 'MEDIUM' ? 'Média' : 'Baixa'
-                  }}
-                </Badge>
+                <p class="text-sm text-[#435574]">Modelo de trabalho</p>
+                <WorkModelBadge :work-model="request.workModel" />
               </div>
               <template v-if="request.desiredDate">
                 <Separator />
@@ -767,7 +766,7 @@ const getStatusColor = (status: string) => {
         </DialogHeader>
         <div class="space-y-4">
           <div class="space-y-2">
-            <Label for="cancel-reason-detail">Motivo (opcional)</Label>
+            <Label for="cancel-reason-detail">Motivo do cancelamento *</Label>
             <Textarea
               id="cancel-reason-detail"
               :model-value="cancelReason"

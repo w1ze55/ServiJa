@@ -10,6 +10,7 @@ import com.servija.servija.service.ServiceRequestService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -32,7 +33,7 @@ public class ServiceRequestController {
     @PostMapping
     @Operation(summary = "Criar solicitação de orçamento", description = "Cria uma nova solicitação de orçamento para um freelancer")
     @SecurityRequirement(name = "bearerAuth")
-    public ResponseEntity<ServiceRequestResponse> create(@RequestBody ServiceRequestDTO dto) {
+    public ResponseEntity<ServiceRequestResponse> create(@Valid @RequestBody ServiceRequestDTO dto) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String email = authentication.getName();
 
@@ -85,7 +86,7 @@ public class ServiceRequestController {
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<ServiceRequestResponse> respond(
             @PathVariable Long id,
-            @RequestBody FreelancerResponseDTO dto) {
+            @Valid @RequestBody FreelancerResponseDTO dto) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String email = authentication.getName();
         return ResponseEntity.ok(serviceRequestService.respondToRequest(id, dto, email));
@@ -96,7 +97,7 @@ public class ServiceRequestController {
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<ServiceRequestResponse> counterProposal(
             @PathVariable Long id,
-            @RequestBody CounterProposalDTO dto,
+            @Valid @RequestBody CounterProposalDTO dto,
             Authentication authentication) {
         return ResponseEntity.ok(serviceRequestService.counterProposal(id, dto, authentication.getName()));
     }

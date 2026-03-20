@@ -249,11 +249,15 @@ const getUserEmail = () => {
 const handleServiceRequestNotification = (event: any) => {
   const notification = event.detail;
   console.log('📩 Notificação recebida em Projetos:', notification);
-  
+
   // Mostrar toast baseado no tipo de notificação
   switch (notification.type) {
     case 'NEW_PROPOSAL':
       toast.success(`${notification.freelancerName} enviou uma proposta!`);
+      store.loadRequests();
+      break;
+    case 'COUNTER_PROPOSAL_REJECTED':
+      toast.info(`${notification.freelancerName} recusou sua contra-proposta`);
       store.loadRequests();
       break;
     case 'SERVICE_REQUEST_STATUS_CHANGED':
@@ -274,6 +278,13 @@ const handleServiceRequestNotification = (event: any) => {
     case 'SERVICE_REQUEST_CANCELLED':
       toast.warning('Projeto cancelado');
       store.loadRequests();
+      break;
+    case 'SERVICE_COMPLETED_REVIEW_PENDING':
+      toast.success('Serviço concluído! Avalie o freelancer.');
+      router.push('/rate-freelancer?requestId=' + notification.serviceRequestId);
+      break;
+    case 'NEW_REVIEW':
+      toast.info(notification.reviewerName + ' enviou uma avaliação!');
       break;
   }
 };
@@ -300,7 +311,9 @@ onMounted(() => {
   
   if (userEmail) {
     wsConnection = useServiceRequestWebSocket(userEmail);
-    wsConnection.connect();
+    wsConnection.connect().catch(error => {
+      console.error('❌ Erro ao conectar WebSocket de projetos:', error);
+    });
     
     console.log('✅ WebSocket inicializado para projetos (Cliente)');
     

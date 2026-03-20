@@ -179,6 +179,16 @@ public class DeliveryAdjustmentService {
             throw new RuntimeException("Só é possível deletar ajustes pendentes");
         }
 
+        // Notificar freelancer via WebSocket antes de deletar
+        if (adjustment.getServiceRequest().getFreelancer() != null) {
+            notificationService.notifyServiceRequestUpdate(
+                    adjustment.getServiceRequest().getFreelancer().getEmail(),
+                    adjustment.getServiceRequest().getId(),
+                    "ADJUSTMENT_DELETED",
+                    "O cliente removeu a solicitação de ajuste",
+                    adjustment.getRequestedBy().getName());
+        }
+
         adjustmentRepository.delete(adjustment);
 
         log.info("Ajuste {} deletado por {}", adjustmentId, userEmail);

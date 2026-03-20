@@ -94,9 +94,9 @@ const handleApprove = async () => {
   const success = await store.completeService(requestId.value);
   
   if (success) {
-    toast.success('Entrega aprovada! Serviço concluído com sucesso.');
+    toast.success('Entrega aprovada! Agora avalie o freelancer.');
     setTimeout(() => {
-      router.push('/cliente-projects');
+      router.push('/rate-freelancer?requestId=' + requestId.value);
     }, 1500);
   } else {
     toast.error('Erro ao aprovar entrega. Tente novamente.');
@@ -161,14 +161,22 @@ const handleServiceRequestNotification = (event: any) => {
     switch (notification.type) {
       case 'SERVICE_REQUEST_STATUS_CHANGED':
         if (notification.status?.toLowerCase() === 'completed') {
-          toast.success('✅ Serviço concluído!');
+          // Não mostrar toast aqui, pois handleApprove já mostra
+          // Apenas redirecionar após um delay
           setTimeout(() => {
-            router.push('/cliente-projects');
+            router.push('/rate-freelancer?requestId=' + requestId.value);
           }, 2000);
         } else {
           toast.info(`Status atualizado: ${getStatusLabel(notification.status)}`);
           store.loadRequests();
         }
+        break;
+      case 'SERVICE_COMPLETED_REVIEW_PENDING':
+        // Não mostrar toast aqui, pois handleApprove já mostra
+        // Apenas redirecionar após um delay
+        setTimeout(() => {
+          router.push('/rate-freelancer?requestId=' + requestId.value);
+        }, 1500);
         break;
       case 'SERVICE_REQUEST_CANCELLED':
         toast.warning('Projeto cancelado');

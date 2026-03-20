@@ -12,9 +12,7 @@ import {
   CheckCircle,
   XCircle,
   Archive,
-  AlertCircle,
   Plus,
-  MoreVertical,
   RefreshCw,
   Send,
   X,
@@ -35,11 +33,6 @@ import Tabs from '../ui/tabs.vue';
 import TabsContent from '../ui/tabs-content.vue';
 import TabsList from '../ui/tabs-list.vue';
 import TabsTrigger from '../ui/tabs-trigger.vue';
-import DropdownMenu from '../ui/dropdown-menu.vue';
-import DropdownMenuContent from '../ui/dropdown-menu-content.vue';
-import DropdownMenuItem from '../ui/dropdown-menu-item.vue';
-import DropdownMenuSeparator from '../ui/dropdown-menu-separator.vue';
-import DropdownMenuTrigger from '../ui/dropdown-menu-trigger.vue';
 import Dialog from '../ui/dialog.vue';
 import DialogContent from '../ui/dialog-content.vue';
 import DialogDescription from '../ui/dialog-description.vue';
@@ -56,10 +49,13 @@ import AlertDialogHeader from '../ui/alert-dialog-header.vue';
 import AlertDialogTitle from '../ui/alert-dialog-title.vue';
 import Textarea from '../ui/textarea.vue';
 import Label from '../ui/label.vue';
+import WorkModelBadge from '../shared/WorkModelBadge.vue';
 import { useClientRequestStore, type ServiceRequest } from '@/stores/clientRequestStore';
 import { useServiceRequestWebSocket } from '@/composables/useServiceRequestWebSocket';
 import { toast } from '@/utils/toast';
 import { getStatusLabel } from '@/utils/statusTranslations';
+import { validateValueRange, extractApiErrorMessage } from '@/utils/valueValidation';
+import { type WorkModelValue } from '@/utils/workModel';
 
 interface Props {
   onNavigate: (page: string, params?: any) => void;
@@ -84,7 +80,7 @@ const newRequest = ref({
   description: '',
   budget: 0,
   deadline: '',
-  priority: 'MEDIUM' as 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT',
+  workModel: '' as WorkModelValue | '',
   address: '',
   desiredDate: '',
 });
@@ -102,7 +98,6 @@ const categories = ['Eletricista', 'Encanador', 'Pintor', 'Pedreiro', 'Designer'
 // Mapeamento de valores de ordenação para português
 const sortOptions = {
   recent: 'Mais recentes',
-  priority: 'Prioridade',
   'budget-high': 'Maior orçamento',
   'budget-low': 'Menor orçamento'
 };
@@ -134,7 +129,9 @@ onMounted(() => {
   
   if (userEmail) {
     wsConnection = useServiceRequestWebSocket(userEmail);
-    wsConnection.connect();
+    wsConnection.connect().catch(error => {
+      console.error('❌ Erro ao conectar WebSocket:', error);
+    });
     
     console.log('✅ WebSocket inicializado para solicitações (Cliente)');
     
@@ -179,6 +176,10 @@ const handleServiceRequestNotification = (event: any) => {
       // Recarregar lista de solicitações
       store.loadRequests();
       break;
+    case 'COUNTER_PROPOSAL_REJECTED':
+      toast.info(`${notification.freelancerName} recusou sua contra-proposta`);
+      store.loadRequests();
+      break;
     case 'PROPOSAL_ACCEPTED':
       toast.success(notification.message);
       store.loadRequests();
@@ -188,8 +189,22 @@ const handleServiceRequestNotification = (event: any) => {
       store.loadRequests();
       break;
     case 'SERVICE_REQUEST_STATUS_CHANGED':
-      toast.info(`Status atualizado: ${getStatusLabel(notification.status)}`);
+      if (notification.status === 'DELIVERED') {
+        toast.success('Serviço entregue! O freelancer marcou o serviço como concluído');
+      } else if (notification.status === 'IN_PROGRESS') {
+        toast.success('Pagamento confirmado! O serviço está em andamento');
+      } else if (notification.status === 'COMPLETED') {
+        toast.success('Serviço concluído com sucesso!');
+      } else {
+        toast.info(`Status atualizado: ${getStatusLabel(notification.status)}`);
+      }
       store.loadRequests();
+      break;
+    case 'SERVICE_COMPLETED_REVIEW_PENDING':
+      toast.success('Serviço concluído! Avalie o freelancer.');
+      break;
+    case 'NEW_REVIEW':
+      toast.info(notification.reviewerName + ' enviou uma avaliação!');
       break;
   }
 };
@@ -218,9 +233,6 @@ const filteredRequests = computed(() => {
     filtered.sort((a, b) => b.budget - a.budget);
   } else if (sortBy.value === 'budget-low') {
     filtered.sort((a, b) => a.budget - b.budget);
-  } else if (sortBy.value === 'priority') {
-    const priorityOrder = { URGENT: 4, HIGH: 3, MEDIUM: 2, LOW: 1 };
-    filtered.sort((a, b) => priorityOrder[b.priority] - priorityOrder[a.priority]);
   }
 
   return filtered;
@@ -284,7 +296,7 @@ const handleOpenCreateDialog = () => {
     description: '',
     budget: 0,
     deadline: '',
-    priority: 'MEDIUM',
+    workModel: '',
     address: '',
     desiredDate: '',
   };
@@ -304,29 +316,66 @@ const handleCreateRequest = async () => {
     toast.error('Descreva o que precisa');
     return;
   }
+  if (!newRequest.value.workModel) {
+    toast.error('Selecione o modelo de trabalho');
+    return;
+  }
   if (newRequest.value.budget <= 0) {
     toast.error('Informe um orçamento válido');
     return;
   }
 
-  isCreating.value = true;
-  const result = await store.createRequest({
-    service: newRequest.value.service,
-    category: newRequest.value.category,
-    description: newRequest.value.description,
-    budget: newRequest.value.budget,
-    deadline: newRequest.value.deadline,
-    priority: newRequest.value.priority,
-    address: newRequest.value.address,
-    desiredDate: newRequest.value.desiredDate,
-  });
-  isCreating.value = false;
+  const rangeError = validateValueRange(newRequest.value.budget);
+  if (rangeError) {
+    toast.error(rangeError);
+    return;
+  }
 
-  if (result) {
-    toast.success('Solicitação criada com sucesso!');
-    showCreateDialog.value = false;
-  } else {
-    toast.error('Erro ao criar solicitação');
+  // Validar que a data desejada não é no passado
+  if (newRequest.value.desiredDate) {
+    const selectedDate = new Date(newRequest.value.desiredDate);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    if (selectedDate < today) {
+      toast.error('A data desejada não pode ser anterior à data atual');
+      return;
+    }
+  }
+
+  if (
+    ['PRESENCIAL', 'HIBRIDO'].includes(newRequest.value.workModel) &&
+    !newRequest.value.address.trim()
+  ) {
+    toast.error('Informe o endereço para serviços presenciais ou híbridos');
+    return;
+  }
+
+  isCreating.value = true;
+  try {
+    const result = await store.createRequest({
+      service: newRequest.value.service,
+      category: newRequest.value.category,
+      description: newRequest.value.description,
+      budget: newRequest.value.budget,
+      deadline: newRequest.value.deadline,
+      workModel: newRequest.value.workModel as WorkModelValue,
+      address: newRequest.value.address,
+      desiredDate: newRequest.value.desiredDate,
+    });
+
+    if (result) {
+      toast.success('Solicitação criada com sucesso!');
+      showCreateDialog.value = false;
+    } else {
+      toast.error('Erro ao criar solicitação');
+    }
+  } catch (err: any) {
+    console.error('Erro ao criar solicitação:', err);
+    const backendMsg = extractApiErrorMessage(err);
+    toast.error(backendMsg || 'Erro ao criar solicitação. Verifique os dados e tente novamente.');
+  } finally {
+    isCreating.value = false;
   }
 };
 
@@ -338,6 +387,12 @@ const handleOpenCancelDialog = (request: ServiceRequest) => {
 
 const handleCancelRequest = async () => {
   if (!selectedRequest.value) return;
+
+  if (!cancelReason.value.trim()) {
+    toast.error('Informe o motivo do cancelamento');
+    return;
+  }
+
   const success = await store.cancelRequest(selectedRequest.value.id, cancelReason.value);
   if (success) {
     toast.success('Solicitação cancelada');
@@ -483,7 +538,6 @@ watch(currentTab, () => {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="recent">Mais recentes</SelectItem>
-            <SelectItem value="priority">Prioridade</SelectItem>
             <SelectItem value="budget-high">Maior orçamento</SelectItem>
             <SelectItem value="budget-low">Menor orçamento</SelectItem>
           </SelectContent>
@@ -625,52 +679,8 @@ watch(currentTab, () => {
                           </Badge>
                         </template>
 
-                        <!-- Priority Badge -->
-                        <template v-if="request.priority === 'URGENT'">
-                          <Badge class="bg-red-200 text-red-900 hover:bg-red-200">
-                            <AlertCircle class="h-3 w-3 mr-1" />
-                            Urgente
-                          </Badge>
-                        </template>
-                        <template v-else-if="request.priority === 'HIGH'">
-                          <Badge class="bg-red-100 text-red-700 hover:bg-red-100">
-                            <AlertCircle class="h-3 w-3 mr-1" />
-                            Alta
-                          </Badge>
-                        </template>
-                        <template v-else-if="request.priority === 'MEDIUM'">
-                          <Badge class="bg-yellow-100 text-yellow-700 hover:bg-yellow-100">
-                            Média
-                          </Badge>
-                        </template>
-                        <template v-else>
-                          <Badge variant="secondary">Baixa</Badge>
-                        </template>
+                        <WorkModelBadge v-if="request.workModel" :work-model="request.workModel" />
                       </div>
-
-                      <!-- Actions Menu -->
-                      <DropdownMenu>
-                        <DropdownMenuTrigger as-child>
-                          <Button variant="ghost" size="icon" @click.stop>
-                            <MoreVertical class="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem @click.stop="handleViewDetails(request)">
-                            <Eye class="h-4 w-4 mr-2" />
-                            Ver Detalhes
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            v-if="request.status === 'pending' || request.status === 'sent'"
-                            @click.stop="handleOpenCancelDialog(request)"
-                            class="text-red-600"
-                          >
-                            <XCircle class="h-4 w-4 mr-2" />
-                            Cancelar
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
                     </div>
                   </div>
 
@@ -840,16 +850,15 @@ watch(currentTab, () => {
 
           <div class="grid grid-cols-2 gap-4">
             <div class="space-y-2">
-              <Label for="priority">Prioridade</Label>
-              <Select :model-value="newRequest.priority" @update:model-value="(val: string) => newRequest.priority = val as any">
+              <Label for="work-model">Modelo de trabalho</Label>
+              <Select :model-value="newRequest.workModel" @update:model-value="(val: string) => newRequest.workModel = val as WorkModelValue">
                 <SelectTrigger>
-                  <SelectValue placeholder="Prioridade" />
+                  <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="LOW">Baixa</SelectItem>
-                  <SelectItem value="MEDIUM">Média</SelectItem>
-                  <SelectItem value="HIGH">Alta</SelectItem>
-                  <SelectItem value="URGENT">Urgente</SelectItem>
+                  <SelectItem value="REMOTO">Remoto</SelectItem>
+                  <SelectItem value="PRESENCIAL">Presencial</SelectItem>
+                  <SelectItem value="HIBRIDO">Híbrido</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -858,6 +867,7 @@ watch(currentTab, () => {
               <Input
                 id="desiredDate"
                 type="date"
+                :min="new Date().toISOString().split('T')[0]"
                 :model-value="newRequest.desiredDate"
                 @update:model-value="(val) => newRequest.desiredDate = val as string"
               />
@@ -901,7 +911,7 @@ watch(currentTab, () => {
         </DialogHeader>
         <div class="space-y-4">
           <div class="space-y-2">
-            <Label for="cancel-reason">Motivo (opcional)</Label>
+            <Label for="cancel-reason">Motivo do cancelamento *</Label>
             <Textarea
               id="cancel-reason"
               :model-value="cancelReason"

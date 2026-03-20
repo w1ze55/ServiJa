@@ -12,7 +12,6 @@ import {
   CheckCircle,
   XCircle,
   Archive,
-  AlertCircle,
   Trash2,
   MoreVertical,
   RefreshCw,
@@ -54,11 +53,15 @@ import DialogHeader from '../ui/dialog-header.vue';
 import DialogTitle from '../ui/dialog-title.vue';
 import Textarea from '../ui/textarea.vue';
 import Label from '../ui/label.vue';
+import WorkModelBadge from '../shared/WorkModelBadge.vue';
 import { useProposalStore, type Proposal } from '@/stores/proposalStore';
+import { useRouter } from 'vue-router';
 import { useServiceRequestWebSocket } from '@/composables/useServiceRequestWebSocket';
 import { usePaymentWebSocket } from '@/composables/usePaymentWebSocket';
 import { toast } from '@/utils/toast';
 import { getStatusLabel } from '@/utils/statusTranslations';
+
+const router = useRouter();
 
 interface Props {
   onNavigate: (page: string, params?: any) => void;
@@ -91,7 +94,6 @@ const categories = ['Eletricista', 'Encanador', 'Pintor', 'Pedreiro', 'Designer'
 // Mapeamento de valores de ordenação para português
 const sortOptions = {
   recent: 'Mais recentes',
-  priority: 'Prioridade',
   'budget-high': 'Maior orçamento',
   'budget-low': 'Menor orçamento'
 };
@@ -113,6 +115,15 @@ const getEmptyMessage = () => {
 
   return messages[currentTab.value as keyof typeof messages] || 'Nenhuma solicitação encontrada';
 };
+
+const isClientCancelled = (proposal: Proposal) =>
+  proposal.status === 'archived' && !!proposal.cancelReason?.trim();
+
+const getArchivedStatusLabel = (proposal: Proposal) =>
+  isClientCancelled(proposal) ? 'Cancelada' : 'Arquivada';
+
+const getArchivedStatusIcon = (proposal: Proposal) =>
+  isClientCancelled(proposal) ? XCircle : Archive;
 
 onMounted(() => {
   proposalStore.loadProposals();
@@ -190,16 +201,31 @@ const handleServiceRequestNotification = (event: any) => {
       proposalStore.loadProposals();
       break;
     case 'SERVICE_REQUEST_CANCELLED':
-      toast.warning('Solicitação cancelada');
+      toast.warning(
+        notification.reason
+          ? `Solicitação cancelada pelo cliente. Motivo: ${notification.reason}`
+          : 'Solicitação cancelada pelo cliente.'
+      );
       proposalStore.loadProposals();
       break;
     case 'SERVICE_REQUEST_STATUS_CHANGED':
       if (notification.status === 'COMPLETED') {
         toast.success('Serviço Concluído! O cliente confirmou a entrega.');
+      } else if (notification.status === 'IN_PROGRESS') {
+        toast.success('Pagamento confirmado! O serviço está em andamento');
       } else {
         toast.info(`Status atualizado: ${getStatusLabel(notification.status)}`);
       }
       proposalStore.loadProposals();
+      break;
+    case 'SERVICE_COMPLETED_REVIEW_PENDING':
+      toast.success('Serviço concluído! Avalie o cliente.');
+      setTimeout(() => {
+        router.push('/rate-client?requestId=' + notification.serviceRequestId);
+      }, 2000);
+      break;
+    case 'NEW_REVIEW':
+      toast.info(notification.reviewerName + ' enviou uma avaliação!');
       break;
   }
 };
@@ -283,9 +309,6 @@ const filteredProposals = computed(() => {
     filtered.sort((a, b) => b.budget - a.budget);
   } else if (sortBy.value === 'Menor orçamento') {
     filtered.sort((a, b) => a.budget - b.budget);
-  } else if (sortBy.value === 'Prioridade') {
-    const priorityOrder = { HIGH: 3, MEDIUM: 2, LOW: 1, URGENT: 4 };
-    filtered.sort((a, b) => (priorityOrder[b.priority] ?? 0) - (priorityOrder[a.priority] ?? 0));
   }
 
   return filtered;
@@ -509,7 +532,6 @@ watch(currentTab, () => {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="Mais recentes">Mais recentes</SelectItem>
-            <SelectItem value="Prioridade">Prioridade</SelectItem>
             <SelectItem value="Maior orçamento">Maior orçamento</SelectItem>
             <SelectItem value="Menor orçamento">Menor orçamento</SelectItem>
           </SelectContent>
@@ -663,27 +685,13 @@ watch(currentTab, () => {
                           </Badge>
                         </template>
                         <template v-else-if="proposal.status === 'archived'">
-                          <Badge variant="secondary">
-                            <Archive class="h-3 w-3 mr-1" />
-                            Arquivada
+                          <Badge class="bg-gray-100 text-gray-700 hover:bg-gray-100">
+                            <component :is="getArchivedStatusIcon(proposal)" class="h-3 w-3 mr-1" />
+                            {{ getArchivedStatusLabel(proposal) }}
                           </Badge>
                         </template>
 
-                        <!-- Priority Badge -->
-                        <template v-if="proposal.priority === 'HIGH' || proposal.priority === 'URGENT'">
-                          <Badge class="bg-red-100 text-red-700 hover:bg-red-100">
-                            <AlertCircle class="h-3 w-3 mr-1" />
-                            Alta
-                          </Badge>
-                        </template>
-                        <template v-else-if="proposal.priority === 'MEDIUM'">
-                          <Badge class="bg-yellow-100 text-yellow-700 hover:bg-yellow-100">
-                            Média
-                          </Badge>
-                        </template>
-                        <template v-else-if="proposal.priority === 'LOW'">
-                          <Badge variant="secondary">Baixa</Badge>
-                        </template>
+                        <WorkModelBadge v-if="proposal.workModel" :work-model="proposal.workModel" />
                       </div>
 
                       <!-- Actions Menu -->
@@ -722,6 +730,14 @@ watch(currentTab, () => {
                   <p class="text-sm text-[#435574] mb-3 line-clamp-2">
                     {{ proposal.description }}
                   </p>
+
+                  <div
+                    v-if="isClientCancelled(proposal)"
+                    class="mb-3 rounded-lg border border-gray-200 bg-gray-50 p-3"
+                  >
+                    <p class="text-sm font-semibold text-[#263238]">Cancelada pelo cliente</p>
+                    <p class="text-sm text-[#435574] italic">"{{ proposal.cancelReason }}"</p>
+                  </div>
 
                   <div class="flex flex-wrap items-center justify-between gap-2">
                     <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">

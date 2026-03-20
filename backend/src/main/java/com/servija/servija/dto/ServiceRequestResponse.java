@@ -29,7 +29,7 @@ public class ServiceRequestResponse {
     private String description;
     private BigDecimal budget;
     private String deadline;
-    private String priority;
+    private String workModel;
     private String status;
     private String address;
     private LocalDate desiredDate;
