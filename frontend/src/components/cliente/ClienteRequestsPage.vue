@@ -122,19 +122,19 @@ const getEmptyMessage = () => {
 
 onMounted(() => {
   store.loadRequests();
-  
+
   // Conectar WebSocket
   const userEmail = getUserEmail();
   console.log('🔍 Tentando conectar WebSocket para:', userEmail);
-  
+
   if (userEmail) {
     wsConnection = useServiceRequestWebSocket(userEmail);
-    wsConnection.connect().catch(error => {
+    wsConnection.connect().catch((error: any) => {
       console.error('❌ Erro ao conectar WebSocket:', error);
     });
-    
+
     console.log('✅ WebSocket inicializado para solicitações (Cliente)');
-    
+
     // Escutar notificações de solicitações
     window.addEventListener('service-request-notification', handleServiceRequestNotification);
   } else {
@@ -154,7 +154,7 @@ onUnmounted(() => {
 const getUserEmail = () => {
   const token = localStorage.getItem('token');
   if (!token) return null;
-  
+
   try {
     const payload = JSON.parse(atob(token.split('.')[1]));
     return payload.sub || payload.email;
@@ -168,7 +168,7 @@ const getUserEmail = () => {
 const handleServiceRequestNotification = (event: any) => {
   const notification = event.detail;
   console.log('📩 Notificação recebida:', notification);
-  
+
   // Mostrar toast baseado no tipo de notificação
   switch (notification.type) {
     case 'NEW_PROPOSAL':
@@ -336,7 +336,7 @@ const handleCreateRequest = async () => {
     const selectedDate = new Date(newRequest.value.desiredDate);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
+
     if (selectedDate < today) {
       toast.error('A data desejada não pode ser anterior à data atual');
       return;
