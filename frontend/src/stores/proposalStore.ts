@@ -128,7 +128,9 @@ export const useProposalStore = defineStore('proposal', () => {
       const response = await api.get('/service-requests/received');
 
       // Mapear dados da API para o formato da store
-      proposals.value = response.data.map((req: any) => ({
+      proposals.value = response.data
+        .filter((req: any) => req.status !== 'CANCELLED')
+        .map((req: any) => ({
         id: req.id.toString(),
         clientName: req.contractorName,
         clientAvatar: req.contractorAvatar,

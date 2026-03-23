@@ -26,6 +26,7 @@ import AlertDialogDescription from '../ui/alert-dialog-description.vue';
 import AlertDialogFooter from '../ui/alert-dialog-footer.vue';
 import AlertDialogHeader from '../ui/alert-dialog-header.vue';
 import AlertDialogTitle from '../ui/alert-dialog-title.vue';
+import { toast } from '../../utils/toast';
 
 const win = window;
 
@@ -108,6 +109,38 @@ const handleRequestAdjustments = () => {
 
 const canPreview = (file: DeliveryFile) => {
   return file.type === 'image' || file.type === 'video' || file.type === 'document';
+};
+
+const handleDownloadFile = async (url: string, fileName: string) => {
+  try {
+    toast.info(`Iniciando download de ${fileName}...`);
+    const response = await fetch(url);
+    const blob = await response.blob();
+    const blobUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(blobUrl);
+  } catch {
+    // Fallback: abrir em nova aba
+    win.open(url, '_blank');
+  }
+};
+
+const handleDownloadAll = () => {
+  if (!props.files || props.files.length === 0) {
+    toast.warning('Não há arquivos para baixar.');
+    return;
+  }
+
+  toast.success('Download de todos os arquivos iniciado');
+
+  props.files.forEach(file => {
+    win.open(file.url, '_blank');
+  });
 };
 </script>
 
@@ -195,7 +228,7 @@ const canPreview = (file: DeliveryFile) => {
               Visualizar
             </Button>
             <Button
-              @click="() => win.open(file.url, '_blank')"
+              @click="handleDownloadFile(file.url, file.name)"
               variant="outline"
               size="sm"
               class="flex-1"
@@ -207,15 +240,14 @@ const canPreview = (file: DeliveryFile) => {
         </div>
       </div>
 
-      <!-- Download All -->
       <div class="mt-4 pt-4 border-t">
         <Button
-          @click="() => win.alert('Download de todos os arquivos iniciado')"
+          @click="handleDownloadAll"
           variant="outline"
           class="w-full border-[#286AD8] text-[#286AD8] hover:bg-blue-50"
         >
           <Download class="h-4 w-4 mr-2" />
-          Baixar Todos os Arquivos
+          Visualizar Todos os Arquivos
         </Button>
       </div>
     </Card>

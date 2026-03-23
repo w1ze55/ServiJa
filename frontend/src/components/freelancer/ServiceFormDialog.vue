@@ -275,11 +275,11 @@ const handleImageUpload = async (e: Event) => {
       return;
     }
 
-    // Validar tamanho dos arquivos (5MB max)
+    // Validar tamanho dos arquivos (10MB max)
     const fileArray = Array.from(files);
-    const oversizedFiles = fileArray.filter((file) => file.size > 5 * 1024 * 1024);
+    const oversizedFiles = fileArray.filter((file) => file.size > 10 * 1024 * 1024);
     if (oversizedFiles.length > 0) {
-      toast.error('Cada imagem deve ter no máximo 5MB');
+      toast.error('Cada imagem deve ter no máximo 10MB');
       return;
     }
 
@@ -529,7 +529,7 @@ const handleRemoveImage = async (index: number) => {
                 Clique para fazer upload ou arraste as imagens aqui
               </p>
               <p class="text-xs text-gray-400 mt-1">
-                PNG, JPG até 5MB (máximo 5 imagens)
+                PNG, JPG até 10MB (máximo 5 imagens)
               </p>
               <input
                 id="images"
