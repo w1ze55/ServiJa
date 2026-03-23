@@ -26,6 +26,7 @@ import AlertDialogDescription from '../ui/alert-dialog-description.vue';
 import AlertDialogFooter from '../ui/alert-dialog-footer.vue';
 import AlertDialogHeader from '../ui/alert-dialog-header.vue';
 import AlertDialogTitle from '../ui/alert-dialog-title.vue';
+import { toast } from '../../utils/toast';
 
 const win = window;
 
@@ -108,6 +109,19 @@ const handleRequestAdjustments = () => {
 
 const canPreview = (file: DeliveryFile) => {
   return file.type === 'image' || file.type === 'video' || file.type === 'document';
+};
+
+const handleDownloadAll = () => {
+  if (!props.files || props.files.length === 0) {
+    toast.warning('Não há arquivos para baixar.');
+    return;
+  }
+  
+  toast.success('Download de todos os arquivos iniciado');
+  
+  props.files.forEach(file => {
+    win.open(file.url, '_blank');
+  });
 };
 </script>
 
@@ -207,10 +221,9 @@ const canPreview = (file: DeliveryFile) => {
         </div>
       </div>
 
-      <!-- Download All -->
       <div class="mt-4 pt-4 border-t">
         <Button
-          @click="() => win.alert('Download de todos os arquivos iniciado')"
+          @click="handleDownloadAll"
           variant="outline"
           class="w-full border-[#286AD8] text-[#286AD8] hover:bg-blue-50"
         >
