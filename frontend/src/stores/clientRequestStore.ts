@@ -56,6 +56,7 @@ export interface ServiceRequest {
     address?: string;
     desiredDate?: string;
     attachments?: ServiceRequestAttachment[];
+    freelancerAttachments?: ServiceRequestAttachment[];
     freelancerResponse?: FreelancerResponse;
     counterValue?: number;
     counterDays?: number;
@@ -136,6 +137,13 @@ export const useClientRequestStore = defineStore('clientRequest', () => {
                 status: mapApiStatusToLocal(req.status),
                 attachments: (req.attachments || []).map((url: string, idx: number) => ({
                     id: `att-${req.id}-${idx}`,
+                    name: extractFileName(url),
+                    size: '',
+                    url,
+                    type: getFileType(url),
+                })),
+                freelancerAttachments: (req.freelancerAttachments || []).map((url: string, idx: number) => ({
+                    id: `fatt-${req.id}-${idx}`,
                     name: extractFileName(url),
                     size: '',
                     url,

@@ -44,12 +44,12 @@ const adjustmentAlreadyUsed = computed(() => {
 
 // Converter attachments para o formato esperado pelo componente
 const deliveryFiles = computed((): DeliveryFile[] => {
-  if (!request.value?.attachments) return [];
-  
-  return request.value.attachments.map((att, idx) => {
+  if (!request.value?.freelancerAttachments) return [];
+
+  return request.value.freelancerAttachments.map((att, idx) => {
     const extension = att.name.split('.').pop()?.toLowerCase() || '';
     let type: DeliveryFile['type'] = 'other';
-    
+
     if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(extension)) {
       type = 'image';
     } else if (['mp4', 'avi', 'mov', 'wmv', 'webm'].includes(extension)) {
@@ -57,7 +57,7 @@ const deliveryFiles = computed((): DeliveryFile[] => {
     } else if (['pdf', 'doc', 'docx', 'xls', 'xlsx', 'txt'].includes(extension)) {
       type = 'document';
     }
-    
+
     return {
       id: att.id || `file-${idx}`,
       name: att.name,
