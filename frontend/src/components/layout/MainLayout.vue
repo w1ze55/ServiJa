@@ -274,8 +274,8 @@ const getInitials = (name: string) => {
       <div class="flex flex-col h-full">
         <!-- Logo -->
         <div
-          :class="`py-6 border-b border-white/10 transition-all duration-300 ${
-            sidebarExpanded ? 'px-6' : 'px-0'
+          :class="`py-2 border-b border-white/10 transition-all duration-300 ${
+            sidebarExpanded ? 'px-6 py-5' : 'px-0'
           }`"
         >
           <div class="flex items-center justify-center">
