@@ -170,7 +170,7 @@ const canPreview = (file: DeliveryFile) => {
           class="w-full border-[#286AD8] text-[#286AD8] hover:bg-blue-50"
         >
           <Download class="h-4 w-4 mr-2" />
-          Baixar Todos os Arquivos
+          Visualizar Todos os Arquivos
         </Button>
       </div>
     </Card>

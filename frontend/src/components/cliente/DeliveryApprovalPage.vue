@@ -135,9 +135,9 @@ const handleDownloadAll = () => {
     toast.warning('Não há arquivos para baixar.');
     return;
   }
-  
+
   toast.success('Download de todos os arquivos iniciado');
-  
+
   props.files.forEach(file => {
     win.open(file.url, '_blank');
   });
