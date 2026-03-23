@@ -111,6 +111,25 @@ const canPreview = (file: DeliveryFile) => {
   return file.type === 'image' || file.type === 'video' || file.type === 'document';
 };
 
+const handleDownloadFile = async (url: string, fileName: string) => {
+  try {
+    toast.info(`Iniciando download de ${fileName}...`);
+    const response = await fetch(url);
+    const blob = await response.blob();
+    const blobUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(blobUrl);
+  } catch {
+    // Fallback: abrir em nova aba
+    win.open(url, '_blank');
+  }
+};
+
 const handleDownloadAll = () => {
   if (!props.files || props.files.length === 0) {
     toast.warning('Não há arquivos para baixar.');
@@ -209,7 +228,7 @@ const handleDownloadAll = () => {
               Visualizar
             </Button>
             <Button
-              @click="() => win.open(file.url, '_blank')"
+              @click="handleDownloadFile(file.url, file.name)"
               variant="outline"
               size="sm"
               class="flex-1"
@@ -228,7 +247,7 @@ const handleDownloadAll = () => {
           class="w-full border-[#286AD8] text-[#286AD8] hover:bg-blue-50"
         >
           <Download class="h-4 w-4 mr-2" />
-          Baixar Todos os Arquivos
+          Visualizar Todos os Arquivos
         </Button>
       </div>
     </Card>
