@@ -52,6 +52,7 @@ import Label from '../ui/label.vue';
 import WorkModelBadge from '../shared/WorkModelBadge.vue';
 import { useClientRequestStore, type ServiceRequest } from '@/stores/clientRequestStore';
 import { useServiceRequestWebSocket } from '@/composables/useServiceRequestWebSocket';
+import { formatApiDate, getApiDateTimestamp } from '@/utils/apiDate';
 import { toast } from '@/utils/toast';
 import { getStatusLabel } from '@/utils/statusTranslations';
 import { validateValueRange, extractApiErrorMessage } from '@/utils/valueValidation';
@@ -228,7 +229,7 @@ const filteredRequests = computed(() => {
   });
 
   if (sortBy.value === 'recent') {
-    filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    filtered.sort((a, b) => getApiDateTimestamp(getLastActivityAt(b)) - getApiDateTimestamp(getLastActivityAt(a)));
   } else if (sortBy.value === 'budget-high') {
     filtered.sort((a, b) => b.budget - a.budget);
   } else if (sortBy.value === 'budget-low') {
@@ -252,8 +253,7 @@ const formatCurrency = (value: number) => {
 };
 
 const formatDate = (dateString: string) => {
-  const date = new Date(dateString);
-  return date.toLocaleDateString('pt-BR', {
+  return formatApiDate(dateString, {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
@@ -262,9 +262,10 @@ const formatDate = (dateString: string) => {
   });
 };
 
+const getLastActivityAt = (request: ServiceRequest) => request.updatedAt || request.createdAt;
+
 const formatShortDate = (dateString: string) => {
-  const date = new Date(dateString);
-  return date.toLocaleDateString('pt-BR', {
+  return formatApiDate(dateString, {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
@@ -623,7 +624,7 @@ watch(currentTab, () => {
                         </span>
                         <span class="flex items-center gap-1">
                           <Calendar class="h-3 w-3" />
-                          {{ formatDate(request.createdAt) }}
+                          {{ formatDate(getLastActivityAt(request)) }}
                         </span>
                       </div>
                     </div>

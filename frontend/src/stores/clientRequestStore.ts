@@ -54,6 +54,7 @@ export interface ServiceRequest {
     workModel?: WorkModelValue | null;
     status: 'pending' | 'sent' | 'negotiating' | 'accepted' | 'in_progress' | 'delivered' | 'rejected' | 'completed' | 'cancelled';
     createdAt: string;
+    updatedAt: string;
     address?: string;
     desiredDate?: string;
     attachments?: ServiceRequestAttachment[];
@@ -176,6 +177,7 @@ export const useClientRequestStore = defineStore('clientRequest', () => {
         service: req.serviceName,
         workModel: normalizeWorkModel(req.workModel),
         status: mapApiStatusToLocal(req.status),
+        updatedAt: req.updatedAt || req.createdAt,
         attachments: mapAttachments(req.attachments, 'att', req.id),
         freelancerAttachments: mapFreelancerAttachments(req, 'fatt', req.id),
         freelancerAvatar: req.freelancerAvatar,
@@ -283,12 +285,13 @@ export const useClientRequestStore = defineStore('clientRequest', () => {
             const request = requests.value.find((r) => r.id === id);
             if (!request) return false;
 
-            await api.patch(`/service-requests/${id}/status`, {
+            const response = await api.patch(`/service-requests/${id}/status`, {
                 status: 'CANCELLED',
                 reason
             });
 
             request.status = 'cancelled';
+            request.updatedAt = response.data.updatedAt || new Date().toISOString();
             request.auditLog = request.auditLog || [];
             request.auditLog.push({
                 id: `log-${Date.now()}`,
@@ -310,11 +313,12 @@ export const useClientRequestStore = defineStore('clientRequest', () => {
             const request = requests.value.find((r) => r.id === id);
             if (!request) return false;
 
-            await api.patch(`/service-requests/${id}/status`, {
+            const response = await api.patch(`/service-requests/${id}/status`, {
                 status: 'ACCEPTED'
             });
 
             request.status = 'accepted';
+            request.updatedAt = response.data.updatedAt || new Date().toISOString();
             request.auditLog = request.auditLog || [];
             request.auditLog.push({
                 id: `log-${Date.now()}`,
@@ -336,12 +340,13 @@ export const useClientRequestStore = defineStore('clientRequest', () => {
             const request = requests.value.find((r) => r.id === id);
             if (!request) return false;
 
-            await api.patch(`/service-requests/${id}/status`, {
+            const response = await api.patch(`/service-requests/${id}/status`, {
                 status: 'REJECTED',
                 reason
             });
 
             request.status = 'rejected';
+            request.updatedAt = response.data.updatedAt || new Date().toISOString();
             request.auditLog = request.auditLog || [];
             request.auditLog.push({
                 id: `log-${Date.now()}`,
@@ -375,6 +380,7 @@ export const useClientRequestStore = defineStore('clientRequest', () => {
 
         const updatedReq = response.data;
         request.status = 'negotiating';
+        request.updatedAt = updatedReq.updatedAt || new Date().toISOString();
         request.counterValue = updatedReq.counterValue;
         request.counterDays = updatedReq.counterDays;
         request.counterNotes = updatedReq.counterNotes;
@@ -396,9 +402,10 @@ export const useClientRequestStore = defineStore('clientRequest', () => {
             const request = requests.value.find((r) => r.id === id);
             if (!request) return false;
 
-            await api.patch(`/service-requests/${id}/complete`);
+            const response = await api.patch(`/service-requests/${id}/complete`);
 
             request.status = 'completed';
+            request.updatedAt = response.data.updatedAt || new Date().toISOString();
 
             request.auditLog = request.auditLog || [];
             request.auditLog.unshift({

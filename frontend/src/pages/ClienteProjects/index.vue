@@ -37,6 +37,7 @@ import MainLayout from '@/components/layout/MainLayout.vue';
 import { useClientRequestStore, type ServiceRequest } from '@/stores/clientRequestStore';
 import { useServiceRequestWebSocket } from '@/composables/useServiceRequestWebSocket';
 import { useNavigation } from '@/utils/navigation';
+import { formatApiDate, formatTimeAgoFromApiDate } from '@/utils/apiDate';
 import { getStatusLabel } from '@/utils/statusTranslations';
 import { toast } from '@/utils/toast';
 
@@ -144,27 +145,16 @@ const formatCurrency = (value: number) => {
 };
 
 const formatDate = (dateString: string) => {
-  const date = new Date(dateString);
-  return date.toLocaleDateString('pt-BR', {
+  return formatApiDate(dateString, {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
   });
 };
 
-const getTimeAgo = (dateString: string) => {
-  const date = new Date(dateString);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMins / 60);
-  const diffDays = Math.floor(diffHours / 24);
+const getLastActivityAt = (request: ServiceRequest) => request.updatedAt || request.createdAt;
 
-  if (diffMins < 60) return `Atualizado há ${diffMins} minuto${diffMins !== 1 ? 's' : ''}`;
-  if (diffHours < 24) return `Atualizado há ${diffHours} hora${diffHours !== 1 ? 's' : ''}`;
-  if (diffDays === 1) return 'Atualizado há 1 dia';
-  return `Atualizado há ${diffDays} dias`;
-};
+const getTimeAgo = (dateString: string) => formatTimeAgoFromApiDate(dateString);
 
 const getInitials = (name: string) => {
   return name
@@ -541,7 +531,7 @@ onUnmounted(() => {
                 </div>
 
                 <div class="flex items-center justify-between pt-2 border-t">
-                  <p class="text-xs text-[#435574]">{{ getTimeAgo(project.createdAt) }}</p>
+                  <p class="text-xs text-[#435574]">{{ getTimeAgo(getLastActivityAt(project)) }}</p>
 
                   <div class="flex items-center gap-2">
                     <Button

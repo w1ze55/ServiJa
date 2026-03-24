@@ -28,6 +28,7 @@ import FileAttachment from '../shared/FileAttachment.vue';
 import { useClientRequestStore, type ServiceRequest } from '@/stores/clientRequestStore';
 import ServiceRequestTimeline from '../service/ServiceRequestTimeline.vue';
 import { useServiceRequestWebSocket, type ServiceRequestNotification } from '@/composables/useServiceRequestWebSocket';
+import { formatApiDate } from '@/utils/apiDate';
 import { toast } from '@/utils/toast';
 import { getStatusLabel } from '@/utils/statusTranslations';
 
@@ -133,8 +134,7 @@ const formatCurrency = (value: number) => {
 };
 
 const formatDate = (dateString: string) => {
-  const date = new Date(dateString);
-  return date.toLocaleDateString('pt-BR', {
+  return formatApiDate(dateString, {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
@@ -250,7 +250,7 @@ const getStatusColor = (status: string) => {
         <div class="flex items-center gap-8 px-6 border-l hidden md:flex">
           <div class="text-center">
             <p class="text-xs text-[#435574] uppercase tracking-wider mb-1">Início</p>
-            <p class="font-semibold text-[#263238]">{{ new Date(request.createdAt).toLocaleDateString('pt-BR') }}</p>
+            <p class="font-semibold text-[#263238]">{{ formatApiDate(request.createdAt, { day: '2-digit', month: '2-digit', year: 'numeric' }) }}</p>
           </div>
           <div class="text-center">
             <p class="text-xs text-[#435574] uppercase tracking-wider mb-1">Investimento</p>
