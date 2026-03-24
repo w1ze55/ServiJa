@@ -26,6 +26,7 @@ import {
   FolderKanban,
   ClipboardList,
   ChevronDown,
+  Pin,
 } from "lucide-vue-next";
 import Avatar from "../ui/avatar.vue";
 import AvatarImage from "../ui/avatar-image.vue";
@@ -85,6 +86,7 @@ watch(
 );
 
 const sidebarOpen = ref(false);
+const sidebarPinned = ref(false);
 const sidebarExpanded = ref(false);
 const professionalDropdownOpen = ref(false);
 
@@ -194,7 +196,31 @@ const openMap = () => {
 // Lifecycle
 onMounted(() => {
   loadUserAddresses();
+  // Carregar estado do pin da sidebar
+  const pinnedState = localStorage.getItem("sidebarPinned");
+  if (pinnedState === "true") {
+    sidebarPinned.value = true;
+    sidebarExpanded.value = true;
+  }
 });
+
+const toggleSidebarPin = () => {
+  sidebarPinned.value = !sidebarPinned.value;
+  localStorage.setItem("sidebarPinned", String(sidebarPinned.value));
+  if (sidebarPinned.value) {
+    sidebarExpanded.value = true;
+  }
+};
+
+const handleMouseEnter = () => {
+  sidebarExpanded.value = true;
+};
+
+const handleMouseLeave = () => {
+  if (!sidebarPinned.value) {
+    sidebarExpanded.value = false;
+  }
+};
 
 // Menu items based on user type
 const menuItems = computed(() =>
@@ -262,8 +288,8 @@ const getInitials = (name: string) => {
 
     <!-- Sidebar - Desktop with Hover -->
     <aside
-      @mouseenter="sidebarExpanded = true"
-      @mouseleave="sidebarExpanded = false"
+      @mouseenter="handleMouseEnter"
+      @mouseleave="handleMouseLeave"
       :class="`
         fixed top-0 left-0 h-full bg-[#263238] text-white z-[60]
         transition-all duration-300 ease-in-out
@@ -278,18 +304,28 @@ const getInitials = (name: string) => {
             sidebarExpanded ? 'px-6 py-5' : 'px-0'
           }`"
         >
-          <div class="flex items-center justify-center">
-            <h1
-              :class="`text-white transition-all duration-300 flex items-center gap-2 ${
-                sidebarExpanded ? 'opacity-100' : 'opacity-0 w-0'
+          <div :class="`flex items-center transition-all duration-300 ${sidebarExpanded ? 'justify-between px-4' : 'justify-center px-0'}`">
+            <div class="flex items-center gap-2 overflow-hidden">
+              <img :src="`${logo}`" alt="Servi Já" class="h-8 w-8 flex-shrink-0" />
+              <span
+                :class="`text-white text-xl font-bold whitespace-nowrap transition-all duration-300 ${
+                  sidebarExpanded ? 'opacity-100 w-auto' : 'opacity-0 w-0 absolute'
+                }`"
+              >
+                Servi Já
+              </span>
+            </div>
+            
+            <button
+              v-if="sidebarExpanded"
+              @click="toggleSidebarPin"
+              :class="`p-1.5 rounded-lg transition-all duration-300 hover:bg-white/10 ${
+                sidebarPinned ? 'text-white bg-white/10' : 'text-white/40'
               }`"
+              title="Fixar Sidebar"
             >
-              <img :src="`${logo}`" alt="Servi Já" />
-              <span class="text-white text-xl font-bold">Servi Já</span>
-            </h1>
-            <span v-if="!sidebarExpanded" class="text-white font-bold"
-              ><img :src="`${logo}`" alt="Servi Já"
-            /></span>
+              <Pin class="h-5 w-5" :class="{ 'rotate-45': !sidebarPinned }" />
+            </button>
           </div>
         </div>
 
