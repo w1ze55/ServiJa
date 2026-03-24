@@ -5,6 +5,7 @@ import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
+import java.util.Locale;
 
 @Entity
 @Table(name = "delivery_adjustments")
@@ -44,11 +45,27 @@ public class DeliveryAdjustment {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    @Getter
+    @RequiredArgsConstructor
     public enum Status {
-        PENDING,      // Aguardando ação do freelancer
-        ACKNOWLEDGED, // Freelancer reconheceu o pedido
-        IN_PROGRESS,  // Freelancer está trabalhando nas correções
-        COMPLETED,    // Freelancer completou os ajustes
-        REJECTED      // Freelancer recusou (com justificativa)
+        PENDING("Pendente"),
+        ACKNOWLEDGED("Recebido"),
+        IN_PROGRESS("Em andamento"),
+        COMPLETED("Ajustes finalizados"),
+        REJECTED("Recusado");
+
+        private final String label;
+
+        public static String getLabel(String status) {
+            if (status == null || status.isBlank()) {
+                return status;
+            }
+
+            try {
+                return valueOf(status.trim().toUpperCase(Locale.ROOT)).getLabel();
+            } catch (IllegalArgumentException ex) {
+                return status;
+            }
+        }
     }
 }

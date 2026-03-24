@@ -144,11 +144,12 @@ public class DeliveryAdjustmentService {
 
         // Registrar no histórico
         User freelancer = adjustment.getServiceRequest().getFreelancer();
+        String statusLabel = adjustment.getStatus().getLabel();
         historyService.record(
                 adjustment.getServiceRequest(),
                 freelancer,
                 ServiceRequestHistory.OperationType.ADJUSTMENT_STATUS_UPDATED,
-                "Status do ajuste atualizado para: " + update.getStatus()
+                "Status do ajuste atualizado para: " + statusLabel
         );
 
         // Notificar cliente via WebSocket
@@ -156,7 +157,7 @@ public class DeliveryAdjustmentService {
                 adjustment.getRequestedBy().getEmail(),
                 adjustment.getServiceRequest().getId(),
                 "ADJUSTMENT_STATUS_CHANGED",
-                "Status do ajuste atualizado: " + update.getStatus(),
+                "Status do ajuste atualizado: " + statusLabel,
                 freelancer.getName()
         );
 
