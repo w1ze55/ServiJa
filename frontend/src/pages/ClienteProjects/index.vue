@@ -322,7 +322,7 @@ onUnmounted(() => {
           <ArrowLeft class="h-5 w-5" />
         </Button>
         <div class="flex-1">
-          <h1 class="text-2xl font-bold text-[#263238] mb-2">Meus Projetos</h1>
+          <h1 class="text-2xl font-bold text-[#263238] mb-2">Projetos em Andamento</h1>
           <p class="text-[#435574]">Acompanhe o progresso dos seus serviços contratados</p>
         </div>
         <Button @click="handleRefresh" variant="outline" :disabled="store.isLoading">
