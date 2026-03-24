@@ -48,6 +48,7 @@ import AlertDialogHeader from '../ui/alert-dialog-header.vue';
 import AlertDialogTitle from '../ui/alert-dialog-title.vue';
 import { useClientRequestStore, type ServiceRequest } from '@/stores/clientRequestStore';
 import ServiceRequestTimeline from '../service/ServiceRequestTimeline.vue';
+import { formatApiDate } from '@/utils/apiDate';
 import { toast } from '@/utils/toast';
 import { getStatusLabel } from '@/utils/statusTranslations';
 import { validateValueRange, extractApiErrorMessage } from '@/utils/valueValidation';
@@ -143,8 +144,7 @@ const formatCurrency = (value: number) => {
 };
 
 const formatDate = (dateString: string) => {
-  const date = new Date(dateString);
-  return date.toLocaleDateString('pt-BR', {
+  return formatApiDate(dateString, {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
@@ -154,8 +154,7 @@ const formatDate = (dateString: string) => {
 };
 
 const formatShortDate = (dateString: string) => {
-  const date = new Date(dateString);
-  return date.toLocaleDateString('pt-BR', {
+  return formatApiDate(dateString, {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
@@ -192,8 +191,8 @@ const handleSendMessage = async () => {
 
 const wasCounterProposalRejected = computed(() => {
   if (!request.value) return false;
-  return request.value.status === 'negotiating' && 
-         !request.value.counterValue && 
+  return request.value.status === 'negotiating' &&
+         !request.value.counterValue &&
          request.value.auditLog?.some(log => log.operationKey === 'COUNTER_PROPOSAL_REJECTED');
 });
 
@@ -885,7 +884,7 @@ const getStatusColor = (status: string) => {
           <!-- Message -->
           <div class="bg-gradient-to-r from-green-50 to-blue-50 rounded-lg p-6 space-y-3">
             <p class="text-[#263238]">
-              Parabéns! Você acaba de aceitar a proposta de 
+              Parabéns! Você acaba de aceitar a proposta de
               <span class="font-semibold">{{ request?.freelancerName }}</span>
             </p>
             <p class="text-sm text-[#435574]">

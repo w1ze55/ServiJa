@@ -1,6 +1,7 @@
 package com.servija.servija.service;
 
 import com.servija.servija.dto.ServiceRequestHistoryResponse;
+import com.servija.servija.model.DeliveryAdjustment;
 import com.servija.servija.model.ServiceRequest;
 import com.servija.servija.model.ServiceRequestHistory;
 import com.servija.servija.model.ServiceRequestHistory.OperationType;
@@ -8,12 +9,12 @@ import com.servija.servija.model.User;
 import com.servija.servija.repository.ServiceRequestHistoryRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import java.time.ZoneId;
-import java.time.ZoneOffset;
-import java.time.ZonedDateTime;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
@@ -26,6 +27,7 @@ public class ServiceRequestHistoryService {
 
         private static final ZoneId BRAZIL_ZONE = ZoneId.of("America/Sao_Paulo");
         private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+        private static final String ADJUSTMENT_STATUS_PREFIX = "Status do ajuste atualizado para:";
 
         @Transactional
         public void record(ServiceRequest serviceRequest, User user, OperationType operationType) {
@@ -70,6 +72,10 @@ public class ServiceRequestHistoryService {
                         }
                 }
 
+                if (history.getOperationType() == OperationType.ADJUSTMENT_STATUS_UPDATED) {
+                        details = translateAdjustmentStatusDetails(details);
+                }
+
                 return ServiceRequestHistoryResponse.builder()
                                 .id(history.getId())
                                 .operationType(history.getOperationType().getLabel())
@@ -78,5 +84,20 @@ public class ServiceRequestHistoryService {
                                 .formattedDateTime(brazilTime.format(FORMATTER))
                                 .details(details)
                                 .build();
+        }
+
+        private String translateAdjustmentStatusDetails(String details) {
+                if (details == null || details.isBlank()) {
+                        return details;
+                }
+
+                String rawStatus = details.startsWith(ADJUSTMENT_STATUS_PREFIX)
+                                ? details.substring(ADJUSTMENT_STATUS_PREFIX.length()).trim()
+                                : details.trim();
+                if (rawStatus.isEmpty()) {
+                        return details;
+                }
+
+                return DeliveryAdjustment.Status.getLabel(rawStatus);
         }
 }

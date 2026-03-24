@@ -39,6 +39,7 @@ export interface ProposalAttachment {
   size: string;
   url: string;
   type: string;
+  description?: string;
 }
 
 export interface FreelancerResponse {
@@ -113,6 +114,33 @@ export const useProposalStore = defineStore('proposal', () => {
     return types[ext] || 'application/octet-stream';
   };
 
+  const mapAttachments = (
+    urls: string[] | undefined,
+    prefix: string,
+    requestId: string | number
+  ): ProposalAttachment[] => (urls || []).map((url: string, idx: number) => ({
+    id: `${prefix}-${requestId}-${idx}`,
+    name: extractFileName(url),
+    size: '',
+    url,
+    type: getFileType(url),
+  }));
+
+  const mapDetailedAttachments = (
+    attachments: Array<{ url: string; name?: string; description?: string | null }> | undefined,
+    prefix: string,
+    requestId: string | number
+  ): ProposalAttachment[] => (attachments || [])
+    .filter((attachment) => attachment?.url)
+    .map((attachment, idx) => ({
+      id: `${prefix}-${requestId}-${idx}`,
+      name: attachment.name?.trim() || extractFileName(attachment.url),
+      size: '',
+      url: attachment.url,
+      type: getFileType(attachment.url),
+      description: attachment.description?.trim() || undefined,
+    }));
+
   const stats = computed<ProposalStats>(() => ({
     pending: proposals.value.filter((p) => p.status === 'pending').length,
     negotiating: proposals.value.filter((p) => p.status === 'negotiating' || p.status === 'accepted').length,
@@ -143,13 +171,7 @@ export const useProposalStore = defineStore('proposal', () => {
         workModel: normalizeWorkModel(req.workModel),
         status: mapApiStatusToLocal(req.status),
         receivedAt: req.createdAt,
-        attachments: (req.attachments || []).map((url: string, idx: number) => ({
-          id: `att-${req.id}-${idx}`,
-          name: extractFileName(url),
-          size: '',
-          url,
-          type: getFileType(url),
-        })),
+        attachments: mapAttachments(req.attachments, 'att', req.id),
         viewed: true,
         address: req.address,
         desiredDate: req.desiredDate,
@@ -160,26 +182,16 @@ export const useProposalStore = defineStore('proposal', () => {
           notes: req.responseNotes,
           sentAt: req.respondedAt,
           milestones: req.milestones,
-          attachments: (req.responseAttachments || []).map((url: string, idx: number) => ({
-            id: `ratt-${req.id}-${idx}`,
-            name: extractFileName(url),
-            size: '',
-            url,
-            type: getFileType(url),
-          }))
+          attachments: mapAttachments(req.responseAttachments, 'ratt', req.id)
         } : undefined,
         counterValue: req.counterValue,
         counterDays: req.counterDays,
         counterNotes: req.counterNotes,
         cancelReason: req.cancelReason,
         rejectReason: req.rejectReason,
-        freelancerAttachments: (req.freelancerAttachments || []).map((url: string, idx: number) => ({
-          id: `fatt-${req.id}-${idx}`,
-          name: extractFileName(url),
-          size: '',
-          url,
-          type: getFileType(url),
-        })),
+        freelancerAttachments: req.freelancerAttachmentDetails?.length
+          ? mapDetailedAttachments(req.freelancerAttachmentDetails, 'fatt', req.id)
+          : mapAttachments(req.freelancerAttachments, 'fatt', req.id),
       }));
     } catch (err) {
       error.value = 'Erro ao carregar propostas';

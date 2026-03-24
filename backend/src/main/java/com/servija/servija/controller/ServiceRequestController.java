@@ -1,6 +1,7 @@
 package com.servija.servija.controller;
 
 import com.servija.servija.dto.CounterProposalDTO;
+import com.servija.servija.dto.FreelancerAttachmentsRequest;
 import com.servija.servija.dto.FreelancerResponseDTO;
 import com.servija.servija.dto.ServiceRequestDTO;
 import com.servija.servija.dto.ServiceRequestHistoryResponse;
@@ -125,13 +126,14 @@ public class ServiceRequestController {
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<ServiceRequestResponse> addFreelancerAttachments(
             @PathVariable Long id,
-            @RequestBody Map<String, List<String>> body,
+            @RequestBody FreelancerAttachmentsRequest body,
             Authentication authentication) {
-        List<String> urls = body.get("urls");
-        if (urls == null || urls.isEmpty()) {
+        boolean hasDetailedAttachments = body != null && body.getAttachments() != null && !body.getAttachments().isEmpty();
+        boolean hasLegacyUrls = body != null && body.getUrls() != null && !body.getUrls().isEmpty();
+        if (!hasDetailedAttachments && !hasLegacyUrls) {
             return ResponseEntity.badRequest().build();
         }
-        return ResponseEntity.ok(serviceRequestService.addFreelancerAttachments(id, urls, authentication.getName()));
+        return ResponseEntity.ok(serviceRequestService.addFreelancerAttachments(id, body, authentication.getName()));
     }
 
     @GetMapping("/{id}/history")

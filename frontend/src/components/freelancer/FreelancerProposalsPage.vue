@@ -11,6 +11,7 @@ import {
   MessageSquare,
   CheckCircle,
   XCircle,
+  Send,
   Archive,
   Trash2,
   MoreVertical,
