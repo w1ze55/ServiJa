@@ -203,10 +203,6 @@ const handleViewProject = (projectId: string) => {
   router.push(`/cliente-project-detail?requestId=${projectId}`);
 };
 
-const handleApproveDelivery = (projectId: string) => {
-  router.push(`/cliente-delivery-approval?requestId=${projectId}&from=projects`);
-};
-
 const handleChat = (projectId: string) => {
   router.push(`/messages?projectId=${projectId}`);
 };
@@ -534,16 +530,6 @@ onUnmounted(() => {
                   <p class="text-xs text-[#435574]">{{ getTimeAgo(getLastActivityAt(project)) }}</p>
 
                   <div class="flex items-center gap-2">
-                    <Button
-                      v-if="project.status === 'delivered'"
-                      @click.stop="handleApproveDelivery(project.id)"
-                      class="bg-[#286AD8] hover:bg-[#435574]"
-                      size="sm"
-                    >
-                      <CheckCircle class="h-4 w-4 mr-2" />
-                      Aprovar Entrega
-                    </Button>
-
                     <Button
                       @click.stop="handleViewProject(project.id)"
                       variant="outline"

@@ -419,16 +419,6 @@ const getStatusColor = (status: string) => {
           </button>
         </div>
         
-        <!-- Botão de Aprovação de Entrega: Só aparece quando o freelancer já entregou (DELIVERED) -->
-        <Button
-          v-if="request.status === 'delivered'"
-          @click="() => props.onNavigate('cliente-delivery-approval', { requestId: request?.id })"
-          class="bg-green-600 hover:bg-green-700"
-          size="sm"
-        >
-          <CheckCircle class="h-4 w-4 mr-2" />
-          Aprovar Entrega
-        </Button>
       </div>
 
       <!-- Info Alert: Aguardando entrega do profissional -->
@@ -437,7 +427,7 @@ const getStatusColor = (status: string) => {
         <Clock class="h-5 w-5 mt-0.5 flex-shrink-0 text-blue-600" />
         <div>
           <p class="font-semibold text-sm">Serviço em Andamento</p>
-          <p class="text-sm opacity-90">O profissional está trabalhando no seu pedido. Assim que ele finalizar a entrega, você poderá marcar o serviço como concluído aqui.</p>
+          <p class="text-sm opacity-90">O profissional está trabalhando no seu pedido. Assim que ele finalizar a entrega, você poderá aprová-la pelo detalhe do projeto.</p>
         </div>
       </div>
 

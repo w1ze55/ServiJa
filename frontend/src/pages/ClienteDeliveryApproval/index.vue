@@ -81,11 +81,7 @@ const formatDate = (dateString: string) => {
 };
 
 const handleBack = () => {
-  if (route.query.from === 'projects') {
-    router.push('/cliente-projects');
-  } else {
-    router.push('/cliente-request-detail?requestId=' + requestId.value);
-  }
+  router.push('/cliente-project-detail?requestId=' + requestId.value);
 };
 
 const handleApprove = async () => {
