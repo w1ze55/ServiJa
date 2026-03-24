@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick } from 'vue';
+import { ref, computed, onMounted, nextTick, watch } from 'vue';
 import {
   ArrowLeft,
   Clock,
@@ -76,6 +76,11 @@ const isSubmittingCounter = ref(false);
 const activeSection = ref<'details' | 'messages' | 'history' | 'attachments'>('details');
 const showCelebrationModal = ref(false);
 const activeFileTab = ref<'client' | 'freelancer'>('client');
+const clientAttachments = computed(() => request.value?.attachments || []);
+const professionalAttachments = computed(() => [
+  ...(request.value?.freelancerResponse?.attachments || []),
+  ...(request.value?.freelancerAttachments || []),
+]);
 
 const handleOpenCounterProposalDialog = () => {
   if (!request.value || !request.value.freelancerResponse) return;
@@ -86,7 +91,13 @@ const handleOpenCounterProposalDialog = () => {
 };
 
 const loadData = async () => {
-  await store.loadRequests();
+  const loadedRequest = await store.loadRequestById(props.requestId);
+  if (loadedRequest) {
+    request.value = loadedRequest;
+    await store.loadHistory(props.requestId);
+    return;
+  }
+
   request.value = store.getRequestById(props.requestId) || null;
   if (request.value) {
     await store.loadHistory(props.requestId);
@@ -127,12 +138,12 @@ const handleSendCounterProposal = async () => {
 };
 
 onMounted(async () => {
-  if (store.requests.length === 0) {
-    await store.loadRequests();
-  }
-  request.value = store.getRequestById(props.requestId) || null;
-  if (request.value) {
-    await store.loadHistory(props.requestId);
+  await loadData();
+});
+
+watch(() => props.requestId, async (newId, oldId) => {
+  if (newId && newId !== oldId) {
+    await loadData();
   }
 });
 
@@ -675,8 +686,8 @@ const getStatusColor = (status: string) => {
             ]"
           >
             Cliente
-            <Badge v-if="request.attachments && request.attachments.length > 0" variant="secondary" class="ml-2">
-              {{ request.attachments.length }}
+            <Badge v-if="clientAttachments.length > 0" variant="secondary" class="ml-2">
+              {{ clientAttachments.length }}
             </Badge>
           </button>
           <button
@@ -689,21 +700,21 @@ const getStatusColor = (status: string) => {
             ]"
           >
             Freelancer
-            <Badge v-if="request.freelancerResponse?.attachments && request.freelancerResponse.attachments.length > 0" variant="secondary" class="ml-2">
-              {{ request.freelancerResponse.attachments.length }}
+            <Badge v-if="professionalAttachments.length > 0" variant="secondary" class="ml-2">
+              {{ professionalAttachments.length }}
             </Badge>
           </button>
         </div>
 
         <!-- Client Files Tab -->
         <div v-if="activeFileTab === 'client'">
-          <div v-if="!request.attachments || request.attachments.length === 0" class="text-center py-8">
+          <div v-if="clientAttachments.length === 0" class="text-center py-8">
             <FileText class="h-12 w-12 text-gray-300 mx-auto mb-3" />
             <p class="text-[#435574]">Nenhum arquivo enviado pelo cliente</p>
           </div>
           <div v-else class="space-y-2">
             <FileAttachment
-              v-for="attachment in request.attachments"
+              v-for="attachment in clientAttachments"
               :key="attachment.id"
               :name="attachment.name"
               :url="attachment.url"
@@ -716,17 +727,18 @@ const getStatusColor = (status: string) => {
 
         <!-- Freelancer Files Tab -->
         <div v-if="activeFileTab === 'freelancer'">
-          <div v-if="!request.freelancerResponse?.attachments || request.freelancerResponse.attachments.length === 0" class="text-center py-8">
+          <div v-if="professionalAttachments.length === 0" class="text-center py-8">
             <FileText class="h-12 w-12 text-gray-300 mx-auto mb-3" />
             <p class="text-[#435574]">Nenhum arquivo enviado pelo freelancer</p>
           </div>
           <div v-else class="space-y-2">
             <FileAttachment
-              v-for="attachment in request.freelancerResponse.attachments"
+              v-for="attachment in professionalAttachments"
               :key="attachment.id"
               :name="attachment.name"
               :url="attachment.url"
               :size="attachment.size"
+              :description="attachment.description"
               sender-info="Enviado pelo profissional"
               variant="amber"
             />

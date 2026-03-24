@@ -274,7 +274,7 @@ const getStatusColor = (status: string) => {
       </div>
     </div>
 
-    <Card v-if="request" class="p-6 bg-gradient-to-r from-blue-50 to-white border-blue-100 shadow-sm">
+    <Card v-if="request" class="p-6 bg-white border shadow-sm">
       <div class="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div class="flex-1 space-y-2">
           <div class="flex items-center justify-between text-sm mb-1">
@@ -289,15 +289,10 @@ const getStatusColor = (status: string) => {
             Status atual: <span class="font-semibold">{{ getStatusLabel(request.status) }}</span>
           </p>
         </div>
-
         <div class="flex items-center gap-8 px-6 border-l hidden md:flex">
           <div class="text-center">
             <p class="text-xs text-[#435574] uppercase tracking-wider mb-1">Início</p>
             <p class="font-semibold text-[#263238]">{{ formatApiDate(request.createdAt, { day: '2-digit', month: '2-digit', year: 'numeric' }) }}</p>
-          </div>
-          <div class="text-center">
-            <p class="text-xs text-[#435574] uppercase tracking-wider mb-1">Investimento</p>
-            <p class="font-bold text-green-600">{{ formatCurrency(request.freelancerResponse?.value || request.budget) }}</p>
           </div>
         </div>
       </div>
