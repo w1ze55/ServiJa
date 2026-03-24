@@ -51,6 +51,18 @@ const currentTab = ref('active');
 
 let wsConnection: any = null;
 
+const categoryOptions = [
+  { value: 'all', label: 'Todas Categorias' },
+  { value: 'Eletricista', label: 'Eletricista' },
+  { value: 'Designer', label: 'Designer' },
+  { value: 'Encanador', label: 'Encanador' },
+  { value: 'Pintor', label: 'Pintor' },
+];
+
+const selectedCategoryLabel = computed(
+  () => categoryOptions.find((option) => option.value === categoryFilter.value)?.label || 'Todas Categorias'
+);
+
 const stats = computed(() => {
   const activeProjects = store.requests.filter(
     (r) => r.status === 'in_progress' || r.status === 'delivered'
@@ -396,14 +408,16 @@ onUnmounted(() => {
 
           <Select v-model="categoryFilter">
             <SelectTrigger class="w-full md:w-[200px]">
-              <SelectValue placeholder="Todas Categorias" />
+              <SelectValue placeholder="Todas Categorias" :label="selectedCategoryLabel" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todas Categorias</SelectItem>
-              <SelectItem value="Eletricista">Eletricista</SelectItem>
-              <SelectItem value="Designer">Designer</SelectItem>
-              <SelectItem value="Encanador">Encanador</SelectItem>
-              <SelectItem value="Pintor">Pintor</SelectItem>
+              <SelectItem
+                v-for="option in categoryOptions"
+                :key="option.value"
+                :value="option.value"
+              >
+                {{ option.label }}
+              </SelectItem>
             </SelectContent>
           </Select>
 
