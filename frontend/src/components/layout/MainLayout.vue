@@ -16,7 +16,7 @@ import {
   Bell,
   Clock,
   Briefcase,
-  Calendar,
+
   Images,
   DollarSign,
   Wallet,
@@ -217,7 +217,7 @@ const menuItems = computed(() =>
         { id: "freelancer-wallet", label: "Carteira", icon: Wallet },
 
         { id: "messages", label: "Mensagens", icon: MessageSquare },
-        { id: "freelancer-schedule", label: "Agenda", icon: Calendar },
+
         { id: "settings", label: "Configurações", icon: Settings },
       ],
 );

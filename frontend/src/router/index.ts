@@ -20,7 +20,7 @@ import FreelancerRequestDetailPage from "@/pages/FreelancerRequestDetail/index.v
 import FreelancerDeliveriesPage from "@/pages/FreelancerDeliveries/index.vue";
 import FreelancerWalletPage from "@/pages/FreelancerWallet/index.vue";
 
-import FreelancerSchedulePage from "@/pages/FreelancerSchedule/index.vue";
+
 import MessagesPage from "@/pages/Messages/index.vue";
 import NotificationsPage from "@/pages/Notifications/index.vue";
 import ExplorePage from "@/pages/Explore/index.vue";
@@ -182,13 +182,7 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, userType: "provider" },
   },
 
-  // ============ FREELANCER SCHEDULE ============
-  {
-    path: "/freelancer-schedule",
-    name: "freelancer-schedule",
-    component: FreelancerSchedulePage,
-    meta: { requiresAuth: true, userType: "provider" },
-  },
+
 
   // ============ FREELANCER PORTFOLIO/GALLERY ============
   {

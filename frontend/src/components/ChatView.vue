@@ -36,7 +36,7 @@ export type Page =
   | 'freelancer-wallet'
 
   | 'freelancer-portfolio'
-  | 'freelancer-schedule'
+
   | 'freelancer-kyc'
   | 'freelancer-account-settings'
   | 'add-address'
