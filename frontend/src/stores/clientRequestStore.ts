@@ -93,6 +93,21 @@ export const useClientRequestStore = defineStore('clientRequest', () => {
     const isLoading = ref(false);
     const error = ref<string | null>(null);
 
+    const mapApiStatusToLocal = (status: string): ServiceRequest['status'] => {
+        const mapping: Record<string, ServiceRequest['status']> = {
+            'PENDING': 'pending',
+            'SENT': 'sent',
+            'NEGOTIATING': 'negotiating',
+            'ACCEPTED': 'accepted',
+            'IN_PROGRESS': 'in_progress',
+            'DELIVERED': 'delivered',
+            'REJECTED': 'rejected',
+            'COMPLETED': 'completed',
+            'CANCELLED': 'cancelled',
+        };
+        return mapping[status] || 'pending';
+    };
+
     const extractFileName = (url: string): string => {
         try {
             const path = new URL(url).pathname;
@@ -115,6 +130,60 @@ export const useClientRequestStore = defineStore('clientRequest', () => {
         return types[ext] || 'application/octet-stream';
     };
 
+    const mapAttachments = (
+        urls: string[] | undefined,
+        prefix: string,
+        requestId: string | number
+    ): ServiceRequestAttachment[] => (urls || []).map((url: string, idx: number) => ({
+        id: `${prefix}-${requestId}-${idx}`,
+        name: extractFileName(url),
+        size: '',
+        url,
+        type: getFileType(url),
+    }));
+
+    const mapRequestResponse = (req: any, existingRequest?: ServiceRequest): ServiceRequest => ({
+        ...req,
+        id: String(req.id),
+        service: req.serviceName,
+        workModel: normalizeWorkModel(req.workModel),
+        status: mapApiStatusToLocal(req.status),
+        attachments: mapAttachments(req.attachments, 'att', req.id),
+        freelancerAttachments: mapAttachments(req.freelancerAttachments, 'fatt', req.id),
+        freelancerAvatar: req.freelancerAvatar,
+        freelancerResponse: req.responseValue ? {
+            value: req.responseValue,
+            executionDays: req.responseDays,
+            scope: req.responseScope,
+            notes: req.responseNotes,
+            sentAt: req.respondedAt,
+            milestones: req.milestones,
+            attachments: mapAttachments(req.responseAttachments, 'ratt', req.id),
+        } : undefined,
+        counterValue: req.counterValue,
+        counterDays: req.counterDays,
+        counterNotes: req.counterNotes,
+        rejectReason: req.rejectReason,
+        cancelReason: req.cancelReason,
+        messages: existingRequest?.messages,
+        auditLog: existingRequest?.auditLog,
+    });
+
+    const getRequestById = (id: string): ServiceRequest | undefined => {
+        return requests.value.find((r) => r.id === String(id));
+    };
+
+    const upsertRequest = (request: ServiceRequest): ServiceRequest => {
+        const index = requests.value.findIndex((existing) => existing.id === request.id);
+        if (index === -1) {
+            requests.value.unshift(request);
+            return requests.value[0];
+        }
+
+        requests.value[index] = request;
+        return requests.value[index];
+    };
+
     const stats = computed<RequestStats>(() => ({
         pending: requests.value.filter((r) => r.status === 'pending' || r.status === 'sent').length,
         negotiating: requests.value.filter((r) => r.status === 'negotiating' || r.status === 'accepted').length,
@@ -128,49 +197,10 @@ export const useClientRequestStore = defineStore('clientRequest', () => {
         error.value = null;
         try {
             const response = await api.get('/service-requests/my');
-            // Mapear campos do backend para o frontend se necessário
-            requests.value = response.data.map((req: any) => ({
-                ...req,
-                id: String(req.id),
-                service: req.serviceName, // Backend usa serviceName
-                workModel: normalizeWorkModel(req.workModel),
-                status: mapApiStatusToLocal(req.status),
-                attachments: (req.attachments || []).map((url: string, idx: number) => ({
-                    id: `att-${req.id}-${idx}`,
-                    name: extractFileName(url),
-                    size: '',
-                    url,
-                    type: getFileType(url),
-                })),
-                freelancerAttachments: (req.freelancerAttachments || []).map((url: string, idx: number) => ({
-                    id: `fatt-${req.id}-${idx}`,
-                    name: extractFileName(url),
-                    size: '',
-                    url,
-                    type: getFileType(url),
-                })),
-                freelancerAvatar: req.freelancerAvatar,
-                freelancerResponse: req.responseValue ? {
-                    value: req.responseValue,
-                    executionDays: req.responseDays,
-                    scope: req.responseScope,
-                    notes: req.responseNotes,
-                    sentAt: req.respondedAt,
-                    milestones: req.milestones,
-                    attachments: (req.responseAttachments || []).map((url: string, idx: number) => ({
-                        id: `ratt-${req.id}-${idx}`,
-                        name: extractFileName(url),
-                        size: '',
-                        url,
-                        type: getFileType(url),
-                    }))
-                } : undefined,
-                counterValue: req.counterValue,
-                counterDays: req.counterDays,
-                counterNotes: req.counterNotes,
-                rejectReason: req.rejectReason,
-                cancelReason: req.cancelReason
-            }));
+            const existingRequests = new Map(requests.value.map((request) => [request.id, request]));
+            requests.value = response.data.map((req: any) =>
+                mapRequestResponse(req, existingRequests.get(String(req.id)))
+            );
         } catch (err) {
             error.value = 'Erro ao carregar solicitações';
             console.error('Erro ao carregar solicitações:', err);
@@ -179,28 +209,24 @@ export const useClientRequestStore = defineStore('clientRequest', () => {
         }
     };
 
-    const getRequestById = (id: string): ServiceRequest | undefined => {
-        return requests.value.find((r) => r.id === String(id));
-    };
-
-    const mapApiStatusToLocal = (status: string): ServiceRequest['status'] => {
-        const mapping: Record<string, ServiceRequest['status']> = {
-            'PENDING': 'pending',
-            'SENT': 'sent',
-            'NEGOTIATING': 'negotiating',
-            'ACCEPTED': 'accepted',
-            'IN_PROGRESS': 'in_progress',
-            'DELIVERED': 'delivered',
-            'REJECTED': 'rejected',
-            'COMPLETED': 'completed',
-            'CANCELLED': 'cancelled',
-        };
-        return mapping[status] || 'pending';
+    const loadRequestById = async (id: string): Promise<ServiceRequest | null> => {
+        isLoading.value = true;
+        error.value = null;
+        try {
+            const response = await api.get(`/service-requests/${id}`);
+            const mappedRequest = mapRequestResponse(response.data, getRequestById(id));
+            return upsertRequest(mappedRequest);
+        } catch (err) {
+            error.value = 'Erro ao carregar detalhes da solicitação';
+            console.error(`Erro ao carregar solicitação ${id}:`, err);
+            return null;
+        } finally {
+            isLoading.value = false;
+        }
     };
 
     const createRequest = async (input: CreateServiceRequestInput): Promise<ServiceRequest | null> => {
         try {
-            // Adequar nomes de campos para o backend
             const requestData = {
                 serviceName: input.service,
                 category: input.category,
@@ -214,14 +240,7 @@ export const useClientRequestStore = defineStore('clientRequest', () => {
             };
 
             const response = await api.post('/service-requests', requestData);
-            const newRequest = {
-                ...response.data,
-                id: String(response.data.id),
-                service: response.data.serviceName,
-                workModel: normalizeWorkModel(response.data.workModel),
-                status: mapApiStatusToLocal(response.data.status),
-                freelancerAvatar: response.data.freelancerAvatar,
-            };
+            const newRequest = mapRequestResponse(response.data);
 
             requests.value.unshift(newRequest);
             return newRequest;
@@ -437,6 +456,7 @@ export const useClientRequestStore = defineStore('clientRequest', () => {
         error,
         stats,
         loadRequests,
+        loadRequestById,
         getRequestById,
         createRequest,
         cancelRequest,
