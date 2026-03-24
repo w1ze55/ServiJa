@@ -87,15 +87,17 @@ public class ServiceRequestHistoryService {
         }
 
         private String translateAdjustmentStatusDetails(String details) {
-                if (details == null || details.isBlank() || !details.startsWith(ADJUSTMENT_STATUS_PREFIX)) {
+                if (details == null || details.isBlank()) {
                         return details;
                 }
 
-                String rawStatus = details.substring(ADJUSTMENT_STATUS_PREFIX.length()).trim();
+                String rawStatus = details.startsWith(ADJUSTMENT_STATUS_PREFIX)
+                                ? details.substring(ADJUSTMENT_STATUS_PREFIX.length()).trim()
+                                : details.trim();
                 if (rawStatus.isEmpty()) {
                         return details;
                 }
 
-                return ADJUSTMENT_STATUS_PREFIX + " " + DeliveryAdjustment.Status.getLabel(rawStatus);
+                return DeliveryAdjustment.Status.getLabel(rawStatus);
         }
 }

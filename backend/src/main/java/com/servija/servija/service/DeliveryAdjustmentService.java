@@ -149,7 +149,7 @@ public class DeliveryAdjustmentService {
                 adjustment.getServiceRequest(),
                 freelancer,
                 ServiceRequestHistory.OperationType.ADJUSTMENT_STATUS_UPDATED,
-                "Status do ajuste atualizado para: " + statusLabel
+                statusLabel
         );
 
         // Notificar cliente via WebSocket

@@ -59,7 +59,7 @@ class ServiceRequestHistoryServiceTest {
 
         assertThat(response).singleElement().satisfies(entry -> {
             assertThat(entry.getOperationKey()).isEqualTo("ADJUSTMENT_STATUS_UPDATED");
-            assertThat(entry.getDetails()).isEqualTo("Status do ajuste atualizado para: Ajustes finalizados");
+            assertThat(entry.getDetails()).isEqualTo("Ajustes finalizados");
             assertThat(entry.getUserName()).isEqualTo("Caue Peres");
         });
     }
