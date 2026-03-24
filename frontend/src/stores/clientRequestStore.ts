@@ -9,6 +9,7 @@ export interface ServiceRequestAttachment {
     size: string;
     url: string;
     type: string;
+    description?: string;
 }
 
 export interface FreelancerResponse {
@@ -142,6 +143,33 @@ export const useClientRequestStore = defineStore('clientRequest', () => {
         type: getFileType(url),
     }));
 
+    const mapDetailedAttachments = (
+        attachments: Array<{ url: string; name?: string; description?: string | null }> | undefined,
+        prefix: string,
+        requestId: string | number
+    ): ServiceRequestAttachment[] => (attachments || [])
+        .filter((attachment) => attachment?.url)
+        .map((attachment, idx) => ({
+            id: `${prefix}-${requestId}-${idx}`,
+            name: attachment.name?.trim() || extractFileName(attachment.url),
+            size: '',
+            url: attachment.url,
+            type: getFileType(attachment.url),
+            description: attachment.description?.trim() || undefined,
+        }));
+
+    const mapFreelancerAttachments = (
+        req: any,
+        prefix: string,
+        requestId: string | number
+    ): ServiceRequestAttachment[] => {
+        if (req.freelancerAttachmentDetails?.length) {
+            return mapDetailedAttachments(req.freelancerAttachmentDetails, prefix, requestId);
+        }
+
+        return mapAttachments(req.freelancerAttachments, prefix, requestId);
+    };
+
     const mapRequestResponse = (req: any, existingRequest?: ServiceRequest): ServiceRequest => ({
         ...req,
         id: String(req.id),
@@ -149,7 +177,7 @@ export const useClientRequestStore = defineStore('clientRequest', () => {
         workModel: normalizeWorkModel(req.workModel),
         status: mapApiStatusToLocal(req.status),
         attachments: mapAttachments(req.attachments, 'att', req.id),
-        freelancerAttachments: mapAttachments(req.freelancerAttachments, 'fatt', req.id),
+        freelancerAttachments: mapFreelancerAttachments(req, 'fatt', req.id),
         freelancerAvatar: req.freelancerAvatar,
         freelancerResponse: req.responseValue ? {
             value: req.responseValue,

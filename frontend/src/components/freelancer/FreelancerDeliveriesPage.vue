@@ -6,8 +6,6 @@ import {
   Check,
   Clock,
   FileText,
-  Download,
-  Eye,
   Calendar,
   CheckCircle,
   MessageSquare,
@@ -16,8 +14,9 @@ import {
   Loader2,
   Briefcase,
   Trash2,
-  X,
 } from 'lucide-vue-next';
+import AttachmentUploadField from '../shared/AttachmentUploadField.vue';
+import FileAttachment from '../shared/FileAttachment.vue';
 import Button from '../ui/button.vue';
 import Card from '../ui/card.vue';
 import Badge from '../ui/badge.vue';
@@ -39,8 +38,6 @@ import DialogDescription from '../ui/dialog-description.vue';
 import DialogFooter from '../ui/dialog-footer.vue';
 import DialogHeader from '../ui/dialog-header.vue';
 import DialogTitle from '../ui/dialog-title.vue';
-import Label from '../ui/label.vue';
-import Textarea from '../ui/textarea.vue';
 import ServiceRequestTimeline from '../service/ServiceRequestTimeline.vue';
 import { useProposalStore, type Proposal, type Milestone } from '@/stores/proposalStore';
 import { useDeliveryAdjustmentStore } from '@/stores/deliveryAdjustmentStore';
@@ -332,15 +329,8 @@ const handleMilestoneComplete = async (milestone: Milestone) => {
 };
 
 // File upload
-const handleFileSelect = (e: Event) => {
-  const target = e.target as HTMLInputElement;
-  if (target.files) {
-    uploadFiles.value = [...uploadFiles.value, ...Array.from(target.files)];
-  }
-};
-
-const removeUploadFile = (index: number) => {
-  uploadFiles.value = uploadFiles.value.filter((_, i) => i !== index);
+const handleUploadFileRejected = (message: string) => {
+  toast.error(message);
 };
 
 const openUploadDialog = () => {
@@ -352,26 +342,26 @@ const openUploadDialog = () => {
 };
 
 const handleUploadFiles = async () => {
+  if (!selectedProject.value) {
+    toast.error('Selecione um projeto antes de enviar arquivos');
+    return;
+  }
+
   if (uploadFiles.value.length === 0) {
     toast.error('Selecione pelo menos um arquivo');
     return;
   }
 
-  const oversized = uploadFiles.value.filter((f) => f.size > 10 * 1024 * 1024);
-  if (oversized.length > 0) {
-    toast.error('Alguns arquivos excedem o limite de 10 MB');
-    return;
-  }
-
   isUploading.value = true;
   uploadProgress.value = 0;
+  let progressInterval: ReturnType<typeof setInterval> | null = null;
 
   try {
     const formData = new FormData();
     uploadFiles.value.forEach((file) => formData.append('files', file));
 
     // Simulate progress
-    const progressInterval = setInterval(() => {
+    progressInterval = setInterval(() => {
       if (uploadProgress.value < 90) uploadProgress.value += 10;
     }, 300);
 
@@ -379,12 +369,19 @@ const handleUploadFiles = async () => {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
 
-    clearInterval(progressInterval);
+    if (progressInterval) {
+      clearInterval(progressInterval);
+    }
 
-    // Vincular URLs ao service request
     const urls = response.data.urls || [];
-    if (urls.length > 0 && selectedProject.value) {
-      await api.post(`/service-requests/${selectedProject.value.id}/freelancer-attachments`, { urls });
+    if (urls.length > 0) {
+      await api.post(`/service-requests/${selectedProject.value.id}/freelancer-attachments`, {
+        attachments: urls.map((url: string, index: number) => ({
+          url,
+          name: uploadFiles.value[index]?.name || 'Arquivo',
+          description: uploadDescription.value.trim() || null,
+        })),
+      });
     }
 
     uploadProgress.value = 100;
@@ -396,31 +393,10 @@ const handleUploadFiles = async () => {
   } catch {
     toast.error('Erro ao enviar arquivos. Tente novamente.');
   } finally {
+    if (progressInterval) {
+      clearInterval(progressInterval);
+    }
     isUploading.value = false;
-  }
-};
-
-// View attachment
-const handleViewAttachment = (url: string) => {
-  window.open(url, '_blank');
-};
-
-// Download attachment
-const handleDownloadAttachment = async (url: string, fileName: string) => {
-  try {
-    const response = await fetch(url);
-    const blob = await response.blob();
-    const blobUrl = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = blobUrl;
-    link.download = fileName;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(blobUrl);
-  } catch {
-    // Fallback: abrir em nova aba
-    window.open(url, '_blank');
   }
 };
 
@@ -786,29 +762,15 @@ const getMilestoneStatusConfig = (status: Milestone['status']) => {
                   <p class="text-[#435574]">Nenhum arquivo enviado pelo cliente</p>
                 </div>
                 <div v-else class="space-y-2">
-                  <div
+                  <FileAttachment
                     v-for="attachment in selectedProject.attachments"
                     :key="attachment.id"
-                    class="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
-                  >
-                    <div class="flex items-center gap-3">
-                      <div class="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
-                        <FileText class="h-5 w-5 text-[#286AD8]" />
-                      </div>
-                      <div>
-                        <p class="text-sm font-medium text-[#263238]">{{ attachment.name }}</p>
-                        <p v-if="attachment.size" class="text-xs text-[#435574]">{{ attachment.size }}</p>
-                      </div>
-                    </div>
-                    <div class="flex gap-1">
-                      <Button @click="handleViewAttachment(attachment.url)" variant="ghost" size="icon" class="text-[#435574] hover:text-[#286AD8]">
-                        <Eye class="h-4 w-4" />
-                      </Button>
-                      <Button @click="handleDownloadAttachment(attachment.url, attachment.name)" variant="ghost" size="icon" class="text-[#435574] hover:text-[#286AD8]">
-                        <Download class="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
+                    :name="attachment.name"
+                    :url="attachment.url"
+                    :size="attachment.size"
+                    variant="blue"
+                    sender-info="Enviado pelo cliente"
+                  />
                 </div>
               </div>
 
@@ -819,29 +781,16 @@ const getMilestoneStatusConfig = (status: Milestone['status']) => {
                   <p class="text-[#435574]">Nenhum arquivo enviado pelo freelancer</p>
                 </div>
                 <div v-else class="space-y-2">
-                  <div
+                  <FileAttachment
                     v-for="attachment in selectedProject.freelancerAttachments"
                     :key="attachment.id"
-                    class="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
-                  >
-                    <div class="flex items-center gap-3">
-                      <div class="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center">
-                        <FileText class="h-5 w-5 text-green-600" />
-                      </div>
-                      <div>
-                        <p class="text-sm font-medium text-[#263238]">{{ attachment.name }}</p>
-                        <p v-if="attachment.size" class="text-xs text-[#435574]">{{ attachment.size }}</p>
-                      </div>
-                    </div>
-                    <div class="flex gap-1">
-                      <Button @click="handleViewAttachment(attachment.url)" variant="ghost" size="icon" class="text-[#435574] hover:text-[#286AD8]">
-                        <Eye class="h-4 w-4" />
-                      </Button>
-                      <Button @click="handleDownloadAttachment(attachment.url, attachment.name)" variant="ghost" size="icon" class="text-[#435574] hover:text-[#286AD8]">
-                        <Download class="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
+                    :name="attachment.name"
+                    :url="attachment.url"
+                    :size="attachment.size"
+                    :description="attachment.description"
+                    variant="amber"
+                    sender-info="Enviado por você"
+                  />
                 </div>
               </div>
             </Card>
@@ -961,70 +910,15 @@ const getMilestoneStatusConfig = (status: Milestone['status']) => {
         </DialogHeader>
 
         <div class="space-y-4">
-          <div class="space-y-2">
-            <Label for="upload-description">Descrição (opcional)</Label>
-            <Textarea
-              id="upload-description"
-              v-model="uploadDescription"
-              placeholder="Adicione uma descrição sobre os arquivos..."
-              :rows="2"
-            />
-          </div>
-
-          <div class="space-y-2">
-            <Label>Arquivos *</Label>
-            <div
-              class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-[#286AD8] transition-colors cursor-pointer"
-              @click="($refs.fileInput as HTMLInputElement)?.click()"
-            >
-              <Upload class="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <p class="text-[#263238] mb-2">
-                Clique para fazer upload ou arraste os arquivos
-              </p>
-              <p class="text-sm text-[#435574] mb-4">
-                PDF, JPG, PNG, ZIP • Máximo 10 MB por arquivo
-              </p>
-              <input
-                ref="fileInput"
-                type="file"
-                multiple
-                @change="handleFileSelect"
-                class="hidden"
-              />
-              <Button @click.stop="($refs.fileInput as HTMLInputElement)?.click()" size="sm" variant="outline">
-                Selecionar Arquivos
-              </Button>
-            </div>
-
-            <div v-if="uploadFiles.length > 0" class="mt-3 space-y-2">
-              <p class="text-sm font-medium text-[#263238]">
-                Arquivos selecionados ({{ uploadFiles.length }}):
-              </p>
-              <div
-                v-for="(file, index) in uploadFiles"
-                :key="index"
-                class="flex items-center justify-between p-2 bg-gray-50 rounded"
-              >
-                <div class="flex items-center gap-2">
-                  <FileText class="h-4 w-4 text-[#286AD8]" />
-                  <span class="text-sm text-[#263238]">{{ file.name }}</span>
-                </div>
-                <div class="flex items-center gap-2">
-                  <span class="text-xs text-[#435574]">
-                    {{ (file.size / (1024 * 1024)).toFixed(2) }} MB
-                  </span>
-                  <Button
-                    @click="removeUploadFile(index)"
-                    variant="ghost"
-                    size="icon"
-                    class="h-6 w-6 text-red-500 hover:text-red-700 hover:bg-red-50"
-                  >
-                    <X class="h-3 w-3" />
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
+          <AttachmentUploadField
+            v-model:files="uploadFiles"
+            v-model:description="uploadDescription"
+            description-enabled
+            label="Arquivos *"
+            empty-message="Clique para fazer upload ou arraste os arquivos"
+            helper-text="PDF, JPG, PNG, ZIP • Máximo 10 MB por arquivo"
+            @file-rejected="handleUploadFileRejected"
+          />
 
           <div v-if="isUploading" class="space-y-2">
             <div class="flex items-center justify-between text-sm">

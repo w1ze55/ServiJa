@@ -374,6 +374,7 @@ const getStatusColor = (status: string) => {
                   :name="file.name"
                   :url="file.url"
                   :size="file.size"
+                  :description="file.description"
                   sender-info="Enviado pelo profissional"
                   variant="amber"
                 />

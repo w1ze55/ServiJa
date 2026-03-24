@@ -16,6 +16,7 @@ interface Props {
   url: string;
   size?: string;
   type?: string;
+  description?: string;
   senderInfo?: string;
   variant?: 'default' | 'amber' | 'blue' | 'compact';
 }
@@ -69,14 +70,14 @@ const handleDownload = async () => {
 
 const variantClasses = {
   default: 'bg-gray-50 border-gray-100 hover:bg-white',
-  amber: 'bg-amber-50 border-amber-100 hover:bg-white',
+  amber: 'bg-blue-50 border-blue-100 hover:bg-white',
   blue: 'bg-blue-50 border-blue-100 hover:bg-white',
   compact: 'bg-transparent border-transparent p-0 shadow-none hover:bg-gray-50',
 };
 
 const iconClasses = {
   default: 'bg-gray-100 text-gray-600',
-  amber: 'bg-amber-100 text-amber-600',
+  amber: 'bg-blue-100 text-blue-600',
   blue: 'bg-blue-100 text-blue-600',
   compact: 'bg-gray-100 text-gray-500',
 };
@@ -107,6 +108,9 @@ const iconClasses = {
           <span v-if="size && senderInfo" class="w-1 h-1 rounded-full bg-gray-300"></span>
           <span v-if="senderInfo" class="text-xs text-[#435574]">{{ senderInfo }}</span>
         </div>
+        <p v-if="description" class="text-xs text-[#435574] mt-1 whitespace-pre-line break-words">
+          {{ description }}
+        </p>
       </div>
     </div>
     

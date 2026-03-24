@@ -1,8 +1,10 @@
 package com.servija.servija.service;
 
-import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.servija.servija.dto.CounterProposalDTO;
+import com.servija.servija.dto.FreelancerAttachmentDTO;
+import com.servija.servija.dto.FreelancerAttachmentsRequest;
 import com.servija.servija.dto.FreelancerResponseDTO;
 import com.servija.servija.dto.ServiceRequestDTO;
 import com.servija.servija.dto.ServiceRequestResponse;
@@ -21,6 +23,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -464,7 +468,7 @@ public class ServiceRequestService {
     }
 
     @Transactional
-    public ServiceRequestResponse addFreelancerAttachments(Long id, List<String> urls, String freelancerEmail) {
+    public ServiceRequestResponse addFreelancerAttachments(Long id, FreelancerAttachmentsRequest body, String freelancerEmail) {
         ServiceRequest request = serviceRequestRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Solicitação não encontrada"));
 
@@ -475,8 +479,13 @@ public class ServiceRequestService {
             throw new IllegalStateException("Apenas o freelancer da solicitação pode enviar arquivos");
         }
 
-        List<String> existing = parseAttachments(request.getFreelancerAttachments());
-        existing.addAll(urls);
+        List<FreelancerAttachmentDTO> attachmentsToAdd = resolveFreelancerAttachments(body);
+        if (attachmentsToAdd.isEmpty()) {
+            throw new IllegalArgumentException("Informe pelo menos um arquivo");
+        }
+
+        List<FreelancerAttachmentDTO> existing = parseFreelancerAttachmentDetails(request.getFreelancerAttachments());
+        existing.addAll(attachmentsToAdd);
 
         try {
             request.setFreelancerAttachments(objectMapper.writeValueAsString(existing));
@@ -486,19 +495,137 @@ public class ServiceRequestService {
         }
 
         ServiceRequest saved = serviceRequestRepository.save(request);
-        log.info("Freelancer attachments adicionados à solicitação {}: {} arquivos", id, urls.size());
+        log.info("Freelancer attachments adicionados à solicitação {}: {} arquivos", id, attachmentsToAdd.size());
         return toResponse(saved);
     }
 
-    private List<String> parseAttachments(String json) {
-        if (json == null || json.isEmpty())
+    private List<String> parseAttachmentUrls(String json) {
+        if (!StringUtils.hasText(json)) {
             return new ArrayList<>();
+        }
+
         try {
-            return objectMapper.readValue(json, new TypeReference<List<String>>() {
-            });
+            JsonNode root = objectMapper.readTree(json);
+            if (!root.isArray()) {
+                return new ArrayList<>();
+            }
+
+            List<String> urls = new ArrayList<>();
+            for (JsonNode node : root) {
+                if (node.isTextual() && StringUtils.hasText(node.asText())) {
+                    urls.add(node.asText());
+                } else if (node.isObject()) {
+                    String url = node.path("url").asText(null);
+                    if (StringUtils.hasText(url)) {
+                        urls.add(url);
+                    }
+                }
+            }
+            return urls;
         } catch (Exception e) {
             log.warn("Erro ao deserializar attachments: {}", e.getMessage());
             return new ArrayList<>();
+        }
+    }
+
+    private List<FreelancerAttachmentDTO> parseFreelancerAttachmentDetails(String json) {
+        if (!StringUtils.hasText(json)) {
+            return new ArrayList<>();
+        }
+
+        try {
+            JsonNode root = objectMapper.readTree(json);
+            if (!root.isArray()) {
+                return new ArrayList<>();
+            }
+
+            List<FreelancerAttachmentDTO> attachments = new ArrayList<>();
+            for (JsonNode node : root) {
+                if (node.isTextual()) {
+                    String url = node.asText();
+                    if (StringUtils.hasText(url)) {
+                        attachments.add(buildFreelancerAttachment(url, null, null));
+                    }
+                    continue;
+                }
+
+                if (!node.isObject()) {
+                    continue;
+                }
+
+                String url = node.path("url").asText(null);
+                if (!StringUtils.hasText(url)) {
+                    continue;
+                }
+
+                attachments.add(buildFreelancerAttachment(
+                        url,
+                        node.path("name").asText(null),
+                        node.path("description").asText(null)));
+            }
+            return attachments;
+        } catch (Exception e) {
+            log.warn("Erro ao deserializar freelancer attachment details: {}", e.getMessage());
+            return new ArrayList<>();
+        }
+    }
+
+    private List<FreelancerAttachmentDTO> resolveFreelancerAttachments(FreelancerAttachmentsRequest body) {
+        List<FreelancerAttachmentDTO> resolved = new ArrayList<>();
+        if (body == null) {
+            return resolved;
+        }
+
+        if (body.getAttachments() != null && !body.getAttachments().isEmpty()) {
+            for (FreelancerAttachmentDTO attachment : body.getAttachments()) {
+                if (attachment == null || !StringUtils.hasText(attachment.getUrl())) {
+                    continue;
+                }
+                resolved.add(buildFreelancerAttachment(
+                        attachment.getUrl(),
+                        attachment.getName(),
+                        attachment.getDescription()));
+            }
+        }
+
+        if (resolved.isEmpty() && body.getUrls() != null && !body.getUrls().isEmpty()) {
+            for (String url : body.getUrls()) {
+                if (!StringUtils.hasText(url)) {
+                    continue;
+                }
+                resolved.add(buildFreelancerAttachment(url, null, null));
+            }
+        }
+
+        return resolved;
+    }
+
+    private FreelancerAttachmentDTO buildFreelancerAttachment(String url, String name, String description) {
+        String normalizedUrl = url.trim();
+        String normalizedName = StringUtils.hasText(name) ? name.trim() : extractFileName(normalizedUrl);
+        String normalizedDescription = StringUtils.hasText(description) ? description.trim() : null;
+
+        return FreelancerAttachmentDTO.builder()
+                .url(normalizedUrl)
+                .name(normalizedName)
+                .description(normalizedDescription)
+                .build();
+    }
+
+    private String extractFileName(String url) {
+        try {
+            String path = java.net.URI.create(url).getPath();
+            if (!StringUtils.hasText(path)) {
+                return "arquivo";
+            }
+
+            String encoded = path.substring(path.lastIndexOf('/') + 1);
+            return StringUtils.hasText(encoded)
+                    ? URLDecoder.decode(encoded, StandardCharsets.UTF_8)
+                    : "arquivo";
+        } catch (Exception e) {
+            String fallback = url.substring(url.lastIndexOf('/') + 1);
+            return StringUtils.hasText(fallback) ? fallback : "arquivo";
         }
     }
 
@@ -552,9 +679,10 @@ public class ServiceRequestService {
                 .counterNotes(request.getCounterNotes())
                 .cancelReason(request.getCancelReason())
                 .rejectReason(request.getRejectReason())
-                .attachments(parseAttachments(request.getAttachments()))
-                .freelancerAttachments(parseAttachments(request.getFreelancerAttachments()))
-                .responseAttachments(parseAttachments(request.getResponseAttachments()))
+                .attachments(parseAttachmentUrls(request.getAttachments()))
+                .freelancerAttachments(parseAttachmentUrls(request.getFreelancerAttachments()))
+                .freelancerAttachmentDetails(parseFreelancerAttachmentDetails(request.getFreelancerAttachments()))
+                .responseAttachments(parseAttachmentUrls(request.getResponseAttachments()))
                 .createdAt(request.getCreatedAt())
                 .updatedAt(request.getUpdatedAt())
                 .build();

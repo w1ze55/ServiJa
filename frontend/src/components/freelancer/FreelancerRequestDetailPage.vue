@@ -16,7 +16,6 @@ import {
   User,
   MessageSquare,
   Milestone as MilestoneIcon,
-  Upload,
   Phone,
   Mail,
   Check,
@@ -25,11 +24,11 @@ import {
   Eye,
   Paperclip,
   XCircle,
-  X,
   Sparkles,
   History,
   CreditCard,
 } from 'lucide-vue-next';
+import AttachmentUploadField from '../shared/AttachmentUploadField.vue';
 import FileAttachment from '../shared/FileAttachment.vue';
 import Button from '../ui/button.vue';
 import Input from '../ui/input.vue';
@@ -96,7 +95,6 @@ const proposalForm = ref({
   scope: '',
   notes: '',
   attachments: [] as File[],
-  attachmentUrls: [] as string[],
 });
 
 const milestones = ref<Array<Omit<Milestone, 'status'> & { status?: Milestone['status'] }>>([]);
@@ -112,7 +110,6 @@ const newMessage = ref('');
 const messageAttachments = ref<File[]>([]);
 
 const messageAttachmentInput = ref<HTMLInputElement | null>(null);
-const proposalAttachmentInput = ref<HTMLInputElement | null>(null);
 
 // WebSocket
 let wsConnection: any = null;
@@ -439,50 +436,8 @@ const handleRemoveMilestone = (id: string) => {
   toast.success('Marco removido');
 };
 
-const handleAttachmentUpload = (e: Event) => {
-  const target = e.target as HTMLInputElement;
-  if (!target.files) return;
-
-  const validFiles: File[] = [];
-  const maxSize = 10 * 1024 * 1024;
-  const allowedTypes = [
-    'application/pdf',
-    'image/jpeg',
-    'image/png',
-    'application/msword',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  ];
-
-  Array.from(target.files).forEach((file) => {
-    if (file.size > maxSize) {
-      toast.error(`Arquivo ${file.name} excede o tamanho máximo de 10MB`);
-      return;
-    }
-
-    if (!allowedTypes.includes(file.type)) {
-      toast.error(`Tipo de arquivo ${file.name} não permitido`);
-      return;
-    }
-
-    validFiles.push(file);
-  });
-
-  if (validFiles.length > 0) {
-    const newUrls = validFiles.map((file) => URL.createObjectURL(file));
-    proposalForm.value = {
-      ...proposalForm.value,
-      attachments: [...proposalForm.value.attachments, ...validFiles],
-      attachmentUrls: [...proposalForm.value.attachmentUrls, ...newUrls],
-    };
-  }
-};
-
-const handleRemoveAttachment = (index: number) => {
-  proposalForm.value = {
-    ...proposalForm.value,
-    attachments: proposalForm.value.attachments.filter((_, i) => i !== index),
-    attachmentUrls: proposalForm.value.attachmentUrls.filter((_, i) => i !== index),
-  };
+const handleProposalAttachmentReject = (message: string) => {
+  toast.error(message);
 };
 
 const handleSendMessage = async () => {
@@ -578,7 +533,6 @@ const handleConfirmSendProposal = async () => {
       scope: '',
       notes: '',
       attachments: [],
-      attachmentUrls: [],
     };
     milestones.value = [];
     
@@ -1439,53 +1393,22 @@ const getStatusBadge = (currentProposal: Proposal) => {
 
           <!-- Attachments -->
           <div class="space-y-2">
-            <Label>Anexos (opcional)</Label>
-            <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-[#286AD8] transition-colors cursor-pointer">
-              <Upload class="h-8 w-8 text-gray-400 mx-auto mb-2" />
-              <p class="text-sm text-[#435574] mb-2">
-                Adicione documentos, certificados ou imagens
-              </p>
-              <p class="text-xs text-[#435574] mb-3">
-                PDF, JPG, PNG, DOC até 10MB cada
-              </p>
-              <input
-                ref="proposalAttachmentInput"
-                type="file"
-                multiple
-                accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
-                @change="handleAttachmentUpload"
-                class="hidden"
-              />
-              <Button
-                @click="proposalAttachmentInput?.click()"
-                size="sm"
-                variant="outline"
-              >
-                Selecionar Arquivos
-              </Button>
-            </div>
-
-            <div v-if="proposalForm.attachments.length > 0" class="space-y-2">
-              <div
-                v-for="(file, index) in proposalForm.attachments"
-                :key="index"
-                class="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-              >
-                <div class="flex items-center gap-2">
-                  <FileText class="h-4 w-4 text-[#435574]" />
-                  <span class="text-sm text-[#263238]">{{ file.name }}</span>
-                  <span class="text-xs text-[#435574]">
-                    ({{ (file.size / 1024).toFixed(1) }} KB)
-                  </span>
-                </div>
-                <button
-                  @click="handleRemoveAttachment(index)"
-                  class="text-red-600 hover:text-red-700"
-                >
-                  <X class="h-4 w-4" />
-                </button>
-              </div>
-            </div>
+            <AttachmentUploadField
+              v-model:files="proposalForm.attachments"
+              label="Anexos (opcional)"
+              empty-message="Adicione documentos, certificados ou imagens"
+              helper-text="PDF, JPG, PNG, DOC, DOCX até 10MB cada"
+              accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+              :allowed-mime-types="[
+                'application/pdf',
+                'image/jpeg',
+                'image/png',
+                'application/msword',
+                'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+              ]"
+              :allowed-extensions="['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx']"
+              @file-rejected="handleProposalAttachmentReject"
+            />
           </div>
         </div>
 

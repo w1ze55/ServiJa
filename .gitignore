@@ -29,3 +29,4 @@ build/
 
 # Maven
 target/
+backend/.m2/

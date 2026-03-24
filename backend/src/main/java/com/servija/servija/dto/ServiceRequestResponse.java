@@ -35,6 +35,7 @@ public class ServiceRequestResponse {
     private LocalDate desiredDate;
     private List<String> attachments;
     private List<String> freelancerAttachments;
+    private List<FreelancerAttachmentDTO> freelancerAttachmentDetails;
     private List<String> responseAttachments;
 
     // Freelancer response
