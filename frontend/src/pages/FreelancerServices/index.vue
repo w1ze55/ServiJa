@@ -48,6 +48,7 @@ interface Service {
   description: string;
   price: number;
   priceType: string;
+  workModel: 'presencial' | 'remoto' | 'hibrido';
   deliveryTime: number;
   deliveryUnit: string;
   tags: string[];
@@ -112,6 +113,25 @@ const categories = [
   'Outro',
 ];
 
+const normalizeWorkModel = (value?: string | null): 'presencial' | 'remoto' | 'hibrido' => {
+  const normalized = value?.toUpperCase();
+  if (normalized === 'HIBRIDO') return 'hibrido';
+  if (normalized === 'PRESENCIAL') return 'presencial';
+  return 'remoto';
+};
+
+const mapWorkModelToApi = (value: ServiceFormData['workModel']) => {
+  if (value === 'hibrido') return 'HIBRIDO';
+  if (value === 'presencial') return 'PRESENCIAL';
+  return 'REMOTO';
+};
+
+const getWorkModelLabel = (value: Service['workModel']) => {
+  if (value === 'hibrido') return 'Híbrido';
+  if (value === 'presencial') return 'Presencial';
+  return 'Remoto';
+};
+
 // Carregar serviços da API
 const loadServices = async () => {
   isLoading.value = true;
@@ -136,6 +156,7 @@ const loadServices = async () => {
       description: s.description,
       price: Number(s.price),
       priceType: priceTypeMap[s.priceType] || 'fixo',
+      workModel: normalizeWorkModel(s.workModel),
       deliveryTime: s.deliveryTime,
       deliveryUnit: deliveryUnitMap[s.deliveryUnit] || 'dias',
       tags: s.tags || [],
@@ -267,6 +288,7 @@ const handleEditService = (serviceId: string) => {
       description: service.description,
       price: service.price,
       priceType: priceTypeMap[service.priceType] || 'fixo',
+      workModel: normalizeWorkModel(service.workModel),
       deliveryTime: String(totalDays),
       tags: service.tags || [],
       images: service.images || [],
@@ -320,6 +342,7 @@ const handleServiceFormSubmit = async (formData: ServiceFormData) => {
       description: formData.description,
       price: formData.price,
       priceType: priceTypeMap[formData.priceType] || 'FIXED',
+      workModel: mapWorkModelToApi(formData.workModel),
       deliveryTime,
       deliveryUnit,
       tags: formData.tags,
@@ -354,6 +377,7 @@ const handleServiceFormSubmit = async (formData: ServiceFormData) => {
               description: response.data.description,
               price: Number(response.data.price),
               priceType: priceTypeMapResponse[response.data.priceType] || 'fixo',
+              workModel: normalizeWorkModel(response.data.workModel),
               deliveryTime: response.data.deliveryTime,
               deliveryUnit: deliveryUnitMapResponse[response.data.deliveryUnit] || 'dias',
               tags: response.data.tags || [],
@@ -387,6 +411,7 @@ const handleServiceFormSubmit = async (formData: ServiceFormData) => {
           description: response.data.description,
           price: Number(response.data.price),
           priceType: priceTypeMapResponse[response.data.priceType] || 'fixo',
+          workModel: normalizeWorkModel(response.data.workModel),
           deliveryTime: response.data.deliveryTime,
           deliveryUnit: deliveryUnitMapResponse[response.data.deliveryUnit] || 'dias',
           tags: response.data.tags || [],
@@ -615,7 +640,12 @@ onMounted(() => {
                     </div>
                   </td>
                   <td class="px-6 py-4 whitespace-nowrap">
-                    <Badge variant="secondary">{{ service.category }}</Badge>
+                    <div class="flex flex-wrap gap-2">
+                      <Badge variant="secondary">{{ service.category }}</Badge>
+                      <Badge variant="outline" class="bg-white text-[#435574]">
+                        {{ getWorkModelLabel(service.workModel) }}
+                      </Badge>
+                    </div>
                   </td>
                   <td class="px-6 py-4 whitespace-nowrap">
                     <p class="text-sm font-medium text-[#263238]">
@@ -692,9 +722,14 @@ onMounted(() => {
             <div class="flex items-start justify-between mb-3">
               <div class="flex-1">
                 <h3 class="font-semibold text-[#263238] mb-1">{{ service.title }}</h3>
-                <Badge variant="secondary" class="text-xs">
-                  {{ service.category }}
-                </Badge>
+                <div class="flex flex-wrap gap-2">
+                  <Badge variant="secondary" class="text-xs">
+                    {{ service.category }}
+                  </Badge>
+                  <Badge variant="outline" class="text-xs bg-white text-[#435574]">
+                    {{ getWorkModelLabel(service.workModel) }}
+                  </Badge>
+                </div>
               </div>
               <DropdownMenu>
                 <DropdownMenuTrigger as-child>

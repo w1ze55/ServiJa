@@ -32,6 +32,7 @@ export interface Service {
   price: number;
   deliveryTime: string;
   category?: string;
+  workModel?: string | null;
 }
 
 export interface Review {
@@ -119,4 +120,3 @@ export const freelancerService = {
     await api.delete(`/freelancers/services/${serviceId}`);
   },
 };
-

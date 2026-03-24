@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { Star, Search, Sparkles, Calendar } from 'lucide-vue-next';
 import Input from '../ui/input.vue';
 import Button from '../ui/button.vue';
@@ -12,6 +12,7 @@ import SelectContent from '../ui/select-content.vue';
 import SelectItem from '../ui/select-item.vue';
 import SelectTrigger from '../ui/select-trigger.vue';
 import SelectValue from '../ui/select-value.vue';
+import reviewService, { type ReviewResponse } from '@/api/services/reviewService';
 
 interface Review {
   id: string;
@@ -35,91 +36,44 @@ const filterRating = ref<string>('all');
 const searchQuery = ref('');
 const currentPage = ref(1);
 const reviewsPerPage = 5;
+const isLoading = ref(false);
 
-// Mock data - substituir por dados reais da API
-const aiSummary = {
-  generated: '2024-11-11T14:30:00',
-  strengths: [
-    'Pontualidade exemplar em 95% dos atendimentos',
-    'Excelente comunicação e clareza nas explicações técnicas',
-    'Trabalho limpo e organizado, sempre deixa o ambiente arrumado',
-    'Preços justos e honestos, sem cobranças surpresa',
-    'Profundo conhecimento técnico e resolve problemas complexos',
-  ],
-  summary: 'João Silva é altamente recomendado pelos clientes, destacando-se pela pontualidade, profissionalismo e qualidade técnica. Os clientes frequentemente elogiam sua capacidade de explicar problemas de forma clara e resolver questões complexas com eficiência. A organização e limpeza durante o trabalho também são pontos constantemente mencionados.',
+const reviews = ref<Review[]>([]);
+
+const loadReviews = async () => {
+  if (!props.freelancerId) return;
+  isLoading.value = true;
+  try {
+    const data = await reviewService.getReviewsForUser(props.freelancerId);
+    reviews.value = data.map((r: ReviewResponse) => ({
+      id: String(r.id),
+      author: r.reviewerName,
+      avatar: r.reviewerAvatar,
+      rating: r.rating,
+      date: r.createdAt,
+      comment: r.comment || '',
+      service: r.serviceName,
+    }));
+  } catch (err) {
+    console.error('Erro ao carregar avaliações:', err);
+    reviews.value = [];
+  } finally {
+    isLoading.value = false;
+  }
 };
 
-const reviews: Review[] = [
-  {
-    id: '1',
-    author: 'Maria Santos',
-    rating: 5,
-    date: '2024-11-05',
-    comment: 'Excelente profissional! Muito pontual, educado e fez um trabalho impecável. A instalação elétrica ficou perfeita e ele explicou tudo com muita paciência. Super recomendo!',
-    service: 'Instalação Elétrica Residencial',
-  },
-  {
-    id: '2',
-    author: 'Carlos Oliveira',
-    rating: 5,
-    date: '2024-10-28',
-    comment: 'Contratei para instalar ar condicionado e fiquei muito satisfeito. Chegou no horário, trabalhou com muita organização e limpeza. O preço foi justo e o resultado ficou ótimo.',
-    service: 'Instalação de Ar Condicionado',
-  },
-  {
-    id: '3',
-    author: 'Ana Paula Costa',
-    rating: 4,
-    date: '2024-10-20',
-    comment: 'Muito bom profissional, fez a manutenção preventiva e encontrou alguns problemas que poderiam ter causado curto circuito. Único ponto é que demorou um pouco mais que o esperado.',
-    service: 'Manutenção Preventiva',
-  },
-  {
-    id: '4',
-    author: 'Roberto Silva',
-    rating: 5,
-    date: '2024-10-15',
-    comment: 'João é excepcional! Resolveu um problema elétrico complexo que outros profissionais não conseguiram identificar. Muito competente e honesto.',
-    service: 'Instalação Elétrica Residencial',
-  },
-  {
-    id: '5',
-    author: 'Juliana Ferreira',
-    rating: 5,
-    date: '2024-10-08',
-    comment: 'Ótimo atendimento! Instalou ventiladores de teto e ficou perfeito. Muito cuidadoso com os detalhes e deixou tudo limpo após o serviço.',
-    service: 'Instalação de Ventiladores de Teto',
-  },
-  {
-    id: '6',
-    author: 'Pedro Henrique',
-    rating: 5,
-    date: '2024-09-30',
-    comment: 'Profissional top! Fez a instalação de painéis solares com muito profissionalismo. Explicou todo o funcionamento do sistema e tirou todas as minhas dúvidas.',
-    service: 'Instalação Elétrica Residencial',
-  },
-  {
-    id: '7',
-    author: 'Fernanda Alves',
-    rating: 4,
-    date: '2024-09-22',
-    comment: 'Serviço bem feito, profissional competente. Trocou os disjuntores e instalou DR. Recomendo!',
-    service: 'Troca de Disjuntores',
-  },
-  {
-    id: '8',
-    author: 'Marcos Paulo',
-    rating: 5,
-    date: '2024-09-15',
-    comment: 'Excelente! Pontual, educado e muito técnico. Resolveu um problema que tinha há meses. Voltarei a contratar com certeza.',
-    service: 'Manutenção Preventiva',
-  },
-];
+onMounted(() => {
+  loadReviews();
+});
+
+watch(() => props.freelancerId, () => {
+  loadReviews();
+});
 
 // Calcular distribuição de ratings
 const ratingDistribution = computed(() => {
   const distribution = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
-  reviews.forEach((review) => {
+  reviews.value.forEach((review) => {
     distribution[review.rating as keyof typeof distribution]++;
   });
   return distribution;
@@ -127,7 +81,7 @@ const ratingDistribution = computed(() => {
 
 // Filtrar reviews
 const filteredReviews = computed(() => {
-  let filtered = reviews;
+  let filtered = reviews.value;
 
   // Filtro por rating
   if (filterRating.value !== 'all') {
@@ -189,45 +143,19 @@ const clearFilters = () => {
 
 <template>
   <div class="space-y-6">
-    <!-- AI Summary -->
-    <div class="bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg p-6">
-      <div class="flex items-start gap-3 mb-4">
-        <div class="w-10 h-10 bg-gradient-to-br from-purple-500 to-blue-500 rounded-full flex items-center justify-center flex-shrink-0">
-          <Sparkles class="h-5 w-5 text-white" />
-        </div>
-        <div class="flex-1">
-          <h3 class="text-[#263238] mb-1">Resumo Gerado por IA</h3>
-          <p class="text-xs text-[#435574] flex items-center gap-1">
-            <Calendar class="h-3 w-3" />
-            Última atualização:
-            {{ new Date(aiSummary.generated).toLocaleDateString('pt-BR', {
-              day: '2-digit',
-              month: '2-digit',
-              year: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit',
-            }) }}
-          </p>
-        </div>
-      </div>
-
-      <p class="text-[#435574] mb-4">{{ aiSummary.summary }}</p>
-
-      <div>
-        <h4 class="text-[#263238] mb-2">Principais Pontos Fortes:</h4>
-        <ul class="space-y-2">
-          <li
-            v-for="(strength, index) in aiSummary.strengths"
-            :key="index"
-            class="flex items-start gap-2 text-[#435574]"
-          >
-            <Star class="h-4 w-4 fill-yellow-400 text-yellow-400 mt-0.5 flex-shrink-0" />
-            <span>{{ strength }}</span>
-          </li>
-        </ul>
-      </div>
+    <!-- Loading -->
+    <div v-if="isLoading" class="flex justify-center py-12">
+      <div class="animate-spin h-8 w-8 border-4 border-[#286AD8] border-t-transparent rounded-full"></div>
     </div>
 
+    <template v-else>
+    <!-- Empty State -->
+    <div v-if="reviews.length === 0" class="text-center py-12 bg-gray-50 rounded-lg border border-gray-200">
+      <Star class="h-12 w-12 text-gray-300 mx-auto mb-4" />
+      <p class="text-[#435574]">Nenhuma avaliação recebida ainda</p>
+    </div>
+
+    <template v-else>
     <!-- Rating Overview -->
     <div class="bg-white border border-gray-200 rounded-lg p-6">
       <div class="grid md:grid-cols-2 gap-6">
@@ -384,6 +312,8 @@ const clearFilters = () => {
         Próxima
       </Button>
     </div>
+    </template>
+    </template>
   </div>
 </template>
 

@@ -95,6 +95,14 @@ public class PaymentController {
         return ResponseEntity.ok(history);
     }
 
+    @GetMapping("/{id}/receipt-url")
+    @Operation(summary = "Obter URL do recibo", description = "Retorna a URL do comprovante/recibo de um pagamento via Asaas")
+    @SecurityRequirement(name = "bearerAuth")
+    public ResponseEntity<Map<String, String>> getReceiptUrl(@PathVariable Long id) {
+        Map<String, String> receiptData = paymentService.getReceiptUrl(id);
+        return ResponseEntity.ok(receiptData);
+    }
+
     /**
      * 🧪 ENDPOINT DE TESTE - REMOVER EM PRODUÇÃO
      * Simula a confirmação de um pagamento PIX para testes locais

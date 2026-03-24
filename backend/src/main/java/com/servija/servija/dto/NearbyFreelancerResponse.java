@@ -23,6 +23,5 @@ public class NearbyFreelancerResponse {
     private BigDecimal longitude;
     private Double distance; // distância em km
     private Boolean available;
-    private BigDecimal hourlyRate;
     private String category;
 }

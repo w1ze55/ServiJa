@@ -16,7 +16,7 @@ onMounted(() => {
   const userData = localStorage.getItem('user');
   if (userData) {
     user.value = JSON.parse(userData);
-    
+
     if (user.value.type !== 'provider') {
       router.push('/cliente-dashboard');
     }
@@ -47,8 +47,8 @@ const handleSearch = (query: string) => {
     :on-logout="handleLogout"
     :on-search="handleSearch"
   >
-    <FreelancerRequestDetailPage 
-      :on-navigate="handleNavigate" 
+    <FreelancerRequestDetailPage
+      :on-navigate="handleNavigate"
       :request-id="requestId"
     />
   </MainLayout>

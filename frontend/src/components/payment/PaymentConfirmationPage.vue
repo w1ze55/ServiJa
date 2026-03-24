@@ -20,6 +20,8 @@ interface Props {
 
 const props = defineProps<Props>();
 
+const goBack = () => window.history.back();
+
 const formatPaymentMethod = (method?: string) => {
   switch (method) {
     case 'pix':
@@ -191,7 +193,7 @@ const formatPaymentMethod = (method?: string) => {
           </Button>
 
           <Button
-            @click="() => window.history.back()"
+            @click="goBack"
             variant="outline"
             class="w-full"
             size="lg"

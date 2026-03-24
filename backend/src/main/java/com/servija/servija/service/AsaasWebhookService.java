@@ -253,6 +253,13 @@ public class AsaasWebhookService {
                         payment.getContractor(),
                         ServiceRequestHistory.OperationType.PAYMENT_CONFIRMED,
                         "Pagamento de R$ " + String.format("%.2f", payment.getTotalAmount()) + " confirmado");
+                
+                // Notificar mudança de status da solicitação para ambas as partes
+                webSocketService.notifyServiceRequestStatusChange(
+                        serviceRequest.getId(),
+                        "IN_PROGRESS",
+                        payment.getContractor().getEmail(),
+                        payment.getFreelancer().getEmail());
             } else if (!Boolean.TRUE.equals(serviceRequest.getChatEnabled())) {
                 // Se já estava em andamento mas chat não estava habilitado
                 serviceRequest.setChatEnabled(true);
@@ -260,7 +267,7 @@ public class AsaasWebhookService {
                 log.info("🔓 Chat habilitado (solicitação já estava {}))", serviceRequest.getStatus());
             }
 
-            // Enviar notificação WebSocket para o cliente E FREELANCER
+            // Enviar notificação WebSocket de pagamento para o cliente E FREELANCER
             webSocketService.notifyPixPaymentConfirmed(
                     payment.getId(),
                     payment.getContractor().getEmail());
@@ -310,6 +317,11 @@ public class AsaasWebhookService {
             paymentRepository.save(payment);
 
             saveStatusHistory(payment, Payment.PaymentStatus.OVERDUE, "PAYMENT_OVERDUE",
+                    "Pagamento vencido");
+
+            webSocketService.notifyPaymentFailed(
+                    payment.getId(),
+                    payment.getContractor().getEmail(),
                     "Pagamento vencido");
 
             log.info("Status do pagamento atualizado para OVERDUE: {}", asaasPaymentId);
@@ -521,6 +533,11 @@ public class AsaasWebhookService {
             saveStatusHistory(payment, Payment.PaymentStatus.CANCELLED, "PAYMENT_DELETED",
                     "Pagamento deletado/cancelado");
 
+            webSocketService.notifyPaymentFailed(
+                    payment.getId(),
+                    payment.getContractor().getEmail(),
+                    "Pagamento cancelado/deletado");
+
             log.info("Pagamento deletado: {}", asaasPaymentId);
         }
     }
@@ -699,6 +716,13 @@ public class AsaasWebhookService {
         saveStatusHistory(payment, Payment.PaymentStatus.REFUNDED, "PAYMENT_REFUNDED",
                 "Pagamento reembolsado/estornado");
 
+        webSocketService.notifyPaymentStatusChange(
+                payment.getId(), "REFUNDED", payment.getContractor().getEmail());
+        if (payment.getFreelancer() != null) {
+            webSocketService.notifyPaymentStatusChange(
+                    payment.getId(), "REFUNDED", payment.getFreelancer().getEmail());
+        }
+
         log.info("Pagamento reembolsado via webhook: {}", asaasPaymentId);
     }
 
@@ -762,6 +786,12 @@ public class AsaasWebhookService {
         walletService.addPendingBalance(
                 withdrawal.getFreelancer(),
                 withdrawal.getAmount());
+
+        // Notificar freelancer sobre falha no saque
+        webSocketService.notifyPaymentFailed(
+                null,
+                withdrawal.getFreelancer().getEmail(),
+                "Falha no saque" + (failReason != null ? ": " + failReason : ""));
 
         log.error("Saque falhou via webhook: {} - Motivo: {}",
                 asaasTransferId, failReason);
@@ -936,13 +966,20 @@ public class AsaasWebhookService {
                         payment.getContractor(),
                         ServiceRequestHistory.OperationType.PAYMENT_CONFIRMED,
                         "Pagamento PIX de R$ " + String.format("%.2f", payment.getTotalAmount()) + " confirmado");
+                
+                // Notificar mudança de status da solicitação
+                webSocketService.notifyServiceRequestStatusChange(
+                        serviceRequest.getId(),
+                        "IN_PROGRESS",
+                        payment.getContractor().getEmail(),
+                        payment.getFreelancer().getEmail());
             } else if (!Boolean.TRUE.equals(serviceRequest.getChatEnabled())) {
                 serviceRequest.setChatEnabled(true);
                 serviceRequestRepository.save(serviceRequest);
                 log.info("🔓 Chat habilitado (solicitação já estava {})", serviceRequest.getStatus());
             }
 
-            // Notificar via WebSocket - CLIENTE E FREELANCER
+            // Notificar pagamento confirmado via WebSocket - CLIENTE E FREELANCER
             webSocketService.notifyPixPaymentConfirmed(
                     payment.getId(),
                     payment.getContractor().getEmail());

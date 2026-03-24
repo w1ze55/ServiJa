@@ -10,6 +10,7 @@ import com.servija.servija.exception.ResourceNotFoundException;
 import com.servija.servija.model.ServiceRequest;
 import com.servija.servija.model.ServiceRequest.Status;
 import com.servija.servija.model.ServiceRequestHistory.OperationType;
+import com.servija.servija.repository.ServiceRepository;
 import com.servija.servija.model.User;
 import com.servija.servija.repository.ServiceRequestRepository;
 import com.servija.servija.repository.UserRepository;
@@ -17,19 +18,26 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
 
 @Service
 @Slf4j
 @RequiredArgsConstructor
 public class ServiceRequestService {
 
+    private static final Pattern LEGACY_SERVICE_DESCRIPTION_PREFIX = Pattern.compile(
+            "^\\[Solicitação referente ao serviço: [^\\]]+\\]");
+
     private final ServiceRequestRepository serviceRequestRepository;
     private final UserRepository userRepository;
+    private final ServiceRepository serviceRepository;
     private final FileStorageService fileStorageService;
     private final ServiceRequestHistoryService historyService;
     private final WebSocketService webSocketService;
@@ -40,10 +48,38 @@ public class ServiceRequestService {
         User contractor = userRepository.findByEmail(contractorEmail)
                 .orElseThrow(() -> new RuntimeException("Contractor not found"));
 
+        com.servija.servija.model.Service selectedService = null;
         User freelancer = null;
-        if (dto.getFreelancerId() != null) {
+
+        if (dto.getServiceId() != null) {
+            selectedService = serviceRepository.findById(dto.getServiceId())
+                    .orElseThrow(() -> new RuntimeException("Service not found"));
+            freelancer = selectedService.getFreelancer();
+        } else if (dto.getFreelancerId() != null) {
             freelancer = userRepository.findById(dto.getFreelancerId())
                     .orElseThrow(() -> new RuntimeException("Freelancer not found"));
+        }
+
+        if (selectedService != null && dto.getFreelancerId() != null
+                && !selectedService.getFreelancer().getId().equals(dto.getFreelancerId())) {
+            throw new IllegalArgumentException("O serviço selecionado não pertence ao freelancer informado");
+        }
+
+        String normalizedAddress = StringUtils.hasText(dto.getAddress()) ? dto.getAddress().trim() : null;
+
+        ServiceRequest.WorkModel requestWorkModel = resolveRequestWorkModel(dto, selectedService);
+        if (requestWorkModel == ServiceRequest.WorkModel.PRESENCIAL
+                || requestWorkModel == ServiceRequest.WorkModel.HIBRIDO) {
+            if (!StringUtils.hasText(normalizedAddress)) {
+                throw new IllegalArgumentException("Informe o local onde o serviço será realizado");
+            }
+        } else {
+            normalizedAddress = null;
+        }
+
+        String normalizedDescription = normalizeRequestDescription(dto.getDescription());
+        if (!StringUtils.hasText(normalizedDescription)) {
+            throw new IllegalArgumentException("A descrição é obrigatória");
         }
 
         String attachmentsJson = null;
@@ -55,17 +91,62 @@ public class ServiceRequestService {
             }
         }
 
+        // Validar orçamento (budget)
+        if (dto.getBudget() != null) {
+            BigDecimal minBudget = new BigDecimal("5.00");
+            BigDecimal maxBudget = new BigDecimal("1000000.00");
+            
+            if (dto.getBudget().compareTo(minBudget) < 0) {
+                throw new IllegalArgumentException("O orçamento mínimo é R$ 5,00");
+            }
+            if (dto.getBudget().compareTo(maxBudget) > 0) {
+                throw new IllegalArgumentException("O orçamento máximo é R$ 1.000.000,00");
+            }
+        }
+
+        // Validar prazo estimado (deadline)
+        if (dto.getDeadline() != null && !dto.getDeadline().isEmpty()) {
+            // Se for prazo estimado (ex: "30 dias"), extrair número e validar
+            String deadlineStr = dto.getDeadline().replaceAll("[^0-9]", "");
+            if (!deadlineStr.isEmpty()) {
+                try {
+                    int days = Integer.parseInt(deadlineStr);
+                    if (days < 1) {
+                        throw new IllegalArgumentException("O prazo mínimo é de 1 dia");
+                    }
+                    if (days > 365) {
+                        throw new IllegalArgumentException("O prazo máximo é de 365 dias");
+                    }
+                } catch (NumberFormatException e) {
+                    // Se não for número, pode ser uma data - ignorar validação de dias
+                }
+            }
+        }
+
+        // Validar desiredDate - não pode ser no passado
+        LocalDate parsedDesiredDate = null;
+        if (dto.getDesiredDate() != null) {
+            try {
+                parsedDesiredDate = LocalDate.parse(dto.getDesiredDate());
+                if (parsedDesiredDate.isBefore(LocalDate.now())) {
+                    throw new IllegalArgumentException("A data desejada não pode ser anterior à data atual");
+                }
+            } catch (java.time.format.DateTimeParseException e) {
+                throw new IllegalArgumentException("Formato de data inválido. Use o formato AAAA-MM-DD");
+            }
+        }
+
         ServiceRequest request = ServiceRequest.builder()
                 .contractor(contractor)
                 .freelancer(freelancer)
                 .serviceName(dto.getServiceName())
                 .category(dto.getCategory())
-                .description(dto.getDescription())
+                .description(normalizedDescription)
                 .budget(dto.getBudget())
                 .deadline(dto.getDeadline())
-                .priority(ServiceRequest.Priority.valueOf(dto.getPriority().toUpperCase()))
-                .address(dto.getAddress())
-                .desiredDate(dto.getDesiredDate() != null ? LocalDate.parse(dto.getDesiredDate()) : null)
+                .workModel(requestWorkModel)
+                .address(normalizedAddress)
+                .desiredDate(parsedDesiredDate)
                 .attachments(attachmentsJson)
                 .build();
 
@@ -121,6 +202,12 @@ public class ServiceRequestService {
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
         ServiceRequest.Status newStatus = ServiceRequest.Status.valueOf(status.toUpperCase());
+
+        if (newStatus == Status.DELIVERED || newStatus == Status.COMPLETED) {
+            throw new IllegalStateException(
+                    "O status " + newStatus + " deve ser alterado através do endpoint de conclusão");
+        }
+
         request.setStatus(newStatus);
 
         if (newStatus == ServiceRequest.Status.CANCELLED && reason != null) {
@@ -161,6 +248,14 @@ public class ServiceRequestService {
         request.setResponseNotes(dto.getNotes());
         request.setRespondedAt(LocalDateTime.now());
         request.setStatus(ServiceRequest.Status.NEGOTIATING);
+
+        if (dto.getAttachments() != null && !dto.getAttachments().isEmpty()) {
+            try {
+                request.setResponseAttachments(objectMapper.writeValueAsString(dto.getAttachments()));
+            } catch (Exception e) {
+                throw new RuntimeException("Error serializing attachments", e);
+            }
+        }
 
         ServiceRequest saved = serviceRequestRepository.save(request);
         String details = String.format("Valor: R$ %.2f | Prazo: %d dias", dto.getValue(), dto.getExecutionDays());
@@ -264,36 +359,74 @@ public class ServiceRequestService {
         }
         historyService.record(saved, freelancer, OperationType.COUNTER_PROPOSAL_REJECTED, details);
 
+        // Notificar contratante sobre rejeição da contra proposta
+        webSocketService.notifyCounterProposalRejected(
+                saved.getId(),
+                request.getContractor().getEmail(),
+                freelancer.getName(),
+                reason);
+
         return toResponse(saved);
     }
 
     @Transactional
-    public ServiceRequestResponse completeService(Long id, String contractorEmail) {
+    public ServiceRequestResponse completeService(Long id, String userEmail) {
         ServiceRequest request = serviceRequestRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Solicitação não encontrada"));
 
-        User contractor = userRepository.findByEmail(contractorEmail)
+        User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
 
-        // Validar se é o contratante da solicitação
-        if (!request.getContractor().getId().equals(contractor.getId())) {
-            throw new IllegalStateException("Apenas o contratante pode marcar o serviço como concluído");
+        // Phase 1: Freelancer marks as Delivered
+        if (request.getFreelancer() != null && request.getFreelancer().getId().equals(user.getId())) {
+            if (request.getStatus() != Status.IN_PROGRESS) {
+                throw new IllegalStateException("O serviço só pode ser entregue quando está em andamento");
+            }
+
+            request.setStatus(Status.DELIVERED);
+            ServiceRequest saved = serviceRequestRepository.save(request);
+
+            historyService.record(saved, user, OperationType.SERVICE_DELIVERED,
+                    "Serviço marcado como entregue pelo profissional");
+
+            // Notificar o cliente sobre a entrega
+            webSocketService.notifyServiceRequestStatusChange(
+                    saved.getId(), "DELIVERED",
+                    request.getContractor().getEmail(), userEmail);
+
+            return toResponse(saved);
         }
 
-        // Validar se o status é IN_PROGRESS
-        if (request.getStatus() != Status.IN_PROGRESS) {
-            throw new IllegalStateException("O serviço só pode ser concluído quando está em andamento");
+        // Phase 2: Client marks as Completed
+        if (request.getContractor().getId().equals(user.getId())) {
+            if (request.getStatus() != Status.DELIVERED) {
+                throw new IllegalStateException("O serviço só pode ser concluído após a entrega pelo profissional");
+            }
+
+            request.setStatus(Status.COMPLETED);
+            ServiceRequest saved = serviceRequestRepository.save(request);
+
+            historyService.record(saved, user, OperationType.SERVICE_COMPLETED,
+                    "Serviço marcado como concluído pelo cliente");
+
+            log.info("Serviço concluído pelo cliente - ID: {}, Contratante: {}", id, userEmail);
+
+            // Notificar o freelancer sobre a conclusão
+            webSocketService.notifyServiceRequestStatusChange(
+                    saved.getId(), "COMPLETED",
+                    userEmail, request.getFreelancer().getEmail());
+
+            // Notificar ambos que a avaliação está pendente
+            webSocketService.notifyReviewPending(
+                    saved.getId(),
+                    userEmail,
+                    request.getFreelancer().getEmail(),
+                    saved.getServiceName());
+
+            return toResponse(saved);
         }
 
-        request.setStatus(Status.COMPLETED);
-        ServiceRequest saved = serviceRequestRepository.save(request);
-
-        historyService.record(saved, contractor, OperationType.SERVICE_COMPLETED,
-                "Serviço marcado como concluído pelo cliente");
-
-        log.info("Serviço concluído - ID: {}, Contratante: {}", id, contractorEmail);
-
-        return toResponse(saved);
+        throw new IllegalStateException("Usuário não autorizado a realizar esta ação");
     }
 
     @Transactional
@@ -373,6 +506,24 @@ public class ServiceRequestService {
         return url != null && url.contains(".s3.") && url.contains("amazonaws.com");
     }
 
+    private ServiceRequest.WorkModel resolveRequestWorkModel(
+            ServiceRequestDTO dto,
+            com.servija.servija.model.Service service) {
+        if (service != null && service.getWorkModel() != null) {
+            return ServiceRequest.WorkModel.valueOf(service.getWorkModel().name());
+        }
+
+        if (!StringUtils.hasText(dto.getWorkModel())) {
+            throw new IllegalArgumentException("Informe o modelo de trabalho");
+        }
+
+        try {
+            return ServiceRequest.WorkModel.valueOf(dto.getWorkModel().trim().toUpperCase());
+        } catch (IllegalArgumentException ex) {
+            throw new IllegalArgumentException("Modelo de trabalho inválido");
+        }
+    }
+
     private ServiceRequestResponse toResponse(ServiceRequest request) {
         return ServiceRequestResponse.builder()
                 .id(request.getId())
@@ -384,10 +535,10 @@ public class ServiceRequestService {
                 .freelancerAvatar(request.getFreelancer() != null ? request.getFreelancer().getAvatarUrl() : null)
                 .serviceName(request.getServiceName())
                 .category(request.getCategory())
-                .description(request.getDescription())
+                .description(normalizeRequestDescription(request.getDescription()))
                 .budget(request.getBudget())
                 .deadline(request.getDeadline())
-                .priority(request.getPriority().name())
+                .workModel(request.getWorkModel() != null ? request.getWorkModel().name() : null)
                 .status(request.getStatus().name())
                 .address(request.getAddress())
                 .desiredDate(request.getDesiredDate())
@@ -403,8 +554,18 @@ public class ServiceRequestService {
                 .rejectReason(request.getRejectReason())
                 .attachments(parseAttachments(request.getAttachments()))
                 .freelancerAttachments(parseAttachments(request.getFreelancerAttachments()))
+                .responseAttachments(parseAttachments(request.getResponseAttachments()))
                 .createdAt(request.getCreatedAt())
                 .updatedAt(request.getUpdatedAt())
                 .build();
+    }
+
+    private String normalizeRequestDescription(String description) {
+        if (!StringUtils.hasText(description)) {
+            return description;
+        }
+
+        String withoutLegacyPrefix = LEGACY_SERVICE_DESCRIPTION_PREFIX.matcher(description).replaceFirst("");
+        return withoutLegacyPrefix.stripLeading();
     }
 }

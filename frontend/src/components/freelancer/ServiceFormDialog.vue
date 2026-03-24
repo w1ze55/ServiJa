@@ -26,6 +26,7 @@ export interface ServiceFormData {
   description: string;
   price: number;
   priceType: 'fixo' | 'hora' | 'dia';
+  workModel: 'presencial' | 'remoto' | 'hibrido';
   deliveryTime: string;
   tags: string[];
   images: string[];
@@ -41,6 +42,12 @@ interface Props {
 
 const props = defineProps<Props>();
 
+const WORK_MODELS = [
+  { value: 'presencial', label: 'Presencial' },
+  { value: 'remoto', label: 'Remoto' },
+  { value: 'hibrido', label: 'Híbrido' },
+] as const;
+
 const formData = ref<ServiceFormData>({
   id: props.service?.id,
   title: props.service?.title || '',
@@ -48,6 +55,7 @@ const formData = ref<ServiceFormData>({
   description: props.service?.description || '',
   price: props.service?.price || 0,
   priceType: props.service?.priceType || 'fixo',
+  workModel: props.service?.workModel || 'presencial',
   deliveryTime: props.service?.deliveryTime || '',
   tags: props.service?.tags || [],
   images: props.service?.images || [],
@@ -69,6 +77,7 @@ watch(() => props.service, (newService) => {
       description: newService.description || '',
       price: newService.price || 0,
       priceType: newService.priceType || 'fixo',
+      workModel: newService.workModel || 'presencial',
       deliveryTime: newService.deliveryTime || '',
       tags: newService.tags || [],
       images: newService.images || [],
@@ -210,6 +219,10 @@ const validateForm = () => {
     newErrors.price = 'Preço deve ser maior que zero';
   }
 
+  if (!formData.value.workModel) {
+    newErrors.workModel = 'Modelo de trabalho é obrigatório';
+  }
+
   if (!formData.value.deliveryTime || parseInt(formData.value.deliveryTime) <= 0) {
     newErrors.deliveryTime = 'Prazo de entrega é obrigatório';
   } else if (parseInt(formData.value.deliveryTime) > 365) {
@@ -240,6 +253,7 @@ const handleClose = () => {
     description: '',
     price: 0,
     priceType: 'fixo',
+    workModel: 'presencial',
     deliveryTime: '',
     tags: [],
     images: [],
@@ -261,11 +275,11 @@ const handleImageUpload = async (e: Event) => {
       return;
     }
 
-    // Validar tamanho dos arquivos (5MB max)
+    // Validar tamanho dos arquivos (10MB max)
     const fileArray = Array.from(files);
-    const oversizedFiles = fileArray.filter((file) => file.size > 5 * 1024 * 1024);
+    const oversizedFiles = fileArray.filter((file) => file.size > 10 * 1024 * 1024);
     if (oversizedFiles.length > 0) {
-      toast.error('Cada imagem deve ter no máximo 5MB');
+      toast.error('Cada imagem deve ter no máximo 10MB');
       return;
     }
 
@@ -321,18 +335,20 @@ const handleRemoveImage = async (index: number) => {
           <Label for="title">
             Título do Serviço <span class="text-red-500">*</span>
           </Label>
-          <Input
-            id="title"
-            placeholder="Ex: Instalação Elétrica Residencial"
-            :model-value="formData.title"
-            @update:model-value="(val) => handleInputChange('title', val)"
-            :class="errors.title ? 'border-red-500' : ''"
-            maxlength="50"
-          />
-          <div class="flex items-center justify-between">
-            <p v-if="errors.title" class="text-sm text-red-500">{{ errors.title }}</p>
-            <p class="text-sm text-gray-500 ml-auto">{{ formData.title.length }} / 50 caracteres</p>
+          <div class="relative">
+            <Input
+              id="title"
+              placeholder="Ex: Instalação Elétrica Residencial"
+              :model-value="formData.title"
+              @update:model-value="(val) => handleInputChange('title', val)"
+              :class="['h-14 pr-28', errors.title ? 'border-red-500' : '']"
+              maxlength="50"
+            />
+            <span class="pointer-events-none absolute bottom-1.5 right-3 text-[11px] text-gray-400">
+              {{ formData.title.length }}/50
+            </span>
           </div>
+          <p v-if="errors.title" class="text-sm text-red-500">{{ errors.title }}</p>
         </div>
 
         <!-- Categoria -->
@@ -360,19 +376,20 @@ const handleRemoveImage = async (index: number) => {
           <Label for="description">
             Descrição <span class="text-red-500">*</span>
           </Label>
-          <Textarea
-            id="description"
-            placeholder="Descreva em detalhes o serviço que você oferece..."
-            v-model="formData.description"
-            :rows="5"
-            :class="errors.description ? 'border-red-500' : ''"
-          />
-          <div class="flex items-center justify-between">
-            <p v-if="errors.description" class="text-sm text-red-500">{{ errors.description }}</p>
-            <p class="text-sm text-gray-500 ml-auto">
-              {{ formData.description.length }} / 500 caracteres
-            </p>
+          <div class="relative">
+            <Textarea
+              id="description"
+              placeholder="Descreva em detalhes o serviço que você oferece..."
+              v-model="formData.description"
+              :rows="5"
+              maxlength="500"
+              :class="['resize-none pb-8 pr-24', errors.description ? 'border-red-500' : '']"
+            />
+            <span class="pointer-events-none absolute bottom-2 right-3 text-[11px] text-gray-400">
+              {{ formData.description.length }}/500
+            </span>
           </div>
+          <p v-if="errors.description" class="text-sm text-red-500">{{ errors.description }}</p>
         </div>
 
         <!-- Preço e Tipo -->
@@ -418,6 +435,21 @@ const handleRemoveImage = async (index: number) => {
 
         <!-- Prazo de Entrega -->
         <div class="space-y-2">
+          <Label for="workModel">
+            Modelo de Trabalho <span class="text-red-500">*</span>
+          </Label>
+          <Select v-model="formData.workModel">
+            <SelectTrigger :class="errors.workModel ? 'border-red-500' : ''">
+              <SelectValue placeholder="Selecione o modelo" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem v-for="model in WORK_MODELS" :key="model.value" :value="model.value">
+                {{ model.label }}
+              </SelectItem>
+            </SelectContent>
+          </Select>
+          <p v-if="errors.workModel" class="text-sm text-red-500">{{ errors.workModel }}</p>
+
           <Label for="deliveryTime">
             Prazo de Entrega (em dias) <span class="text-red-500">*</span>
           </Label>
@@ -497,7 +529,7 @@ const handleRemoveImage = async (index: number) => {
                 Clique para fazer upload ou arraste as imagens aqui
               </p>
               <p class="text-xs text-gray-400 mt-1">
-                PNG, JPG até 5MB (máximo 5 imagens)
+                PNG, JPG até 10MB (máximo 5 imagens)
               </p>
               <input
                 id="images"
@@ -552,4 +584,3 @@ const handleRemoveImage = async (index: number) => {
     </DialogContent>
   </Dialog>
 </template>
-

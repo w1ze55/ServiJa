@@ -39,7 +39,6 @@ interface QuoteRequest {
   description: string;
   budget?: number;
   deadline?: string;
-  priority?: string;
   status: 'pending' | 'sent' | 'negotiating' | 'responded' | 'accepted' | 'in_progress' | 'rejected' | 'completed' | 'cancelled';
   createdAt: string;
   lastMessage?: string;
@@ -73,7 +72,6 @@ const loadRequests = async () => {
       description: req.description ?? '',
       budget: req.budget,
       deadline: req.deadline,
-      priority: (req.priority ?? 'medium').toLowerCase(),
       status: (req.status ?? 'pending').toLowerCase() as QuoteRequest['status'],
       createdAt: req.createdAt,
       lastMessage: req.responseScope,
@@ -459,7 +457,6 @@ const getFilterStatusLabel = (value: string) => {
     </AlertDialog>
   </div>
 </template>
-
 
 
 

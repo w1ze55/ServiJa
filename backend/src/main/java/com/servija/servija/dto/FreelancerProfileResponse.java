@@ -19,10 +19,8 @@ public class FreelancerProfileResponse {
     private String profession;
     private String category;
     private String bio;
-    private Double hourlyRate;
     private String profilePhoto;
     private String serviceType;
-    private String workModel;
     private String location;
     private List<String> cities;
     private List<ServiceCityResponse> serviceCities;

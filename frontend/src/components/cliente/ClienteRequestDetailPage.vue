@@ -14,11 +14,13 @@ import {
   FileEdit,
   Lock,
   CreditCard,
-  Sparkles,
-  Send,
   AlertCircle,
   FileText,
+  Eye,
+  Download,
+  Sparkles,
 } from 'lucide-vue-next';
+import FileAttachment from '../shared/FileAttachment.vue';
 import Button from '../ui/button.vue';
 import Input from '../ui/input.vue';
 import Card from '../ui/card.vue';
@@ -35,6 +37,7 @@ import DialogDescription from '../ui/dialog-description.vue';
 import DialogFooter from '../ui/dialog-footer.vue';
 import DialogHeader from '../ui/dialog-header.vue';
 import DialogTitle from '../ui/dialog-title.vue';
+import WorkModelBadge from '../shared/WorkModelBadge.vue';
 import AlertDialog from '../ui/alert-dialog.vue';
 import AlertDialogAction from '../ui/alert-dialog-action.vue';
 import AlertDialogCancel from '../ui/alert-dialog-cancel.vue';
@@ -46,6 +49,8 @@ import AlertDialogTitle from '../ui/alert-dialog-title.vue';
 import { useClientRequestStore, type ServiceRequest } from '@/stores/clientRequestStore';
 import ServiceRequestTimeline from '../service/ServiceRequestTimeline.vue';
 import { toast } from '@/utils/toast';
+import { getStatusLabel } from '@/utils/statusTranslations';
+import { validateValueRange, extractApiErrorMessage } from '@/utils/valueValidation';
 
 interface Props {
   onNavigate: (page: string, params?: any) => void;
@@ -67,10 +72,9 @@ const counterValue = ref(0);
 const counterDays = ref(0);
 const counterNotes = ref('');
 const isSubmittingCounter = ref(false);
-const activeSection = ref<'details' | 'messages' | 'history'>('details');
+const activeSection = ref<'details' | 'messages' | 'history' | 'attachments'>('details');
 const showCelebrationModal = ref(false);
-const showCompleteDialog = ref(false);
-const isCompletingService = ref(false);
+const activeFileTab = ref<'client' | 'freelancer'>('client');
 
 const handleOpenCounterProposalDialog = () => {
   if (!request.value || !request.value.freelancerResponse) return;
@@ -88,22 +92,6 @@ const loadData = async () => {
   }
 };
 
-const handleCompleteService = async () => {
-  if (!request.value) return;
-  
-  isCompletingService.value = true;
-  const success = await store.completeService(request.value.id);
-  isCompletingService.value = false;
-  
-  if (success) {
-    toast.success('Serviço marcado como concluído!');
-    showCompleteDialog.value = false;
-    await loadData();
-  } else {
-    toast.error('Erro ao concluir o serviço');
-  }
-};
-
 const handleSendCounterProposal = async () => {
   if (!request.value) return;
 
@@ -112,20 +100,28 @@ const handleSendCounterProposal = async () => {
     return;
   }
 
-  isSubmittingCounter.value = true;
-  const success = await store.sendCounterProposal(
-    request.value.id,
-    counterValue.value,
-    counterDays.value,
-    counterNotes.value
-  );
-  isSubmittingCounter.value = false;
+  const rangeError = validateValueRange(counterValue.value);
+  if (rangeError) {
+    toast.error(rangeError);
+    return;
+  }
 
-  if (success) {
+  isSubmittingCounter.value = true;
+  try {
+    await store.sendCounterProposal(
+      request.value.id,
+      counterValue.value,
+      counterDays.value,
+      counterNotes.value
+    );
     toast.success('Contra proposta enviada com sucesso!');
     showCounterProposalDialog.value = false;
-  } else {
-    toast.error('Erro ao enviar contra proposta');
+  } catch (err: any) {
+    console.error('Erro ao enviar contra proposta:', err);
+    const backendMsg = extractApiErrorMessage(err);
+    toast.error(backendMsg || 'Erro ao enviar contra proposta. Verifique os dados e tente novamente.');
+  } finally {
+    isSubmittingCounter.value = false;
   }
 };
 
@@ -196,8 +192,8 @@ const handleSendMessage = async () => {
 
 const wasCounterProposalRejected = computed(() => {
   if (!request.value) return false;
-  return request.value.status === 'negotiating' && 
-         !request.value.counterValue && 
+  return request.value.status === 'negotiating' &&
+         !request.value.counterValue &&
          request.value.auditLog?.some(log => log.operationKey === 'COUNTER_PROPOSAL_REJECTED');
 });
 
@@ -246,6 +242,11 @@ const handleRejectResponse = async () => {
 const handleCancelRequest = async () => {
   if (!request.value) return;
 
+  if (!cancelReason.value.trim()) {
+    toast.error('Informe o motivo do cancelamento');
+    return;
+  }
+
   const success = await store.cancelRequest(request.value.id, cancelReason.value);
   if (success) {
     toast.success('Solicitação cancelada');
@@ -262,25 +263,12 @@ const getStatusColor = (status: string) => {
     negotiating: { bg: 'bg-amber-100', text: 'text-amber-700' },
     accepted: { bg: 'bg-green-100', text: 'text-green-700' },
     in_progress: { bg: 'bg-purple-100', text: 'text-purple-700' },
+    delivered: { bg: 'bg-amber-100', text: 'text-amber-700' },
     completed: { bg: 'bg-teal-100', text: 'text-teal-700' },
     rejected: { bg: 'bg-red-100', text: 'text-red-700' },
     cancelled: { bg: 'bg-gray-100', text: 'text-gray-700' },
   };
   return colors[status] || colors.pending;
-};
-
-const getStatusLabel = (status: string) => {
-  const labels: Record<string, string> = {
-    pending: 'Pendente',
-    sent: 'Enviada',
-    negotiating: 'Negociando',
-    accepted: 'Aceita',
-    in_progress: 'Em Andamento',
-    rejected: 'Recusada',
-    completed: 'Concluída',
-    cancelled: 'Cancelada',
-  };
-  return labels[status] || status;
 };
 </script>
 
@@ -420,18 +408,38 @@ const getStatusLabel = (status: string) => {
           >
             Histórico
           </button>
+          <button
+            @click="activeSection = 'attachments'"
+            :class="`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              activeSection === 'attachments'
+                ? 'border-[#286AD8] text-[#286AD8]'
+                : 'border-transparent text-[#435574] hover:text-[#263238]'
+            }`"
+          >
+            Anexo
+          </button>
         </div>
         
-        <!-- Complete Service Button (só aparece quando status é IN_PROGRESS) -->
+        <!-- Botão de Aprovação de Entrega: Só aparece quando o freelancer já entregou (DELIVERED) -->
         <Button
-          v-if="request.status === 'in_progress'"
-          @click="showCompleteDialog = true"
-          class="bg-teal-600 hover:bg-teal-700 shadow-lg hover:shadow-xl transition-all"
+          v-if="request.status === 'delivered'"
+          @click="() => props.onNavigate('cliente-delivery-approval', { requestId: request?.id })"
+          class="bg-green-600 hover:bg-green-700"
           size="sm"
         >
           <CheckCircle class="h-4 w-4 mr-2" />
-          Marcar como Concluído
+          Aprovar Entrega
         </Button>
+      </div>
+
+      <!-- Info Alert: Aguardando entrega do profissional -->
+      <div v-if="request.status === 'in_progress'" 
+           class="mt-4 p-4 rounded-lg border border-blue-100 bg-blue-50 text-blue-900 flex items-start gap-3">
+        <Clock class="h-5 w-5 mt-0.5 flex-shrink-0 text-blue-600" />
+        <div>
+          <p class="font-semibold text-sm">Serviço em Andamento</p>
+          <p class="text-sm opacity-90">O profissional está trabalhando no seu pedido. Assim que ele finalizar a entrega, você poderá marcar o serviço como concluído aqui.</p>
+        </div>
       </div>
 
       <!-- Details Section -->
@@ -545,24 +553,6 @@ const getStatusLabel = (status: string) => {
               </div>
             </div>
           </Card>
-
-          <!-- Attachments -->
-          <Card v-if="request.attachments && request.attachments.length > 0" class="p-6">
-            <h3 class="font-semibold text-[#263238] mb-3">Anexos</h3>
-            <div class="space-y-2">
-              <div
-                v-for="attachment in request.attachments"
-                :key="attachment.id"
-                class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg"
-              >
-                <FileText class="h-5 w-5 text-[#286AD8]" />
-                <div class="flex-1 min-w-0">
-                  <p class="text-sm font-medium text-[#263238] truncate">{{ attachment.name }}</p>
-                  <p class="text-xs text-[#435574]">{{ attachment.size }}</p>
-                </div>
-              </div>
-            </div>
-          </Card>
         </div>
 
         <!-- Sidebar -->
@@ -580,11 +570,9 @@ const getStatusLabel = (status: string) => {
               </div>
               <Separator />
               <div>
-                <p class="text-sm text-[#435574]">
-                  {{ ['accepted', 'in_progress', 'completed'].includes(request.status) && request.freelancerResponse ? 'Prazo Acordado' : 'Prazo solicitado' }}
-                </p>
+                <p class="text-sm text-[#435574]">Data desejada</p>
                 <p class="font-medium text-[#263238]">
-                  {{ ['accepted', 'in_progress', 'completed'].includes(request.status) && request.freelancerResponse ? request.freelancerResponse.executionDays + ' dias' : request.deadline }}
+                  {{ request.desiredDate ? formatShortDate(request.desiredDate) : request.deadline }}
                 </p>
               </div>
               <Separator />
@@ -594,32 +582,9 @@ const getStatusLabel = (status: string) => {
               </div>
               <Separator />
               <div>
-                <p class="text-sm text-[#435574]">Prioridade</p>
-                <Badge
-                  :class="
-                    request.priority === 'URGENT'
-                      ? 'bg-red-200 text-red-900'
-                      : request.priority === 'HIGH'
-                      ? 'bg-red-100 text-red-700'
-                      : request.priority === 'MEDIUM'
-                      ? 'bg-yellow-100 text-yellow-700'
-                      : 'bg-gray-100 text-gray-700'
-                  "
-                >
-                  {{ 
-                    request.priority === 'URGENT' ? 'Urgente' :
-                    request.priority === 'HIGH' ? 'Alta' :
-                    request.priority === 'MEDIUM' ? 'Média' : 'Baixa'
-                  }}
-                </Badge>
+                <p class="text-sm text-[#435574]">Modelo de trabalho</p>
+                <WorkModelBadge :work-model="request.workModel" />
               </div>
-              <template v-if="request.desiredDate">
-                <Separator />
-                <div>
-                  <p class="text-sm text-[#435574]">Data desejada</p>
-                  <p class="font-medium text-[#263238]">{{ formatShortDate(request.desiredDate) }}</p>
-                </div>
-              </template>
             </div>
           </Card>
 
@@ -674,7 +639,7 @@ const getStatusLabel = (status: string) => {
         </div>
 
         <!-- Message Input -->
-        <div v-if="request.status === 'in_progress' || request.status === 'completed'" class="flex gap-2">
+        <div v-if="request.status === 'in_progress' || request.status === 'delivered'" class="flex gap-2">
           <Textarea
             v-model="newMessage"
             placeholder="Digite sua mensagem..."
@@ -702,6 +667,83 @@ const getStatusLabel = (status: string) => {
         :request-id="request.id"
         title="Histórico de Atividades"
       />
+
+      <!-- Attachments Section -->
+      <Card v-if="activeSection === 'attachments'" class="p-6">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-lg font-semibold text-[#263238]">Arquivos do Projeto</h3>
+        </div>
+
+        <!-- Tabs -->
+        <div class="flex border-b border-gray-200 mb-4">
+          <button
+            @click="activeFileTab = 'client'"
+            :class="[
+              'px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px',
+              activeFileTab === 'client'
+                ? 'border-[#286AD8] text-[#286AD8]'
+                : 'border-transparent text-[#435574] hover:text-[#263238]'
+            ]"
+          >
+            Cliente
+            <Badge v-if="request.attachments && request.attachments.length > 0" variant="secondary" class="ml-2">
+              {{ request.attachments.length }}
+            </Badge>
+          </button>
+          <button
+            @click="activeFileTab = 'freelancer'"
+            :class="[
+              'px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px',
+              activeFileTab === 'freelancer'
+                ? 'border-[#286AD8] text-[#286AD8]'
+                : 'border-transparent text-[#435574] hover:text-[#263238]'
+            ]"
+          >
+            Freelancer
+            <Badge v-if="request.freelancerResponse?.attachments && request.freelancerResponse.attachments.length > 0" variant="secondary" class="ml-2">
+              {{ request.freelancerResponse.attachments.length }}
+            </Badge>
+          </button>
+        </div>
+
+        <!-- Client Files Tab -->
+        <div v-if="activeFileTab === 'client'">
+          <div v-if="!request.attachments || request.attachments.length === 0" class="text-center py-8">
+            <FileText class="h-12 w-12 text-gray-300 mx-auto mb-3" />
+            <p class="text-[#435574]">Nenhum arquivo enviado pelo cliente</p>
+          </div>
+          <div v-else class="space-y-2">
+            <FileAttachment
+              v-for="attachment in request.attachments"
+              :key="attachment.id"
+              :name="attachment.name"
+              :url="attachment.url"
+              :size="attachment.size"
+              sender-info="Enviado por você"
+              variant="blue"
+            />
+          </div>
+        </div>
+
+        <!-- Freelancer Files Tab -->
+        <div v-if="activeFileTab === 'freelancer'">
+          <div v-if="!request.freelancerResponse?.attachments || request.freelancerResponse.attachments.length === 0" class="text-center py-8">
+            <FileText class="h-12 w-12 text-gray-300 mx-auto mb-3" />
+            <p class="text-[#435574]">Nenhum arquivo enviado pelo freelancer</p>
+          </div>
+          <div v-else class="space-y-2">
+            <FileAttachment
+              v-for="attachment in request.freelancerResponse.attachments"
+              :key="attachment.id"
+              :name="attachment.name"
+              :url="attachment.url"
+              :size="attachment.size"
+              sender-info="Enviado pelo profissional"
+              variant="amber"
+            />
+          </div>
+        </div>
+      </Card>
     </template>
 
     <!-- Cancel Dialog -->
@@ -715,7 +757,7 @@ const getStatusLabel = (status: string) => {
         </DialogHeader>
         <div class="space-y-4">
           <div class="space-y-2">
-            <Label for="cancel-reason-detail">Motivo (opcional)</Label>
+            <Label for="cancel-reason-detail">Motivo do cancelamento *</Label>
             <Textarea
               id="cancel-reason-detail"
               :model-value="cancelReason"
@@ -816,41 +858,6 @@ const getStatusLabel = (status: string) => {
       </DialogContent>
     </Dialog>
 
-    <!-- Complete Service Dialog -->
-    <Dialog :open="showCompleteDialog" @update:open="(val) => showCompleteDialog = val">
-      <DialogContent class="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Confirmar Conclusão do Serviço</DialogTitle>
-          <DialogDescription>
-            Você está prestes a marcar este serviço como concluído. Isso indica que o freelancer finalizou o trabalho e você está satisfeito com o resultado.
-          </DialogDescription>
-        </DialogHeader>
-        <div class="bg-green-50 border border-green-200 rounded-lg p-4 my-4">
-          <div class="flex items-start gap-3">
-            <CheckCircle class="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
-            <div class="text-sm text-green-800">
-              <p class="font-medium mb-1">Ao confirmar:</p>
-              <ul class="list-disc list-inside space-y-1 text-green-700">
-                <li>O serviço será marcado como concluído</li>
-                <li>O freelancer poderá receber a avaliação</li>
-                <li>Você poderá contratar novos serviços</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-        <DialogFooter>
-          <Button @click="showCompleteDialog = false" variant="outline">Cancelar</Button>
-          <Button 
-            @click="handleCompleteService" 
-            class="bg-teal-600 hover:bg-teal-700"
-            :disabled="isCompletingService"
-          >
-            {{ isCompletingService ? 'Processando...' : 'Confirmar Conclusão' }}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-
     <!-- Celebration Modal - "Hora de Fechar!" -->
     <Dialog :open="showCelebrationModal" @update:open="(val) => showCelebrationModal = val">
       <DialogContent class="sm:max-w-lg">
@@ -878,7 +885,7 @@ const getStatusLabel = (status: string) => {
           <!-- Message -->
           <div class="bg-gradient-to-r from-green-50 to-blue-50 rounded-lg p-6 space-y-3">
             <p class="text-[#263238]">
-              Parabéns! Você acaba de aceitar a proposta de 
+              Parabéns! Você acaba de aceitar a proposta de
               <span class="font-semibold">{{ request?.freelancerName }}</span>
             </p>
             <p class="text-sm text-[#435574]">

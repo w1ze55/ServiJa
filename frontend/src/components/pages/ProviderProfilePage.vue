@@ -47,6 +47,7 @@ import Dialog from '../ui/dialog.vue';
 import DialogContent from '../ui/dialog-content.vue';
 import DialogHeader from '../ui/dialog-header.vue';
 import DialogTitle from '../ui/dialog-title.vue';
+import ScrollArea from '../ui/scroll-area.vue';
 import Select from '../ui/select.vue';
 import SelectContent from '../ui/select-content.vue';
 import SelectItem from '../ui/select-item.vue';
@@ -68,10 +69,8 @@ interface FreelancerData {
   profession: string;
   category: string;
   bio: string;
-  hourlyRate: number;
   profilePhoto: string;
   serviceType: string;
-  workModel: string;
   location: string;
   rating: number;
   totalReviews: number;
@@ -98,6 +97,7 @@ interface ServiceItem {
   priceType: string;
   deliveryTime: number;
   deliveryUnit: string;
+  workModel?: string | null;
   tags: string[];
   images: string[];
   isActive: boolean;
@@ -129,6 +129,61 @@ interface Props {
   onNavigate: (page: string, params?: any) => void;
 }
 
+interface QuoteServiceAddress {
+  zipCode: string;
+  street: string;
+  number: string;
+  complement: string;
+  neighborhood: string;
+  city: string;
+  state: string;
+}
+
+interface QuoteAddressErrors {
+  zipCode: string;
+  street: string;
+  number: string;
+  neighborhood: string;
+  city: string;
+  state: string;
+}
+
+type WorkModel = 'presencial' | 'remoto' | 'hibrido';
+
+const createEmptyQuoteAddress = (): QuoteServiceAddress => ({
+  zipCode: '',
+  street: '',
+  number: '',
+  complement: '',
+  neighborhood: '',
+  city: '',
+  state: '',
+});
+
+const createEmptyQuoteAddressErrors = (): QuoteAddressErrors => ({
+  zipCode: '',
+  street: '',
+  number: '',
+  neighborhood: '',
+  city: '',
+  state: '',
+});
+
+const normalizeWorkModel = (value?: string | null): WorkModel | null => {
+  const normalized = value?.toUpperCase();
+  if (normalized === 'PRESENCIAL') return 'presencial';
+  if (normalized === 'HIBRIDO') return 'hibrido';
+  if (normalized === 'REMOTO') return 'remoto';
+  return null;
+};
+
+const getWorkModelLabel = (value?: WorkModel | null) => {
+  if (value === 'presencial') return 'Presencial';
+  if (value === 'hibrido') return 'Híbrido';
+  if (value === 'remoto') return 'Remoto';
+  return 'Não informado';
+};
+
 const props = defineProps<Props>();
 
 const freelancer = ref<FreelancerData | null>(null);
@@ -138,17 +193,34 @@ const isLoading = ref(true);
 const error = ref('');
 const quoteMessage = ref('');
 const quoteCategory = ref('');
+const displayedServicesCount = ref(6);
+
+const paginatedServices = computed(() => {
+  return services.value.slice(0, displayedServicesCount.value);
+});
+
+const hasMoreServices = computed(() => {
+  return services.value.length > displayedServicesCount.value;
+});
+
+const handleShowMoreServices = () => {
+  displayedServicesCount.value += 6;
+};
 const quoteBudget = ref('');
 const formattedQuoteBudget = ref('');
 const quoteDeadline = ref('');
 const quoteDeadlineDate = ref('');
 const quoteDeadlineType = ref<'estimated' | 'decided'>('estimated');
-const quotePriority = ref('MEDIUM');
+const requestedServiceId = ref<number | null>(null);
 const requestedServiceTitle = ref('');
+const requestedServiceWorkModel = ref<WorkModel | null>(null);
 const showQuoteDialog = ref(false);
 const activeTab = ref('services');
 const isSendingQuote = ref(false);
 const quoteAttachments = ref<File[]>([]);
+const quoteServiceAddress = ref<QuoteServiceAddress>(createEmptyQuoteAddress());
+const quoteAddressErrors = ref<QuoteAddressErrors>(createEmptyQuoteAddressErrors());
+const isLoadingQuoteCEP = ref(false);
 const favoritesStore = useFavoritesStore();
 const router = useRouter();
 const fileInputRef = ref<HTMLInputElement | null>(null);
@@ -158,19 +230,37 @@ const selectedImageIndex = ref(0);
 const route = useRoute();
 const selectedServiceModal = ref<ServiceItem | null>(null);
 const selectedServiceImageIndex = ref(0);
+const effectiveWorkModels = computed<WorkModel[]>(() => {
+  const serviceModels = Array.from(
+    new Set(
+      services.value
+        .map((service) => normalizeWorkModel(service.workModel))
+        .filter((value): value is WorkModel => value !== null)
+    )
+  );
 
-const categories = [
-  'Eletricista',
-  'Encanador',
-  'Pintor',
-  'Pedreiro',
-  'Marceneiro',
-  'Jardineiro',
-  'Mecânico',
-  'Designer Gráfico',
-  'Desenvolvedor Web',
-  'Outro',
-];
+  if (serviceModels.length > 0) {
+    return serviceModels;
+  }
+  return [];
+});
+
+const workModelSummary = computed(() => {
+  if (!effectiveWorkModels.value.length) {
+    return 'Não informado';
+  }
+
+  return effectiveWorkModels.value.map((value) => getWorkModelLabel(value)).join(' / ');
+});
+
+const hasOnsiteServices = computed(() =>
+  effectiveWorkModels.value.some((value) => value === 'presencial' || value === 'hibrido')
+);
+
+const serviceRequiresAddress = computed(
+  () => requestedServiceWorkModel.value === 'presencial' || requestedServiceWorkModel.value === 'hibrido'
+);
+
 
 const loadFreelancerData = async () => {
   isLoading.value = true;
@@ -183,7 +273,10 @@ const loadFreelancerData = async () => {
 
     // Buscar serviços do freelancer
     const servicesResponse = await api.get(`/services/public/freelancer/${props.providerId}`);
-    services.value = servicesResponse.data;
+    services.value = (servicesResponse.data || []).map((service: ServiceItem) => ({
+      ...service,
+      workModel: normalizeWorkModel(service.workModel),
+    }));
 
     // Buscar portfólio do freelancer
     try {
@@ -257,22 +350,99 @@ const formatPriceDisplay = (value: number): string => {
 const handleQuoteBudgetInput = (val: string) => {
   // Remove tudo que não é dígito
   let digits = val.replace(/\D/g, '');
-  
+
   if (!digits) {
     formattedQuoteBudget.value = '';
     quoteBudget.value = '';
     return;
   }
-  
-  // Converter para centavos: últimos 2 dígitos são decimais
+
+  // Limitar a 9 dígitos (100.000.000 centavos = R$ 1.000.000,00)
+  if (digits.length > 9) {
+    digits = digits.slice(0, 9);
+  }
+
+  // Converter para reais: últimos 2 dígitos são decimais
   let numValue = parseInt(digits) / 100;
-  
+
   // Limite de 1 milhão (R$ 1.000.000,00)
   if (numValue > 1000000) {
     numValue = 1000000;
+    digits = '100000000';
+  }
+
+  // Formatar para exibição
+  formattedQuoteBudget.value = formatPriceDisplay(numValue);
+  quoteBudget.value = numValue.toString();
+};
+
+const blockNonNumericKeys = (event: KeyboardEvent) => {
+  // Permitir teclas de controle: Backspace, Delete, Tab, Escape, Enter, setas
+  const allowedKeys = [
+    'Backspace', 'Delete', 'Tab', 'Escape', 'Enter',
+    'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown',
+    'Home', 'End'
+  ];
+  
+  if (allowedKeys.includes(event.key)) {
+    return;
   }
   
-  // Formatar para exibição
+  // Permitir Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X
+  if (event.ctrlKey || event.metaKey) {
+    return;
+  }
+  
+  // Bloquear tudo que não é número
+  if (!/^[0-9]$/.test(event.key)) {
+    event.preventDefault();
+  }
+};
+
+const blockBudgetExceedingMax = (event: KeyboardEvent) => {
+  // Permitir teclas de controle
+  const allowedKeys = [
+    'Backspace', 'Delete', 'Tab', 'Escape', 'Enter',
+    'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown',
+    'Home', 'End'
+  ];
+  
+  if (allowedKeys.includes(event.key)) {
+    return;
+  }
+  
+  // Permitir Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X
+  if (event.ctrlKey || event.metaKey) {
+    return;
+  }
+  
+  // Bloquear tudo que não é número
+  if (!/^[0-9]$/.test(event.key)) {
+    event.preventDefault();
+    return;
+  }
+  
+  // Verificar se já atingiu o valor máximo (R$ 1.000.000,00)
+  const currentDigits = formattedQuoteBudget.value.replace(/\D/g, '');
+  if (currentDigits.length >= 9 || Number(quoteBudget.value) >= 1000000) {
+    event.preventDefault();
+  }
+};
+
+const handleBudgetPaste = (event: ClipboardEvent) => {
+  const pastedText = event.clipboardData?.getData('text') || '';
+  const digits = pastedText.replace(/\D/g, '');
+  
+  if (!digits) {
+    return;
+  }
+
+  let numValue = parseInt(digits) / 100;
+  
+  if (numValue > 1000000) {
+    numValue = 1000000;
+  }
+
   formattedQuoteBudget.value = formatPriceDisplay(numValue);
   quoteBudget.value = numValue.toString();
 };
@@ -281,9 +451,9 @@ const getDetailedApproximation = (totalDays: number) => {
   // Garantir máximo de 365 dias
   const d = Math.min(totalDays, 365);
   if (d <= 0) return '';
-  
+
   if (d === 365) return '1 ano';
-  
+
   if (d >= 30) {
     const months = Math.floor(d / 30);
     const rem = d % 30;
@@ -291,7 +461,7 @@ const getDetailedApproximation = (totalDays: number) => {
     if (rem > 0) str += ` e ${rem} ${rem === 1 ? 'dia' : 'dias'}`;
     return str;
   }
-  
+
   if (d >= 7) {
     const weeks = Math.floor(d / 7);
     const rem = d % 7;
@@ -299,16 +469,16 @@ const getDetailedApproximation = (totalDays: number) => {
     if (rem > 0) str += ` e ${rem} ${rem === 1 ? 'dia' : 'dias'}`;
     return str;
   }
-  
+
   return '';
 };
 
 const formatDelivery = (time: number, unit: string, showApproximation: boolean = true) => {
   // Garantir máximo de 365 dias se a unidade for dias
   const effectiveTime = unit === 'DAYS' && time > 365 ? 365 : time;
-  
+
   const unitLabel = unit === 'HOURS' ? 'hora(s)' : unit === 'DAYS' ? 'dia(s)' : 'semana(s)';
-  
+
   let approximation = '';
   if (showApproximation && unit === 'DAYS') {
     const detailed = getDetailedApproximation(effectiveTime);
@@ -316,14 +486,14 @@ const formatDelivery = (time: number, unit: string, showApproximation: boolean =
       approximation = ` =~ ${detailed}`;
     }
   }
-  
+
   return `${effectiveTime} ${unitLabel}${approximation}`;
 };
 
 const getDeadlineApproximation = (days: string) => {
   const d = parseInt(days);
   if (isNaN(d) || d <= 0) return '';
-  
+
   const detailed = getDetailedApproximation(d);
   return detailed ? `~ ${detailed}` : '';
 };
@@ -331,7 +501,7 @@ const getDeadlineApproximation = (days: string) => {
 const handleDeadlineInput = (val: string) => {
   // Apenas dígitos
   let digits = val.replace(/\D/g, '');
-  
+
   if (digits) {
     const d = parseInt(digits);
     if (d > 365) {
@@ -347,8 +517,133 @@ const handleDeadlineInput = (val: string) => {
       return;
     }
   }
-  
+
   quoteDeadline.value = digits;
+};
+
+const handleDeadlinePaste = (event: ClipboardEvent) => {
+  const pastedText = event.clipboardData?.getData('text') || '';
+  const digits = pastedText.replace(/\D/g, '');
+  
+  if (digits) {
+    const d = parseInt(digits);
+    if (d > 365) {
+      quoteDeadline.value = '365';
+    } else {
+      quoteDeadline.value = digits;
+    }
+  }
+};
+
+const clearQuoteAddressErrors = () => {
+  quoteAddressErrors.value = createEmptyQuoteAddressErrors();
+};
+
+const formatCEP = (value: string) => {
+  const numbers = value.replace(/\D/g, '').slice(0, 8);
+  return numbers.replace(/(\d{5})(\d{0,3})/, '$1-$2');
+};
+
+const fetchQuoteAddressByCEP = async (cep: string) => {
+  const cleanCEP = cep.replace(/\D/g, '');
+  if (cleanCEP.length !== 8) return;
+
+  isLoadingQuoteCEP.value = true;
+
+  try {
+    const response = await fetch(`https://viacep.com.br/ws/${cleanCEP}/json/`);
+    const data = await response.json();
+
+    if (data.erro) {
+      toast.error('CEP não encontrado');
+      return;
+    }
+
+    quoteServiceAddress.value = {
+      ...quoteServiceAddress.value,
+      zipCode: formatCEP(cleanCEP),
+      street: data.logradouro || '',
+      neighborhood: data.bairro || '',
+      city: data.localidade || '',
+      state: data.uf || '',
+      complement: quoteServiceAddress.value.complement || data.complemento || '',
+    };
+  } catch (error) {
+    console.error('Erro ao buscar CEP:', error);
+    toast.error('Não foi possível buscar o endereço pelo CEP informado');
+  } finally {
+    isLoadingQuoteCEP.value = false;
+  }
+};
+
+const handleQuoteCEPInput = (value: string) => {
+  const formatted = formatCEP(value);
+  quoteServiceAddress.value.zipCode = formatted;
+  quoteAddressErrors.value.zipCode = '';
+
+  const cleanCEP = formatted.replace(/\D/g, '');
+  if (cleanCEP.length === 8) {
+    fetchQuoteAddressByCEP(cleanCEP);
+  }
+};
+
+const validateQuoteAddress = () => {
+  clearQuoteAddressErrors();
+
+  if (!serviceRequiresAddress.value) {
+    return true;
+  }
+
+  let isValid = true;
+  const cleanCEP = quoteServiceAddress.value.zipCode.replace(/\D/g, '');
+
+  if (!cleanCEP) {
+    quoteAddressErrors.value.zipCode = 'CEP é obrigatório';
+    isValid = false;
+  } else if (cleanCEP.length !== 8) {
+    quoteAddressErrors.value.zipCode = 'CEP deve ter 8 dígitos';
+    isValid = false;
+  }
+
+  if (!quoteServiceAddress.value.street.trim()) {
+    quoteAddressErrors.value.street = 'Rua é obrigatória';
+    isValid = false;
+  }
+
+  if (!quoteServiceAddress.value.number.trim()) {
+    quoteAddressErrors.value.number = 'Número é obrigatório';
+    isValid = false;
+  }
+
+  if (!quoteServiceAddress.value.neighborhood.trim()) {
+    quoteAddressErrors.value.neighborhood = 'Bairro é obrigatório';
+    isValid = false;
+  }
+
+  if (!quoteServiceAddress.value.city.trim()) {
+    quoteAddressErrors.value.city = 'Cidade é obrigatória';
+    isValid = false;
+  }
+
+  if (!quoteServiceAddress.value.state.trim()) {
+    quoteAddressErrors.value.state = 'Estado é obrigatório';
+    isValid = false;
+  } else if (quoteServiceAddress.value.state.trim().length !== 2) {
+    quoteAddressErrors.value.state = 'Use a sigla do estado';
+    isValid = false;
+  }
+
+  return isValid;
+};
+
+const buildQuoteAddress = () => {
+  const address = quoteServiceAddress.value;
+  const streetLine = [
+    `${address.street.trim()}, ${address.number.trim()}`,
+    address.complement.trim(),
+  ].filter(Boolean).join(', ');
+
+  return `${streetLine} - ${address.neighborhood.trim()} - ${address.city.trim()}/${address.state.trim().toUpperCase()} - CEP: ${address.zipCode.trim()}`;
 };
 
 const handleViewProject = (project: PortfolioProject) => {
@@ -375,19 +670,19 @@ const handleSendQuote = async () => {
   }
 
   if (!quoteCategory.value) {
-    toast.error('Por favor, selecione uma categoria');
+    toast.error('Erro: Categoria do serviço não definida. Tente selecionar o serviço novamente.');
     return;
   }
 
-  if (!quoteBudget.value || Number(quoteBudget.value) <= 0) {
-    toast.error('Por favor, informe um orçamento válido');
+  if (!quoteBudget.value || Number(quoteBudget.value) < 5) {
+    toast.error('Por favor, informe um orçamento de no mínimo R$ 5,00');
     return;
   }
 
-  const deadline = quoteDeadlineType.value === 'decided' 
-    ? quoteDeadlineDate.value 
+  const deadline = quoteDeadlineType.value === 'decided'
+    ? quoteDeadlineDate.value
     : `${quoteDeadline.value} dias`;
-  
+
   if (!quoteDeadline.value && quoteDeadlineType.value === 'estimated') {
     toast.error('Por favor, informe a quantidade de dias');
     return;
@@ -396,6 +691,26 @@ const handleSendQuote = async () => {
     toast.error('Por favor, selecione uma data');
     return;
   }
+
+  // Validar que a data decidida não é no passado
+  if (quoteDeadlineType.value === 'decided' && quoteDeadlineDate.value) {
+    const selectedDate = new Date(quoteDeadlineDate.value);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Remove hora para comparar apenas a data
+    
+    if (selectedDate < today) {
+      toast.error('A data desejada não pode ser anterior à data atual');
+      return;
+    }
+  }
+
+  if (!validateQuoteAddress()) {
+    const firstAddressError = Object.values(quoteAddressErrors.value).find(Boolean);
+    toast.error(firstAddressError || 'Informe a localização do serviço');
+    return;
+  }
+
+  const serviceAddress = serviceRequiresAddress.value ? buildQuoteAddress() : null;
 
   isSendingQuote.value = true;
   try {
@@ -409,13 +724,12 @@ const handleSendQuote = async () => {
     const requestData = {
       serviceName: requestedServiceTitle.value ? `${requestedServiceTitle.value} - Solicitação` : `${quoteCategory.value} - Solicitação`,
       category: quoteCategory.value,
-      description: requestedServiceTitle.value 
-        ? `[Solicitação referente ao serviço: ${requestedServiceTitle.value}]\n\n${quoteMessage.value}`
-        : quoteMessage.value,
+      description: quoteMessage.value,
       budget: Number(quoteBudget.value),
       deadline: deadline,
-      priority: quotePriority.value,
-      address: '',
+      workModel: requestedServiceWorkModel.value?.toUpperCase(),
+      address: serviceAddress,
+      serviceId: requestedServiceId.value,
       freelancerId: Number(props.providerId),
       attachments: attachmentUrls,
     };
@@ -472,15 +786,20 @@ const resetQuoteForm = () => {
   formattedQuoteBudget.value = '';
   quoteDeadline.value = '';
   quoteDeadlineDate.value = '';
-  quotePriority.value = 'MEDIUM';
+  quoteDeadlineType.value = 'estimated';
+  requestedServiceId.value = null;
   requestedServiceTitle.value = '';
+  requestedServiceWorkModel.value = null;
   quoteAttachments.value = [];
+  quoteServiceAddress.value = createEmptyQuoteAddress();
+  clearQuoteAddressErrors();
+  isLoadingQuoteCEP.value = false;
 };
 
 const handleServiceClick = (service: ServiceItem) => {
   selectedServiceModal.value = service;
   selectedServiceImageIndex.value = 0;
-  
+
   // Update URL to include serviceId
   router.replace({
     query: { ...route.query, serviceId: service.id }
@@ -489,21 +808,20 @@ const handleServiceClick = (service: ServiceItem) => {
 
 const handleCloseServiceModal = () => {
   selectedServiceModal.value = null;
-  
+
   // Remove serviceId from URL
   const query = { ...route.query };
   delete query.serviceId;
-  
+
   router.replace({ query });
 };
 
 const handleRequestService = (service: ServiceItem) => {
+  resetQuoteForm();
+  requestedServiceId.value = service.id;
   quoteCategory.value = service.category;
   requestedServiceTitle.value = service.title;
-  quoteDeadlineType.value = 'estimated';
-  quoteDeadlineDate.value = '';
-  quoteDeadline.value = ''; // Clear previous estimate
-  quotePriority.value = 'MEDIUM';
+  requestedServiceWorkModel.value = normalizeWorkModel(service.workModel);
   selectedServiceModal.value = null;
   showQuoteDialog.value = true;
 };
@@ -529,6 +847,14 @@ const handleToggleFavorite = async () => {
 const isFavorite = computed(() => {
   return favoritesStore.isFavoriteFreelancer(props.providerId);
 });
+
+const isServiceFavorite = (serviceId: number) => {
+  return favoritesStore.isFavoriteService(serviceId);
+};
+
+const handleToggleServiceFavorite = async (serviceId: number) => {
+  await favoritesStore.toggleFavoriteService(serviceId);
+};
 
 onMounted(() => {
   loadFreelancerData();
@@ -597,8 +923,8 @@ onMounted(() => {
                   <Button variant="outline" size="icon" @click="handleShare">
                     <Share2 class="h-4 w-4" />
                   </Button>
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     size="icon"
                     @click="handleToggleFavorite"
                     :class="isFavorite ? 'text-red-500 border-red-200 bg-red-50 hover:bg-red-100 hover:text-red-600' : 'text-gray-400 hover:text-red-500'"
@@ -658,60 +984,78 @@ onMounted(() => {
                     Disponíveis para contratação ({{ services.length }} itens)
                   </p>
                 </div>
-                
-                <div v-if="services.length > 0" class="grid md:grid-cols-2 gap-4">
-                  <Card
-                    v-for="service in services"
-                    :key="service.id"
-                    class="overflow-hidden hover:shadow-lg hover:border-[#286AD8]/30 transition-all cursor-pointer group"
-                    @click="handleServiceClick(service)"
-                  >
-                    <!-- Service Image -->
-                    <div class="relative h-40 bg-gradient-to-br from-[#286AD8]/10 to-[#435574]/10">
-                      <img
-                        v-if="service.images && service.images.length > 0"
-                        :src="service.images[0]"
-                        :alt="service.title"
-                        class="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                      />
-                      <div v-else class="w-full h-full flex items-center justify-center">
-                        <Briefcase class="h-12 w-12 text-[#286AD8]/30" />
-                      </div>
-                      <Badge class="absolute top-3 left-3 bg-[#286AD8]/90 backdrop-blur-sm">
-                        {{ service.category }}
-                      </Badge>
-                    </div>
 
-                    <!-- Service Content -->
-                    <div class="p-4">
-                      <h3 class="font-semibold text-[#263238] mb-2 line-clamp-1 group-hover:text-[#286AD8]">
-                        {{ service.title }}
-                      </h3>
-                      <p class="text-sm text-[#435574] mb-3 line-clamp-2">{{ service.description }}</p>
-
-                      <!-- Tags -->
-                      <div v-if="service.tags && service.tags.length > 0" class="flex flex-wrap gap-1 mb-3">
-                        <Badge v-for="tag in service.tags.slice(0, 2)" :key="tag" variant="secondary" class="text-xs">
-                          {{ tag }}
-                        </Badge>
-                        <Badge v-if="service.tags.length > 2" variant="secondary" class="text-xs">
-                          +{{ service.tags.length - 2 }}
+                <div v-if="services.length > 0">
+                  <div class="grid md:grid-cols-2 gap-4 mb-8">
+                    <Card
+                      v-for="service in paginatedServices"
+                      :key="service.id"
+                      class="overflow-hidden hover:shadow-lg hover:border-[#286AD8]/30 transition-all cursor-pointer group"
+                      @click="handleServiceClick(service)"
+                    >
+                      <!-- Service Image -->
+                      <div class="relative h-40 bg-gradient-to-br from-[#286AD8]/10 to-[#435574]/10">
+                        <img
+                          v-if="service.images && service.images.length > 0"
+                          :src="service.images[0]"
+                          :alt="service.title"
+                          class="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                        />
+                        <div v-else class="w-full h-full flex items-center justify-center">
+                          <Briefcase class="h-12 w-12 text-[#286AD8]/30" />
+                        </div>
+                        <Badge class="absolute top-3 left-3 bg-[#286AD8]/90 backdrop-blur-sm">
+                          {{ service.category }}
                         </Badge>
                       </div>
 
-                      <!-- Footer -->
-                      <div class="flex items-center justify-between pt-3 border-t border-gray-100">
-                        <div class="flex items-center gap-1 text-[#286AD8]">
-                          <DollarSign class="h-4 w-4" />
-                          <span class="font-bold text-sm">{{ formatPrice(service.price, service.priceType) }}</span>
+                      <!-- Service Content -->
+                      <div class="p-4">
+                        <h3 class="font-semibold text-[#263238] mb-2 line-clamp-1 group-hover:text-[#286AD8]">
+                          {{ service.title }}
+                        </h3>
+                        <div v-if="service.workModel" class="mb-3">
+                          <Badge variant="outline" class="bg-white text-[#435574]">
+                            {{ getWorkModelLabel(normalizeWorkModel(service.workModel)) }}
+                          </Badge>
                         </div>
-                        <div class="flex items-center gap-1 text-[#435574]">
-                          <Clock class="h-3.5 w-3.5" />
-                          <span class="text-xs">{{ formatDelivery(service.deliveryTime, service.deliveryUnit) }}</span>
+                        <p class="text-sm text-[#435574] mb-3 line-clamp-2">{{ service.description }}</p>
+
+                        <!-- Tags -->
+                        <div v-if="service.tags && service.tags.length > 0" class="flex flex-wrap gap-1 mb-3">
+                          <Badge v-for="tag in service.tags.slice(0, 2)" :key="tag" variant="secondary" class="text-xs">
+                            {{ tag }}
+                          </Badge>
+                          <Badge v-if="service.tags.length > 2" variant="secondary" class="text-xs">
+                            +{{ service.tags.length - 2 }}
+                          </Badge>
+                        </div>
+
+                        <!-- Footer -->
+                        <div class="flex items-center justify-between pt-3 border-t border-gray-100">
+                          <div class="flex items-center gap-1 text-[#286AD8]">
+                            <DollarSign class="h-4 w-4" />
+                            <span class="font-bold text-sm">{{ formatPrice(service.price, service.priceType) }}</span>
+                          </div>
+                          <div class="flex items-center gap-1 text-[#435574]">
+                            <Clock class="h-3.5 w-3.5" />
+                            <span class="text-xs">{{ formatDelivery(service.deliveryTime, service.deliveryUnit) }}</span>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </Card>
+                    </Card>
+                  </div>
+
+                  <!-- Show More Button -->
+                  <div v-if="hasMoreServices" class="flex justify-center mt-8">
+                    <Button
+                      variant="outline"
+                      @click="handleShowMoreServices"
+                      class="border-[#286AD8] text-[#286AD8] hover:bg-blue-50 px-8"
+                    >
+                      Ver mais serviços
+                    </Button>
+                  </div>
                 </div>
                 <Card v-else class="p-12 text-center">
                   <Briefcase class="h-12 w-12 text-[#435574]/30 mx-auto mb-4" />
@@ -727,7 +1071,7 @@ onMounted(() => {
                   <p v-else class="text-[#435574] mb-6">Nenhuma descrição disponível.</p>
 
                   <!-- Service Cities -->
-                  <div v-if="freelancer.serviceCities && freelancer.serviceCities.length > 0" class="mb-6">
+                  <div v-if="hasOnsiteServices && freelancer.serviceCities && freelancer.serviceCities.length > 0" class="mb-6">
                     <h3 class="font-semibold text-[#263238] mb-3">Cidades atendidas</h3>
                     <div class="flex flex-wrap gap-2">
                       <Badge v-for="city in freelancer.serviceCities" :key="city.id" variant="secondary">
@@ -796,8 +1140,8 @@ onMounted(() => {
                       <div v-else class="w-full h-full flex items-center justify-center">
                         <Briefcase class="h-10 w-10 text-[#286AD8]/30" />
                       </div>
-                      <Badge 
-                        v-if="project.featured" 
+                      <Badge
+                        v-if="project.featured"
                         class="absolute top-2 left-2 bg-yellow-500 hover:bg-yellow-600 text-white border-none text-[10px] px-1.5"
                       >
                         <Sparkles class="h-3 w-3 mr-1" />
@@ -850,15 +1194,6 @@ onMounted(() => {
 
           <!-- Sidebar -->
           <div class="space-y-6">
-            <!-- Pricing -->
-            <Card class="p-6">
-              <h3 class="font-semibold text-[#263238] mb-3">Valor</h3>
-              <p class="text-2xl font-bold text-[#286AD8] mb-2">
-                {{ formatPrice(freelancer.hourlyRate || 0, 'HOURLY') }}
-              </p>
-              <p class="text-sm text-[#435574]">*Valores podem variar de acordo com a complexidade</p>
-            </Card>
-
             <!-- Work Model -->
             <Card class="p-6">
               <h3 class="font-semibold text-[#263238] mb-3">Modelo de trabalho</h3>
@@ -866,16 +1201,16 @@ onMounted(() => {
                 <div class="flex items-center justify-between">
                   <span class="text-sm text-[#435574]">Modo:</span>
                   <Badge variant="secondary" class="text-sm">
-                    {{ freelancer.workModel === 'remoto' ? 'Remoto' : freelancer.workModel === 'presencial' ? 'Presencial' : freelancer.workModel === 'hibrido' ? 'Híbrido' : 'Não informado' }}
+                    {{ workModelSummary }}
                   </Badge>
                 </div>
-                
+
                 <div v-if="freelancer.serviceType" class="flex items-center justify-between border-t pt-3">
                   <span class="text-sm text-[#435574]">Tipo:</span>
                   <span class="text-sm font-medium text-[#263238]">{{ freelancer.serviceType }}</span>
                 </div>
-                
-                <div v-if="(freelancer.workModel === 'presencial' || freelancer.workModel === 'hibrido') && freelancer.serviceCities?.length" class="border-t pt-3">
+
+                <div v-if="hasOnsiteServices && freelancer.serviceCities?.length" class="border-t pt-3">
                   <p class="text-sm text-[#435574] mb-2">Cidades atendidas:</p>
                   <div class="flex flex-wrap gap-1">
                     <Badge v-for="city in freelancer.serviceCities.slice(0, 3)" :key="city.id" variant="outline" class="text-[10px] bg-white text-gray-600">
@@ -899,7 +1234,7 @@ onMounted(() => {
                 </div>
                 <div class="flex items-center justify-between">
                   <span class="text-[#435574]">Trabalhos concluídos</span>
-                  <span class="text-[#263238] font-semibold">{{ freelancer.completedJobs || 0 }}</span>
+                  <span class="text-[#263238] font-semibold">{{ freelancer.completedJobs || (freelancer as any).completedProjects || 0 }}</span>
                 </div>
                 <div class="flex items-center justify-between">
                   <span class="text-[#435574]">Serviços ativos</span>
@@ -934,8 +1269,15 @@ onMounted(() => {
 
     <!-- Project Details Modal -->
     <Dialog :open="selectedProject !== null" @update:open="(val) => !val && (selectedProject = null)">
-      <DialogContent class="max-w-4xl max-h-[90vh] p-0 border-none bg-transparent">
+      <DialogContent class="max-w-4xl max-h-[90vh] p-0 border-none bg-transparent" :hide-close="true">
         <div class="relative bg-white rounded-xl overflow-hidden shadow-2xl h-[80vh]">
+          <!-- Custom Close Button -->
+          <button
+            @click="selectedProject = null"
+            class="absolute top-4 right-4 p-2 bg-black/20 hover:bg-black/40 backdrop-blur-md rounded-full text-white transition-all z-50"
+          >
+            <CloseIcon class="h-5 w-5" />
+          </button>
           <div class="grid grid-cols-1 md:grid-cols-2 h-full">
             <!-- Image Carousel -->
             <div class="relative bg-gray-900 flex items-center justify-center min-h-[300px] md:min-h-[500px]">
@@ -1020,8 +1362,8 @@ onMounted(() => {
                 </div>
 
                 <div v-if="selectedProject?.tags && selectedProject.tags.length > 0" class="flex flex-wrap gap-2">
-                  <Badge 
-                    v-for="tag in selectedProject.tags" 
+                  <Badge
+                    v-for="tag in selectedProject.tags"
                     :key="tag"
                     variant="secondary"
                     class="bg-gray-100 hover:bg-gray-200 text-[#435574] transition-colors border-none"
@@ -1054,10 +1396,10 @@ onMounted(() => {
 
     <!-- Service Details Modal (Deep Link / Direct Action) -->
     <Dialog :open="selectedServiceModal !== null" @update:open="(val) => !val && handleCloseServiceModal()">
-      <DialogContent class="max-w-4xl max-h-[90vh] p-0 border-none bg-transparent">
-        <div v-if="selectedServiceModal" class="relative bg-white rounded-xl overflow-hidden shadow-2xl h-[85vh] flex flex-col">
+      <DialogContent class="max-w-4xl max-h-[95vh] p-4 md:p-0 border-none bg-transparent" :hide-close="true">
+        <div v-if="selectedServiceModal" class="relative bg-white rounded-xl overflow-y-auto shadow-2xl max-h-[90vh] md:max-h-[85vh]">
           <!-- Gallery / Cover Image -->
-          <div class="relative h-80 bg-gray-900 overflow-hidden shrink-0">
+          <div class="relative h-64 md:h-80 bg-gray-900 overflow-hidden">
             <img
               v-if="selectedServiceModal.images && selectedServiceModal.images.length > 0"
               :src="selectedServiceModal.images[selectedServiceImageIndex]"
@@ -1099,16 +1441,16 @@ onMounted(() => {
                 </button>
               </div>
             </template>
-            
-            <button 
-              @click="handleCloseServiceModal" 
-              class="absolute top-4 right-4 p-2 bg-black/20 hover:bg-black/40 backdrop-blur-md rounded-full text-white transition-all z-10"
+
+            <button
+              @click="handleCloseServiceModal"
+              class="absolute top-4 right-4 p-2 bg-black/20 hover:bg-black/40 backdrop-blur-md rounded-full text-white transition-all z-50"
             >
               <CloseIcon class="h-5 w-5" />
             </button>
           </div>
 
-          <div class="p-8 overflow-y-auto">
+          <div class="p-8">
             <!-- Freelancer Mini Profile -->
             <div class="flex items-center gap-4 mb-8 pb-8 border-b border-gray-100">
               <Avatar class="h-14 w-14 border-2 border-white shadow-sm">
@@ -1130,11 +1472,17 @@ onMounted(() => {
                   </div>
                 </div>
               </div>
-              <div class="hidden sm:flex gap-2">
-                <Button variant="outline" size="icon" class="rounded-full text-gray-400 border-gray-200">
-                  <Heart class="h-5 w-5" />
+              <div v-if="selectedServiceModal" class="hidden sm:flex gap-2">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  class="rounded-full"
+                  @click="handleToggleServiceFavorite(selectedServiceModal.id)"
+                  :class="isServiceFavorite(selectedServiceModal.id) ? 'text-red-500 border-red-200 bg-red-50 hover:bg-red-100 hover:text-red-600' : 'text-gray-400 border-gray-200 hover:text-red-500'"
+                >
+                  <Heart :class="['h-5 w-5', isServiceFavorite(selectedServiceModal.id) ? 'fill-red-500 text-red-500' : '']" />
                 </Button>
-                <Button variant="outline" size="icon" class="rounded-full text-gray-400 border-gray-200">
+                <Button variant="outline" size="icon" class="rounded-full text-gray-400 border-gray-200" @click="handleShare">
                   <Share2 class="h-5 w-5" />
                 </Button>
               </div>
@@ -1145,6 +1493,13 @@ onMounted(() => {
               <div class="flex items-center gap-2 mb-3">
                 <Badge class="bg-blue-50 text-[#286AD8] border-none font-bold uppercase tracking-wider text-[10px] px-3">
                   {{ selectedServiceModal.category }}
+                </Badge>
+                <Badge
+                  v-if="selectedServiceModal.workModel"
+                  variant="outline"
+                  class="bg-white text-[#435574] border-gray-200"
+                >
+                  {{ getWorkModelLabel(normalizeWorkModel(selectedServiceModal.workModel)) }}
                 </Badge>
               </div>
               <h2 class="text-3xl font-bold text-[#263238] leading-tight">{{ selectedServiceModal.title }}</h2>
@@ -1180,7 +1535,7 @@ onMounted(() => {
             <!-- Description -->
             <div class="mb-8">
               <h3 class="text-lg font-bold text-[#263238] mb-4">Sobre o Serviço</h3>
-              <p class="text-[#435574] leading-relaxed whitespace-pre-line text-lg">
+              <p class="text-[#435574] leading-relaxed whitespace-pre-line text-base sm:text-lg break-words">
                 {{ selectedServiceModal.description }}
               </p>
             </div>
@@ -1189,20 +1544,20 @@ onMounted(() => {
             <div class="mb-10">
               <h3 class="text-lg font-bold text-[#263238] mb-4">O que está incluído</h3>
               <div class="grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-8">
-                <div class="flex items-center gap-3 text-[#435574]">
-                  <CheckCircle class="h-5 w-5 text-green-500" />
+                <div class="flex items-center gap-3 text-[#435574] leading-tight">
+                  <CheckCircle class="h-5 w-5 text-green-500 flex-shrink-0" />
                   <span>Atendimento profissional e especializado</span>
                 </div>
-                <div class="flex items-center gap-3 text-[#435574]">
-                  <CheckCircle class="h-5 w-5 text-green-500" />
+                <div class="flex items-center gap-3 text-[#435574] leading-tight">
+                  <CheckCircle class="h-5 w-5 text-green-500 flex-shrink-0" />
                   <span>Materiais e ferramentas inclusas</span>
                 </div>
-                <div class="flex items-center gap-3 text-[#435574]">
-                  <CheckCircle class="h-5 w-5 text-green-500" />
+                <div class="flex items-center gap-3 text-[#435574] leading-tight">
+                  <CheckCircle class="h-5 w-5 text-green-500 flex-shrink-0" />
                   <span>Garantia de qualidade e suporte</span>
                 </div>
-                <div class="flex items-center gap-3 text-[#435574]">
-                  <CheckCircle class="h-5 w-5 text-green-500" />
+                <div class="flex items-center gap-3 text-[#435574] leading-tight">
+                  <CheckCircle class="h-5 w-5 text-green-500 flex-shrink-0" />
                   <span>Agendamento flexível de acordo com sua necessidade</span>
                 </div>
               </div>
@@ -1228,19 +1583,12 @@ onMounted(() => {
 
             <!-- Actions -->
             <div class="flex flex-col sm:flex-row gap-4 mb-4">
-              <Button 
+              <Button
                 @click="handleRequestService(selectedServiceModal)"
                 class="flex-1 bg-[#286AD8] hover:bg-[#435574] h-14 text-base font-bold shadow-lg shadow-[#286AD8]/20 transition-all active:scale-95 rounded-xl"
               >
                 <Send class="h-5 w-5 mr-2" />
                 Solicitar este serviço
-              </Button>
-              <Button 
-                variant="outline"
-                class="bg-white border-2 border-gray-100 hover:border-[#286AD8] transition-all h-14 rounded-xl px-10 text-base font-bold text-[#435574] hover:text-[#286AD8]"
-              >
-                <MessageSquare class="h-5 w-5 mr-2" />
-                Conversar
               </Button>
             </div>
           </div>
@@ -1249,26 +1597,12 @@ onMounted(() => {
     </Dialog>
     <!-- Quote Dialog -->
     <Dialog v-model:open="showQuoteDialog">
-      <DialogContent class="max-w-md">
-        <DialogHeader>
-          <DialogTitle>Solicitar Orçamento</DialogTitle>
-        </DialogHeader>
-        <div class="space-y-4">
-          <div>
-            <Label class="text-[#435574] mb-2 block text-sm">
-              Categoria <span class="text-red-500">*</span>
-            </Label>
-            <Select v-model="quoteCategory">
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione a categoria" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem v-for="cat in categories" :key="cat" :value="cat">
-                  {{ cat }}
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+      <DialogContent class="max-w-md max-h-[90vh] overflow-hidden p-0 gap-0">
+        <ScrollArea class="mt-10 max-h-[calc(90vh-2.5rem)]">
+        <div class="space-y-4 px-6 pb-6 pr-8">
+          <DialogHeader class="pr-6">
+            <DialogTitle>Solicitar Orçamento</DialogTitle>
+          </DialogHeader>
 
           <div>
             <Label class="text-[#435574] mb-2 block text-sm">
@@ -1284,16 +1618,28 @@ onMounted(() => {
                 placeholder="0,00"
                 :model-value="formattedQuoteBudget"
                 @update:model-value="(val: string) => handleQuoteBudgetInput(val)"
+                @keydown="blockBudgetExceedingMax"
+                @paste.prevent="handleBudgetPaste"
                 class="pl-10"
+                :class="{ 
+                  'border-red-500 focus-visible:ring-red-500': quoteBudget && Number(quoteBudget) < 5,
+                  'border-amber-500 focus-visible:ring-amber-500': Number(quoteBudget) >= 1000000
+                }"
               />
             </div>
+            <p v-if="quoteBudget && Number(quoteBudget) < 5" class="text-[11px] text-red-500 font-medium mt-1">
+              O orçamento mínimo é R$ 5,00
+            </p>
+            <p v-else-if="Number(quoteBudget) >= 1000000" class="text-[11px] text-amber-600 font-medium mt-1">
+              Valor máximo atingido: R$ 1.000.000,00
+            </p>
           </div>
 
           <div class="space-y-3">
             <Label class="text-[#435574] mb-2 block text-sm">
               Prazo desejado <span class="text-red-500">*</span>
             </Label>
-            
+
             <div class="flex p-1 bg-gray-100 rounded-lg mb-2">
               <button
                 type="button"
@@ -1325,6 +1671,8 @@ onMounted(() => {
                   placeholder="Quantidade de dias"
                   :model-value="quoteDeadline"
                   @update:model-value="handleDeadlineInput"
+                  @keydown="blockNonNumericKeys"
+                  @paste.prevent="handleDeadlinePaste"
                   class="pr-24"
                 />
                 <div class="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2 pointer-events-none">
@@ -1339,27 +1687,12 @@ onMounted(() => {
               <Input
                 type="date"
                 v-model="quoteDeadlineDate"
+                :min="new Date().toISOString().split('T')[0]"
                 class="w-full"
               />
             </div>
           </div>
 
-          <div>
-            <Label class="text-[#435574] mb-2 block text-sm">
-              Prioridade <span class="text-red-500">*</span>
-            </Label>
-            <Select v-model="quotePriority">
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione a prioridade" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="LOW">Baixa</SelectItem>
-                <SelectItem value="MEDIUM">Média</SelectItem>
-                <SelectItem value="HIGH">Alta</SelectItem>
-                <SelectItem value="URGENT">Urgente</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
 
           <div>
             <Label class="text-[#435574] mb-2 block text-sm">
@@ -1371,6 +1704,126 @@ onMounted(() => {
               v-model="quoteMessage"
               class="resize-none"
             />
+          </div>
+
+          <div v-if="serviceRequiresAddress" class="space-y-3 rounded-lg border border-blue-100 bg-blue-50/40 p-4">
+            <div class="flex items-start gap-2">
+              <MapPin class="h-4 w-4 text-[#286AD8] mt-0.5" />
+              <div>
+                <Label class="text-[#435574] mb-1 block text-sm">
+                  Localização do serviço <span class="text-red-500">*</span>
+                </Label>
+                <p class="text-xs text-[#435574]">
+                  Digite o CEP para buscar o endereço e complete os demais dados do local.
+                </p>
+              </div>
+            </div>
+
+            <div class="space-y-1">
+              <Label for="quote-service-zipcode" class="text-sm text-[#435574]">CEP *</Label>
+              <div class="relative">
+                <Input
+                  id="quote-service-zipcode"
+                  :model-value="quoteServiceAddress.zipCode"
+                  @update:model-value="(val) => handleQuoteCEPInput(val as string)"
+                  placeholder="00000-000"
+                  maxlength="9"
+                  :disabled="isLoadingQuoteCEP"
+                  :class="{ 'border-red-500 focus-visible:ring-red-500': quoteAddressErrors.zipCode }"
+                />
+                <div v-if="isLoadingQuoteCEP" class="absolute right-3 top-1/2 -translate-y-1/2">
+                  <Loader2 class="h-4 w-4 animate-spin text-[#286AD8]" />
+                </div>
+              </div>
+              <p v-if="quoteAddressErrors.zipCode" class="text-[11px] text-red-500">
+                {{ quoteAddressErrors.zipCode }}
+              </p>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div class="sm:col-span-2 space-y-1">
+                <Label for="quote-service-street" class="text-sm text-[#435574]">Rua *</Label>
+                <Input
+                  id="quote-service-street"
+                  :model-value="quoteServiceAddress.street"
+                  @update:model-value="(val) => { quoteServiceAddress.street = val as string; quoteAddressErrors.street = '' }"
+                  placeholder="Nome da rua"
+                  :class="{ 'border-red-500 focus-visible:ring-red-500': quoteAddressErrors.street }"
+                />
+                <p v-if="quoteAddressErrors.street" class="text-[11px] text-red-500">
+                  {{ quoteAddressErrors.street }}
+                </p>
+              </div>
+
+              <div class="space-y-1">
+                <Label for="quote-service-number" class="text-sm text-[#435574]">Número *</Label>
+                <Input
+                  id="quote-service-number"
+                  :model-value="quoteServiceAddress.number"
+                  @update:model-value="(val) => { quoteServiceAddress.number = val as string; quoteAddressErrors.number = '' }"
+                  placeholder="123"
+                  :class="{ 'border-red-500 focus-visible:ring-red-500': quoteAddressErrors.number }"
+                />
+                <p v-if="quoteAddressErrors.number" class="text-[11px] text-red-500">
+                  {{ quoteAddressErrors.number }}
+                </p>
+              </div>
+            </div>
+
+            <div class="space-y-1">
+              <Label for="quote-service-complement" class="text-sm text-[#435574]">Complemento</Label>
+              <Input
+                id="quote-service-complement"
+                :model-value="quoteServiceAddress.complement"
+                @update:model-value="(val) => quoteServiceAddress.complement = val as string"
+                placeholder="Apto, bloco, referência..."
+              />
+            </div>
+
+            <div class="space-y-1">
+              <Label for="quote-service-neighborhood" class="text-sm text-[#435574]">Bairro *</Label>
+              <Input
+                id="quote-service-neighborhood"
+                :model-value="quoteServiceAddress.neighborhood"
+                @update:model-value="(val) => { quoteServiceAddress.neighborhood = val as string; quoteAddressErrors.neighborhood = '' }"
+                placeholder="Nome do bairro"
+                :class="{ 'border-red-500 focus-visible:ring-red-500': quoteAddressErrors.neighborhood }"
+              />
+              <p v-if="quoteAddressErrors.neighborhood" class="text-[11px] text-red-500">
+                {{ quoteAddressErrors.neighborhood }}
+              </p>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div class="sm:col-span-2 space-y-1">
+                <Label for="quote-service-city" class="text-sm text-[#435574]">Cidade *</Label>
+                <Input
+                  id="quote-service-city"
+                  :model-value="quoteServiceAddress.city"
+                  @update:model-value="(val) => { quoteServiceAddress.city = val as string; quoteAddressErrors.city = '' }"
+                  placeholder="Cidade"
+                  :class="{ 'border-red-500 focus-visible:ring-red-500': quoteAddressErrors.city }"
+                />
+                <p v-if="quoteAddressErrors.city" class="text-[11px] text-red-500">
+                  {{ quoteAddressErrors.city }}
+                </p>
+              </div>
+
+              <div class="space-y-1">
+                <Label for="quote-service-state" class="text-sm text-[#435574]">Estado *</Label>
+                <Input
+                  id="quote-service-state"
+                  :model-value="quoteServiceAddress.state"
+                  @update:model-value="(val) => { quoteServiceAddress.state = (val as string).toUpperCase().slice(0, 2); quoteAddressErrors.state = '' }"
+                  placeholder="SP"
+                  maxlength="2"
+                  :class="{ 'border-red-500 focus-visible:ring-red-500': quoteAddressErrors.state }"
+                />
+                <p v-if="quoteAddressErrors.state" class="text-[11px] text-red-500">
+                  {{ quoteAddressErrors.state }}
+                </p>
+              </div>
+            </div>
           </div>
 
           <!-- Attachments -->
@@ -1412,8 +1865,8 @@ onMounted(() => {
             </ul>
           </div>
 
-          <Button 
-            @click="handleSendQuote" 
+          <Button
+            @click="handleSendQuote"
             class="w-full bg-[#286AD8]"
             :disabled="isSendingQuote"
           >
@@ -1422,8 +1875,7 @@ onMounted(() => {
             {{ isSendingQuote ? 'Enviando...' : 'Enviar Solicitação' }}
           </Button>
         </div>
+        </ScrollArea>
       </DialogContent>
     </Dialog>
 </template>
-
-```

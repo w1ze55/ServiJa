@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import api from '@/api/config/axios';
+import { normalizeWorkModel, type WorkModelValue } from '@/utils/workModel';
 
 export interface Proposal {
   id: string;
@@ -14,8 +15,8 @@ export interface Proposal {
   description: string;
   budget: number;
   deadline: string;
-  priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
-  status: 'pending' | 'negotiating' | 'accepted' | 'in_progress' | 'rejected' | 'completed' | 'archived';
+  workModel?: WorkModelValue | null;
+  status: 'pending' | 'negotiating' | 'accepted' | 'in_progress' | 'delivered' | 'rejected' | 'completed' | 'archived';
   receivedAt: string;
   attachments?: ProposalAttachment[];
   freelancerAttachments?: ProposalAttachment[];
@@ -26,6 +27,7 @@ export interface Proposal {
   counterValue?: number;
   counterDays?: number;
   counterNotes?: string;
+  cancelReason?: string;
   rejectReason?: string;
   messages?: ProposalMessage[];
   auditLog?: AuditLogEntry[];
@@ -114,7 +116,7 @@ export const useProposalStore = defineStore('proposal', () => {
   const stats = computed<ProposalStats>(() => ({
     pending: proposals.value.filter((p) => p.status === 'pending').length,
     negotiating: proposals.value.filter((p) => p.status === 'negotiating' || p.status === 'accepted').length,
-    inProgress: proposals.value.filter((p) => p.status === 'in_progress').length,
+    inProgress: proposals.value.filter((p) => p.status === 'in_progress' || p.status === 'delivered').length,
     completed: proposals.value.filter((p) => p.status === 'completed' || p.status === 'archived').length,
     rejected: proposals.value.filter((p) => p.status === 'rejected').length,
   }));
@@ -126,7 +128,9 @@ export const useProposalStore = defineStore('proposal', () => {
       const response = await api.get('/service-requests/received');
 
       // Mapear dados da API para o formato da store
-      proposals.value = response.data.map((req: any) => ({
+      proposals.value = response.data
+        .filter((req: any) => req.status !== 'CANCELLED')
+        .map((req: any) => ({
         id: req.id.toString(),
         clientName: req.contractorName,
         clientAvatar: req.contractorAvatar,
@@ -136,7 +140,7 @@ export const useProposalStore = defineStore('proposal', () => {
         description: req.description,
         budget: Number(req.budget),
         deadline: req.deadline,
-        priority: req.priority || 'MEDIUM',
+        workModel: normalizeWorkModel(req.workModel),
         status: mapApiStatusToLocal(req.status),
         receivedAt: req.createdAt,
         attachments: (req.attachments || []).map((url: string, idx: number) => ({
@@ -155,10 +159,19 @@ export const useProposalStore = defineStore('proposal', () => {
           scope: req.responseScope,
           notes: req.responseNotes,
           sentAt: req.respondedAt,
+          milestones: req.milestones,
+          attachments: (req.responseAttachments || []).map((url: string, idx: number) => ({
+            id: `ratt-${req.id}-${idx}`,
+            name: extractFileName(url),
+            size: '',
+            url,
+            type: getFileType(url),
+          }))
         } : undefined,
         counterValue: req.counterValue,
         counterDays: req.counterDays,
         counterNotes: req.counterNotes,
+        cancelReason: req.cancelReason,
         rejectReason: req.rejectReason,
         freelancerAttachments: (req.freelancerAttachments || []).map((url: string, idx: number) => ({
           id: `fatt-${req.id}-${idx}`,
@@ -185,6 +198,7 @@ export const useProposalStore = defineStore('proposal', () => {
       'NEGOTIATING': 'negotiating',
       'ACCEPTED': 'accepted',
       'IN_PROGRESS': 'in_progress',
+      'DELIVERED': 'delivered',
       'REJECTED': 'rejected',
       'COMPLETED': 'completed',
       'CANCELLED': 'archived',
@@ -209,28 +223,25 @@ export const useProposalStore = defineStore('proposal', () => {
     id: string,
     response: Omit<FreelancerResponse, 'sentAt'>
   ): Promise<boolean> => {
-    try {
-      await api.patch(`/service-requests/${id}/respond`, {
-        value: response.value,
-        executionDays: response.executionDays,
-        scope: response.scope,
-        notes: response.notes,
-      });
+    await api.patch(`/service-requests/${id}/respond`, {
+      value: response.value,
+      executionDays: response.executionDays,
+      scope: response.scope,
+      notes: response.notes,
+      milestones: response.milestones,
+      attachments: response.attachments?.map(a => a.url)
+    });
 
-      const proposal = proposals.value.find((p) => p.id === id);
-      if (proposal) {
-        proposal.freelancerResponse = {
-          ...response,
-          sentAt: new Date().toISOString(),
-        };
-        proposal.status = 'negotiating';
-      }
-
-      return true;
-    } catch (err) {
-      console.error('Erro ao enviar resposta:', err);
-      return false;
+    const proposal = proposals.value.find((p) => p.id === id);
+    if (proposal) {
+      proposal.freelancerResponse = {
+        ...response,
+        sentAt: new Date().toISOString(),
+      };
+      proposal.status = 'negotiating';
     }
+
+    return true;
   };
 
   const updateStatus = async (
@@ -276,7 +287,19 @@ export const useProposalStore = defineStore('proposal', () => {
   };
 
   const completeProposal = async (id: string): Promise<boolean> => {
-    return updateStatus(id, 'completed');
+    try {
+      const response = await api.patch(`/service-requests/${id}/complete`);
+      const updatedReq = response.data;
+
+      const proposal = proposals.value.find((p) => p.id === id);
+      if (proposal) {
+        proposal.status = mapApiStatusToLocal(updatedReq.status);
+      }
+      return true;
+    } catch (err) {
+      console.error('Erro ao completar proposta:', err);
+      return false;
+    }
   };
 
   const archiveProposal = async (id: string): Promise<boolean> => {

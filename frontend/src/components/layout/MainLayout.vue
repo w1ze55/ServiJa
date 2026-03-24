@@ -39,6 +39,7 @@ import DropdownMenuTrigger from "../ui/dropdown-menu-trigger.vue";
 import logo from "@/assets/favicon-32x32.png";
 import api from "@/api/config/axios";
 import { useUserStore } from "@/stores/userStore";
+import PendingReviewBanner from "../shared/PendingReviewBanner.vue";
 
 const router = useRouter();
 const userStore = useUserStore();
@@ -203,6 +204,7 @@ const menuItems = computed(() =>
         { id: "home", label: "Início", icon: Home },
         { id: "explore", label: "Explorar", icon: Compass },
         { id: "requests", label: "Minhas Solicitações", icon: FileText },
+        { id: "cliente-projects", label: "Meus Projetos", icon: Package },
         { id: "messages", label: "Mensagens", icon: MessageSquare },
         { id: "favorites", label: "Favoritos", icon: Heart },
         { id: "settings", label: "Configurações", icon: Settings },
@@ -272,8 +274,8 @@ const getInitials = (name: string) => {
       <div class="flex flex-col h-full">
         <!-- Logo -->
         <div
-          :class="`py-6 border-b border-white/10 transition-all duration-300 ${
-            sidebarExpanded ? 'px-6' : 'px-0'
+          :class="`py-2 border-b border-white/10 transition-all duration-300 ${
+            sidebarExpanded ? 'px-6 py-5' : 'px-0'
           }`"
         >
           <div class="flex items-center justify-center">
@@ -616,6 +618,9 @@ const getInitials = (name: string) => {
           </div>
         </div>
       </header>
+
+      <!-- Pending Review Banner -->
+      <PendingReviewBanner />
 
       <!-- Page Content -->
       <main class="p-6">

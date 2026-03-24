@@ -4,7 +4,6 @@ import { useRouter } from 'vue-router';
 import { usePaymentWebSocket } from '../../composables/usePaymentWebSocket';
 import {
   CreditCard,
-  Smartphone,
   QrCode,
   ArrowLeft,
   Shield,
@@ -16,7 +15,6 @@ import {
   CheckCircle,
   Copy,
   Info,
-  RefreshCw,
   AlertTriangle,
   Zap,
   Star,
@@ -24,8 +22,6 @@ import {
 import Button from '../ui/button.vue';
 import Label from '../ui/label.vue';
 import Input from '../ui/input.vue';
-import RadioGroup from '../ui/radio-group.vue';
-import RadioGroupItem from '../ui/radio-group-item.vue';
 import Card from '../ui/card.vue';
 import Separator from '../ui/separator.vue';
 import Avatar from '../ui/avatar.vue';
@@ -78,6 +74,10 @@ const userEmail = getUserEmail();
 const { connected: wsConnected, connectionError: wsError, connect: connectWS, disconnect: disconnectWS } = usePaymentWebSocket(userEmail);
 
 const paymentMethod = ref<string>('');
+
+const togglePaymentMethod = (method: string) => {
+  paymentMethod.value = paymentMethod.value === method ? '' : method;
+};
 const isProcessing = ref(false);
 const isLoadingPix = ref(false);
 const showPixQrCode = ref(false);
@@ -178,27 +178,22 @@ const copyPixCode = async () => {
 
 // Observar mudanças no método de pagamento
 watch(paymentMethod, async (newMethod, oldMethod) => {
-  // Se já existe um pagamento em andamento e estamos voltando para PIX, não resetar
+  // Se voltando para PIX e já existe pagamento, carregar QR Code se necessário
   if (newMethod === 'pix' && currentPaymentId.value) {
-    // Se temos um pagamento PIX existente, tentar carregar o QR Code
     if (!pixData.value) {
       await loadExistingPixQrCode(currentPaymentId.value);
     }
     return;
   }
   
-  if (newMethod === 'pix') {
-    // Novo pagamento PIX - aguardar CPF
-    showPixQrCode.value = false;
-    pixData.value = null;
-    pixCpf.value = '';
-  } else if (oldMethod === 'pix') {
-    // Trocando de PIX para outro método - limpar dados do PIX
-    // Mas manter currentPaymentId se existir um pagamento
-    showPixQrCode.value = false;
-    pixData.value = null;
-    pixCpf.value = '';
+  if (newMethod === 'pix' && !currentPaymentId.value) {
+    // Novo pagamento PIX - aguardar CPF (só reseta se não tem pagamento)
+    if (!pixData.value) {
+      showPixQrCode.value = false;
+      pixCpf.value = '';
+    }
   }
+  // Não limpar pixData/showPixQrCode ao sair do PIX - dados ficam pré-carregados
 });
 
 const generatePixQrCode = async () => {
@@ -457,7 +452,7 @@ onMounted(async () => {
     console.warn('userEmail vazio, WebSocket não será conectado');
   }
 
-  // Verificar se já existe um pagamento para esta solicitação
+  // Verificar se já existe um pagamento e pré-carregar QR Code
   await checkExistingPayment();
 
   // Escutar notificações de pagamento
@@ -490,12 +485,12 @@ const checkExistingPayment = async () => {
         return;
       }
       
-      // Se o pagamento ainda não foi completado, carregar os dados
+      // Se o pagamento ainda não foi completado, pré-carregar dados
       if (payment.status === 'PENDING' || payment.status === 'PROCESSING') {
         currentPaymentId.value = payment.id;
-        paymentMethod.value = payment.paymentMethod?.toLowerCase() || 'pix';
+        // Não selecionar método automaticamente - deixar usuário escolher
         
-        // Se for PIX, buscar QR Code atualizado da API
+        // Pré-carregar QR Code em background (sem selecionar PIX)
         if (payment.paymentMethod?.toLowerCase() === 'pix') {
           await loadExistingPixQrCode(payment.id);
         }
@@ -570,6 +565,51 @@ onUnmounted(() => {
   if (copyFeedbackTimeout) clearTimeout(copyFeedbackTimeout);
   if (copyFeedbackFadeTimeout) clearTimeout(copyFeedbackFadeTimeout);
 });
+
+// =============================================
+// EXPAND/COLLAPSE ANIMATION HOOKS
+// =============================================
+const onBeforeEnter = (el: Element) => {
+  const htmlEl = el as HTMLElement;
+  htmlEl.style.height = '0';
+  htmlEl.style.opacity = '0';
+  htmlEl.style.overflow = 'hidden';
+};
+
+const onEnter = (el: Element, done: () => void) => {
+  const htmlEl = el as HTMLElement;
+  htmlEl.style.willChange = 'height, opacity';
+  htmlEl.style.transition = 'height 300ms ease, opacity 200ms ease';
+  // Force reflow so the browser picks up the starting state
+  void htmlEl.offsetHeight;
+  htmlEl.style.height = htmlEl.scrollHeight + 'px';
+  htmlEl.style.opacity = '1';
+  htmlEl.addEventListener('transitionend', () => {
+    htmlEl.style.height = '';
+    htmlEl.style.overflow = '';
+    htmlEl.style.willChange = '';
+    done();
+  }, { once: true });
+};
+
+const onBeforeLeave = (el: Element) => {
+  const htmlEl = el as HTMLElement;
+  htmlEl.style.height = htmlEl.scrollHeight + 'px';
+  htmlEl.style.overflow = 'hidden';
+};
+
+const onLeave = (el: Element, done: () => void) => {
+  const htmlEl = el as HTMLElement;
+  htmlEl.style.willChange = 'height, opacity';
+  htmlEl.style.transition = 'height 300ms ease, opacity 200ms ease';
+  void htmlEl.offsetHeight;
+  htmlEl.style.height = '0';
+  htmlEl.style.opacity = '0';
+  htmlEl.addEventListener('transitionend', () => {
+    htmlEl.style.willChange = '';
+    done();
+  }, { once: true });
+};
 </script>
 
 <template>
@@ -652,342 +692,317 @@ onUnmounted(() => {
         <Card v-if="!paymentConfirmed" class="p-6">
           <h3 class="text-[#263238] mb-4">Método de Pagamento</h3>
 
-          <RadioGroup :value="paymentMethod" @update:value="(val: string) => paymentMethod = val">
+          <div>
             <div class="space-y-3">
-              <!-- PIX -->
-              <label
-                :class="`flex items-center gap-3 p-4 border-2 rounded-lg cursor-pointer transition-all ${
+              <!-- PIX Section -->
+              <div
+                :class="`border-2 rounded-lg transition-all duration-200 ${
                   paymentMethod === 'pix'
                     ? 'border-[#286AD8] bg-blue-50'
                     : 'border-gray-200 hover:border-gray-300'
                 }`"
               >
-                <RadioGroupItem value="pix" id="pix" />
-                <QrCode class="h-5 w-5 text-[#286AD8]" />
-                <div class="flex-1">
-                  <p class="text-[#263238]">PIX</p>
-                  <p class="text-sm text-[#435574]">Aprovação imediata</p>
+                <div class="flex items-center gap-3 p-4 cursor-pointer" @click="togglePaymentMethod('pix')">
+                  <div :class="`h-4 w-4 rounded-full border-2 flex items-center justify-center transition-colors ${ paymentMethod === 'pix' ? 'border-[#286AD8]' : 'border-gray-400' }`">
+                    <div v-if="paymentMethod === 'pix'" class="h-2 w-2 rounded-full bg-[#286AD8]"></div>
+                  </div>
+                  <QrCode class="h-5 w-5 text-[#286AD8]" />
+                  <div class="flex-1">
+                    <p class="text-[#263238]">PIX</p>
+                    <p class="text-sm text-[#435574]">Aprovação imediata</p>
+                  </div>
+                  <Badge class="bg-green-100 text-green-700 hover:bg-green-100">
+                    Recomendado
+                  </Badge>
                 </div>
-                <Badge class="bg-green-100 text-green-700 hover:bg-green-100">
-                  Recomendado
-                </Badge>
-              </label>
 
-              <!-- Credit Card -->
-              <label
-                :class="`flex items-center gap-3 p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                <!-- PIX - Pagamento em andamento (sem QR Code visível) -->
+                <Transition :css="false" @before-enter="onBeforeEnter" @enter="onEnter" @before-leave="onBeforeLeave" @leave="onLeave">
+                  <div v-if="paymentMethod === 'pix' && currentPaymentId && !showPixQrCode && !paymentConfirmed">
+                    <div class="px-4 pb-4 space-y-4">
+                      <div class="p-4 bg-yellow-50 rounded-lg border border-yellow-300">
+                        <div class="flex items-start gap-3">
+                          <Clock class="h-5 w-5 text-yellow-600 mt-0.5" />
+                          <div class="flex-1">
+                            <p class="text-sm text-[#263238] font-medium">Pagamento PIX em andamento</p>
+                            <p class="text-xs text-[#435574] mt-1">
+                              Já existe um pagamento PIX aguardando confirmação para este serviço.
+                            </p>
+                            <p class="text-xs text-[#435574] mt-1">
+                              ID do Pagamento: <span class="font-mono font-medium">#{{ currentPaymentId }}</span>
+                            </p>
+                          </div>
+                        </div>
+
+                        <Button
+                          @click="reloadPixQrCode"
+                          :disabled="isLoadingPix"
+                          class="w-full mt-3 bg-[#286AD8] hover:bg-[#1e5bb8] text-white"
+                        >
+                          <Loader2 v-if="isLoadingPix" class="h-4 w-4 mr-2 animate-spin" />
+                          <QrCode v-else class="h-4 w-4 mr-2" />
+                          {{ isLoadingPix ? 'Carregando...' : 'Exibir QR Code PIX' }}
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </Transition>
+
+                <!-- PIX Form (apenas se não tem pagamento em andamento) -->
+                <Transition :css="false" @before-enter="onBeforeEnter" @enter="onEnter" @before-leave="onBeforeLeave" @leave="onLeave">
+                  <div v-if="paymentMethod === 'pix' && !currentPaymentId && !showPixQrCode">
+                    <div class="px-4 pb-4 space-y-4">
+                      <div class="p-4 bg-white rounded-lg border border-blue-200">
+                        <div class="flex items-start gap-3 mb-4">
+                          <Shield class="h-5 w-5 text-[#286AD8] mt-0.5" />
+                          <div>
+                            <p class="text-sm text-[#263238] font-medium">Informe seu CPF para gerar o QR Code</p>
+                            <p class="text-xs text-[#435574] mt-1">Obrigatório para criar a cobrança PIX</p>
+                          </div>
+                        </div>
+                        
+                        <div class="space-y-2">
+                          <Label for="pix-cpf" class="text-[#263238]">CPF do pagador *</Label>
+                          <Input
+                            id="pix-cpf"
+                            placeholder="000.000.000-00"
+                            :model-value="pixCpf"
+                            @input="handleCpfInput"
+                            maxlength="14"
+                            class="text-center text-lg font-mono"
+                          />
+                          <p class="text-xs text-[#435574]">Digite apenas os números do seu CPF</p>
+                        </div>
+
+                        <Button
+                          @click="generatePixQrCode"
+                          :disabled="!pixCpf || pixCpf.replace(/\D/g, '').length !== 11 || isLoadingPix"
+                          class="w-full mt-3 bg-[#286AD8] hover:bg-[#1e5bb8] text-white"
+                        >
+                          <Loader2 v-if="isLoadingPix" class="h-4 w-4 mr-2 animate-spin" />
+                          <QrCode v-else class="h-4 w-4 mr-2" />
+                          {{ isLoadingPix ? 'Gerando QR Code...' : 'Gerar QR Code PIX' }}
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </Transition>
+
+                <!-- PIX QR Code Display (dentro da seção PIX) -->
+                <Transition :css="false" @before-enter="onBeforeEnter" @enter="onEnter" @before-leave="onBeforeLeave" @leave="onLeave">
+                  <div v-if="paymentMethod === 'pix' && showPixQrCode && pixData" class="px-4 pb-4">
+                  <div class="p-4 bg-white rounded-lg border-2 border-[#286AD8]">
+                    <div class="flex items-center gap-2 mb-4">
+                      <CheckCircle class="h-5 w-5 text-green-600" />
+                      <h3 class="text-[#263238]">QR Code PIX Gerado</h3>
+                    </div>
+                    
+                    <div class="text-center">
+                      <div class="bg-white rounded-lg p-4 mb-4 inline-block border-2 border-[#286AD8] shadow-lg">
+                        <img
+                          :src="`data:image/png;base64,${pixData?.qrCodeImage}`"
+                          alt="QR Code PIX"
+                          class="w-64 h-64 mx-auto"
+                        />
+                      </div>
+
+                      <div class="space-y-3">
+                        <div class="flex items-center justify-center gap-2 text-sm text-[#263238] font-semibold">
+                          <QrCode class="h-4 w-4 text-[#286AD8]" />
+                          <p>Escaneie o QR Code com seu app de pagamento</p>
+                        </div>
+                        <p class="text-xs text-[#435574]">Ou copie o código PIX abaixo</p>
+
+                        <div class="flex gap-2 max-w-md mx-auto">
+                          <Input
+                            :value="pixData?.payload"
+                            readonly
+                            class="text-xs font-mono flex-1 bg-gray-100"
+                          />
+                          <div class="relative">
+                            <Button
+                              @click="copyPixCode"
+                              variant="outline"
+                              size="sm"
+                              class="shrink-0 bg-white"
+                            >
+                              <Copy class="h-4 w-4 mr-2" />
+                              Copiar
+                            </Button>
+                            <transition name="fade">
+                              <div
+                                v-if="copyFeedbackVisible"
+                                class="absolute left-1/2 -translate-x-1/2 -top-12 pointer-events-none transition-opacity duration-300"
+                                :class="copyFeedbackFading ? 'opacity-0' : 'opacity-100'"
+                              >
+                                <div class="relative bg-white/95 text-green-700 border border-green-500/90 text-xs px-3 py-2 rounded-md shadow-lg whitespace-nowrap opacity-95">
+                                  {{ copyFeedback }}
+                                  <div class="absolute left-1/2 -bottom-1.5 -translate-x-1/2 w-3 h-3 bg-white/95 border-b border-r border-green-500/90 rotate-45 shadow-sm"></div>
+                                </div>
+                              </div>
+                            </transition>
+                          </div>
+                        </div>
+
+                        <div class="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                          <div class="flex items-center gap-2 text-xs text-[#435574] font-medium">
+                            <Clock class="h-4 w-4 text-[#286AD8]" />
+                            <p>Válido até: {{ pixData?.expirationDate ? new Date(pixData.expirationDate).toLocaleString('pt-BR') : 'Hoje às 23:59' }}</p>
+                          </div>
+                          <div class="flex items-start gap-2 text-xs text-[#435574] mt-2">
+                            <Info class="h-4 w-4 text-[#286AD8]" />
+                            <p>O pagamento será confirmado automaticamente após a aprovação</p>
+                          </div>
+                        </div>
+
+                        <!-- Payment Error -->
+                        <div v-if="paymentError" class="mt-4 p-4 bg-red-50 rounded-lg border-2 border-red-300">
+                          <div class="flex items-center gap-2">
+                            <svg class="h-5 w-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <p class="text-sm text-red-800 font-semibold">{{ paymentError }}</p>
+                          </div>
+                          <Button
+                            @click="() => { paymentError = null; reloadPixQrCode(); }"
+                            class="mt-3 bg-red-600 hover:bg-red-700 text-white"
+                            size="sm"
+                          >
+                            Tentar Novamente
+                          </Button>
+                        </div>
+
+                        <!-- Payment Confirmed -->
+                        <div v-if="paymentConfirmed" class="mt-4 p-4 bg-green-100 rounded-lg border-2 border-green-400 animate-pulse">
+                          <div class="flex items-center gap-2">
+                            <CheckCircle class="h-5 w-5 text-green-700" />
+                            <p class="text-sm text-green-800 font-bold">Pagamento Confirmado!</p>
+                          </div>
+                          <p class="text-xs text-green-700 mt-2">Redirecionando para confirmação...</p>
+                        </div>
+
+                        <!-- BOTÃO DE TESTE -->
+                        <div v-if="!paymentConfirmed" class="mt-4 p-3 bg-yellow-100 border-2 border-yellow-400 border-dashed rounded-lg">
+                          <p class="text-xs text-yellow-800 font-bold mb-2 flex items-center gap-2">
+                            <AlertTriangle class="h-4 w-4 text-yellow-700" />
+                            MODO DE TESTE (REMOVER EM PRODUÇÃO)
+                          </p>
+                          <Button
+                            @click="simulatePaymentConfirmation"
+                            :disabled="isSimulatingPayment"
+                            class="w-full bg-yellow-500 hover:bg-yellow-600 text-yellow-900"
+                            size="sm"
+                          >
+                            <Loader2 v-if="isSimulatingPayment" class="h-4 w-4 mr-2 animate-spin" />
+                            <template v-else>
+                              <Zap class="h-4 w-4 mr-2" />
+                            </template>
+                            {{ isSimulatingPayment ? 'Simulando...' : 'Simular Confirmação do Pagamento' }}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  </div>
+                </Transition>
+              </div>
+
+              <!-- Credit Card Section -->
+              <div
+                :class="`border-2 rounded-lg transition-all duration-200 ${
                   paymentMethod === 'credit-card'
                     ? 'border-[#286AD8] bg-blue-50'
                     : 'border-gray-200 hover:border-gray-300'
                 }`"
               >
-                <RadioGroupItem value="credit-card" id="credit-card" />
-                <CreditCard class="h-5 w-5 text-[#286AD8]" />
-                <div class="flex-1">
-                  <p class="text-[#263238]">Cartão de Crédito</p>
-                  <p class="text-sm text-[#435574]">Parcelamento disponível</p>
+                <div class="flex items-center gap-3 p-4 cursor-pointer" @click="togglePaymentMethod('credit-card')">
+                  <div :class="`h-4 w-4 rounded-full border-2 flex items-center justify-center transition-colors ${ paymentMethod === 'credit-card' ? 'border-[#286AD8]' : 'border-gray-400' }`">
+                    <div v-if="paymentMethod === 'credit-card'" class="h-2 w-2 rounded-full bg-[#286AD8]"></div>
+                  </div>
+                  <CreditCard class="h-5 w-5 text-[#286AD8]" />
+                  <div class="flex-1">
+                    <p class="text-[#263238]">Cartão de Crédito</p>
+                    <p class="text-sm text-[#435574]">Parcelamento disponível</p>
+                  </div>
                 </div>
-              </label>
 
-              <!-- Digital Wallet -->
-              <label
-                :class="`flex items-center gap-3 p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                  paymentMethod === 'wallet'
-                    ? 'border-[#286AD8] bg-blue-50'
-                    : 'border-gray-200 hover:border-gray-300'
-                }`"
-              >
-                <RadioGroupItem value="wallet" id="wallet" />
-                <Smartphone class="h-5 w-5 text-[#286AD8]" />
-                <div class="flex-1">
-                  <p class="text-[#263238]">Carteira Digital</p>
-                  <p class="text-sm text-[#435574]">PicPay, Mercado Pago</p>
-                </div>
-              </label>
-            </div>
-          </RadioGroup>
+                <!-- Credit Card Form (inline) -->
+                <Transition :css="false" @before-enter="onBeforeEnter" @enter="onEnter" @before-leave="onBeforeLeave" @leave="onLeave">
+                  <div v-if="paymentMethod === 'credit-card'">
+                    <div class="px-4 pb-4 space-y-4">
+                      <div class="p-4 bg-white rounded-lg border border-gray-200">
+                        <div class="space-y-4">
+                          <div class="space-y-2">
+                            <Label for="card-number">Número do cartão</Label>
+                            <Input
+                              id="card-number"
+                              placeholder="0000 0000 0000 0000"
+                              :model-value="cardData.number"
+                              @input="handleCardNumberInput"
+                              maxlength="19"
+                            />
+                          </div>
 
-          <!-- PIX - Pagamento em andamento (sem QR Code visível) -->
-          <div v-if="paymentMethod === 'pix' && currentPaymentId && !showPixQrCode && !paymentConfirmed" class="mt-6 space-y-4 p-4 bg-yellow-50 rounded-lg border border-yellow-300">
-            <div class="flex items-start gap-3">
-              <Clock class="h-5 w-5 text-yellow-600 mt-0.5" />
-              <div class="flex-1">
-                <p class="text-sm text-[#263238] font-medium">Pagamento PIX em andamento</p>
-                <p class="text-xs text-[#435574] mt-1">
-                  Já existe um pagamento PIX aguardando confirmação para este serviço.
-                </p>
-                <p class="text-xs text-[#435574] mt-1">
-                  ID do Pagamento: <span class="font-mono font-medium">#{{ currentPaymentId }}</span>
-                </p>
-              </div>
-            </div>
+                          <div class="space-y-2">
+                            <Label for="card-name">Nome no cartão</Label>
+                            <Input
+                              id="card-name"
+                              placeholder="Nome como está no cartão"
+                              :model-value="cardData.name"
+                              @update:model-value="(val) => cardData.name = val as string"
+                            />
+                          </div>
 
-            <Button
-              @click="reloadPixQrCode"
-              :disabled="isLoadingPix"
-              class="w-full bg-[#286AD8] hover:bg-[#1e5bb8] text-white"
-            >
-              <Loader2 v-if="isLoadingPix" class="h-4 w-4 mr-2 animate-spin" />
-              <QrCode v-else class="h-4 w-4 mr-2" />
-              {{ isLoadingPix ? 'Carregando...' : 'Exibir QR Code PIX' }}
-            </Button>
-          </div>
+                          <div class="grid grid-cols-2 gap-4">
+                            <div class="space-y-2">
+                              <Label for="card-expiry">Validade</Label>
+                              <Input
+                                id="card-expiry"
+                                placeholder="MM/AA"
+                                :model-value="cardData.expiry"
+                                @input="handleExpiryInput"
+                                maxlength="5"
+                              />
+                            </div>
+                            <div class="space-y-2">
+                              <Label for="card-cvv">CVV</Label>
+                              <Input
+                                id="card-cvv"
+                                placeholder="123"
+                                type="password"
+                                :model-value="cardData.cvv"
+                                @update:model-value="(val) => cardData.cvv = val as string"
+                                maxlength="4"
+                              />
+                            </div>
+                          </div>
 
-          <!-- PIX Form (apenas se não tem pagamento em andamento) -->
-          <div v-if="paymentMethod === 'pix' && !currentPaymentId && !showPixQrCode" class="mt-6 space-y-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-            <div class="flex items-start gap-3 mb-4">
-              <Shield class="h-5 w-5 text-[#286AD8] mt-0.5" />
-              <div>
-                <p class="text-sm text-[#263238] font-medium">Informe seu CPF para gerar o QR Code</p>
-                <p class="text-xs text-[#435574] mt-1">Obrigatório para criar a cobrança PIX</p>
-              </div>
-            </div>
-            
-            <div class="space-y-2">
-              <Label for="pix-cpf" class="text-[#263238]">CPF do pagador *</Label>
-              <Input
-                id="pix-cpf"
-                placeholder="000.000.000-00"
-                :model-value="pixCpf"
-                @input="handleCpfInput"
-                maxlength="14"
-                class="text-center text-lg font-mono"
-              />
-              <p class="text-xs text-[#435574]">Digite apenas os números do seu CPF</p>
-            </div>
-
-            <Button
-              @click="generatePixQrCode"
-              :disabled="!pixCpf || pixCpf.replace(/\D/g, '').length !== 11 || isLoadingPix"
-              class="w-full bg-[#286AD8] hover:bg-[#1e5bb8] text-white"
-            >
-              <Loader2 v-if="isLoadingPix" class="h-4 w-4 mr-2 animate-spin" />
-              <QrCode v-else class="h-4 w-4 mr-2" />
-              {{ isLoadingPix ? 'Gerando QR Code...' : 'Gerar QR Code PIX' }}
-            </Button>
-          </div>
-
-          <!-- Credit Card Form -->
-          <div v-if="paymentMethod === 'credit-card'" class="mt-6 space-y-4 p-4 bg-gray-50 rounded-lg">
-            <div class="space-y-2">
-              <Label for="card-number">Número do cartão</Label>
-              <Input
-                id="card-number"
-                placeholder="0000 0000 0000 0000"
-                :model-value="cardData.number"
-                @input="handleCardNumberInput"
-                maxlength="19"
-              />
-            </div>
-
-            <div class="space-y-2">
-              <Label for="card-name">Nome no cartão</Label>
-              <Input
-                id="card-name"
-                placeholder="Nome como está no cartão"
-                :model-value="cardData.name"
-                @update:model-value="(val) => cardData.name = val as string"
-              />
-            </div>
-
-            <div class="grid grid-cols-2 gap-4">
-              <div class="space-y-2">
-                <Label for="card-expiry">Validade</Label>
-                <Input
-                  id="card-expiry"
-                  placeholder="MM/AA"
-                  :model-value="cardData.expiry"
-                  @input="handleExpiryInput"
-                  maxlength="5"
-                />
-              </div>
-              <div class="space-y-2">
-                <Label for="card-cvv">CVV</Label>
-                <Input
-                  id="card-cvv"
-                  placeholder="123"
-                  type="password"
-                  :model-value="cardData.cvv"
-                  @update:model-value="(val) => cardData.cvv = val as string"
-                  maxlength="4"
-                />
-              </div>
-            </div>
-
-            <div class="pt-2">
-              <Button
-                @click="handleConfirmPayment"
-                :disabled="isProcessing"
-                class="w-full bg-[#286AD8] hover:bg-[#435574] transition-colors"
-                size="lg"
-              >
-                <span v-if="isProcessing" class="flex items-center gap-2">
-                  <span class="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
-                  Processando...
-                </span>
-                <span v-else>Confirmar Pagamento</span>
-              </Button>
-              <p class="text-xs text-center text-[#435574] mt-3">
-                Ao confirmar, você concorda com os
-                <a href="#" class="text-[#286AD8] hover:underline">Termos de Serviço</a>
-                e
-                <a href="#" class="text-[#286AD8] hover:underline">Política de Privacidade</a>
-              </p>
-            </div>
-          </div>
-
-          <!-- Digital Wallet -->
-          <div v-if="paymentMethod === 'wallet'" class="mt-6 p-6 bg-gray-50 rounded-lg">
-            <p class="text-sm text-[#435574] mb-4 text-center">
-              Você será redirecionado para completar o pagamento
-            </p>
-            <div class="grid grid-cols-2 gap-3">
-              <Button variant="outline" class="w-full">PicPay</Button>
-              <Button variant="outline" class="w-full">Mercado Pago</Button>
-            </div>
-          </div>
-        </Card>
-
-        <!-- PIX QR Code Display (Após Geração) -->
-        <Card v-if="paymentMethod === 'pix' && showPixQrCode && pixData" class="p-6">
-          <div class="flex items-center gap-2 mb-4">
-            <CheckCircle class="h-5 w-5 text-green-600" />
-            <h3 class="text-[#263238]">QR Code PIX Gerado</h3>
-          </div>
-          
-          <div class="text-center">
-            <!-- QR Code Image -->
-            <div class="bg-white rounded-lg p-4 mb-4 inline-block border-2 border-[#286AD8] shadow-lg">
-              <img
-                :src="`data:image/png;base64,${pixData.qrCodeImage}`"
-                alt="QR Code PIX"
-                class="w-64 h-64 mx-auto"
-              />
-            </div>
-
-            <!-- Instructions -->
-            <div class="space-y-3">
-              <div class="flex items-center justify-center gap-2 text-sm text-[#263238] font-semibold">
-                <QrCode class="h-4 w-4 text-[#286AD8]" />
-                <p>Escaneie o QR Code com seu app de pagamento</p>
-              </div>
-              <p class="text-xs text-[#435574]">Ou copie o código PIX abaixo</p>
-
-              <!-- PIX Copy/Paste Code -->
-              <div class="flex gap-2 max-w-md mx-auto">
-                <Input
-                  :value="pixData.payload"
-                  readonly
-                  class="text-xs font-mono flex-1 bg-gray-100"
-                />
-                <div class="relative">
-                  <Button
-                    @click="copyPixCode"
-                    variant="outline"
-                    size="sm"
-                    class="shrink-0 bg-white"
-                  >
-                    <Copy class="h-4 w-4 mr-2" />
-                    Copiar
-                  </Button>
-                  <transition name="fade">
-                    <div
-                      v-if="copyFeedbackVisible"
-                      class="absolute left-1/2 -translate-x-1/2 -top-12 pointer-events-none transition-opacity duration-300"
-                      :class="copyFeedbackFading ? 'opacity-0' : 'opacity-100'"
-                    >
-                      <div class="relative bg-white/95 text-green-700 border border-green-500/90 text-xs px-3 py-2 rounded-md shadow-lg whitespace-nowrap opacity-95">
-                        {{ copyFeedback }}
-                        <div class="absolute left-1/2 -bottom-1.5 -translate-x-1/2 w-3 h-3 bg-white/95 border-b border-r border-green-500/90 rotate-45 shadow-sm"></div>
+                          <div class="pt-2">
+                            <Button
+                              @click="handleConfirmPayment"
+                              :disabled="isProcessing"
+                              class="w-full bg-[#286AD8] hover:bg-[#435574] transition-colors"
+                              size="lg"
+                            >
+                              <span v-if="isProcessing" class="flex items-center gap-2">
+                                <span class="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+                                Processando...
+                              </span>
+                              <span v-else>Confirmar Pagamento</span>
+                            </Button>
+                            <p class="text-xs text-center text-[#435574] mt-3">
+                              Ao confirmar, você concorda com os
+                              <a href="#" class="text-[#286AD8] hover:underline">Termos de Serviço</a>
+                              e
+                              <a href="#" class="text-[#286AD8] hover:underline">Política de Privacidade</a>
+                            </p>
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </transition>
-                </div>
-                <Button
-                  v-if="!paymentConfirmed"
-                  @click="reloadPixQrCode"
-                  variant="outline"
-                  size="sm"
-                  class="shrink-0 bg-white"
-                  :disabled="isLoadingPix"
-                >
-                  <Loader2 v-if="isLoadingPix" class="h-4 w-4 mr-2 animate-spin" />
-                  <RefreshCw v-else class="h-4 w-4 mr-2" />
-                  Recarregar
-                </Button>
+                  </div>
+                </Transition>
               </div>
-
-              <!-- Expiration Info -->
-              <div class="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                <div class="flex items-center gap-2 text-xs text-[#435574] font-medium">
-                  <Clock class="h-4 w-4 text-[#286AD8]" />
-                  <p>Válido até: {{ pixData.expirationDate ? new Date(pixData.expirationDate).toLocaleString('pt-BR') : 'Hoje às 23:59' }}</p>
-                </div>
-                <div class="flex items-start gap-2 text-xs text-[#435574] mt-2">
-                  <Info class="h-4 w-4 text-[#286AD8]" />
-                  <p>O pagamento será confirmado automaticamente após a aprovação</p>
-                </div>
-              </div>
-
-              <!-- Payment Error -->
-              <div v-if="paymentError" class="mt-4 p-4 bg-red-50 rounded-lg border-2 border-red-300">
-                <div class="flex items-center gap-2">
-                  <svg class="h-5 w-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <p class="text-sm text-red-800 font-semibold">
-                    {{ paymentError }}
-                  </p>
-                </div>
-                <Button
-                  @click="() => { paymentError = null; reloadPixQrCode(); }"
-                  class="mt-3 bg-red-600 hover:bg-red-700 text-white"
-                  size="sm"
-                >
-                  Tentar Novamente
-                </Button>
-              </div>
-
-              <!-- Payment Confirmed -->
-              <div v-if="paymentConfirmed" class="mt-4 p-4 bg-green-100 rounded-lg border-2 border-green-400 animate-pulse">
-                <div class="flex items-center gap-2">
-                  <CheckCircle class="h-5 w-5 text-green-700" />
-                  <p class="text-sm text-green-800 font-bold">
-                    Pagamento Confirmado!
-                  </p>
-                </div>
-                <p class="text-xs text-green-700 mt-2">
-                  Redirecionando para confirmação...
-                </p>
-              </div>
-              <!-- BOTÃO DE TESTE - REMOVER EM PRODUÇÃO -->
-              <div v-if="!paymentConfirmed" class="mt-4 p-3 bg-yellow-100 border-2 border-yellow-400 border-dashed rounded-lg">
-                <p class="text-xs text-yellow-800 font-bold mb-2 flex items-center gap-2">
-                  <AlertTriangle class="h-4 w-4 text-yellow-700" />
-                  MODO DE TESTE (REMOVER EM PRODUÇÃO)
-                </p>
-                <Button
-                  @click="simulatePaymentConfirmation"
-                  :disabled="isSimulatingPayment"
-                  class="w-full bg-yellow-500 hover:bg-yellow-600 text-yellow-900"
-                  size="sm"
-                >
-                  <Loader2 v-if="isSimulatingPayment" class="h-4 w-4 mr-2 animate-spin" />
-                  <template v-else>
-                    <Zap class="h-4 w-4 mr-2" />
-                  </template>
-                  {{ isSimulatingPayment ? 'Simulando...' : 'Simular Confirmação do Pagamento' }}
-                </Button>
-              </div>
-              <!-- FIM DO BOTÃO DE TESTE -->
-            </div>
-
-            <!-- Histórico da Solicitação -->
-            <div class="mt-8 pt-6 border-t border-gray-200">
-              <ServiceRequestTimeline
-                :request-id="props.requestId"
-                title="Histórico da Solicitação"
-              />
             </div>
           </div>
         </Card>

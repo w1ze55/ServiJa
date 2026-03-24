@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import {
-  Briefcase,
-  DollarSign,
   MapPin,
   Link as LinkIcon,
   FileText,
@@ -23,7 +21,6 @@ import Button from '../ui/button.vue'
 import Input from '../ui/input.vue'
 import Label from '../ui/label.vue'
 import Card from '../ui/card.vue'
-import Badge from '../ui/badge.vue'
 import Textarea from '../ui/textarea.vue'
 import Select from '../ui/select.vue'
 import SelectContent from '../ui/select-content.vue'
@@ -61,19 +58,12 @@ interface ProfessionalLink {
 }
 
 interface ProfessionalProfile {
-  workModel: 'presencial' | 'remoto' | 'hibrido'
-  hourlyRate: string
   serviceType: string
   bio: string
   serviceCities: ServiceCity[]
   professionalLinks: ProfessionalLink[]
 }
 
-const WORK_MODELS = [
-  { value: 'presencial', label: 'Presencial' },
-  { value: 'remoto', label: 'Remoto' },
-  { value: 'hibrido', label: 'Híbrido' },
-]
 
 const SERVICE_TYPES = [
   'Eletricista',
@@ -110,15 +100,13 @@ const BRAZILIAN_STATES = [
 ]
 
 const isLoading = ref(false)
-const isEditingWorkModel = ref(false)
+const isEditingServiceSettings = ref(false)
 const isEditingBio = ref(false)
 const isEditingLinks = ref(false)
 const isSaving = ref(false)
 
 // Profile data
 const profileData = ref<ProfessionalProfile>({
-  workModel: 'presencial',
-  hourlyRate: '',
   serviceType: '',
   bio: '',
   serviceCities: [],
@@ -181,8 +169,6 @@ const loadProfileData = async () => {
     }))
 
     profileData.value = {
-      workModel: data.workModel || 'presencial',
-      hourlyRate: data.hourlyRate?.toString() || '',
       serviceType: data.serviceType || data.category || '',
       bio: data.bio || '',
       serviceCities: mappedCities,
@@ -195,8 +181,6 @@ const loadProfileData = async () => {
     if (userString) {
       const user = JSON.parse(userString)
       profileData.value = {
-        workModel: user.workModel || 'presencial',
-        hourlyRate: user.hourlyRate?.toString() || '',
         serviceType: user.serviceType || user.category || '',
         bio: user.bio || '',
         serviceCities: [],
@@ -209,19 +193,8 @@ const loadProfileData = async () => {
   }
 }
 
-// Work Model & Service Type
-const handleSaveWorkModel = async () => {
-  if (!editedData.value.hourlyRate) {
-    toast.error('Preço base por hora é obrigatório')
-    return
-  }
-
-  const hourlyRateNum = parseFloat(editedData.value.hourlyRate.replace(',', '.'))
-  if (isNaN(hourlyRateNum) || hourlyRateNum <= 0) {
-    toast.error('Preço base deve ser um número válido maior que zero')
-    return
-  }
-
+// Service settings
+const handleSaveServiceSettings = async () => {
   if (!editedData.value.serviceType) {
     toast.error('Tipo de serviço é obrigatório')
     return
@@ -230,16 +203,12 @@ const handleSaveWorkModel = async () => {
   isSaving.value = true
   try {
     await api.put('/freelancer/profile', {
-      workModel: editedData.value.workModel,
-      hourlyRate: hourlyRateNum,
       serviceType: editedData.value.serviceType,
       category: editedData.value.serviceType,
     })
 
-    profileData.value.workModel = editedData.value.workModel
-    profileData.value.hourlyRate = editedData.value.hourlyRate
     profileData.value.serviceType = editedData.value.serviceType
-    isEditingWorkModel.value = false
+    isEditingServiceSettings.value = false
     toast.success('Configurações de trabalho atualizadas!')
   } catch (error: any) {
     const errorMessage = error.response?.data?.message || 'Erro ao atualizar configurações'
@@ -249,11 +218,9 @@ const handleSaveWorkModel = async () => {
   }
 }
 
-const handleCancelWorkModel = () => {
-  editedData.value.workModel = profileData.value.workModel
-  editedData.value.hourlyRate = profileData.value.hourlyRate
+const handleCancelServiceSettings = () => {
   editedData.value.serviceType = profileData.value.serviceType
-  isEditingWorkModel.value = false
+  isEditingServiceSettings.value = false
 }
 
 // Biography
@@ -591,16 +558,6 @@ const getLinkLabel = (link: ProfessionalLink) => {
   return linkType?.label || 'Link'
 }
 
-const formatCurrency = (value: string) => {
-  const numbers = value.replace(/\D/g, '')
-  const formatted = (parseInt(numbers) / 100).toFixed(2).replace('.', ',')
-  return formatted
-}
-
-const getWorkModelLabel = (value: string) => {
-  const model = WORK_MODELS.find((m) => m.value === value)
-  return model?.label || value
-}
 </script>
 
 <template>
@@ -617,53 +574,17 @@ const getWorkModelLabel = (value: string) => {
     </div>
 
     <template v-else>
-      <!-- Work Model, Hourly Rate & Service Type -->
+      <!-- Service Type -->
       <Card class="p-6">
         <div class="flex items-center justify-between mb-4">
           <h3 class="text-lg font-semibold text-[#263238]">Configurações de Trabalho</h3>
-          <Button v-if="!isEditingWorkModel" @click="isEditingWorkModel = true" variant="outline" size="sm">
+          <Button v-if="!isEditingServiceSettings" @click="isEditingServiceSettings = true" variant="outline" size="sm">
             <Edit class="h-4 w-4 mr-2" />
             Editar
           </Button>
         </div>
 
-        <div v-if="isEditingWorkModel" class="space-y-4">
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <!-- Modelo de Trabalho -->
-            <div class="space-y-2">
-              <Label for="workModel">Modelo de Trabalho *</Label>
-              <Select
-                :model-value="editedData.workModel"
-                @update:model-value="(val: string) => editedData.workModel = val as ProfessionalProfile['workModel']"
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o modelo" :label="WORK_MODELS.find(m => m.value === editedData.workModel)?.label" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem v-for="model in WORK_MODELS" :key="model.value" :value="model.value">
-                    {{ model.label }}
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <!-- Preço Base por Hora -->
-            <div class="space-y-2">
-              <Label for="hourlyRate">Preço Base por Hora *</Label>
-              <div class="relative">
-                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-[#435574]">R$</span>
-                <Input
-                  id="hourlyRate"
-                  :model-value="editedData.hourlyRate"
-                  @update:model-value="(val) => editedData.hourlyRate = val as string"
-                  placeholder="0,00"
-                  class="pl-10"
-                />
-              </div>
-              <p class="text-xs text-[#435574]">Este é o preço base. Você pode ajustar em cada orçamento.</p>
-            </div>
-          </div>
-
+        <div v-if="isEditingServiceSettings" class="space-y-4">
           <!-- Tipo de Serviço -->
           <div class="space-y-2">
             <Label for="serviceType">Tipo de Serviço *</Label>
@@ -684,37 +605,21 @@ const getWorkModelLabel = (value: string) => {
 
           <div class="flex gap-2 pt-4">
             <Button 
-              @click="handleSaveWorkModel" 
+              @click="handleSaveServiceSettings" 
               class="bg-[#286AD8] hover:bg-[#435574]"
               :disabled="isSaving"
             >
               <Check class="h-4 w-4 mr-2" />
               {{ isSaving ? 'Salvando...' : 'Salvar Alterações' }}
             </Button>
-            <Button @click="handleCancelWorkModel" variant="outline">
+            <Button @click="handleCancelServiceSettings" variant="outline">
               <X class="h-4 w-4 mr-2" />
               Cancelar
             </Button>
           </div>
         </div>
 
-        <div v-else class="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <p class="text-sm text-[#435574] mb-1">Modelo de Trabalho</p>
-            <div class="flex items-center gap-2">
-              <Briefcase class="h-4 w-4 text-[#286AD8]" />
-              <Badge variant="secondary">{{ getWorkModelLabel(profileData.workModel) }}</Badge>
-            </div>
-          </div>
-          <div>
-            <p class="text-sm text-[#435574] mb-1">Preço Base por Hora</p>
-            <div class="flex items-center gap-2">
-              <DollarSign class="h-4 w-4 text-green-600" />
-              <span class="text-[#263238] font-semibold">
-                R$ {{ profileData.hourlyRate || '0,00' }}
-              </span>
-            </div>
-          </div>
+        <div v-else>
           <div>
             <p class="text-sm text-[#435574] mb-1">Tipo de Serviço</p>
             <div class="flex items-center gap-2">

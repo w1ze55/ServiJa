@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import api from '@/api/config/axios';
+import { normalizeWorkModel, type WorkModelValue } from '@/utils/workModel';
 
 export interface ServiceRequestAttachment {
     id: string;
@@ -16,6 +17,8 @@ export interface FreelancerResponse {
     scope: string;
     notes?: string;
     sentAt: string;
+    milestones?: any[];
+    attachments?: ServiceRequestAttachment[];
 }
 
 export interface RequestMessage {
@@ -47,12 +50,13 @@ export interface ServiceRequest {
     description: string;
     budget: number;
     deadline: string;
-    priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
-    status: 'pending' | 'sent' | 'negotiating' | 'accepted' | 'in_progress' | 'rejected' | 'completed' | 'cancelled';
+    workModel?: WorkModelValue | null;
+    status: 'pending' | 'sent' | 'negotiating' | 'accepted' | 'in_progress' | 'delivered' | 'rejected' | 'completed' | 'cancelled';
     createdAt: string;
     address?: string;
     desiredDate?: string;
     attachments?: ServiceRequestAttachment[];
+    freelancerAttachments?: ServiceRequestAttachment[];
     freelancerResponse?: FreelancerResponse;
     counterValue?: number;
     counterDays?: number;
@@ -70,7 +74,7 @@ export interface CreateServiceRequestInput {
     description: string;
     budget: number;
     deadline: string;
-    priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+    workModel: WorkModelValue;
     address?: string;
     desiredDate?: string;
     attachments?: File[];
@@ -114,7 +118,7 @@ export const useClientRequestStore = defineStore('clientRequest', () => {
     const stats = computed<RequestStats>(() => ({
         pending: requests.value.filter((r) => r.status === 'pending' || r.status === 'sent').length,
         negotiating: requests.value.filter((r) => r.status === 'negotiating' || r.status === 'accepted').length,
-        inProgress: requests.value.filter((r) => r.status === 'in_progress').length,
+        inProgress: requests.value.filter((r) => r.status === 'in_progress' || r.status === 'delivered').length,
         completed: requests.value.filter((r) => r.status === 'completed').length,
         cancelled: requests.value.filter((r) => r.status === 'cancelled' || r.status === 'rejected').length,
     }));
@@ -129,10 +133,17 @@ export const useClientRequestStore = defineStore('clientRequest', () => {
                 ...req,
                 id: String(req.id),
                 service: req.serviceName, // Backend usa serviceName
-                priority: req.priority || 'MEDIUM',
-                status: (req.status || 'PENDING').toLowerCase(),
+                workModel: normalizeWorkModel(req.workModel),
+                status: mapApiStatusToLocal(req.status),
                 attachments: (req.attachments || []).map((url: string, idx: number) => ({
                     id: `att-${req.id}-${idx}`,
+                    name: extractFileName(url),
+                    size: '',
+                    url,
+                    type: getFileType(url),
+                })),
+                freelancerAttachments: (req.freelancerAttachments || []).map((url: string, idx: number) => ({
+                    id: `fatt-${req.id}-${idx}`,
                     name: extractFileName(url),
                     size: '',
                     url,
@@ -144,7 +155,15 @@ export const useClientRequestStore = defineStore('clientRequest', () => {
                     executionDays: req.responseDays,
                     scope: req.responseScope,
                     notes: req.responseNotes,
-                    sentAt: req.respondedAt
+                    sentAt: req.respondedAt,
+                    milestones: req.milestones,
+                    attachments: (req.responseAttachments || []).map((url: string, idx: number) => ({
+                        id: `ratt-${req.id}-${idx}`,
+                        name: extractFileName(url),
+                        size: '',
+                        url,
+                        type: getFileType(url),
+                    }))
                 } : undefined,
                 counterValue: req.counterValue,
                 counterDays: req.counterDays,
@@ -164,6 +183,21 @@ export const useClientRequestStore = defineStore('clientRequest', () => {
         return requests.value.find((r) => r.id === String(id));
     };
 
+    const mapApiStatusToLocal = (status: string): ServiceRequest['status'] => {
+        const mapping: Record<string, ServiceRequest['status']> = {
+            'PENDING': 'pending',
+            'SENT': 'sent',
+            'NEGOTIATING': 'negotiating',
+            'ACCEPTED': 'accepted',
+            'IN_PROGRESS': 'in_progress',
+            'DELIVERED': 'delivered',
+            'REJECTED': 'rejected',
+            'COMPLETED': 'completed',
+            'CANCELLED': 'cancelled',
+        };
+        return mapping[status] || 'pending';
+    };
+
     const createRequest = async (input: CreateServiceRequestInput): Promise<ServiceRequest | null> => {
         try {
             // Adequar nomes de campos para o backend
@@ -173,7 +207,7 @@ export const useClientRequestStore = defineStore('clientRequest', () => {
                 description: input.description,
                 budget: input.budget,
                 deadline: input.deadline,
-                priority: input.priority,
+                workModel: input.workModel,
                 address: input.address,
                 desiredDate: input.desiredDate,
                 freelancerId: input.freelancerId
@@ -184,8 +218,8 @@ export const useClientRequestStore = defineStore('clientRequest', () => {
                 ...response.data,
                 id: String(response.data.id),
                 service: response.data.serviceName,
-                priority: response.data.priority || 'MEDIUM',
-                status: (response.data.status || 'PENDING').toLowerCase(),
+                workModel: normalizeWorkModel(response.data.workModel),
+                status: mapApiStatusToLocal(response.data.status),
                 freelancerAvatar: response.data.freelancerAvatar,
             };
 
@@ -283,36 +317,31 @@ export const useClientRequestStore = defineStore('clientRequest', () => {
         executionDays: number,
         notes: string
     ): Promise<boolean> => {
-        try {
-            const request = requests.value.find((r) => r.id === id);
-            if (!request) return false;
+        const request = requests.value.find((r) => r.id === id);
+        if (!request) return false;
 
-            const response = await api.patch(`/service-requests/${id}/counter-proposal`, {
-                value,
-                executionDays,
-                notes
-            });
+        const response = await api.patch(`/service-requests/${id}/counter-proposal`, {
+            value,
+            executionDays,
+            notes
+        });
 
-            const updatedReq = response.data;
-            request.status = 'negotiating';
-            request.counterValue = updatedReq.counterValue;
-            request.counterDays = updatedReq.counterDays;
-            request.counterNotes = updatedReq.counterNotes;
+        const updatedReq = response.data;
+        request.status = 'negotiating';
+        request.counterValue = updatedReq.counterValue;
+        request.counterDays = updatedReq.counterDays;
+        request.counterNotes = updatedReq.counterNotes;
 
-            request.auditLog = request.auditLog || [];
-            request.auditLog.unshift({
-                id: `log-${Date.now()}`,
-                action: 'Contra proposta enviada',
-                user: 'Você (Cliente)',
-                timestamp: new Date().toISOString(),
-                details: `Valor proposto: R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} | Prazo: ${executionDays} dias`,
-            });
+        request.auditLog = request.auditLog || [];
+        request.auditLog.unshift({
+            id: `log-${Date.now()}`,
+            action: 'Contra proposta enviada',
+            user: 'Você (Cliente)',
+            timestamp: new Date().toISOString(),
+            details: `Valor proposto: R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} | Prazo: ${executionDays} dias`,
+        });
 
-            return true;
-        } catch (err) {
-            console.error('Erro ao enviar contra proposta:', err);
-            return false;
-        }
+        return true;
     };
 
     const completeService = async (id: string): Promise<boolean> => {

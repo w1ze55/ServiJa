@@ -148,6 +148,29 @@ public class WebSocketService {
     }
 
     /**
+     * Notifica sobre rejeição de contra-proposta pelo freelancer
+     */
+    public void notifyCounterProposalRejected(Long serviceRequestId, String contractorEmail, String freelancerName, String reason) {
+        Map<String, Object> message = new HashMap<>();
+        message.put("type", "COUNTER_PROPOSAL_REJECTED");
+        message.put("serviceRequestId", serviceRequestId);
+        message.put("freelancerName", freelancerName);
+        message.put("reason", reason);
+        String messageText = freelancerName + " recusou sua contra-proposta";
+        if (reason != null && !reason.trim().isEmpty()) {
+            messageText += ". Motivo: " + reason;
+        }
+        message.put("message", messageText);
+        message.put("timestamp", System.currentTimeMillis());
+        
+        String destination = "/topic/service-request/" + contractorEmail;
+        messagingTemplate.convertAndSend(destination, (Object) message);
+        
+        log.info("Notificação de contra-proposta recusada enviada para {}: solicitação {}", 
+                contractorEmail, serviceRequestId);
+    }
+
+    /**
      * Notifica sobre proposta aceita
      */
     public void notifyProposalAccepted(Long serviceRequestId, String freelancerEmail, String contractorEmail) {
@@ -188,5 +211,68 @@ public class WebSocketService {
         messagingTemplate.convertAndSend(destinationContractor, (Object) message);
         
         log.info("Notificação de cancelamento enviada: solicitação {}", serviceRequestId);
+    }
+
+    /**
+     * Notifica sobre nova avaliação recebida
+     */
+    public void notifyNewReview(Long serviceRequestId, Long reviewId, String reviewedEmail, String reviewerName, int rating) {
+        Map<String, Object> message = new HashMap<>();
+        message.put("type", "NEW_REVIEW");
+        message.put("serviceRequestId", serviceRequestId);
+        message.put("reviewId", reviewId);
+        message.put("reviewerName", reviewerName);
+        message.put("rating", rating);
+        message.put("message", reviewerName + " enviou uma avaliação de " + rating + " estrelas");
+        message.put("timestamp", System.currentTimeMillis());
+
+        String destination = "/topic/service-request/" + reviewedEmail;
+        messagingTemplate.convertAndSend(destination, (Object) message);
+
+        log.info("Notificação de nova avaliação enviada para {}: solicitação {} - {} estrelas",
+                reviewedEmail, serviceRequestId, rating);
+    }
+
+    /**
+     * Notifica que o serviço foi concluído e a avaliação está pendente
+     */
+    public void notifyReviewPending(Long serviceRequestId, String contractorEmail, String freelancerEmail, String serviceName) {
+        Map<String, Object> messageContractor = new HashMap<>();
+        messageContractor.put("type", "SERVICE_COMPLETED_REVIEW_PENDING");
+        messageContractor.put("serviceRequestId", serviceRequestId);
+        messageContractor.put("serviceName", serviceName);
+        messageContractor.put("message", "Serviço concluído! Avalie o freelancer.");
+        messageContractor.put("timestamp", System.currentTimeMillis());
+
+        Map<String, Object> messageFreelancer = new HashMap<>();
+        messageFreelancer.put("type", "SERVICE_COMPLETED_REVIEW_PENDING");
+        messageFreelancer.put("serviceRequestId", serviceRequestId);
+        messageFreelancer.put("serviceName", serviceName);
+        messageFreelancer.put("message", "Serviço concluído! Avalie o cliente.");
+        messageFreelancer.put("timestamp", System.currentTimeMillis());
+
+        String destinationContractor = "/topic/service-request/" + contractorEmail;
+        String destinationFreelancer = "/topic/service-request/" + freelancerEmail;
+        messagingTemplate.convertAndSend(destinationContractor, (Object) messageContractor);
+        messagingTemplate.convertAndSend(destinationFreelancer, (Object) messageFreelancer);
+
+        log.info("Notificação de avaliação pendente enviada: solicitação {}", serviceRequestId);
+    }
+
+    /**
+     * Notifica sobre atualizações gerais de solicitação de serviço
+     */
+    public void notifyServiceRequestUpdate(String userEmail, Long serviceRequestId, String eventType, String message, String actorName) {
+        Map<String, Object> notification = new HashMap<>();
+        notification.put("type", eventType);
+        notification.put("serviceRequestId", serviceRequestId);
+        notification.put("message", message);
+        notification.put("actorName", actorName);
+        notification.put("timestamp", System.currentTimeMillis());
+        
+        String destination = "/topic/service-request/" + userEmail;
+        messagingTemplate.convertAndSend(destination, (Object) notification);
+        
+        log.info("Notificação {} enviada para {}: solicitação {}", eventType, userEmail, serviceRequestId);
     }
 }

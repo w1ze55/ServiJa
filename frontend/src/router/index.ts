@@ -35,6 +35,11 @@ import NotFoundPage from "@/pages/NotFound/index.vue";
 import RegisterPage from "@/pages/Register/index.vue";
 import CheckoutPage from "@/pages/Checkout/index.vue";
 import PaymentSuccessPage from "@/pages/PaymentSuccess/index.vue";
+import ClienteProjectsPage from "@/pages/ClienteProjects/index.vue";
+import ClienteDeliveryApprovalPage from "@/pages/ClienteDeliveryApproval/index.vue";
+import ClienteProjectDetailPage from "@/pages/ClienteProjectDetail/index.vue";
+import RateFreelancerPage from "@/pages/RateFreelancer/index.vue";
+import RateClientPage from "@/pages/RateClient/index.vue";
 
 const routes: RouteRecordRaw[] = [
   // ============ ROTAS PÚBLICAS ============
@@ -110,6 +115,24 @@ const routes: RouteRecordRaw[] = [
     path: "/cliente-request-detail",
     name: "cliente-request-detail",
     component: ClienteRequestDetailPage,
+    meta: { requiresAuth: true, userType: "contractor" },
+  },
+  {
+    path: "/cliente-projects",
+    name: "cliente-projects",
+    component: ClienteProjectsPage,
+    meta: { requiresAuth: true, userType: "contractor" },
+  },
+  {
+    path: "/cliente-delivery-approval",
+    name: "cliente-delivery-approval",
+    component: ClienteDeliveryApprovalPage,
+    meta: { requiresAuth: true, userType: "contractor" },
+  },
+  {
+    path: "/cliente-project-detail",
+    name: "cliente-project-detail",
+    component: ClienteProjectDetailPage,
     meta: { requiresAuth: true, userType: "contractor" },
   },
 
@@ -280,6 +303,20 @@ const routes: RouteRecordRaw[] = [
     name: "payment-success",
     component: PaymentSuccessPage,
     meta: { requiresAuth: true, userType: "contractor" },
+  },
+
+  // ============ AVALIAÇÕES ============
+  {
+    path: "/rate-freelancer",
+    name: "rate-freelancer",
+    component: RateFreelancerPage,
+    meta: { requiresAuth: true, userType: "contractor" },
+  },
+  {
+    path: "/rate-client",
+    name: "rate-client",
+    component: RateClientPage,
+    meta: { requiresAuth: true, userType: "provider" },
   },
 
   // ============ PÁGINA 404 - DEVE SER A ÚLTIMA ROTA ============

@@ -92,6 +92,14 @@ export const paymentService = {
   },
 
   /**
+   * Obtém URL do recibo/comprovante via Asaas
+   */
+  async getReceiptUrl(paymentId: string): Promise<{ transactionReceiptUrl?: string; invoiceUrl?: string }> {
+    const response = await api.get(`/payments/${paymentId}/receipt-url`);
+    return response.data;
+  },
+
+  /**
    * Solicita reembolso
    */
   async requestRefund(paymentId: string, reason: string): Promise<Payment> {
