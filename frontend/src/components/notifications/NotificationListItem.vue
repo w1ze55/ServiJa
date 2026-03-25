@@ -108,15 +108,6 @@ const description = computed(() => getNotificationDescription(props.notification
               :class="unreadIndicatorClasses"
             />
             <Button
-              v-if="!notification.isRead"
-              variant="ghost"
-              size="icon"
-              :class="markReadButtonClasses"
-              @click.stop="emit('markRead', notification)"
-            >
-              <Check class="h-4 w-4" />
-            </Button>
-            <Button
               variant="ghost"
               size="icon"
               class="h-8 w-8 text-slate-500 hover:bg-red-100 hover:text-red-700"
