@@ -322,10 +322,6 @@ onUnmounted(() => {
           <h1 class="text-2xl font-bold text-[#263238] mb-2">Projetos em Andamento</h1>
           <p class="text-[#435574]">Acompanhe o progresso dos seus serviços contratados</p>
         </div>
-        <Button @click="handleRefresh" variant="outline" :disabled="store.isLoading">
-          <RefreshCw :class="`h-4 w-4 mr-2 ${store.isLoading ? 'animate-spin' : ''}`" />
-          Atualizar
-        </Button>
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
