@@ -1000,15 +1000,19 @@ onMounted(() => {
                 </div>
               </div>
 
-              <!-- Status Badge -->
-              <div class="mb-4">
-                <Badge v-if="freelancer.available" class="bg-green-100 text-green-700 hover:bg-green-100">
-                  ✓ Disponível
-                </Badge>
-                <Badge v-else variant="secondary">
-                  Indisponível
-                </Badge>
-              </div>
+                <!-- Professional Links (Compact) -->
+                <div v-if="freelancer.professionalLinks && freelancer.professionalLinks.length > 0" class="mb-8 flex flex-wrap gap-2 justify-start">
+                  <a
+                    v-for="link in freelancer.professionalLinks"
+                    :key="link.id"
+                    :href="link.url"
+                    target="_blank"
+                    class="flex items-center gap-2 px-3 py-1.5 rounded-full border border-gray-200 bg-white text-xs text-[#435574] hover:border-[#286AD8] hover:text-[#286AD8] transition-all"
+                  >
+                    <component :is="getLinkIcon(link.type)" class="h-3.5 w-3.5" />
+                    <span>{{ link.label || link.type }}</span>
+                  </a>
+                </div>
 
               <!-- Action Buttons removed as per request -->
             </div>
@@ -1191,20 +1195,6 @@ onMounted(() => {
                   <p class="text-[#435574]">
                     Galeria de trabalhos realizados ({{ portfolio.length }} itens)
                   </p>
-                </div>
-
-                <!-- Professional Links (Compact) -->
-                <div v-if="freelancer.professionalLinks && freelancer.professionalLinks.length > 0" class="mb-8 flex flex-wrap gap-2 justify-center">
-                  <a
-                    v-for="link in freelancer.professionalLinks"
-                    :key="link.id"
-                    :href="link.url"
-                    target="_blank"
-                    class="flex items-center gap-2 px-3 py-1.5 rounded-full border border-gray-200 bg-white text-xs text-[#435574] hover:border-[#286AD8] hover:text-[#286AD8] transition-all"
-                  >
-                    <component :is="getLinkIcon(link.type)" class="h-3.5 w-3.5" />
-                    <span>{{ link.label || link.type }}</span>
-                  </a>
                 </div>
 
                 <div v-if="portfolio.length > 0" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
