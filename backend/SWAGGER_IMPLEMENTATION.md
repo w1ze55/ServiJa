@@ -20,7 +20,7 @@
   - Licença Apache 2.0
 - Servidores configurados:
   - Local (http://localhost:8080)
-  - Produção (https://api.servija.com)
+  - Produção (https://servija.app)
 - Esquema de segurança JWT (Bearer Token)
 
 #### `SecurityConfig.java`
