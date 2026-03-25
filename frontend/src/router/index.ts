@@ -31,6 +31,7 @@ import ContractsPage from "@/pages/Contracts/index.vue";
 import FreelancerKYCPage from "@/pages/FreelancerKYC/index.vue";
 import FreelancerAccountSettingsPage from "@/pages/FreelancerAccountSettings/index.vue";
 import ProviderProfilePage from "@/pages/ProviderProfile/index.vue";
+import ServiceDetailPage from "@/pages/ServiceDetail/index.vue";
 import NotFoundPage from "@/pages/NotFound/index.vue";
 import RegisterPage from "@/pages/Register/index.vue";
 import CheckoutPage from "@/pages/Checkout/index.vue";
@@ -279,6 +280,15 @@ const routes: RouteRecordRaw[] = [
     path: "/provider-profile/:providerId",
     name: "provider-profile",
     component: ProviderProfilePage,
+    meta: { requiresAuth: true },
+    props: true,
+  },
+
+  // Service Detail Page
+  {
+    path: "/provider-profile/:providerId/service/:serviceId",
+    name: "service-detail",
+    component: ServiceDetailPage,
     meta: { requiresAuth: true },
     props: true,
   },

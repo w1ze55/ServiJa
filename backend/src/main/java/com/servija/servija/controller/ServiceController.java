@@ -185,6 +185,22 @@ public class ServiceController {
         }
     }
 
+    @GetMapping("/public/{id}")
+    @Operation(summary = "Obter serviço por ID (público)", description = "Retorna os detalhes de um serviço ativo específico")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Serviço encontrado", content = @Content(schema = @Schema(implementation = ServiceResponse.class))),
+            @ApiResponse(responseCode = "404", description = "Serviço não encontrado ou inativo")
+    })
+    public ResponseEntity<ServiceResponse> getPublicServiceById(
+            @Parameter(description = "ID do serviço", required = true) @PathVariable Long id) {
+        try {
+            ServiceResponse service = serviceService.getPublicServiceById(id);
+            return ResponseEntity.ok(service);
+        } catch (Exception e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
     @GetMapping("/public/freelancer/{id}")
     @Operation(summary = "Listar todos os serviços ativos de um freelancer (público)", description = "Retorna todos os serviços ativos de um freelancer específico")
     @ApiResponses(value = {
