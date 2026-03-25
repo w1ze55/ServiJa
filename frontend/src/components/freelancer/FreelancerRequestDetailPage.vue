@@ -1174,15 +1174,15 @@ const getStatusBadge = (currentProposal: Proposal) => {
                   :model-value="proposalForm.executionDays"
                   @update:model-value="(val) => handleExecutionDaysInput(val as string)"
                   @keydown="handleExecutionDaysKeydown"
-                  placeholder="Ex: 15"
-                  class="pr-28"
+                  placeholder="Quantidade de dias"
+                  class="pr-24"
                 />
-                <span
-                  v-if="executionTimeLabel"
-                  class="absolute top-1/2 right-2 -translate-y-1/2 flex items-center px-3 py-0.5 rounded-full bg-blue-50 text-[11px] font-medium text-[#286AD8] pointer-events-none whitespace-nowrap shadow-sm"
-                >
-                  {{ executionTimeLabel }}
-                </span>
+                <div class="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2 pointer-events-none">
+                  <span class="text-xs text-gray-400 font-medium">dia(s)</span>
+                  <Badge v-if="executionTimeLabel" variant="secondary" class="bg-blue-50 text-[#286AD8] border-[#286AD8]/20 px-2 h-6 text-[10px]">
+                    {{ executionTimeLabel }}
+                  </Badge>
+                </div>
               </div>
             </div>
           </div>
