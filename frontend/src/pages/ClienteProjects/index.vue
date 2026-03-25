@@ -403,11 +403,6 @@ onUnmounted(() => {
               </SelectItem>
             </SelectContent>
           </Select>
-
-          <Button variant="outline" class="w-full md:w-auto">
-            <Filter class="h-4 w-4 mr-2" />
-            Filtros
-          </Button>
         </div>
       </Card>
 
