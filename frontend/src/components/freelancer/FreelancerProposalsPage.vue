@@ -623,11 +623,6 @@ watch(currentTab, () => {
                       </div>
                       <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-[#435574]">
                         <span class="flex items-center gap-1">
-                          <Avatar class="h-4 w-4">
-                            <AvatarFallback class="bg-gray-300 text-[10px]">
-                              {{ getInitials(proposal.clientName) }}
-                            </AvatarFallback>
-                          </Avatar>
                           {{ proposal.clientName }}
                         </span>
                         <span class="flex items-center gap-1">
