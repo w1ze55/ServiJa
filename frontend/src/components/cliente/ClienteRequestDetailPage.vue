@@ -48,6 +48,7 @@ import AlertDialogHeader from '../ui/alert-dialog-header.vue';
 import AlertDialogTitle from '../ui/alert-dialog-title.vue';
 import { useClientRequestStore, type ServiceRequest } from '@/stores/clientRequestStore';
 import ServiceRequestTimeline from '../service/ServiceRequestTimeline.vue';
+import ChatBox from '../shared/ChatBox.vue';
 import { formatApiDate } from '@/utils/apiDate';
 import { toast } from '@/utils/toast';
 import { getStatusLabel } from '@/utils/statusTranslations';
@@ -62,7 +63,6 @@ const props = defineProps<Props>();
 const store = useClientRequestStore();
 
 const request = ref<ServiceRequest | null>(null);
-const newMessage = ref('');
 const isSendingMessage = ref(false);
 const showCancelDialog = ref(false);
 const cancelReason = ref('');
@@ -185,15 +185,18 @@ const goBack = () => {
   props.onNavigate('requests');
 };
 
-const handleSendMessage = async () => {
-  if (!request.value || !newMessage.value.trim()) return;
+const handleSendMessage = async (message: string, attachments: File[]) => {
+  if (!request.value) return;
 
   isSendingMessage.value = true;
-  const success = await store.sendMessage(request.value.id, newMessage.value.trim());
+  const success = await store.sendMessage(
+    request.value.id,
+    message,
+    attachments.length > 0 ? attachments : undefined
+  );
   isSendingMessage.value = false;
 
   if (success) {
-    newMessage.value = '';
     toast.success('Mensagem enviada');
   } else {
     toast.error('Erro ao enviar mensagem');
@@ -613,53 +616,13 @@ const getStatusColor = (status: string) => {
       <Card v-if="activeSection === 'messages'" class="p-6">
         <h3 class="font-semibold text-[#263238] mb-4">Mensagens</h3>
 
-        <div v-if="!request.messages || request.messages.length === 0" class="text-center py-8">
-          <MessageSquare class="h-10 w-10 text-gray-300 mx-auto mb-3" />
-          <p class="text-[#435574]">Nenhuma mensagem ainda</p>
-        </div>
-
-        <div v-else class="space-y-4 max-h-96 overflow-y-auto mb-4">
-          <div
-            v-for="msg in request.messages"
-            :key="msg.id"
-            :class="`flex ${msg.sender === 'client' ? 'justify-end' : 'justify-start'}`"
-          >
-            <div
-              :class="`max-w-[80%] rounded-lg p-3 ${
-                msg.sender === 'client'
-                  ? 'bg-[#286AD8] text-white'
-                  : 'bg-gray-100 text-[#263238]'
-              }`"
-            >
-              <p class="text-xs font-medium mb-1 opacity-80">{{ msg.senderName }}</p>
-              <p class="text-sm">{{ msg.message }}</p>
-              <p class="text-xs mt-1 opacity-60">{{ formatDate(msg.timestamp) }}</p>
-            </div>
-          </div>
-        </div>
-
-        <!-- Message Input -->
-        <div v-if="request.status === 'in_progress' || request.status === 'delivered'" class="flex gap-2">
-          <Textarea
-            v-model="newMessage"
-            placeholder="Digite sua mensagem..."
-            :rows="2"
-            class="flex-1"
-          />
-          <Button
-            @click="handleSendMessage"
-            :disabled="!newMessage.trim() || isSendingMessage"
-            class="bg-[#286AD8] hover:bg-[#435574]"
-          >
-            <Send class="h-4 w-4" />
-          </Button>
-        </div>
-        <div v-else class="flex items-center justify-center p-4 bg-gray-50 rounded-lg border border-dashed border-gray-200">
-          <p class="text-sm text-[#435574] flex items-center gap-2 text-center">
-            <Lock class="h-4 w-4 text-amber-500" />
-            O chat será liberado automaticamente após a confirmação do pagamento.
-          </p>
-        </div>
+        <ChatBox
+          :messages="request.messages || []"
+          current-user-role="client"
+          :is-locked="request.status !== 'in_progress' && request.status !== 'delivered'"
+          :is-sending="isSendingMessage"
+          @send-message="handleSendMessage"
+        />
       </Card>
 
       <ServiceRequestTimeline
