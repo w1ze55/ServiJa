@@ -419,10 +419,6 @@ watch(currentTab, () => {
         <h1 class="text-2xl font-bold text-[#263238] mb-2">Solicitações Recebidas</h1>
         <p class="text-[#435574]">Gerencie as propostas enviadas pelos clientes</p>
       </div>
-      <Button @click="handleRefresh" variant="outline" :disabled="proposalStore.isLoading" class="self-start">
-        <RefreshCw :class="`h-4 w-4 mr-2 ${proposalStore.isLoading ? 'animate-spin' : ''}`" />
-        Atualizar
-      </Button>
     </div>
 
     <!-- Stats Cards -->
