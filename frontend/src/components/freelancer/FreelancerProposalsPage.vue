@@ -74,7 +74,7 @@ const proposalStore = useProposalStore();
 const searchQuery = ref('');
 const categoryFilter = ref('Todas as categorias');
 const sortBy = ref('Mais recentes');
-const timeFilter = ref('Últimos 7 dias');
+const timeFilter = ref('Mês atual');
 const customDateFrom = ref('');
 const customDateTo = ref('');
 const currentTab = ref('all');
@@ -515,7 +515,7 @@ watch(currentTab, () => {
 
         <Select :model-value="timeFilter" @update:model-value="(val: string) => { timeFilter = val; currentPage = 1; }">
           <SelectTrigger>
-            <SelectValue placeholder="Últimos 7 dias" />
+            <SelectValue placeholder="Mês atual" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="Hoje">Hoje</SelectItem>
