@@ -169,7 +169,21 @@ const freelancerGroups = computed(() => {
   return Object.values(groups);
 });
 
-const totalFreelancers = computed(() => freelancerGroups.value.length);
+const freelancerResults = computed(() =>
+  freelancerGroups.value.map((group) => ({
+    id: group.freelancerId,
+    name: group.freelancerName,
+    avatar: group.freelancerProfilePhoto,
+    category: Array.from(new Set(group.services.map((s) => s.category))).join(', '),
+    categories: Array.from(new Set(group.services.map((s) => s.category))),
+    servicesCount: group.services.length,
+    rating: 5.0,
+    reviewCount: 0,
+    isAvailable: true,
+  }))
+);
+
+const totalFreelancers = computed(() => freelancerResults.value.length);
 
 const toggleFavoriteService = (id: number | string) => {
   favoritesStore.toggleFavoriteService(id);
@@ -222,10 +236,6 @@ onMounted(() => {
           Encontre profissionais qualificados com serviços cadastrados na plataforma
         </p>
       </div>
-      <Button @click="loadServices" variant="outline" :disabled="isLoading" class="self-start md:self-auto">
-        <RefreshCw :class="`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`" />
-        Atualizar
-      </Button>
     </div>
 
     <!-- Mode Toggle -->
@@ -362,7 +372,7 @@ onMounted(() => {
         </p>
       </div>
 
-      <div v-if="freelancerGroups.length === 0" class="text-center py-16">
+      <div v-if="freelancerResults.length === 0" class="text-center py-16">
         <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
           <Search class="h-8 w-8 text-[#435574]" />
         </div>
@@ -373,25 +383,86 @@ onMounted(() => {
         </Button>
       </div>
 
-      <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div v-else-if="viewMode === 'grid'" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <FreelancerCard
-          v-for="group in freelancerGroups"
-          :key="group.freelancerId"
-          :freelancer="{
-            id: group.freelancerId,
-            name: group.freelancerName,
-            avatar: group.freelancerProfilePhoto,
-            category: Array.from(new Set(group.services.map(s => s.category))).join(', '),
-            categories: Array.from(new Set(group.services.map(s => s.category))),
-            servicesCount: group.services.length,
-            rating: 5.0,
-            reviewCount: 0,
-            isAvailable: true
-          }"
-          :is-favorite="isFavoriteFreelancer(group.freelancerId)"
+          v-for="freelancer in freelancerResults"
+          :key="freelancer.id"
+          :freelancer="freelancer"
+          :is-favorite="isFavoriteFreelancer(freelancer.id)"
           @view-profile="handleViewProfile"
           @toggle-favorite="toggleFavoriteFreelancer"
         />
+      </div>
+
+      <div v-else class="space-y-4">
+        <Card
+          v-for="freelancer in freelancerResults"
+          :key="freelancer.id"
+          class="p-5 hover:shadow-md hover:border-[#286AD8]/30 transition-all cursor-pointer group"
+          @click="handleViewProfile(freelancer.id)"
+        >
+          <div class="flex gap-4">
+            <div class="flex h-16 w-16 flex-shrink-0 items-center justify-center overflow-hidden rounded-full border border-blue-100 bg-blue-50 text-lg font-bold text-[#286AD8]">
+              <img
+                v-if="freelancer.avatar"
+                :src="freelancer.avatar"
+                :alt="freelancer.name"
+                class="h-full w-full object-cover"
+              />
+              <template v-else>
+                {{ getInitials(freelancer.name) }}
+              </template>
+            </div>
+
+            <div class="min-w-0 flex-1">
+              <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0">
+                  <h3 class="font-semibold text-[#263238] group-hover:text-[#286AD8] transition-colors mb-1">
+                    {{ freelancer.name }}
+                  </h3>
+                  <p class="text-sm text-[#435574]">
+                    {{ freelancer.servicesCount }} {{ freelancer.servicesCount === 1 ? 'serviço cadastrado' : 'serviços cadastrados' }}
+                  </p>
+                </div>
+
+                <div class="flex items-center gap-2 flex-shrink-0">
+                  <button
+                    @click.stop="toggleFavoriteFreelancer(freelancer.id)"
+                    :class="`p-2 rounded-full transition-all ${
+                      isFavoriteFreelancer(freelancer.id)
+                        ? 'text-red-500 bg-red-50'
+                        : 'text-gray-400 hover:text-red-500 hover:bg-red-50'
+                    }`"
+                  >
+                    <Heart :class="`h-4 w-4 ${isFavoriteFreelancer(freelancer.id) ? 'fill-current' : ''}`" />
+                  </button>
+                  <ChevronRight class="h-5 w-5 text-gray-300 group-hover:text-[#286AD8] transition-colors" />
+                </div>
+              </div>
+
+              <p class="mt-3 text-sm text-[#435574] line-clamp-2">
+                Atua em {{ freelancer.category }}.
+              </p>
+
+              <div class="mt-3 flex flex-wrap gap-2">
+                <Badge
+                  v-for="category in freelancer.categories.slice(0, 3)"
+                  :key="category"
+                  variant="secondary"
+                  class="text-xs"
+                >
+                  {{ category }}
+                </Badge>
+                <span
+                  v-if="freelancer.categories.length > 3"
+                  class="self-center text-xs text-[#435574]"
+                >
+                  +{{ freelancer.categories.length - 3 }}
+                </span>
+              </div>
+            </div>
+          </div>
+        </Card>
       </div>
     </template>
 
