@@ -611,11 +611,6 @@ watch(currentTab, () => {
                       </div>
                       <div class="flex items-center gap-3 text-sm text-[#435574] flex-wrap">
                         <span v-if="request.freelancerName" class="flex items-center gap-1">
-                          <Avatar class="h-4 w-4">
-                            <AvatarFallback class="bg-gray-300 text-[10px]">
-                              {{ getInitials(request.freelancerName) }}
-                            </AvatarFallback>
-                          </Avatar>
                           {{ request.freelancerName }}
                         </span>
                         <span v-if="request.address" class="flex items-center gap-1">
