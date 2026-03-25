@@ -371,7 +371,6 @@ onMounted(() => {
           {{ totalFreelancers === 1 ? 'profissional encontrado' : 'profissionais encontrados' }}
         </p>
       </div>
-
       <div v-if="freelancerResults.length === 0" class="text-center py-16">
         <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
           <Search class="h-8 w-8 text-[#435574]" />
