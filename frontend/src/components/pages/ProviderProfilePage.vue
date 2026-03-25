@@ -1565,7 +1565,7 @@ onMounted(() => {
 
             <!-- Freelancer Stats Bar -->
             <div class="bg-gray-50 rounded-2xl p-6 mb-10">
-              <div class="grid grid-cols-3 gap-8 text-center">
+              <div class="grid grid-cols-2 gap-8 text-center">
                 <div>
                   <p class="text-2xl font-black text-[#263238]">{{ freelancer?.completedJobs || 0 }}</p>
                   <p class="text-xs font-bold text-[#435574] uppercase tracking-wider">Trabalhos Concluídos</p>
@@ -1573,10 +1573,6 @@ onMounted(() => {
                 <div>
                   <p class="text-2xl font-black text-[#263238]">{{ freelancer?.rating?.toFixed(1) || '0.0' }}</p>
                   <p class="text-xs font-bold text-[#435574] uppercase tracking-wider">Avaliação Média</p>
-                </div>
-                <div>
-                  <p class="text-2xl font-black text-[#263238]">95%</p>
-                  <p class="text-xs font-bold text-[#435574] uppercase tracking-wider">Taxa de Sucesso</p>
                 </div>
               </div>
             </div>
