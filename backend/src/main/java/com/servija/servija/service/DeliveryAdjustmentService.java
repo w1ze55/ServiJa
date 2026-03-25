@@ -29,6 +29,7 @@ public class DeliveryAdjustmentService {
     private final UserRepository userRepository;
     private final ServiceRequestHistoryService historyService;
     private final WebSocketService notificationService;
+    private final NotificationService persistedNotificationService;
 
     @Transactional
     public DeliveryAdjustmentResponse requestAdjustment(Long serviceRequestId, DeliveryAdjustmentRequest request, String contractorEmail) {
@@ -82,6 +83,7 @@ public class DeliveryAdjustmentService {
                     contractor.getName() + " solicitou ajustes na entrega",
                     contractor.getName()
             );
+            persistedNotificationService.notifyAdjustmentsRequested(serviceRequest, contractor);
         }
 
         log.info("Ajuste {} criado com sucesso para solicitação {}", adjustment.getId(), serviceRequestId);
@@ -159,6 +161,14 @@ public class DeliveryAdjustmentService {
                 "ADJUSTMENT_STATUS_CHANGED",
                 "Status do ajuste atualizado: " + statusLabel,
                 freelancer.getName()
+        );
+        persistedNotificationService.notifyStatusUpdated(
+                adjustment.getServiceRequest(),
+                adjustment.getRequestedBy(),
+                freelancer,
+                "Status do ajuste atualizado: " + statusLabel,
+                adjustment.getStatus().name(),
+                "cliente-project-detail"
         );
 
         log.info("Status do ajuste {} atualizado para {}", adjustmentId, update.getStatus());

@@ -318,9 +318,6 @@ onUnmounted(() => {
   >
     <div class="max-w-7xl mx-auto space-y-6 p-6">
       <div class="flex items-center gap-4 mb-4">
-        <Button @click="handleBack" variant="ghost" size="icon">
-          <ArrowLeft class="h-5 w-5" />
-        </Button>
         <div class="flex-1">
           <h1 class="text-2xl font-bold text-[#263238] mb-2">Projetos em Andamento</h1>
           <p class="text-[#435574]">Acompanhe o progresso dos seus serviços contratados</p>

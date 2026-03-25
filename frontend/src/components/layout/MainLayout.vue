@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from "vue";
+import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useRouter } from "vue-router";
 import {
   Home,
@@ -40,10 +40,15 @@ import DropdownMenuTrigger from "../ui/dropdown-menu-trigger.vue";
 import logo from "@/assets/favicon-32x32.png";
 import api from "@/api/config/axios";
 import { useUserStore } from "@/stores/userStore";
+import { useNotificationStore } from "@/stores/notificationStore";
+import { useNotificationsRealtime } from "@/composables/useNotificationsRealtime";
 import PendingReviewBanner from "../shared/PendingReviewBanner.vue";
+import NotificationsDropdown from "@/components/notifications/NotificationsDropdown.vue";
+import type { NotificationStreamEvent } from "@/types/notifications";
 
 const router = useRouter();
 const userStore = useUserStore();
+const notificationStore = useNotificationStore();
 
 interface User {
   id: string;
@@ -73,6 +78,7 @@ const props = defineProps<Props>();
 
 // Usar o usuário da store se disponível, caso contrário usar das props
 const currentUser = computed(() => userStore.user || props.user);
+let notificationConnection: ReturnType<typeof useNotificationsRealtime> | null = null;
 
 // Watch para debug
 watch(
@@ -83,6 +89,24 @@ watch(
       new: newAvatar,
     });
   },
+);
+
+watch(
+  () => currentUser.value?.email,
+  (email) => {
+    notificationConnection?.disconnect();
+    notificationConnection = null;
+
+    if (!email) {
+      return;
+    }
+
+    notificationConnection = useNotificationsRealtime(email);
+    notificationConnection.connect().catch((error) => {
+      console.error("Erro ao conectar stream de notificações:", error);
+    });
+  },
+  { immediate: true },
 );
 
 const sidebarOpen = ref(false);
@@ -196,12 +220,22 @@ const openMap = () => {
 // Lifecycle
 onMounted(() => {
   loadUserAddresses();
+  notificationStore.ensurePreviewLoaded();
+
+  window.addEventListener("notification-stream-event", handleNotificationStreamEvent as EventListener);
+
   // Carregar estado do pin da sidebar
   const pinnedState = localStorage.getItem("sidebarPinned");
   if (pinnedState === "true") {
     sidebarPinned.value = true;
     sidebarExpanded.value = true;
   }
+});
+
+onUnmounted(() => {
+  window.removeEventListener("notification-stream-event", handleNotificationStreamEvent as EventListener);
+  notificationConnection?.disconnect();
+  notificationConnection = null;
 });
 
 const toggleSidebarPin = () => {
@@ -274,6 +308,11 @@ const getInitials = (name: string) => {
     .join("")
     .toUpperCase()
     .slice(0, 2);
+};
+
+const handleNotificationStreamEvent = (event: Event) => {
+  const streamEvent = (event as CustomEvent<NotificationStreamEvent>).detail;
+  notificationStore.applyStreamEvent(streamEvent);
 };
 </script>
 
@@ -566,28 +605,16 @@ const getInitials = (name: string) => {
               @click="sidebarOpen = true"
               class="lg:hidden text-[#263238] hover:text-[#435574]"
             >
-              <Menu class="h-6 w-6" />
+              <Menu class="h-6 w-6"/>
             </button>
-
-            <!-- Logo - visible on desktop only -->
-            <div class="hidden lg:block">
-              <h2 class="text-[#263238]">Servi Já</h2>
-            </div>
 
             <!-- Spacer -->
-            <div class="flex-1" />
+            <div class="flex-1"/>
 
-            <!-- Notifications Button -->
-            <button
-              @click="props.onNavigate('notifications')"
-              class="relative p-2 text-[#435574] hover:bg-gray-100 rounded-lg transition-colors"
-            >
-              <Bell class="h-6 w-6" />
-              <!-- Notification Badge -->
-              <span
-                class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"
-              />
-            </button>
+            <!-- Notifications Dropdown -->
+            <NotificationsDropdown
+              :user-type="currentUser.type === 'provider' ? 'provider' : 'contractor'"
+            />
 
             <!-- User Menu -->
             <DropdownMenu>
