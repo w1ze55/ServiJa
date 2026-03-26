@@ -203,10 +203,6 @@ const handleViewProject = (projectId: string) => {
   router.push(`/cliente-project-detail?requestId=${projectId}`);
 };
 
-const handleApproveDelivery = (projectId: string) => {
-  router.push(`/cliente-delivery-approval?requestId=${projectId}&from=projects`);
-};
-
 const handleChat = (projectId: string) => {
   router.push(`/messages?projectId=${projectId}`);
 };
@@ -322,17 +318,10 @@ onUnmounted(() => {
   >
     <div class="max-w-7xl mx-auto space-y-6 p-6">
       <div class="flex items-center gap-4 mb-4">
-        <Button @click="handleBack" variant="ghost" size="icon">
-          <ArrowLeft class="h-5 w-5" />
-        </Button>
         <div class="flex-1">
-          <h1 class="text-2xl font-bold text-[#263238] mb-2">Meus Projetos</h1>
+          <h1 class="text-2xl font-bold text-[#263238] mb-2">Projetos em Andamento</h1>
           <p class="text-[#435574]">Acompanhe o progresso dos seus serviços contratados</p>
         </div>
-        <Button @click="handleRefresh" variant="outline" :disabled="store.isLoading">
-          <RefreshCw :class="`h-4 w-4 mr-2 ${store.isLoading ? 'animate-spin' : ''}`" />
-          Atualizar
-        </Button>
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -410,11 +399,6 @@ onUnmounted(() => {
               </SelectItem>
             </SelectContent>
           </Select>
-
-          <Button variant="outline" class="w-full md:w-auto">
-            <Filter class="h-4 w-4 mr-2" />
-            Filtros
-          </Button>
         </div>
       </Card>
 
@@ -534,16 +518,6 @@ onUnmounted(() => {
                   <p class="text-xs text-[#435574]">{{ getTimeAgo(getLastActivityAt(project)) }}</p>
 
                   <div class="flex items-center gap-2">
-                    <Button
-                      v-if="project.status === 'delivered'"
-                      @click.stop="handleApproveDelivery(project.id)"
-                      class="bg-[#286AD8] hover:bg-[#435574]"
-                      size="sm"
-                    >
-                      <CheckCircle class="h-4 w-4 mr-2" />
-                      Aprovar Entrega
-                    </Button>
-
                     <Button
                       @click.stop="handleViewProject(project.id)"
                       variant="outline"

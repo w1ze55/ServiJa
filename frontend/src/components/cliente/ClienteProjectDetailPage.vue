@@ -6,6 +6,7 @@ import {
   MapPin,
   MessageSquare,
   CheckCircle,
+  AlertCircle,
   Lock,
   Sparkles,
   Send,
@@ -16,6 +17,7 @@ import Button from '../ui/button.vue';
 import Input from '../ui/input.vue';
 import Card from '../ui/card.vue';
 import Badge from '../ui/badge.vue';
+import DeliveryAdjustmentModal from './DeliveryAdjustmentModal.vue';
 import Avatar from '../ui/avatar.vue';
 import AvatarFallback from '../ui/avatar-fallback.vue';
 import AvatarImage from '../ui/avatar-image.vue';
@@ -26,6 +28,7 @@ import TabsList from '../ui/tabs-list.vue';
 import TabsTrigger from '../ui/tabs-trigger.vue';
 import FileAttachment from '../shared/FileAttachment.vue';
 import { useClientRequestStore, type ServiceRequest } from '@/stores/clientRequestStore';
+import { useDeliveryAdjustmentStore } from '@/stores/deliveryAdjustmentStore';
 import ServiceRequestTimeline from '../service/ServiceRequestTimeline.vue';
 import { useServiceRequestWebSocket, type ServiceRequestNotification } from '@/composables/useServiceRequestWebSocket';
 import { formatApiDate } from '@/utils/apiDate';
@@ -39,11 +42,13 @@ interface Props {
 
 const props = defineProps<Props>();
 const store = useClientRequestStore();
+const adjustmentStore = useDeliveryAdjustmentStore();
 
 const request = ref<ServiceRequest | null>(null);
 const activeTab = ref('details');
 const newMessage = ref('');
 const isSendingMessage = ref(false);
+const showAdjustmentModal = ref(false);
 let wsConnection: ReturnType<typeof useServiceRequestWebSocket> | null = null;
 
 const clientAttachments = computed(() => request.value?.attachments || []);
@@ -54,6 +59,7 @@ const professionalAttachments = computed(() => [
 const hasProjectAttachments = computed(() =>
   clientAttachments.value.length > 0 || professionalAttachments.value.length > 0
 );
+const adjustmentAlreadyUsed = computed(() => adjustmentStore.adjustments.length > 0);
 
 const loadData = async (preserveCurrent = false) => {
   const loadedRequest = await store.loadRequestById(props.requestId);
@@ -69,6 +75,11 @@ const loadData = async (preserveCurrent = false) => {
       await store.loadHistory(props.requestId);
     }
   }
+};
+
+const loadAdjustments = async () => {
+  if (!props.requestId) return;
+  await adjustmentStore.getAdjustmentsByServiceRequest(parseInt(props.requestId));
 };
 
 const getUserEmail = () => {
@@ -102,6 +113,7 @@ const handleServiceRequestNotification = async (event: Event) => {
 
 onMounted(async () => {
   await loadData();
+  await loadAdjustments();
 
   const userEmail = getUserEmail();
   if (userEmail) {
@@ -123,6 +135,7 @@ onUnmounted(() => {
 watch(() => props.requestId, async (newId, oldId) => {
   if (newId && newId !== oldId) {
     await loadData();
+    await loadAdjustments();
   }
 });
 
@@ -175,6 +188,28 @@ const handleApproveDelivery = () => {
   props.onNavigate('cliente-delivery-approval', { requestId: props.requestId });
 };
 
+const handleOpenAdjustmentModal = () => {
+  showAdjustmentModal.value = true;
+};
+
+const handleRequestAdjustments = async (reason: string) => {
+  const success = await adjustmentStore.requestAdjustment(parseInt(props.requestId), reason);
+
+  if (success) {
+    toast.success('Solicitacao de ajustes enviada ao freelancer.');
+    await loadAdjustments();
+    await loadData(true);
+    return true;
+  }
+
+  toast.error('Erro ao enviar solicitacao. Tente novamente.');
+  return false;
+};
+
+const handleGoToChat = () => {
+  activeTab.value = 'messages';
+};
+
 const progress = computed(() => {
   if (!request.value) return 0;
   switch (request.value.status) {
@@ -224,6 +259,14 @@ const getStatusColor = (status: string) => {
         <p class="text-[#435574]">Acompanhamento detalhado do seu projeto</p>
       </div>
       <div v-if="request?.status === 'delivered'" class="flex items-center gap-2">
+        <Button
+          @click="handleOpenAdjustmentModal"
+          variant="outline"
+          class="border-yellow-500 text-yellow-700 hover:bg-yellow-50"
+        >
+          <AlertCircle class="h-4 w-4 mr-2" />
+          Solicitar Ajustes
+        </Button>
         <Button @click="handleApproveDelivery" class="bg-green-600 hover:bg-green-700">
           <CheckCircle class="h-4 w-4 mr-2" />
           Aprovar Entrega
@@ -231,7 +274,7 @@ const getStatusColor = (status: string) => {
       </div>
     </div>
 
-    <Card v-if="request" class="p-6 bg-gradient-to-r from-blue-50 to-white border-blue-100 shadow-sm">
+    <Card v-if="request" class="p-6 bg-white border shadow-sm">
       <div class="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div class="flex-1 space-y-2">
           <div class="flex items-center justify-between text-sm mb-1">
@@ -246,15 +289,10 @@ const getStatusColor = (status: string) => {
             Status atual: <span class="font-semibold">{{ getStatusLabel(request.status) }}</span>
           </p>
         </div>
-
         <div class="flex items-center gap-8 px-6 border-l hidden md:flex">
           <div class="text-center">
             <p class="text-xs text-[#435574] uppercase tracking-wider mb-1">Início</p>
             <p class="font-semibold text-[#263238]">{{ formatApiDate(request.createdAt, { day: '2-digit', month: '2-digit', year: 'numeric' }) }}</p>
-          </div>
-          <div class="text-center">
-            <p class="text-xs text-[#435574] uppercase tracking-wider mb-1">Investimento</p>
-            <p class="font-bold text-green-600">{{ formatCurrency(request.freelancerResponse?.value || request.budget) }}</p>
           </div>
         </div>
       </div>
@@ -442,6 +480,15 @@ const getStatusColor = (status: string) => {
         </Card>
       </div>
     </div>
+
+    <DeliveryAdjustmentModal
+      v-model:open="showAdjustmentModal"
+      :service-name="request?.service"
+      :adjustment-already-used="adjustmentAlreadyUsed"
+      :is-loading="adjustmentStore.isLoading"
+      :on-submit="handleRequestAdjustments"
+      :on-go-to-chat="handleGoToChat"
+    />
   </div>
 </template>
 

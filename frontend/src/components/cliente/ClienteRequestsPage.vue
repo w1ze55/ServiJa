@@ -422,12 +422,6 @@ watch(currentTab, () => {
         <h1 class="text-2xl font-bold text-[#263238] mb-2">Minhas Solicitações</h1>
         <p class="text-[#435574]">Gerencie seus pedidos de orçamento enviados a profissionais</p>
       </div>
-      <div class="flex items-center gap-3">
-        <Button @click="handleRefresh" variant="outline" :disabled="store.isLoading">
-          <RefreshCw :class="`h-4 w-4 mr-2 ${store.isLoading ? 'animate-spin' : ''}`" />
-          Atualizar
-        </Button>
-      </div>
     </div>
 
     <!-- Stats Cards -->
@@ -611,11 +605,6 @@ watch(currentTab, () => {
                       </div>
                       <div class="flex items-center gap-3 text-sm text-[#435574] flex-wrap">
                         <span v-if="request.freelancerName" class="flex items-center gap-1">
-                          <Avatar class="h-4 w-4">
-                            <AvatarFallback class="bg-gray-300 text-[10px]">
-                              {{ getInitials(request.freelancerName) }}
-                            </AvatarFallback>
-                          </Avatar>
                           {{ request.freelancerName }}
                         </span>
                         <span v-if="request.address" class="flex items-center gap-1">

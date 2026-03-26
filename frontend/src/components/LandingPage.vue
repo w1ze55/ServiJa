@@ -220,42 +220,6 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll));
               </Button>
             </div>
           </div>
-
-          <div id="contratantes-cta" class="cta-cardC">
-            <div class="cta-card-glow"></div>
-            <div class="cta-card-content">
-              <div class="cta-badge">
-                <Sparkles :size="16" />
-                <span>Seja um Contratante</span>
-              </div>
-
-              <h3 class="cta-title">Encontre o profissional ideal</h3>
-              <p class="cta-description">
-                O melhor profissional para o seu serviço a apenas alguns cliques de distância.
-              </p>
-
-              <ul class="cta-benefits">
-                <li class="cta-benefit">
-                  <CheckCircle :size="20" />
-                  <span>Busca simplificada por categoria</span>
-                </li>
-                <li class="cta-benefit">
-                  <CheckCircle :size="20" />
-                  <span>Histórico e avaliações reais</span>
-                </li>
-                <li class="cta-benefit">
-                  <CheckCircle :size="20" />
-                  <span>Contratação direta e segura</span>
-                </li>
-              </ul>
-
-              <Button variant="secondary" class="cta-button" @click="$props.onSignup">
-                Cadastre-se como Contratante
-              </Button>
-            </div>
-          </div>
-
-
         </div>
       </div>
     </section>

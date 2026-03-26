@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { ref } from 'vue';
 import {
   ArrowLeft,
   Download,
@@ -12,12 +12,12 @@ import {
 } from 'lucide-vue-next';
 import Button from '../ui/button.vue';
 import Card from '../ui/card.vue';
-import Textarea from '../ui/textarea.vue';
 import Badge from '../ui/badge.vue';
 import Avatar from '../ui/avatar.vue';
 import AvatarFallback from '../ui/avatar-fallback.vue';
 import AvatarImage from '../ui/avatar-image.vue';
 import Separator from '../ui/separator.vue';
+import DeliveryAdjustmentModal from './DeliveryAdjustmentModal.vue';
 import AlertDialog from '../ui/alert-dialog.vue';
 import AlertDialogAction from '../ui/alert-dialog-action.vue';
 import AlertDialogCancel from '../ui/alert-dialog-cancel.vue';
@@ -51,24 +51,15 @@ interface Props {
   isLoading?: boolean;
   onBack: () => void;
   onApprove: () => void;
-  onRequestAdjustments: (reason: string) => void;
+  onRequestAdjustments: (reason: string) => boolean | void | Promise<boolean | void>;
   onGoToChat?: () => void;
 }
 
 const props = defineProps<Props>();
 
 const showApprovalDialog = ref(false);
-const showAdjustmentsForm = ref(false);
-const showAdjustmentConfirmDialog = ref(false);
-const adjustmentsReason = ref('');
+const showAdjustmentsModal = ref(false);
 const previewFile = ref<DeliveryFile | null>(null);
-const adjustmentUsed = ref(props.adjustmentAlreadyUsed ?? false);
-
-watch(() => props.adjustmentAlreadyUsed, (newVal) => {
-  if (newVal) {
-    adjustmentUsed.value = true;
-  }
-});
 
 const getFileIcon = (type: DeliveryFile['type']) => {
   switch (type) {
@@ -95,16 +86,6 @@ const getInitials = (name: string) => {
 const handleApprove = () => {
   showApprovalDialog.value = false;
   props.onApprove();
-};
-
-const handleRequestAdjustments = () => {
-  if (adjustmentsReason.value.trim()) {
-    showAdjustmentConfirmDialog.value = false;
-    props.onRequestAdjustments(adjustmentsReason.value);
-    adjustmentsReason.value = '';
-    showAdjustmentsForm.value = false;
-    adjustmentUsed.value = true;
-  }
 };
 
 const canPreview = (file: DeliveryFile) => {
@@ -252,85 +233,18 @@ const handleDownloadAll = () => {
       </div>
     </Card>
 
-    <!-- Request Adjustments Form -->
-    <Card v-if="showAdjustmentsForm" class="p-6 border-yellow-200 bg-yellow-50">
-      <div class="flex items-start gap-3 mb-4">
-        <AlertCircle class="h-5 w-5 text-yellow-600 mt-0.5" />
-        <div class="flex-1">
-          <h3 class="text-[#263238] mb-2">Solicitar Ajustes</h3>
-          <p class="text-sm text-[#435574] mb-2">
-            Descreva detalhadamente os ajustes necessários para que o freelancer possa realizar as
-            correções.
-          </p>
-          <p class="text-xs text-yellow-700 font-medium mb-4 flex items-center gap-1">
-            <AlertCircle class="h-3.5 w-3.5" />
-            Atenção: você só pode solicitar ajustes <strong>uma única vez</strong>. Após o envio,
-            quaisquer outras negociações deverão ser feitas pelo chat.
-          </p>
-          <Textarea
-            placeholder="Descreva os ajustes necessários..."
-            v-model="adjustmentsReason"
-            :rows="4"
-            class="mb-4"
-          />
-          <div class="flex gap-2">
-            <Button
-              @click="showAdjustmentConfirmDialog = true"
-              :disabled="!adjustmentsReason.trim()"
-              class="bg-yellow-600 hover:bg-yellow-700"
-            >
-              Enviar Solicitação
-            </Button>
-            <Button
-              @click="
-                showAdjustmentsForm = false;
-                adjustmentsReason = '';
-              "
-              variant="outline"
-            >
-              Cancelar
-            </Button>
-          </div>
-        </div>
-      </div>
-    </Card>
-
     <!-- Action Buttons -->
-    <div v-if="!showAdjustmentsForm" class="flex gap-4">
-      <!-- Adjustment already used: show chat CTA instead -->
-      <template v-if="adjustmentUsed">
-        <div class="flex-1 rounded-lg border border-yellow-300 bg-yellow-50 p-4 flex items-start gap-3">
-          <AlertCircle class="h-5 w-5 text-yellow-600 mt-0.5 flex-shrink-0" />
-          <div>
-            <p class="text-sm font-medium text-[#263238] mb-1">Solicitação de ajuste já enviada</p>
-            <p class="text-xs text-[#435574] mb-3">
-              Você já utilizou sua única solicitação de ajuste. Para negociar novas correções ou
-              esclarecimentos, entre em contato com o freelancer pelo chat.
-            </p>
-            <Button
-              v-if="props.onGoToChat"
-              @click="props.onGoToChat"
-              size="sm"
-              variant="outline"
-              class="border-[#286AD8] text-[#286AD8] hover:bg-blue-50"
-            >
-              Ir para o Chat
-            </Button>
-          </div>
-        </div>
-      </template>
-      <template v-else>
-        <Button
-          @click="showAdjustmentsForm = true"
-          :disabled="props.isLoading"
-          variant="outline"
-          class="flex-1 border-yellow-600 text-yellow-600 hover:bg-yellow-50"
-          size="lg"
-        >
-          <AlertCircle class="h-4 w-4 mr-2" />
-          Solicitar Ajustes
-        </Button>
-      </template>
+    <div class="flex gap-4">
+      <Button
+        @click="showAdjustmentsModal = true"
+        :disabled="props.isLoading"
+        variant="outline"
+        class="flex-1 border-yellow-600 text-yellow-600 hover:bg-yellow-50"
+        size="lg"
+      >
+        <AlertCircle class="h-4 w-4 mr-2" />
+        Solicitar Ajustes
+      </Button>
       <Button
         @click="showApprovalDialog = true"
         :disabled="props.isLoading"
@@ -370,33 +284,14 @@ const handleDownloadAll = () => {
       </AlertDialogContent>
     </AlertDialog>
 
-    <!-- Adjustment Confirmation Dialog -->
-    <AlertDialog v-model:open="showAdjustmentConfirmDialog">
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Confirmar Solicitação de Ajuste</AlertDialogTitle>
-          <AlertDialogDescription class="space-y-3">
-            <span class="block">
-              Você tem direito a apenas <strong>uma única solicitação de ajuste</strong>.
-              Após o envio, não será possível solicitar novos ajustes por aqui.
-            </span>
-            <span class="block">
-              Caso precise de mais alterações futuramente, você e o freelancer deverão
-              resolver diretamente pelo <strong>chat</strong>.
-            </span>
-            <span class="block font-medium text-yellow-700">
-              Deseja realmente enviar esta solicitação?
-            </span>
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel @click="showAdjustmentConfirmDialog = false">Voltar e Revisar</AlertDialogCancel>
-          <AlertDialogAction @click="handleRequestAdjustments" class="bg-yellow-600 hover:bg-yellow-700">
-            Sim, Enviar Solicitação
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+    <DeliveryAdjustmentModal
+      v-model:open="showAdjustmentsModal"
+      :service-name="props.serviceName"
+      :adjustment-already-used="props.adjustmentAlreadyUsed"
+      :is-loading="props.isLoading"
+      :on-submit="props.onRequestAdjustments"
+      :on-go-to-chat="props.onGoToChat"
+    />
 
     <!-- File Preview Modal -->
     <template v-if="previewFile">
@@ -433,7 +328,4 @@ const handleDownloadAll = () => {
     </template>
   </div>
 </template>
-
-
-
 

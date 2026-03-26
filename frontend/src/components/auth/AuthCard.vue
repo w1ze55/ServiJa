@@ -205,8 +205,8 @@
             <div class="auth-card-overlay-content">
               <Transition name="fade-slide" mode="out-in">
                 <div v-if="!isSignUp" key="signup">
-                  <h2 class="auth-card-overlay-title">Olá, Amigo!</h2>
-                  <p class="auth-card-overlay-text">Insira seus dados pessoais e comece sua jornada conosco</p>
+                  <h2 class="auth-card-overlay-title">Bem-vindo de volta!</h2>
+                  <p class="auth-card-overlay-text">Faça login usando suas credenciais</p>
                   <Button
                     variant="outline"
                     size="lg"
@@ -218,9 +218,9 @@
                 </div>
 
                 <div v-else key="login">
-                  <h2 class="auth-card-overlay-title">Bem-vindo de volta!</h2>
+                  <h2 class="auth-card-overlay-title">Seja bem-vindo(a)!</h2>
                   <p class="auth-card-overlay-text">
-                    Para se manter conectado conosco, faça login com suas informações pessoais
+                    Cadastre-se para encontrar os melhores profissionais ou oferecer seus serviços de forma simples e rápida.
                   </p>
                   <Button
                     variant="outline"

@@ -45,6 +45,7 @@ public class ServiceRequestService {
     private final FileStorageService fileStorageService;
     private final ServiceRequestHistoryService historyService;
     private final WebSocketService webSocketService;
+    private final NotificationService notificationService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Transactional
@@ -164,6 +165,7 @@ public class ServiceRequestService {
                     freelancer.getEmail(),
                     contractor.getName(),
                     dto.getServiceName());
+            notificationService.notifyNewServiceRequest(saved, contractor);
         }
 
         log.info("Service request created: {} for freelancer: {}", saved.getId(),
@@ -226,13 +228,35 @@ public class ServiceRequestService {
         if (newStatus == ServiceRequest.Status.REJECTED) {
             String details = reason != null ? "Motivo: " + reason : null;
             historyService.record(saved, actionUser, OperationType.REQUEST_REJECTED, details);
+            if (request.getFreelancer() != null && request.getFreelancer().getId().equals(actionUser.getId())) {
+                notificationService.notifyRequestRejected(saved, actionUser, reason);
+                webSocketService.notifyServiceRequestStatusChange(
+                        saved.getId(),
+                        ServiceRequest.Status.REJECTED.name(),
+                        request.getContractor().getEmail(),
+                        request.getFreelancer().getEmail());
+            }
         } else if (newStatus == ServiceRequest.Status.ACCEPTED) {
             historyService.record(saved, actionUser, OperationType.BUDGET_ACCEPTED);
+            if (request.getFreelancer() != null) {
+                webSocketService.notifyProposalAccepted(
+                        saved.getId(),
+                        request.getFreelancer().getEmail(),
+                        request.getContractor().getEmail());
+                notificationService.notifyProposalAccepted(saved);
+            }
         } else if (newStatus == ServiceRequest.Status.NEGOTIATING) {
             historyService.record(saved, actionUser, OperationType.COUNTER_PROPOSAL_SENT);
         } else if (newStatus == ServiceRequest.Status.CANCELLED) {
             String details = reason != null ? "Motivo: " + reason : null;
             historyService.record(saved, actionUser, OperationType.CANCELLED, details);
+            if (request.getFreelancer() != null) {
+                webSocketService.notifyServiceRequestCancelled(
+                        saved.getId(),
+                        reason,
+                        request.getFreelancer().getEmail(),
+                        request.getContractor().getEmail());
+            }
         }
 
         return toResponse(saved);
@@ -271,6 +295,7 @@ public class ServiceRequestService {
                 request.getContractor().getEmail(),
                 freelancer.getName(),
                 String.format("R$ %.2f", dto.getValue()));
+        notificationService.notifyNewProposal(saved, freelancer);
 
         return toResponse(saved);
     }
@@ -332,6 +357,7 @@ public class ServiceRequestService {
                     saved.getId(),
                     freelancer.getEmail(),
                     request.getContractor().getEmail());
+            notificationService.notifyProposalAccepted(saved);
 
             return toResponse(saved);
         }
@@ -369,6 +395,15 @@ public class ServiceRequestService {
                 request.getContractor().getEmail(),
                 freelancer.getName(),
                 reason);
+        notificationService.notifyStatusUpdated(
+                saved,
+                request.getContractor(),
+                freelancer,
+                StringUtils.hasText(reason)
+                        ? freelancer.getName() + " recusou sua contra-proposta. Motivo: " + reason.trim()
+                        : freelancer.getName() + " recusou sua contra-proposta. O orçamento original segue ativo.",
+                ServiceRequest.Status.NEGOTIATING.name(),
+                "cliente-request-detail");
 
         return toResponse(saved);
     }
@@ -397,6 +432,7 @@ public class ServiceRequestService {
             webSocketService.notifyServiceRequestStatusChange(
                     saved.getId(), "DELIVERED",
                     request.getContractor().getEmail(), userEmail);
+            notificationService.notifyProjectCompleted(saved, user);
 
             return toResponse(saved);
         }
@@ -419,6 +455,7 @@ public class ServiceRequestService {
             webSocketService.notifyServiceRequestStatusChange(
                     saved.getId(), "COMPLETED",
                     userEmail, request.getFreelancer().getEmail());
+            notificationService.notifyDeliveryApproved(saved, user);
 
             // Notificar ambos que a avaliação está pendente
             webSocketService.notifyReviewPending(
@@ -495,6 +532,7 @@ public class ServiceRequestService {
         }
 
         ServiceRequest saved = serviceRequestRepository.save(request);
+        notificationService.notifyAttachmentAdded(saved, freelancer, attachmentsToAdd.size());
         log.info("Freelancer attachments adicionados à solicitação {}: {} arquivos", id, attachmentsToAdd.size());
         return toResponse(saved);
     }

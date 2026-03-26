@@ -42,6 +42,7 @@ import Tabs from '../ui/tabs.vue';
 import TabsContent from '../ui/tabs-content.vue';
 import TabsList from '../ui/tabs-list.vue';
 import TabsTrigger from '../ui/tabs-trigger.vue';
+import ReviewList, { type ReviewItem } from '../shared/ReviewList.vue';
 import Textarea from '../ui/textarea.vue';
 import Dialog from '../ui/dialog.vue';
 import DialogContent from '../ui/dialog-content.vue';
@@ -189,23 +190,63 @@ const props = defineProps<Props>();
 const freelancer = ref<FreelancerData | null>(null);
 const services = ref<ServiceItem[]>([]);
 const portfolio = ref<PortfolioProject[]>([]);
+const reviews = ref<ReviewItem[]>([]);
+const isLoadingReviews = ref(false);
 const isLoading = ref(true);
 const error = ref('');
 const quoteMessage = ref('');
 const quoteCategory = ref('');
-const displayedServicesCount = ref(6);
+const servicesPerPage = 4;
+const currentServicePage = ref(1);
+
+const totalServicePages = computed(() => {
+  return Math.ceil(services.value.length / servicesPerPage);
+});
 
 const paginatedServices = computed(() => {
-  return services.value.slice(0, displayedServicesCount.value);
+  const start = (currentServicePage.value - 1) * servicesPerPage;
+  const end = start + servicesPerPage;
+  return services.value.slice(start, end);
 });
 
-const hasMoreServices = computed(() => {
-  return services.value.length > displayedServicesCount.value;
-});
-
-const handleShowMoreServices = () => {
-  displayedServicesCount.value += 6;
+const goToServicePage = (page: number) => {
+  if (page >= 1 && page <= totalServicePages.value) {
+    currentServicePage.value = page;
+  }
 };
+
+const visibleServicePages = computed(() => {
+  const total = totalServicePages.value;
+  const current = currentServicePage.value;
+  const pages: (number | string)[] = [];
+  
+  if (total <= 7) {
+    for (let i = 1; i <= total; i++) {
+      pages.push(i);
+    }
+  } else {
+    pages.push(1);
+    
+    if (current > 3) {
+      pages.push('...');
+    }
+    
+    const start = Math.max(2, current - 1);
+    const end = Math.min(total - 1, current + 1);
+    
+    for (let i = start; i <= end; i++) {
+      pages.push(i);
+    }
+    
+    if (current < total - 2) {
+      pages.push('...');
+    }
+    
+    pages.push(total);
+  }
+  
+  return pages;
+});
 const quoteBudget = ref('');
 const formattedQuoteBudget = ref('');
 const quoteDeadline = ref('');
@@ -287,33 +328,47 @@ const loadFreelancerData = async () => {
       portfolio.value = [];
     }
 
+    // Buscar avaliações do freelancer
+    loadFreelancerReviews();
+
   } catch (err: any) {
     console.error('Erro ao carregar dados do freelancer:', err);
     error.value = 'Não foi possível carregar os dados do profissional.';
     toast.error('Erro ao carregar perfil');
   } finally {
     isLoading.value = false;
-
-    // Check for serviceId in URL query to auto-open modal
-    const serviceId = route.query.serviceId;
-    if (serviceId && services.value.length > 0) {
-      const service = services.value.find(s => s.id === Number(serviceId));
-      if (service) {
-        selectedServiceModal.value = service;
-        selectedServiceImageIndex.value = 0;
-      }
-    }
   }
 };
 
-// Watch for serviceId in query to open modal (handles navigation within the same profile)
+const loadFreelancerReviews = async () => {
+  isLoadingReviews.value = true;
+  try {
+    const response = await api.get(`/reviews/user/${props.providerId}`);
+    const reviewsData = response.data || [];
+    
+    reviews.value = reviewsData.map((review: any) => ({
+      id: review.id,
+      rating: review.rating,
+      comment: review.comment || '',
+      clientName: review.reviewerName,
+      clientPhoto: review.reviewerAvatar,
+      createdAt: review.createdAt,
+    }));
+  } catch (err) {
+    console.log('Avaliações não disponíveis');
+    reviews.value = [];
+  } finally {
+    isLoadingReviews.value = false;
+  }
+};
+
+// Watch for serviceId in query to redirect to new service page
 watch(() => route.query.serviceId, (newId) => {
-  if (newId && services.value.length > 0) {
-    const service = services.value.find(s => s.id === Number(newId));
-    if (service) {
-      selectedServiceModal.value = service;
-      selectedServiceImageIndex.value = 0;
-    }
+  if (newId) {
+    router.replace({
+      name: 'service-detail',
+      params: { providerId: props.providerId, serviceId: String(newId) }
+    });
   }
 });
 
@@ -797,22 +852,16 @@ const resetQuoteForm = () => {
 };
 
 const handleServiceClick = (service: ServiceItem) => {
-  selectedServiceModal.value = service;
-  selectedServiceImageIndex.value = 0;
-
-  // Update URL to include serviceId
-  router.replace({
-    query: { ...route.query, serviceId: service.id }
+  router.push({
+    name: 'service-detail',
+    params: { providerId: props.providerId, serviceId: service.id }
   });
 };
 
 const handleCloseServiceModal = () => {
   selectedServiceModal.value = null;
-
-  // Remove serviceId from URL
   const query = { ...route.query };
   delete query.serviceId;
-
   router.replace({ query });
 };
 
@@ -951,15 +1000,19 @@ onMounted(() => {
                 </div>
               </div>
 
-              <!-- Status Badge -->
-              <div class="mb-4">
-                <Badge v-if="freelancer.available" class="bg-green-100 text-green-700 hover:bg-green-100">
-                  ✓ Disponível
-                </Badge>
-                <Badge v-else variant="secondary">
-                  Indisponível
-                </Badge>
-              </div>
+                <!-- Professional Links (Compact) -->
+                <div v-if="freelancer.professionalLinks && freelancer.professionalLinks.length > 0" class="mb-8 flex flex-wrap gap-2 justify-start">
+                  <a
+                    v-for="link in freelancer.professionalLinks"
+                    :key="link.id"
+                    :href="link.url"
+                    target="_blank"
+                    class="flex items-center gap-2 px-3 py-1.5 rounded-full border border-gray-200 bg-white text-xs text-[#435574] hover:border-[#286AD8] hover:text-[#286AD8] transition-all"
+                  >
+                    <component :is="getLinkIcon(link.type)" class="h-3.5 w-3.5" />
+                    <span>{{ link.label || link.type }}</span>
+                  </a>
+                </div>
 
               <!-- Action Buttons removed as per request -->
             </div>
@@ -970,10 +1023,11 @@ onMounted(() => {
           <!-- Main Content -->
           <div class="lg:col-span-2">
             <Tabs v-model="activeTab" class="space-y-6">
-              <TabsList class="grid w-full grid-cols-3">
+              <TabsList class="grid w-full grid-cols-4">
                 <TabsTrigger value="services">Serviços ({{ services.length }})</TabsTrigger>
                 <TabsTrigger value="about">Sobre</TabsTrigger>
                 <TabsTrigger value="portfolio">Portfólio ({{ portfolio.length }})</TabsTrigger>
+                <TabsTrigger value="reviews">Avaliações ({{ reviews.length }})</TabsTrigger>
               </TabsList>
 
               <!-- Services Tab -->
@@ -1046,14 +1100,39 @@ onMounted(() => {
                     </Card>
                   </div>
 
-                  <!-- Show More Button -->
-                  <div v-if="hasMoreServices" class="flex justify-center mt-8">
+                  <!-- Pagination -->
+                  <div v-if="totalServicePages > 1" class="flex justify-center items-center gap-2 mt-8">
                     <Button
                       variant="outline"
-                      @click="handleShowMoreServices"
-                      class="border-[#286AD8] text-[#286AD8] hover:bg-blue-50 px-8"
+                      size="icon"
+                      :disabled="currentServicePage === 1"
+                      @click="goToServicePage(currentServicePage - 1)"
+                      class="h-9 w-9"
                     >
-                      Ver mais serviços
+                      <ChevronLeft class="h-4 w-4" />
+                    </Button>
+                    
+                    <template v-for="(page, index) in visibleServicePages" :key="index">
+                      <span v-if="page === '...'" class="px-2 text-gray-400">...</span>
+                      <Button
+                        v-else
+                        :variant="currentServicePage === page ? 'default' : 'outline'"
+                        @click="goToServicePage(page as number)"
+                        class="h-9 w-9 p-0"
+                        :class="currentServicePage === page ? 'bg-[#286AD8] hover:bg-[#286AD8]/90' : ''"
+                      >
+                        {{ page }}
+                      </Button>
+                    </template>
+                    
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      :disabled="currentServicePage === totalServicePages"
+                      @click="goToServicePage(currentServicePage + 1)"
+                      class="h-9 w-9"
+                    >
+                      <ChevronRight class="h-4 w-4" />
                     </Button>
                   </div>
                 </div>
@@ -1061,6 +1140,15 @@ onMounted(() => {
                   <Briefcase class="h-12 w-12 text-[#435574]/30 mx-auto mb-4" />
                   <p class="text-[#435574]">Nenhum serviço cadastrado ainda</p>
                 </Card>
+              </TabsContent>
+
+              <!-- Reviews Tab -->
+              <TabsContent value="reviews">
+                <ReviewList 
+                  :reviews="reviews" 
+                  :is-loading="isLoadingReviews"
+                  :page-size="5"
+                />
               </TabsContent>
 
               <!-- About Tab -->
@@ -1107,20 +1195,6 @@ onMounted(() => {
                   <p class="text-[#435574]">
                     Galeria de trabalhos realizados ({{ portfolio.length }} itens)
                   </p>
-                </div>
-
-                <!-- Professional Links (Compact) -->
-                <div v-if="freelancer.professionalLinks && freelancer.professionalLinks.length > 0" class="mb-8 flex flex-wrap gap-2 justify-center">
-                  <a
-                    v-for="link in freelancer.professionalLinks"
-                    :key="link.id"
-                    :href="link.url"
-                    target="_blank"
-                    class="flex items-center gap-2 px-3 py-1.5 rounded-full border border-gray-200 bg-white text-xs text-[#435574] hover:border-[#286AD8] hover:text-[#286AD8] transition-all"
-                  >
-                    <component :is="getLinkIcon(link.type)" class="h-3.5 w-3.5" />
-                    <span>{{ link.label || link.type }}</span>
-                  </a>
                 </div>
 
                 <div v-if="portfolio.length > 0" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1394,207 +1468,6 @@ onMounted(() => {
       </DialogContent>
     </Dialog>
 
-    <!-- Service Details Modal (Deep Link / Direct Action) -->
-    <Dialog :open="selectedServiceModal !== null" @update:open="(val) => !val && handleCloseServiceModal()">
-      <DialogContent class="max-w-4xl max-h-[95vh] p-4 md:p-0 border-none bg-transparent" :hide-close="true">
-        <div v-if="selectedServiceModal" class="relative bg-white rounded-xl overflow-y-auto shadow-2xl max-h-[90vh] md:max-h-[85vh]">
-          <!-- Gallery / Cover Image -->
-          <div class="relative h-64 md:h-80 bg-gray-900 overflow-hidden">
-            <img
-              v-if="selectedServiceModal.images && selectedServiceModal.images.length > 0"
-              :src="selectedServiceModal.images[selectedServiceImageIndex]"
-              :alt="selectedServiceModal.title"
-              class="w-full h-full object-cover"
-            />
-            <div v-else class="w-full h-full flex flex-col items-center justify-center text-white/30 bg-gray-800">
-              <Briefcase class="h-16 w-16 mb-4" />
-              <span>Nenhuma imagem disponível</span>
-            </div>
-
-            <!-- Carousel Controls -->
-            <template v-if="selectedServiceModal.images && selectedServiceModal.images.length > 1">
-              <button
-                @click.stop="selectedServiceImageIndex = (selectedServiceImageIndex - 1 + selectedServiceModal.images.length) % selectedServiceModal.images.length"
-                class="absolute left-4 top-1/2 -translate-y-1/2 p-2 bg-black/40 hover:bg-black/60 text-white rounded-full transition-colors flex items-center justify-center"
-              >
-                <ChevronLeft class="h-6 w-6" />
-              </button>
-              <button
-                @click.stop="selectedServiceImageIndex = (selectedServiceImageIndex + 1) % selectedServiceModal.images.length"
-                class="absolute right-4 top-1/2 -translate-y-1/2 p-2 bg-black/40 hover:bg-black/60 text-white rounded-full transition-colors flex items-center justify-center"
-              >
-                <ChevronRight class="h-6 w-6" />
-              </button>
-
-              <!-- Thumbnails / Indicators -->
-              <div class="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
-                <button
-                  v-for="(img, index) in selectedServiceModal.images"
-                  :key="index"
-                  @click.stop="selectedServiceImageIndex = index"
-                  :class="[
-                    'w-12 h-12 rounded-lg overflow-hidden border-2 transition-all',
-                    selectedServiceImageIndex === index ? 'border-[#286AD8] scale-110' : 'border-transparent opacity-70 hover:opacity-100'
-                  ]"
-                >
-                  <img :src="img" class="w-full h-full object-cover" />
-                </button>
-              </div>
-            </template>
-
-            <button
-              @click="handleCloseServiceModal"
-              class="absolute top-4 right-4 p-2 bg-black/20 hover:bg-black/40 backdrop-blur-md rounded-full text-white transition-all z-50"
-            >
-              <CloseIcon class="h-5 w-5" />
-            </button>
-          </div>
-
-          <div class="p-8">
-            <!-- Freelancer Mini Profile -->
-            <div class="flex items-center gap-4 mb-8 pb-8 border-b border-gray-100">
-              <Avatar class="h-14 w-14 border-2 border-white shadow-sm">
-                <AvatarImage :src="freelancer?.profilePhoto" :alt="freelancer?.name" />
-                <AvatarFallback class="bg-[#286AD8] text-white">{{ freelancer?.name ? getInitials(freelancer.name) : '?' }}</AvatarFallback>
-              </Avatar>
-              <div class="flex-1">
-                <h3 class="font-bold text-[#263238] text-lg">{{ freelancer?.name }}</h3>
-                <div class="flex items-center gap-3 text-sm text-[#435574]">
-                  <div class="flex items-center gap-1">
-                    <Star class="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                    <span class="font-bold">{{ freelancer?.rating?.toFixed(1) || '0.0' }}</span>
-                    <span class="text-gray-400">({{ freelancer?.totalReviews || 0 }})</span>
-                  </div>
-                  <span class="text-gray-300">•</span>
-                  <div class="flex items-center gap-1">
-                    <MapPin class="h-4 w-4 text-gray-400" />
-                    <span>{{ freelancer?.location || 'Localização não informada' }}</span>
-                  </div>
-                </div>
-              </div>
-              <div v-if="selectedServiceModal" class="hidden sm:flex gap-2">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  class="rounded-full"
-                  @click="handleToggleServiceFavorite(selectedServiceModal.id)"
-                  :class="isServiceFavorite(selectedServiceModal.id) ? 'text-red-500 border-red-200 bg-red-50 hover:bg-red-100 hover:text-red-600' : 'text-gray-400 border-gray-200 hover:text-red-500'"
-                >
-                  <Heart :class="['h-5 w-5', isServiceFavorite(selectedServiceModal.id) ? 'fill-red-500 text-red-500' : '']" />
-                </Button>
-                <Button variant="outline" size="icon" class="rounded-full text-gray-400 border-gray-200" @click="handleShare">
-                  <Share2 class="h-5 w-5" />
-                </Button>
-              </div>
-            </div>
-
-            <!-- Title & Category -->
-            <div class="mb-8">
-              <div class="flex items-center gap-2 mb-3">
-                <Badge class="bg-blue-50 text-[#286AD8] border-none font-bold uppercase tracking-wider text-[10px] px-3">
-                  {{ selectedServiceModal.category }}
-                </Badge>
-                <Badge
-                  v-if="selectedServiceModal.workModel"
-                  variant="outline"
-                  class="bg-white text-[#435574] border-gray-200"
-                >
-                  {{ getWorkModelLabel(normalizeWorkModel(selectedServiceModal.workModel)) }}
-                </Badge>
-              </div>
-              <h2 class="text-3xl font-bold text-[#263238] leading-tight">{{ selectedServiceModal.title }}</h2>
-            </div>
-
-            <!-- Card Info Grid -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-              <div class="p-5 bg-gray-50 rounded-2xl flex items-start gap-4 border border-gray-100">
-                <div class="p-3 bg-white rounded-xl text-[#286AD8] shadow-sm">
-                  <DollarSign class="h-6 w-6" />
-                </div>
-                <div>
-                  <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Investimento</span>
-                  <p class="text-2xl font-black text-[#263238]">
-                    {{ formatPrice(selectedServiceModal.price, selectedServiceModal.priceType) }}
-                  </p>
-                </div>
-              </div>
-
-              <div class="p-5 bg-gray-50 rounded-2xl flex items-start gap-4 border border-gray-100">
-                <div class="p-3 bg-white rounded-xl text-green-600 shadow-sm">
-                  <Clock class="h-6 w-6" />
-                </div>
-                <div>
-                  <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Tempo estimado</span>
-                  <p class="text-2xl font-black text-[#263238]">
-                    {{ formatDelivery(selectedServiceModal.deliveryTime, selectedServiceModal.deliveryUnit, false) }}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <!-- Description -->
-            <div class="mb-8">
-              <h3 class="text-lg font-bold text-[#263238] mb-4">Sobre o Serviço</h3>
-              <p class="text-[#435574] leading-relaxed whitespace-pre-line text-base sm:text-lg break-words">
-                {{ selectedServiceModal.description }}
-              </p>
-            </div>
-
-            <!-- What's included (Features) -->
-            <div class="mb-10">
-              <h3 class="text-lg font-bold text-[#263238] mb-4">O que está incluído</h3>
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-8">
-                <div class="flex items-center gap-3 text-[#435574] leading-tight">
-                  <CheckCircle class="h-5 w-5 text-green-500 flex-shrink-0" />
-                  <span>Atendimento profissional e especializado</span>
-                </div>
-                <div class="flex items-center gap-3 text-[#435574] leading-tight">
-                  <CheckCircle class="h-5 w-5 text-green-500 flex-shrink-0" />
-                  <span>Materiais e ferramentas inclusas</span>
-                </div>
-                <div class="flex items-center gap-3 text-[#435574] leading-tight">
-                  <CheckCircle class="h-5 w-5 text-green-500 flex-shrink-0" />
-                  <span>Garantia de qualidade e suporte</span>
-                </div>
-                <div class="flex items-center gap-3 text-[#435574] leading-tight">
-                  <CheckCircle class="h-5 w-5 text-green-500 flex-shrink-0" />
-                  <span>Agendamento flexível de acordo com sua necessidade</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Freelancer Stats Bar -->
-            <div class="bg-gray-50 rounded-2xl p-6 mb-10">
-              <div class="grid grid-cols-3 gap-8 text-center">
-                <div>
-                  <p class="text-2xl font-black text-[#263238]">{{ freelancer?.completedJobs || 0 }}</p>
-                  <p class="text-xs font-bold text-[#435574] uppercase tracking-wider">Trabalhos Concluídos</p>
-                </div>
-                <div>
-                  <p class="text-2xl font-black text-[#263238]">{{ freelancer?.rating?.toFixed(1) || '0.0' }}</p>
-                  <p class="text-xs font-bold text-[#435574] uppercase tracking-wider">Avaliação Média</p>
-                </div>
-                <div>
-                  <p class="text-2xl font-black text-[#263238]">95%</p>
-                  <p class="text-xs font-bold text-[#435574] uppercase tracking-wider">Taxa de Sucesso</p>
-                </div>
-              </div>
-            </div>
-
-            <!-- Actions -->
-            <div class="flex flex-col sm:flex-row gap-4 mb-4">
-              <Button
-                @click="handleRequestService(selectedServiceModal)"
-                class="flex-1 bg-[#286AD8] hover:bg-[#435574] h-14 text-base font-bold shadow-lg shadow-[#286AD8]/20 transition-all active:scale-95 rounded-xl"
-              >
-                <Send class="h-5 w-5 mr-2" />
-                Solicitar este serviço
-              </Button>
-            </div>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
     <!-- Quote Dialog -->
     <Dialog v-model:open="showQuoteDialog">
       <DialogContent class="max-w-md max-h-[90vh] overflow-hidden p-0 gap-0">

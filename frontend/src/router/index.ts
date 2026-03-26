@@ -20,7 +20,7 @@ import FreelancerRequestDetailPage from "@/pages/FreelancerRequestDetail/index.v
 import FreelancerDeliveriesPage from "@/pages/FreelancerDeliveries/index.vue";
 import FreelancerWalletPage from "@/pages/FreelancerWallet/index.vue";
 
-import FreelancerSchedulePage from "@/pages/FreelancerSchedule/index.vue";
+
 import MessagesPage from "@/pages/Messages/index.vue";
 import NotificationsPage from "@/pages/Notifications/index.vue";
 import ExplorePage from "@/pages/Explore/index.vue";
@@ -31,6 +31,7 @@ import ContractsPage from "@/pages/Contracts/index.vue";
 import FreelancerKYCPage from "@/pages/FreelancerKYC/index.vue";
 import FreelancerAccountSettingsPage from "@/pages/FreelancerAccountSettings/index.vue";
 import ProviderProfilePage from "@/pages/ProviderProfile/index.vue";
+import ServiceDetailPage from "@/pages/ServiceDetail/index.vue";
 import NotFoundPage from "@/pages/NotFound/index.vue";
 import RegisterPage from "@/pages/Register/index.vue";
 import CheckoutPage from "@/pages/Checkout/index.vue";
@@ -182,13 +183,7 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, userType: "provider" },
   },
 
-  // ============ FREELANCER SCHEDULE ============
-  {
-    path: "/freelancer-schedule",
-    name: "freelancer-schedule",
-    component: FreelancerSchedulePage,
-    meta: { requiresAuth: true, userType: "provider" },
-  },
+
 
   // ============ FREELANCER PORTFOLIO/GALLERY ============
   {
@@ -285,6 +280,15 @@ const routes: RouteRecordRaw[] = [
     path: "/provider-profile/:providerId",
     name: "provider-profile",
     component: ProviderProfilePage,
+    meta: { requiresAuth: true },
+    props: true,
+  },
+
+  // Service Detail Page
+  {
+    path: "/provider-profile/:providerId/service/:serviceId",
+    name: "service-detail",
+    component: ServiceDetailPage,
     meta: { requiresAuth: true },
     props: true,
   },

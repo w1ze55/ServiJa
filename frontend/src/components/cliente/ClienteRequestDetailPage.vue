@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick } from 'vue';
+import { ref, computed, onMounted, nextTick, watch } from 'vue';
 import {
   ArrowLeft,
   Clock,
@@ -48,6 +48,7 @@ import AlertDialogHeader from '../ui/alert-dialog-header.vue';
 import AlertDialogTitle from '../ui/alert-dialog-title.vue';
 import { useClientRequestStore, type ServiceRequest } from '@/stores/clientRequestStore';
 import ServiceRequestTimeline from '../service/ServiceRequestTimeline.vue';
+import ChatBox from '../shared/ChatBox.vue';
 import { formatApiDate } from '@/utils/apiDate';
 import { toast } from '@/utils/toast';
 import { getStatusLabel } from '@/utils/statusTranslations';
@@ -62,7 +63,6 @@ const props = defineProps<Props>();
 const store = useClientRequestStore();
 
 const request = ref<ServiceRequest | null>(null);
-const newMessage = ref('');
 const isSendingMessage = ref(false);
 const showCancelDialog = ref(false);
 const cancelReason = ref('');
@@ -76,6 +76,11 @@ const isSubmittingCounter = ref(false);
 const activeSection = ref<'details' | 'messages' | 'history' | 'attachments'>('details');
 const showCelebrationModal = ref(false);
 const activeFileTab = ref<'client' | 'freelancer'>('client');
+const clientAttachments = computed(() => request.value?.attachments || []);
+const professionalAttachments = computed(() => [
+  ...(request.value?.freelancerResponse?.attachments || []),
+  ...(request.value?.freelancerAttachments || []),
+]);
 
 const handleOpenCounterProposalDialog = () => {
   if (!request.value || !request.value.freelancerResponse) return;
@@ -86,7 +91,13 @@ const handleOpenCounterProposalDialog = () => {
 };
 
 const loadData = async () => {
-  await store.loadRequests();
+  const loadedRequest = await store.loadRequestById(props.requestId);
+  if (loadedRequest) {
+    request.value = loadedRequest;
+    await store.loadHistory(props.requestId);
+    return;
+  }
+
   request.value = store.getRequestById(props.requestId) || null;
   if (request.value) {
     await store.loadHistory(props.requestId);
@@ -127,12 +138,12 @@ const handleSendCounterProposal = async () => {
 };
 
 onMounted(async () => {
-  if (store.requests.length === 0) {
-    await store.loadRequests();
-  }
-  request.value = store.getRequestById(props.requestId) || null;
-  if (request.value) {
-    await store.loadHistory(props.requestId);
+  await loadData();
+});
+
+watch(() => props.requestId, async (newId, oldId) => {
+  if (newId && newId !== oldId) {
+    await loadData();
   }
 });
 
@@ -174,15 +185,18 @@ const goBack = () => {
   props.onNavigate('requests');
 };
 
-const handleSendMessage = async () => {
-  if (!request.value || !newMessage.value.trim()) return;
+const handleSendMessage = async (message: string, attachments: File[]) => {
+  if (!request.value) return;
 
   isSendingMessage.value = true;
-  const success = await store.sendMessage(request.value.id, newMessage.value.trim());
+  const success = await store.sendMessage(
+    request.value.id,
+    message,
+    attachments.length > 0 ? attachments : undefined
+  );
   isSendingMessage.value = false;
 
   if (success) {
-    newMessage.value = '';
     toast.success('Mensagem enviada');
   } else {
     toast.error('Erro ao enviar mensagem');
@@ -419,16 +433,6 @@ const getStatusColor = (status: string) => {
           </button>
         </div>
         
-        <!-- Botão de Aprovação de Entrega: Só aparece quando o freelancer já entregou (DELIVERED) -->
-        <Button
-          v-if="request.status === 'delivered'"
-          @click="() => props.onNavigate('cliente-delivery-approval', { requestId: request?.id })"
-          class="bg-green-600 hover:bg-green-700"
-          size="sm"
-        >
-          <CheckCircle class="h-4 w-4 mr-2" />
-          Aprovar Entrega
-        </Button>
       </div>
 
       <!-- Info Alert: Aguardando entrega do profissional -->
@@ -437,7 +441,7 @@ const getStatusColor = (status: string) => {
         <Clock class="h-5 w-5 mt-0.5 flex-shrink-0 text-blue-600" />
         <div>
           <p class="font-semibold text-sm">Serviço em Andamento</p>
-          <p class="text-sm opacity-90">O profissional está trabalhando no seu pedido. Assim que ele finalizar a entrega, você poderá marcar o serviço como concluído aqui.</p>
+          <p class="text-sm opacity-90">O profissional está trabalhando no seu pedido. Assim que ele finalizar a entrega, você poderá aprová-la pelo detalhe do projeto.</p>
         </div>
       </div>
 
@@ -612,53 +616,13 @@ const getStatusColor = (status: string) => {
       <Card v-if="activeSection === 'messages'" class="p-6">
         <h3 class="font-semibold text-[#263238] mb-4">Mensagens</h3>
 
-        <div v-if="!request.messages || request.messages.length === 0" class="text-center py-8">
-          <MessageSquare class="h-10 w-10 text-gray-300 mx-auto mb-3" />
-          <p class="text-[#435574]">Nenhuma mensagem ainda</p>
-        </div>
-
-        <div v-else class="space-y-4 max-h-96 overflow-y-auto mb-4">
-          <div
-            v-for="msg in request.messages"
-            :key="msg.id"
-            :class="`flex ${msg.sender === 'client' ? 'justify-end' : 'justify-start'}`"
-          >
-            <div
-              :class="`max-w-[80%] rounded-lg p-3 ${
-                msg.sender === 'client'
-                  ? 'bg-[#286AD8] text-white'
-                  : 'bg-gray-100 text-[#263238]'
-              }`"
-            >
-              <p class="text-xs font-medium mb-1 opacity-80">{{ msg.senderName }}</p>
-              <p class="text-sm">{{ msg.message }}</p>
-              <p class="text-xs mt-1 opacity-60">{{ formatDate(msg.timestamp) }}</p>
-            </div>
-          </div>
-        </div>
-
-        <!-- Message Input -->
-        <div v-if="request.status === 'in_progress' || request.status === 'delivered'" class="flex gap-2">
-          <Textarea
-            v-model="newMessage"
-            placeholder="Digite sua mensagem..."
-            :rows="2"
-            class="flex-1"
-          />
-          <Button
-            @click="handleSendMessage"
-            :disabled="!newMessage.trim() || isSendingMessage"
-            class="bg-[#286AD8] hover:bg-[#435574]"
-          >
-            <Send class="h-4 w-4" />
-          </Button>
-        </div>
-        <div v-else class="flex items-center justify-center p-4 bg-gray-50 rounded-lg border border-dashed border-gray-200">
-          <p class="text-sm text-[#435574] flex items-center gap-2 text-center">
-            <Lock class="h-4 w-4 text-amber-500" />
-            O chat será liberado automaticamente após a confirmação do pagamento.
-          </p>
-        </div>
+        <ChatBox
+          :messages="request.messages || []"
+          current-user-role="client"
+          :is-locked="request.status !== 'in_progress' && request.status !== 'delivered'"
+          :is-sending="isSendingMessage"
+          @send-message="handleSendMessage"
+        />
       </Card>
 
       <ServiceRequestTimeline
@@ -685,8 +649,8 @@ const getStatusColor = (status: string) => {
             ]"
           >
             Cliente
-            <Badge v-if="request.attachments && request.attachments.length > 0" variant="secondary" class="ml-2">
-              {{ request.attachments.length }}
+            <Badge v-if="clientAttachments.length > 0" variant="secondary" class="ml-2">
+              {{ clientAttachments.length }}
             </Badge>
           </button>
           <button
@@ -699,21 +663,21 @@ const getStatusColor = (status: string) => {
             ]"
           >
             Freelancer
-            <Badge v-if="request.freelancerResponse?.attachments && request.freelancerResponse.attachments.length > 0" variant="secondary" class="ml-2">
-              {{ request.freelancerResponse.attachments.length }}
+            <Badge v-if="professionalAttachments.length > 0" variant="secondary" class="ml-2">
+              {{ professionalAttachments.length }}
             </Badge>
           </button>
         </div>
 
         <!-- Client Files Tab -->
         <div v-if="activeFileTab === 'client'">
-          <div v-if="!request.attachments || request.attachments.length === 0" class="text-center py-8">
+          <div v-if="clientAttachments.length === 0" class="text-center py-8">
             <FileText class="h-12 w-12 text-gray-300 mx-auto mb-3" />
             <p class="text-[#435574]">Nenhum arquivo enviado pelo cliente</p>
           </div>
           <div v-else class="space-y-2">
             <FileAttachment
-              v-for="attachment in request.attachments"
+              v-for="attachment in clientAttachments"
               :key="attachment.id"
               :name="attachment.name"
               :url="attachment.url"
@@ -726,17 +690,18 @@ const getStatusColor = (status: string) => {
 
         <!-- Freelancer Files Tab -->
         <div v-if="activeFileTab === 'freelancer'">
-          <div v-if="!request.freelancerResponse?.attachments || request.freelancerResponse.attachments.length === 0" class="text-center py-8">
+          <div v-if="professionalAttachments.length === 0" class="text-center py-8">
             <FileText class="h-12 w-12 text-gray-300 mx-auto mb-3" />
             <p class="text-[#435574]">Nenhum arquivo enviado pelo freelancer</p>
           </div>
           <div v-else class="space-y-2">
             <FileAttachment
-              v-for="attachment in request.freelancerResponse.attachments"
+              v-for="attachment in professionalAttachments"
               :key="attachment.id"
               :name="attachment.name"
               :url="attachment.url"
               :size="attachment.size"
+              :description="attachment.description"
               sender-info="Enviado pelo profissional"
               variant="amber"
             />

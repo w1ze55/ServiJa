@@ -40,7 +40,7 @@ export type Page =
   | 'freelancer-wallet'
 
   | 'freelancer-portfolio'
-  | 'freelancer-schedule'
+
   | 'freelancer-kyc'
   | 'freelancer-account-settings'
   | 'add-address'
@@ -171,7 +171,7 @@ const filteredQuotes = computed(() =>
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <!-- Welcome Section -->
       <div class="mb-8">
-        <h1 class="text-gray-900 mb-2">Bem-vindo, {{ user.name }}!</h1>
+        <h1 class="text-gray-900 mb-2 text-3xl font-bold">Bem-vindo, {{ user.name }}!</h1>
         <p class="text-gray-600">Gerencie suas solicitações e serviços contratados</p>
       </div>
 

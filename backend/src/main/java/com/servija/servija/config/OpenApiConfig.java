@@ -28,11 +28,15 @@ import org.springframework.context.annotation.Configuration;
     servers = {
         @Server(
             description = "Servidor Local",
-            url = "http://3.131.85.191"
+            url = "http://54.94.199.137"
+        ),
+        @Server(
+            description = "Servidor de Homologação",
+            url = "https://homolog.servija.app"
         ),
         @Server(
             description = "Servidor de Produção",
-            url = "https://api.servija.com"
+            url = "https://servija.app"
         )
     }
 )

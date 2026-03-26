@@ -1,5 +1,6 @@
 package com.servija.servija.service;
 
+import com.servija.servija.dto.NotificationStreamEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -274,5 +275,17 @@ public class WebSocketService {
         messagingTemplate.convertAndSend(destination, (Object) notification);
         
         log.info("Notificação {} enviada para {}: solicitação {}", eventType, userEmail, serviceRequestId);
+    }
+
+    /**
+     * Publica eventos do stream de notificações persistidas.
+     */
+    public void publishNotificationEvent(String userEmail, NotificationStreamEvent event) {
+        String destination = "/topic/notifications/" + userEmail;
+        messagingTemplate.convertAndSend(destination, event);
+
+        log.info("Evento de notificação {} enviado para {}",
+                event != null ? event.getEventType() : "UNKNOWN",
+                userEmail);
     }
 }

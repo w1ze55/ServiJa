@@ -24,6 +24,7 @@ import {
   Eye,
   Paperclip,
   XCircle,
+  X,
   Sparkles,
   History,
   CreditCard,
@@ -57,6 +58,7 @@ import Separator from '../ui/separator.vue';
 import WorkModelBadge from '../shared/WorkModelBadge.vue';
 import { useProposalStore, type Proposal, type Milestone } from '@/stores/proposalStore';
 import ServiceRequestTimeline from '../service/ServiceRequestTimeline.vue';
+import ChatBox from '../shared/ChatBox.vue';
 import { useRouter } from 'vue-router';
 import { useServiceRequestWebSocket } from '@/composables/useServiceRequestWebSocket';
 import { toast } from '@/utils/toast';
@@ -106,10 +108,7 @@ const milestoneForm = ref({
 });
 const showAddMilestone = ref(false);
 
-const newMessage = ref('');
-const messageAttachments = ref<File[]>([]);
-
-const messageAttachmentInput = ref<HTMLInputElement | null>(null);
+const isSendingMessage = ref(false);
 
 // WebSocket
 let wsConnection: any = null;
@@ -440,23 +439,18 @@ const handleProposalAttachmentReject = (message: string) => {
   toast.error(message);
 };
 
-const handleSendMessage = async () => {
-  if (!newMessage.value.trim() && messageAttachments.value.length === 0) {
-    toast.error('Digite uma mensagem ou adicione um anexo');
-    return;
-  }
-
+const handleSendMessage = async (message: string, attachments: File[]) => {
   if (!proposal.value) return;
 
+  isSendingMessage.value = true;
   const success = await proposalStore.sendMessage(
     proposal.value.id,
-    newMessage.value,
-    messageAttachments.value.length > 0 ? messageAttachments.value : undefined
+    message,
+    attachments.length > 0 ? attachments : undefined
   );
+  isSendingMessage.value = false;
 
   if (success) {
-    newMessage.value = '';
-    messageAttachments.value = [];
     proposal.value = proposalStore.getProposalById(proposal.value.id) || null;
     toast.success('Mensagem enviada');
   } else {
@@ -601,12 +595,6 @@ const handleUpdateMilestoneStatus = async (milestoneId: string, status: 'pending
   }
 };
 
-const handleMessageAttachmentChange = (e: Event) => {
-  const target = e.target as HTMLInputElement;
-  if (target.files) {
-    messageAttachments.value = [...messageAttachments.value, ...Array.from(target.files)];
-  }
-};
 
 const handleAcceptCounterProposal = async () => {
   if (!proposal.value) return;
@@ -1058,86 +1046,13 @@ const getStatusBadge = (currentProposal: Proposal) => {
       <Card v-if="activeSection === 'messages'" class="p-6">
         <h3 class="font-semibold text-[#263238] mb-4">Mensagens</h3>
 
-        <div v-if="!proposal.messages || proposal.messages.length === 0" class="text-center py-8">
-          <MessageSquare class="h-10 w-10 text-gray-300 mx-auto mb-3" />
-          <p class="text-[#435574]">Nenhuma mensagem ainda</p>
-        </div>
-
-        <div v-else class="space-y-4 max-h-96 overflow-y-auto mb-4">
-          <div
-            v-for="msg in proposal.messages"
-            :key="msg.id"
-            :class="`flex ${msg.sender === 'freelancer' ? 'justify-end' : 'justify-start'}`"
-          >
-            <div
-              :class="`max-w-[80%] rounded-lg p-3 ${
-                msg.sender === 'freelancer'
-                  ? 'bg-[#286AD8] text-white'
-                  : 'bg-gray-100 text-[#263238]'
-              }`"
-            >
-              <p class="text-xs font-medium mb-1 opacity-80">{{ msg.senderName }}</p>
-              <p class="text-sm">{{ msg.message }}</p>
-              <div v-if="msg.attachments && msg.attachments.length > 0" class="mt-3 space-y-2">
-                <FileAttachment
-                  v-for="att in msg.attachments"
-                  :key="att.id"
-                  :name="att.name"
-                  :url="att.url"
-                  :size="att.size"
-                  variant="compact"
-                  class="bg-white/10 border-white/20 text-white"
-                />
-              </div>
-              <p class="text-xs mt-1 opacity-60">{{ new Date(msg.timestamp).toLocaleString('pt-BR', {
-                day: '2-digit',
-                month: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit',
-              }) }}</p>
-            </div>
-          </div>
-        </div>
-
-        <!-- Message Input -->
-        <div v-if="proposal.status === 'in_progress' || proposal.status === 'delivered'" class="flex gap-2">
-          <Textarea
-            :model-value="newMessage"
-            @update:model-value="(val) => newMessage = val as string"
-            placeholder="Digite sua mensagem..."
-            :rows="2"
-            class="flex-1"
-          />
-          <div class="flex flex-col gap-2">
-            <Button
-              @click="handleSendMessage"
-              :disabled="!newMessage.trim()"
-              class="bg-[#286AD8] hover:bg-[#435574]"
-            >
-              <Send class="h-4 w-4" />
-            </Button>
-            <input
-              ref="messageAttachmentInput"
-              type="file"
-              multiple
-              @change="handleMessageAttachmentChange"
-              class="hidden"
-            />
-            <Button
-              @click="messageAttachmentInput?.click()"
-              variant="outline"
-              size="icon"
-            >
-              <Paperclip class="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-        <div v-else class="flex items-center justify-center p-4 bg-gray-50 rounded-lg border border-dashed border-gray-200">
-          <p class="text-sm text-[#435574] flex items-center gap-2 text-center">
-            <Lock class="h-4 w-4 text-[#286AD8]" />
-            O chat será liberado automaticamente após a confirmação do pagamento.
-          </p>
-        </div>
+        <ChatBox
+          :messages="proposal.messages || []"
+          current-user-role="freelancer"
+          :is-locked="proposal.status !== 'in_progress' && proposal.status !== 'delivered'"
+          :is-sending="isSendingMessage"
+          @send-message="handleSendMessage"
+        />
       </Card>
 
       <!-- History Section -->
@@ -1259,15 +1174,15 @@ const getStatusBadge = (currentProposal: Proposal) => {
                   :model-value="proposalForm.executionDays"
                   @update:model-value="(val) => handleExecutionDaysInput(val as string)"
                   @keydown="handleExecutionDaysKeydown"
-                  placeholder="Ex: 15"
-                  class="pr-28"
+                  placeholder="Quantidade de dias"
+                  class="pr-24"
                 />
-                <span
-                  v-if="executionTimeLabel"
-                  class="absolute top-1/2 right-2 -translate-y-1/2 flex items-center px-3 py-0.5 rounded-full bg-blue-50 text-[11px] font-medium text-[#286AD8] pointer-events-none whitespace-nowrap shadow-sm"
-                >
-                  {{ executionTimeLabel }}
-                </span>
+                <div class="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2 pointer-events-none">
+                  <span class="text-xs text-gray-400 font-medium">dia(s)</span>
+                  <Badge v-if="executionTimeLabel" variant="secondary" class="bg-blue-50 text-[#286AD8] border-[#286AD8]/20 px-2 h-6 text-[10px]">
+                    {{ executionTimeLabel }}
+                  </Badge>
+                </div>
               </div>
             </div>
           </div>

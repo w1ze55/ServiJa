@@ -36,7 +36,7 @@ const settingsOptions = computed<SettingsOption[]>(() => {
         icon: Bell,
         title: 'Notificações',
         description: 'Configure suas preferências de notificações',
-        onClick: () => alert('Em desenvolvimento'),
+        onClick: () => router.push('/notifications'),
       },
       {
         id: 'payment',

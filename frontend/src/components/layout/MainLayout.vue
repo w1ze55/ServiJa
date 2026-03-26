@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from "vue";
+import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useRouter } from "vue-router";
 import {
   Home,
@@ -16,7 +16,7 @@ import {
   Bell,
   Clock,
   Briefcase,
-  Calendar,
+
   Images,
   DollarSign,
   Wallet,
@@ -26,6 +26,7 @@ import {
   FolderKanban,
   ClipboardList,
   ChevronDown,
+  Pin,
 } from "lucide-vue-next";
 import Avatar from "../ui/avatar.vue";
 import AvatarImage from "../ui/avatar-image.vue";
@@ -39,10 +40,15 @@ import DropdownMenuTrigger from "../ui/dropdown-menu-trigger.vue";
 import logo from "@/assets/favicon-32x32.png";
 import api from "@/api/config/axios";
 import { useUserStore } from "@/stores/userStore";
+import { useNotificationStore } from "@/stores/notificationStore";
+import { useNotificationsRealtime } from "@/composables/useNotificationsRealtime";
 import PendingReviewBanner from "../shared/PendingReviewBanner.vue";
+import NotificationsDropdown from "@/components/notifications/NotificationsDropdown.vue";
+import type { NotificationStreamEvent } from "@/types/notifications";
 
 const router = useRouter();
 const userStore = useUserStore();
+const notificationStore = useNotificationStore();
 
 interface User {
   id: string;
@@ -72,6 +78,7 @@ const props = defineProps<Props>();
 
 // Usar o usuário da store se disponível, caso contrário usar das props
 const currentUser = computed(() => userStore.user || props.user);
+let notificationConnection: ReturnType<typeof useNotificationsRealtime> | null = null;
 
 // Watch para debug
 watch(
@@ -84,7 +91,26 @@ watch(
   },
 );
 
+watch(
+  () => currentUser.value?.email,
+  (email) => {
+    notificationConnection?.disconnect();
+    notificationConnection = null;
+
+    if (!email) {
+      return;
+    }
+
+    notificationConnection = useNotificationsRealtime(email);
+    notificationConnection.connect().catch((error) => {
+      console.error("Erro ao conectar stream de notificações:", error);
+    });
+  },
+  { immediate: true },
+);
+
 const sidebarOpen = ref(false);
+const sidebarPinned = ref(false);
 const sidebarExpanded = ref(false);
 const professionalDropdownOpen = ref(false);
 
@@ -194,7 +220,41 @@ const openMap = () => {
 // Lifecycle
 onMounted(() => {
   loadUserAddresses();
+  notificationStore.ensurePreviewLoaded();
+
+  window.addEventListener("notification-stream-event", handleNotificationStreamEvent as EventListener);
+
+  // Carregar estado do pin da sidebar
+  const pinnedState = localStorage.getItem("sidebarPinned");
+  if (pinnedState === "true") {
+    sidebarPinned.value = true;
+    sidebarExpanded.value = true;
+  }
 });
+
+onUnmounted(() => {
+  window.removeEventListener("notification-stream-event", handleNotificationStreamEvent as EventListener);
+  notificationConnection?.disconnect();
+  notificationConnection = null;
+});
+
+const toggleSidebarPin = () => {
+  sidebarPinned.value = !sidebarPinned.value;
+  localStorage.setItem("sidebarPinned", String(sidebarPinned.value));
+  if (sidebarPinned.value) {
+    sidebarExpanded.value = true;
+  }
+};
+
+const handleMouseEnter = () => {
+  sidebarExpanded.value = true;
+};
+
+const handleMouseLeave = () => {
+  if (!sidebarPinned.value) {
+    sidebarExpanded.value = false;
+  }
+};
 
 // Menu items based on user type
 const menuItems = computed(() =>
@@ -204,7 +264,7 @@ const menuItems = computed(() =>
         { id: "home", label: "Início", icon: Home },
         { id: "explore", label: "Explorar", icon: Compass },
         { id: "requests", label: "Minhas Solicitações", icon: FileText },
-        { id: "cliente-projects", label: "Meus Projetos", icon: Package },
+        { id: "cliente-projects", label: "Projetos em andamento", icon: Package },
         { id: "messages", label: "Mensagens", icon: MessageSquare },
         { id: "favorites", label: "Favoritos", icon: Heart },
         { id: "settings", label: "Configurações", icon: Settings },
@@ -217,7 +277,7 @@ const menuItems = computed(() =>
         { id: "freelancer-wallet", label: "Carteira", icon: Wallet },
 
         { id: "messages", label: "Mensagens", icon: MessageSquare },
-        { id: "freelancer-schedule", label: "Agenda", icon: Calendar },
+
         { id: "settings", label: "Configurações", icon: Settings },
       ],
 );
@@ -249,6 +309,11 @@ const getInitials = (name: string) => {
     .toUpperCase()
     .slice(0, 2);
 };
+
+const handleNotificationStreamEvent = (event: Event) => {
+  const streamEvent = (event as CustomEvent<NotificationStreamEvent>).detail;
+  notificationStore.applyStreamEvent(streamEvent);
+};
 </script>
 
 <template>
@@ -262,8 +327,8 @@ const getInitials = (name: string) => {
 
     <!-- Sidebar - Desktop with Hover -->
     <aside
-      @mouseenter="sidebarExpanded = true"
-      @mouseleave="sidebarExpanded = false"
+      @mouseenter="handleMouseEnter"
+      @mouseleave="handleMouseLeave"
       :class="`
         fixed top-0 left-0 h-full bg-[#263238] text-white z-[60]
         transition-all duration-300 ease-in-out
@@ -275,21 +340,31 @@ const getInitials = (name: string) => {
         <!-- Logo -->
         <div
           :class="`py-2 border-b border-white/10 transition-all duration-300 ${
-            sidebarExpanded ? 'px-6 py-5' : 'px-0'
+            sidebarExpanded ? 'px-6 py-5' : 'px-0 py-5'
           }`"
         >
-          <div class="flex items-center justify-center">
-            <h1
-              :class="`text-white transition-all duration-300 flex items-center gap-2 ${
-                sidebarExpanded ? 'opacity-100' : 'opacity-0 w-0'
+          <div :class="`flex items-center transition-all duration-300 ${sidebarExpanded ? 'justify-between px-4' : 'justify-center px-0'}`">
+            <div class="flex items-center gap-2 overflow-hidden">
+              <img :src="`${logo}`" alt="Servi Já" class="h-8 w-8 flex-shrink-0" />
+              <span
+                :class="`text-white text-xl font-bold whitespace-nowrap transition-all duration-300 ${
+                  sidebarExpanded ? 'opacity-100 w-auto' : 'opacity-0 w-0 absolute'
+                }`"
+              >
+                Servi Já
+              </span>
+            </div>
+            
+            <button
+              v-if="sidebarExpanded"
+              @click="toggleSidebarPin"
+              :class="`p-1.5 rounded-lg transition-all duration-300 hover:bg-white/10 ${
+                sidebarPinned ? 'text-white bg-white/10' : 'text-white/40'
               }`"
+              title="Fixar Sidebar"
             >
-              <img :src="`${logo}`" alt="Servi Já" />
-              <span class="text-white text-xl font-bold">Servi Já</span>
-            </h1>
-            <span v-if="!sidebarExpanded" class="text-white font-bold"
-              ><img :src="`${logo}`" alt="Servi Já"
-            /></span>
+              <Pin class="h-5 w-5" :class="{ 'rotate-45': !sidebarPinned }" />
+            </button>
           </div>
         </div>
 
@@ -530,28 +605,16 @@ const getInitials = (name: string) => {
               @click="sidebarOpen = true"
               class="lg:hidden text-[#263238] hover:text-[#435574]"
             >
-              <Menu class="h-6 w-6" />
+              <Menu class="h-6 w-6"/>
             </button>
-
-            <!-- Logo - visible on desktop only -->
-            <div class="hidden lg:block">
-              <h2 class="text-[#263238]">Servi Já</h2>
-            </div>
 
             <!-- Spacer -->
-            <div class="flex-1" />
+            <div class="flex-1"/>
 
-            <!-- Notifications Button -->
-            <button
-              @click="props.onNavigate('notifications')"
-              class="relative p-2 text-[#435574] hover:bg-gray-100 rounded-lg transition-colors"
-            >
-              <Bell class="h-6 w-6" />
-              <!-- Notification Badge -->
-              <span
-                class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"
-              />
-            </button>
+            <!-- Notifications Dropdown -->
+            <NotificationsDropdown
+              :user-type="currentUser.type === 'provider' ? 'provider' : 'contractor'"
+            />
 
             <!-- User Menu -->
             <DropdownMenu>

@@ -37,6 +37,7 @@ public class PaymentService {
     private final FreelancerWalletService walletService;
     private final ServiceRequestHistoryService serviceRequestHistoryService;
     private final WebSocketService webSocketService;
+    private final NotificationService notificationService;
 
     private static final BigDecimal PLATFORM_FEE_PERCENTAGE = new BigDecimal("0.10"); // 10%
     private static final BigDecimal ASAAS_PIX_FEE = new BigDecimal("0.99"); // Taxa Asaas para PIX (promocional)
@@ -185,6 +186,7 @@ public class PaymentService {
             if (serviceRequest.getFreelancer() != null) {
                 webSocketService.notifyPixPaymentConfirmed(payment.getId(), serviceRequest.getFreelancer().getEmail());
             }
+            notificationService.notifyProjectStarted(payment);
 
             log.info("Pagamento com cartão confirmado e notificações enviadas. ID: {}", payment.getId());
         }
@@ -517,6 +519,7 @@ public class PaymentService {
         webSocketService.notifyPixPaymentConfirmed(
                 payment.getId(),
                 payment.getFreelancer().getEmail());
+        notificationService.notifyProjectStarted(payment);
 
         log.info("🧪 Simulação de confirmação concluída com sucesso!");
     }

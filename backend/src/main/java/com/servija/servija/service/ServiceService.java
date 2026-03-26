@@ -234,6 +234,21 @@ public class ServiceService {
     }
 
     /**
+     * Obter um serviço ativo específico por ID (público)
+     */
+    @Transactional(readOnly = true)
+    public ServiceResponse getPublicServiceById(Long id) {
+        Service service = serviceRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Serviço não encontrado"));
+        
+        if (!service.getIsActive()) {
+            throw new RuntimeException("Serviço não está ativo");
+        }
+        
+        return toResponse(service);
+    }
+
+    /**
      * Listar todos os serviços ativos de um freelancer específico (público)
      */
     @Transactional(readOnly = true)

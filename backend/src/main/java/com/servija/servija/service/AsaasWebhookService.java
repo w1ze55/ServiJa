@@ -33,6 +33,7 @@ public class AsaasWebhookService {
     private final FreelancerWalletService walletService;
     private final WebSocketService webSocketService;
     private final ServiceRequestHistoryService serviceRequestHistoryService;
+    private final NotificationService notificationService;
     private final ObjectMapper objectMapper;
 
     /**
@@ -275,6 +276,7 @@ public class AsaasWebhookService {
             webSocketService.notifyPixPaymentConfirmed(
                     payment.getId(),
                     payment.getFreelancer().getEmail());
+            notificationService.notifyProjectStarted(payment);
 
             log.info("✅ Pagamento confirmado via webhook: {} - R$ {}",
                     asaasPaymentId, payment.getAmount());
@@ -987,6 +989,7 @@ public class AsaasWebhookService {
             webSocketService.notifyPixPaymentConfirmed(
                     payment.getId(),
                     payment.getFreelancer().getEmail());
+            notificationService.notifyProjectStarted(payment);
 
             log.info("✅ Pagamento PIX confirmado via webhook: Payment ID={}, Transaction ID={}, Valor=R$ {}",
                     payment.getId(), pixTransaction.getId(), payment.getAmount());

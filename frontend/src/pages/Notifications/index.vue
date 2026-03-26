@@ -61,6 +61,6 @@ const handleSearch = (query: string) => router.push({ path: '/search', query: { 
 
 <template>
   <MainLayout v-if="user" :user="user" current-page="notifications" :on-navigate="handleNavigate" :on-logout="handleLogout" :on-search="handleSearch">
-    <NotificationsPage :on-navigate="handleNavigate" />
+    <NotificationsPage :user-type="user.type === 'provider' ? 'provider' : 'contractor'" />
   </MainLayout>
 </template>

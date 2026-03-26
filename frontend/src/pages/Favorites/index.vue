@@ -14,10 +14,6 @@
             Sua lista de serviços e profissionais salvos na plataforma
           </p>
         </div>
-        <Button @click="favoritesStore.fetchFavorites" variant="outline" :disabled="favoritesStore.loading" class="self-start md:self-auto">
-          <RefreshCw :class="`h-4 w-4 mr-2 ${favoritesStore.loading ? 'animate-spin' : ''}`" />
-          Atualizar
-        </Button>
       </div>
 
       <!-- Mode Toggle -->
@@ -182,8 +178,8 @@ const handleViewService = (params: { providerId: number; serviceId: number }) =>
   handleNavigate('provider-profile', params);
 };
 
-const handleToggleFavoriteFreelancer = (id: number) => {
-  favoritesStore.toggleFavoriteFreelancer(id);
+const handleToggleFavoriteFreelancer = (id: string | number) => {
+  favoritesStore.toggleFavoriteFreelancer(typeof id === 'string' ? parseInt(id, 10) : id);
 };
 
 const handleToggleFavoriteService = (id: number) => {
