@@ -36,6 +36,7 @@ public class UserService {
     private final PasswordEncoder passwordEncoder;
     private final EntityManager entityManager;
     private final FileStorageService fileStorageService;
+    private final WebSocketService webSocketService;
 
     @Transactional
     public void changePassword(String email, ChangePasswordRequest request) {
@@ -135,6 +136,8 @@ public class UserService {
         // Recarregar o usuário atualizado do banco
         User updatedUser = userRepository.findById(user.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado após atualização"));
+
+        webSocketService.notifyProfileImageUpdate(email, finalAvatarUrl);
 
         return buildUserDto(updatedUser);
     }

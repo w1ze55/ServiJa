@@ -278,6 +278,21 @@ public class WebSocketService {
     }
 
     /**
+     * Notifica sobre atualização de imagem de perfil do usuário.
+     */
+    public void notifyProfileImageUpdate(String userEmail, String avatarUrl) {
+        Map<String, Object> message = new HashMap<>();
+        message.put("type", "PROFILE_IMAGE_UPDATED");
+        message.put("avatarUrl", avatarUrl);
+        message.put("timestamp", System.currentTimeMillis());
+
+        String destination = "/topic/profile-update/" + userEmail;
+        messagingTemplate.convertAndSend(destination, (Object) message);
+
+        log.info("Notificação de atualização de avatar enviada para {}", userEmail);
+    }
+
+    /**
      * Publica eventos do stream de notificações persistidas.
      */
     public void publishNotificationEvent(String userEmail, NotificationStreamEvent event) {
