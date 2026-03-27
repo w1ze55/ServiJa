@@ -53,31 +53,64 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll));
 
     <!-- Hero Section -->
     <section class="hero-section">
-      <div class="hero-background"></div>
-      <div class="hero-content">
-        <div class="hero-badge">
-          <Sparkles :size="16" />
-          <span>Plataforma de conexão entre prestadores e contratantes</span>
+      <div class="hero-bg-overlay">
+        <img src="/BG.svg" alt="Background" class="hero-bg-img" />
+      </div>
+
+      <div class="hero-container">
+        <div class="hero-content-left">
+
+          <h1 class="hero-title-v2">
+            Encontre os melhores
+            <span class="hero-highlight-v2">profissionais</span>
+            para qualquer serviço
+          </h1>
+
+          <p class="hero-description-v2">
+            A plataforma mais completa para conectar você aos melhores prestadores.
+            Segurança, qualidade e agilidade em um só lugar.
+          </p>
+
+          <div class="hero-actions-v2">
+            <Button size="lg" @click="$props.onSignup" class="btn-primary-v2">
+              Começar agora - É grátis
+              <CheckCircle :size="20" />
+            </Button>
+            <div class="hero-trust-badges">
+              <div class="trust-item">
+                <ShieldCheck :size="18" />
+                <span>100% Seguro</span>
+              </div>
+              <div class="trust-item">
+                <Star :size="18" />
+                <span>Avaliações aprimoradas</span>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <h1 class="hero-title">
-          Encontre os melhores
-          <span class="hero-highlight">profissionais</span>
-          para qualquer serviço
-        </h1>
-
-        <p class="hero-description">
-          O lugar onde você encontra os melhores prestadores de serviço.
-          Compare perfis, avaliações e escolha com confiança.
-        </p>
-
-        <div class="hero-actions">
-          <Button size="lg" @click="$props.onSignup" class="btn-primary">
-            Começar agora - É grátis
-            <CheckCircle :size="20" />
-          </Button>
+        <div class="hero-visual-right">
+          <div class="visual-wrapper">
+            <img src="/peopleblue.svg" alt="Profissionais" class="hero-people-img" />
+            <div class="floating-card card-1">
+              <div class="card-icon blue"><CheckCircle :size="16" /></div>
+              <div class="card-info">
+                <span class="card-label">Qualidade</span>
+                <span class="card-val">Verificada</span>
+              </div>
+            </div>
+            <div class="floating-card card-2">
+              <div class="card-icon yellow"><Star :size="16" /></div>
+              <div class="card-info">
+                <span class="card-label">Avaliação</span>
+                <span class="card-val">4.9/5.0</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
+      <img src="/line.svg" alt="Decorative Line Top" class="hero-line-img-inverted" />
+      <img src="/line.svg" alt="Decorative Line Bottom" class="hero-line-img-fixed" />
     </section>
 
     <!-- Features -->
@@ -504,182 +537,282 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll));
   box-shadow: 0 6px 20px rgba(40, 106, 216, 0.4);
 }
 
-/* ===== Hero Section ===== */
+/* ===== Hero Section V2 ===== */
 .hero-section {
   position: relative;
-  overflow: hidden;
-  padding: 6rem 1.5rem;
-  min-height: 96vh;
+  min-height: 100vh;
   display: flex;
   align-items: center;
-  justify-content: center;
-  position: sticky;
-  top: 0;
+  overflow: hidden;
+  background: white;
 }
 
-.hero-background {
+.hero-bg-overlay {
   position: absolute;
-  inset: 0;
-  background: linear-gradient(135deg, #286ad8 0%, #1c3b70 50%, #0a2657 100%);
-  opacity: 1;
+  top: -20rem;
+  left: 0;
+  width: 100%;
+  height: 120%;
+  z-index: 1;
+  pointer-events: none;
 }
 
-.hero-background::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(circle at 30% 50%, rgba(255, 255, 255, 0.1) 0%, transparent 50%),
-    radial-gradient(circle at 70% 80%, rgba(255, 255, 255, 0.05) 0%, transparent 50%);
-  animation: pulse 8s ease-in-out infinite;
+.hero-bg-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.9;
 }
 
-@keyframes pulse {
-
-  0%,
-  100% {
-    opacity: 1;
-  }
-
-  50% {
-    opacity: 0.8;
-  }
-}
-
-.hero-content {
-  position: relative;
-  max-width: 56rem;
+.hero-container {
+  max-width: 1280px;
   margin: 0 auto;
-  text-align: center;
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+  gap: 4rem;
+  align-items: center;
+  position: relative;
   z-index: 10;
 }
 
-.hero-badge {
+.hero-content-left {
+  animation: slideInLeft 1s ease-out;
+}
+
+.hero-badge-v2 {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 1.25rem;
-  background: rgba(255, 255, 255, 0.2);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  border-radius: 9999px;
-  color: white;
-  font-size: 0.875rem;
-  font-weight: 600;
-  margin-bottom: 2rem;
-  animation: fadeInDown 1s ease-out;
-}
-
-@keyframes fadeInDown {
-  from {
-    opacity: 0;
-    transform: translateY(-20px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.hero-title {
-  font-size: 2.5rem;
-  font-weight: 800;
-  line-height: 1.2;
-  color: white;
-  margin-bottom: 1.5rem;
-  animation: fadeInUp 1s ease-out 0.2s both;
-}
-
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.hero-highlight {
-  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  position: relative;
-  display: inline-block;
-}
-
-.hero-description {
-  font-size: 1.125rem;
-  line-height: 1.75;
-  color: rgba(255, 255, 255, 0.95);
-  margin-bottom: 2.5rem;
-  max-width: 42rem;
-  margin-left: auto;
-  margin-right: auto;
-  animation: fadeInUp 1s ease-out 0.4s both;
-}
-
-.hero-actions {
-  display: flex;
-  gap: 1rem;
-  justify-content: center;
-  margin-bottom: 3rem;
-  animation: fadeInUp 1s ease-out 0.6s both;
-}
-
-.btn-primary {
-  background: white;
+  gap: 0.75rem;
+  background: rgba(40, 106, 216, 0.08);
+  border: 1px solid rgba(40, 106, 216, 0.15);
+  padding: 0.6rem 1.25rem;
+  border-radius: 99px;
   color: #286ad8;
-  font-weight: 700;
+  font-weight: 600;
+  font-size: 0.9rem;
+  margin-bottom: 2rem;
+}
+
+.hero-title-v2 {
+  font-size: clamp(2.5rem, 5vw, 4rem);
+  line-height: 1.1;
+  font-weight: 800;
+  color: #0f172a;
+  margin-bottom: 1.5rem;
+  letter-spacing: -0.02em;
+}
+
+.hero-highlight-v2 {
+  color: #286ad8;
+  position: relative;
+}
+
+.hero-description-v2 {
+  font-size: clamp(1.1rem, 2vw, 1.25rem);
+  color: #475569;
+  line-height: 1.6;
+  max-width: 540px;
+  margin-bottom: 2.5rem;
+}
+
+.hero-actions-v2 {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.btn-primary-v2 {
+  background: #286ad8;
+  color: white;
+  padding: 1.25rem 2.5rem;
+  border-radius: 1rem;
   font-size: 1.125rem;
-  padding: 1rem 2rem;
-  border-radius: 0.75rem;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-  transition: all 0.3s ease;
+  font-weight: 700;
+  width: fit-content;
+  box-shadow: 0 10px 25px rgba(40, 106, 216, 0.25);
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.btn-primary-v2:hover {
+  transform: translateY(-4px) scale(1.02);
+  box-shadow: 0 15px 35px rgba(40, 106, 216, 0.35);
+  background: #1e58bc;
+}
+
+.hero-trust-badges {
+  display: flex;
+  gap: 2rem;
+  align-items: center;
+}
+
+.trust-item {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-}
-
-.btn-primary:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
-  background: #f9fafb;
-}
-
-.hero-stats {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 2rem;
-  flex-wrap: wrap;
-  animation: fadeInUp 1s ease-out 0.8s both;
-}
-
-.stat-item {
-  text-align: center;
-}
-
-.stat-number {
-  font-size: 2rem;
-  font-weight: 800;
-  color: white;
-  margin-bottom: 0.25rem;
-}
-
-.stat-label {
+  color: #64748b;
   font-size: 0.875rem;
-  color: rgba(255, 255, 255, 0.8);
   font-weight: 500;
 }
 
-.stat-divider {
-  width: 1px;
-  height: 2.5rem;
-  background: rgba(255, 255, 255, 0.3);
+.trust-item svg {
+  color: #286ad8;
+}
+
+.hero-visual-right {
+  position: relative;
+  animation: slideInRight 1.2s ease-out;
+}
+
+.visual-wrapper {
+  position: relative;
+  width: 100%;
+  max-width: 600px;
+}
+
+.hero-people-img {
+  width: 100%;
+  height: auto;
+  filter: drop-shadow(0 20px 50px rgba(0, 0, 0, 0.1));
+  position: relative;
+  z-index: 5;
+}
+
+.hero-line-img-fixed {
+  position: absolute;
+  top: 80.5%;
+  right: 0;
+  width: 20%;
+  max-width: 45vw;
+  z-index: 1;
+  opacity: 0.8;
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.hero-line-img-inverted {
+  position: absolute;
+  top: 10%;
+  left: 0;
+  width: 20%;
+  max-width: 45vw;
+  z-index: 1;
+  opacity: 0.8;
+  pointer-events: none;
+  transform: scaleX(-1) scaleY(-1);
+}
+
+.floating-card {
+  position: absolute;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(10px);
+  padding: 1rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  z-index: 20;
+}
+
+.card-1 {
+  top: 15%;
+  right: -5%;
+}
+
+.card-2 {
+  bottom: 20%;
+  left: -5%;
+}
+
+.card-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.card-icon.blue { background: rgba(40, 106, 216, 0.1); color: #286ad8; }
+.card-icon.yellow { background: rgba(245, 158, 11, 0.1); color: #f59e0b; }
+
+.card-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.card-label {
+  font-size: 0.75rem;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.card-val {
+  font-size: 0.9rem;
+  color: #0f172a;
+  font-weight: 700;
+}
+
+/* Animations */
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-40px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(40px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-20px); }
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .hero-container {
+    grid-template-columns: 1fr;
+    text-align: center;
+    gap: 3rem;
+  }
+
+  .hero-content-left {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .hero-description-v2 {
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .hero-actions-v2 {
+    align-items: center;
+  }
+
+  .hero-visual-right {
+    order: -1;
+    max-width: 500px;
+    margin: 0 auto;
+  }
+}
+
+@media (max-width: 640px) {
+  .hero-section {
+    padding-top: 60px;
+  }
+  
+  .hero-badge-v2 {
+    font-size: 0.8rem;
+  }
+
+  .floating-card {
+    display: none;
+  }
 }
 
 /* ===== Features Section ===== */
