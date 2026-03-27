@@ -30,6 +30,7 @@ public class ServiceService {
     private final ServiceRepository serviceRepository;
     private final FreelancerRepository freelancerRepository;
     private final UserRepository userRepository;
+    private final FileStorageService fileStorageService;
     private final ObjectMapper objectMapper;
 
     /**
@@ -86,7 +87,9 @@ public class ServiceService {
                 .price(request.getPrice())
                 .priceType(parseEnum(Service.PriceType.class, request.getPriceType(), Service.PriceType.FIXED))
                 .deliveryTime(request.getDeliveryTime())
-                .deliveryUnit(parseEnum(Service.DeliveryUnit.class, request.getDeliveryUnit(), Service.DeliveryUnit.DAYS))
+                .deliveryUnit(
+                        parseEnum(Service.DeliveryUnit.class, request.getDeliveryUnit(), Service.DeliveryUnit.DAYS))
+                .workModel(parseEnum(Service.WorkModel.class, request.getWorkModel(), Service.WorkModel.REMOTO))
                 .tags(toJson(request.getTags()))
                 .images(toJson(request.getImages()))
                 .isActive(request.getIsActive() != null ? request.getIsActive() : true)
@@ -104,7 +107,7 @@ public class ServiceService {
     @Transactional
     public ServiceResponse updateService(Long id, ServiceRequest request) {
         Freelancer freelancer = getCurrentFreelancer();
-        
+
         Service service = serviceRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Serviço não encontrado"));
 
@@ -133,13 +136,33 @@ public class ServiceService {
             service.setDeliveryTime(request.getDeliveryTime());
         }
         if (request.getDeliveryUnit() != null) {
-            service.setDeliveryUnit(parseEnum(Service.DeliveryUnit.class, request.getDeliveryUnit(), service.getDeliveryUnit()));
+            service.setDeliveryUnit(
+                    parseEnum(Service.DeliveryUnit.class, request.getDeliveryUnit(), service.getDeliveryUnit()));
+        }
+        if (request.getWorkModel() != null) {
+            service.setWorkModel(parseEnum(Service.WorkModel.class, request.getWorkModel(), service.getWorkModel()));
         }
         if (request.getTags() != null) {
             service.setTags(toJson(request.getTags()));
         }
         if (request.getImages() != null) {
-            service.setImages(toJson(request.getImages()));
+            // Coletar URLs das imagens antigas para deletar do S3
+            List<String> oldImagesUrls = fromJson(service.getImages());
+            List<String> newImagesUrls = request.getImages();
+
+            service.setImages(toJson(newImagesUrls));
+
+            // Deletar as imagens que não estão mais na lista e são URLs do S3
+            for (String oldUrl : oldImagesUrls) {
+                if (!newImagesUrls.contains(oldUrl) && isS3Url(oldUrl)) {
+                    try {
+                        fileStorageService.deleteFile(oldUrl);
+                    } catch (Exception e) {
+                        log.warn("Falha ao deletar imagem de serviço antiga do S3: {}. Erro: {}", oldUrl,
+                                e.getMessage());
+                    }
+                }
+            }
         }
         if (request.getIsActive() != null) {
             service.setIsActive(request.getIsActive());
@@ -157,7 +180,7 @@ public class ServiceService {
     @Transactional
     public void deleteService(Long id) {
         Freelancer freelancer = getCurrentFreelancer();
-        
+
         Service service = serviceRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Serviço não encontrado"));
 
@@ -166,8 +189,26 @@ public class ServiceService {
             throw new RuntimeException("Você não tem permissão para excluir este serviço");
         }
 
+        // Coletar URLs das imagens para deletar do S3
+        List<String> imageUrls = fromJson(service.getImages());
+
         serviceRepository.delete(service);
         log.info("Serviço excluído: {}", id);
+
+        // Deletar imagens do S3
+        for (String url : imageUrls) {
+            if (isS3Url(url)) {
+                try {
+                    fileStorageService.deleteFile(url);
+                } catch (Exception e) {
+                    log.warn("Falha ao deletar imagem de serviço do S3 ao excluir: {}. Erro: {}", url, e.getMessage());
+                }
+            }
+        }
+    }
+
+    private boolean isS3Url(String url) {
+        return url != null && url.contains(".s3.") && url.contains("amazonaws.com");
     }
 
     /**
@@ -176,7 +217,7 @@ public class ServiceService {
     @Transactional
     public ServiceResponse toggleServiceStatus(Long id) {
         Freelancer freelancer = getCurrentFreelancer();
-        
+
         Service service = serviceRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Serviço não encontrado"));
 
@@ -190,6 +231,40 @@ public class ServiceService {
         log.info("Status do serviço {} alterado para: {}", id, service.getIsActive());
 
         return toResponse(service);
+    }
+
+    /**
+     * Obter um serviço ativo específico por ID (público)
+     */
+    @Transactional(readOnly = true)
+    public ServiceResponse getPublicServiceById(Long id) {
+        Service service = serviceRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Serviço não encontrado"));
+        
+        if (!service.getIsActive()) {
+            throw new RuntimeException("Serviço não está ativo");
+        }
+        
+        return toResponse(service);
+    }
+
+    /**
+     * Listar todos os serviços ativos de um freelancer específico (público)
+     */
+    @Transactional(readOnly = true)
+    public List<ServiceResponse> getPublicServicesByFreelancer(Long freelancerId) {
+        List<Service> services = serviceRepository.findByFreelancerIdAndIsActiveOrderByCreatedAtDesc(freelancerId,
+                true);
+        return services.stream().map(this::toResponse).collect(Collectors.toList());
+    }
+
+    /**
+     * Listar todos os serviços ativos
+     */
+    @Transactional(readOnly = true)
+    public List<ServiceResponse> getAllActiveServices() {
+        List<Service> services = serviceRepository.findByIsActiveOrderByCreatedAtDesc(true);
+        return services.stream().map(this::toResponse).collect(Collectors.toList());
     }
 
     /**
@@ -229,7 +304,7 @@ public class ServiceService {
 
     // ==================== MÉTODOS AUXILIARES ====================
 
-    private ServiceResponse toResponse(Service service) {
+    public ServiceResponse toResponse(Service service) {
         return ServiceResponse.builder()
                 .id(service.getId())
                 .freelancerId(service.getFreelancer().getId())
@@ -241,9 +316,11 @@ public class ServiceService {
                 .priceType(service.getPriceType().name())
                 .deliveryTime(service.getDeliveryTime())
                 .deliveryUnit(service.getDeliveryUnit().name())
+                .workModel(service.getWorkModel() != null ? service.getWorkModel().name() : null)
                 .tags(fromJson(service.getTags()))
                 .images(fromJson(service.getImages()))
                 .isActive(service.getIsActive())
+                .freelancerProfilePhoto(service.getFreelancer().getAvatarUrl())
                 .createdAt(service.getCreatedAt())
                 .updatedAt(service.getUpdatedAt())
                 .build();
@@ -266,7 +343,8 @@ public class ServiceService {
             return new ArrayList<>();
         }
         try {
-            return objectMapper.readValue(json, new TypeReference<List<String>>() {});
+            return objectMapper.readValue(json, new TypeReference<List<String>>() {
+            });
         } catch (JsonProcessingException e) {
             log.error("Erro ao converter JSON para lista", e);
             return new ArrayList<>();

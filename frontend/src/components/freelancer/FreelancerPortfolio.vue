@@ -201,7 +201,7 @@ const confirmReport = () => {
           </DialogDescription>
         </DialogHeader>
 
-        <div class="space-y-4">
+        <div class="hidden sm:block space-y-4">
           <!-- Media -->
           <div class="rounded-lg overflow-hidden bg-gray-100">
             <video

@@ -1,0 +1,138 @@
+<script setup lang="ts">
+import { Briefcase, Heart, DollarSign, Clock } from 'lucide-vue-next';
+import Card from '../ui/card.vue';
+import Badge from '../ui/badge.vue';
+
+interface ServiceItem {
+  id: number;
+  freelancerId: number;
+  freelancerName: string;
+  title: string;
+  category: string;
+  description: string;
+  price: number;
+  priceType: string;
+  deliveryTime: number;
+  deliveryUnit: string;
+  workModel?: string | null;
+  freelancerProfilePhoto?: string;
+  images: string[];
+}
+
+interface Props {
+  service: ServiceItem;
+  isFavorite: boolean;
+  onNavigate: (params: { providerId: number; serviceId: number }) => void;
+  onToggleFavorite: (id: number) => void;
+}
+
+const props = defineProps<Props>();
+
+const formatPrice = (price: number, priceType: string) => {
+  const formatted = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(price);
+  const suffix = priceType === 'HOURLY' ? '/hora' : priceType === 'DAILY' ? '/dia' : '';
+  return `${formatted}${suffix}`;
+};
+
+const formatDelivery = (time: number, unit: string) => {
+  const unitLabel = unit === 'HOURS' ? 'hora(s)' : unit === 'DAYS' ? 'dia(s)' : 'semana(s)';
+  return `${time} ${unitLabel}`;
+};
+
+const formatWorkModel = (value?: string | null) => {
+  const normalized = value?.toUpperCase();
+  if (normalized === 'PRESENCIAL') return 'Presencial';
+  if (normalized === 'HIBRIDO') return 'Híbrido';
+  if (normalized === 'REMOTO') return 'Remoto';
+  return null;
+};
+
+const getInitials = (name: string) =>
+  name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+
+const handleCardClick = () => {
+  props.onNavigate({ providerId: props.service.freelancerId, serviceId: props.service.id });
+};
+
+const handleFavoriteClick = (e: MouseEvent) => {
+  e.stopPropagation();
+  props.onToggleFavorite(props.service.id);
+};
+</script>
+
+<template>
+  <Card
+    class="group hover:shadow-lg hover:border-[#286AD8]/30 transition-all duration-200 overflow-hidden cursor-pointer"
+    @click="handleCardClick"
+  >
+    <!-- Service Image -->
+    <div class="relative h-40 bg-gradient-to-br from-[#286AD8]/10 to-[#435574]/10 overflow-hidden">
+      <img
+        v-if="service.images && service.images.length > 0"
+        :src="service.images[0]"
+        :alt="service.title"
+        class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+      />
+      <div v-else class="w-full h-full flex items-center justify-center">
+        <Briefcase class="h-12 w-12 text-[#286AD8]/30" />
+      </div>
+
+      <!-- Category Badge -->
+      <Badge class="absolute top-3 left-3 bg-white/90 text-[#263238] backdrop-blur-sm text-xs">
+        {{ service.category }}
+      </Badge>
+
+      <!-- Favorite -->
+      <button
+        @click="handleFavoriteClick"
+        :class="`absolute top-3 right-3 p-1.5 rounded-full transition-all ${
+          isFavorite
+            ? 'bg-red-50 text-red-500'
+            : 'bg-white/80 text-gray-400 hover:text-red-500 hover:bg-red-50'
+        }`"
+      >
+        <Heart :class="`h-4 w-4 ${isFavorite ? 'fill-current' : ''}`" />
+      </button>
+    </div>
+
+    <!-- Content -->
+    <div class="p-4">
+      <h3 class="font-semibold text-[#263238] mb-1 line-clamp-1 group-hover:text-[#286AD8] transition-colors">
+        {{ service.title }}
+      </h3>
+      <Badge v-if="formatWorkModel(service.workModel)" variant="outline" class="mb-2 bg-white text-[#435574]">
+        {{ formatWorkModel(service.workModel) }}
+      </Badge>
+
+      <!-- Freelancer -->
+      <div class="flex items-center gap-2 mb-3">
+        <div class="w-6 h-6 rounded-full bg-[#286AD8]/10 overflow-hidden flex items-center justify-center text-[10px] font-semibold text-[#286AD8]">
+          <img
+            v-if="service.freelancerProfilePhoto"
+            :src="service.freelancerProfilePhoto"
+            :alt="service.freelancerName"
+            class="w-full h-full object-cover"
+          />
+          <template v-else>
+            {{ getInitials(service.freelancerName) }}
+          </template>
+        </div>
+        <span class="text-sm text-[#435574]">{{ service.freelancerName }}</span>
+      </div>
+
+      <p class="text-sm text-[#435574] mb-3 line-clamp-2">{{ service.description }}</p>
+
+      <!-- Footer -->
+      <div class="flex items-center justify-between pt-3 border-t border-gray-100">
+        <div class="flex items-center gap-1 text-[#286AD8]">
+          <DollarSign class="h-4 w-4" />
+          <span class="font-bold text-sm">{{ formatPrice(service.price, service.priceType) }}</span>
+        </div>
+        <div class="flex items-center gap-1 text-[#435574]">
+          <Clock class="h-3.5 w-3.5" />
+          <span class="text-xs">{{ formatDelivery(service.deliveryTime, service.deliveryUnit) }}</span>
+        </div>
+      </div>
+    </div>
+  </Card>
+</template>

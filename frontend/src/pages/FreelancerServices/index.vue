@@ -48,6 +48,7 @@ interface Service {
   description: string;
   price: number;
   priceType: string;
+  workModel: 'presencial' | 'remoto' | 'hibrido';
   deliveryTime: number;
   deliveryUnit: string;
   tags: string[];
@@ -112,6 +113,25 @@ const categories = [
   'Outro',
 ];
 
+const normalizeWorkModel = (value?: string | null): 'presencial' | 'remoto' | 'hibrido' => {
+  const normalized = value?.toUpperCase();
+  if (normalized === 'HIBRIDO') return 'hibrido';
+  if (normalized === 'PRESENCIAL') return 'presencial';
+  return 'remoto';
+};
+
+const mapWorkModelToApi = (value: ServiceFormData['workModel']) => {
+  if (value === 'hibrido') return 'HIBRIDO';
+  if (value === 'presencial') return 'PRESENCIAL';
+  return 'REMOTO';
+};
+
+const getWorkModelLabel = (value: Service['workModel']) => {
+  if (value === 'hibrido') return 'Híbrido';
+  if (value === 'presencial') return 'Presencial';
+  return 'Remoto';
+};
+
 // Carregar serviços da API
 const loadServices = async () => {
   isLoading.value = true;
@@ -126,6 +146,7 @@ const loadServices = async () => {
     const deliveryUnitMap: Record<string, string> = {
       'DAYS': 'dias',
       'WEEKS': 'semanas',
+      'MONTHS': 'meses',
     };
     
     services.value = response.data.map((s: any) => ({
@@ -135,6 +156,7 @@ const loadServices = async () => {
       description: s.description,
       price: Number(s.price),
       priceType: priceTypeMap[s.priceType] || 'fixo',
+      workModel: normalizeWorkModel(s.workModel),
       deliveryTime: s.deliveryTime,
       deliveryUnit: deliveryUnitMap[s.deliveryUnit] || 'dias',
       tags: s.tags || [],
@@ -171,13 +193,13 @@ const filteredServices = computed(() => {
   });
 
   // Ordenar
-  if (sortBy.value === 'recent') {
+  if (sortBy.value === 'Mais recentes') {
     filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  } else if (sortBy.value === 'price-asc') {
+  } else if (sortBy.value === 'Menor preço') {
     filtered.sort((a, b) => a.price - b.price);
-  } else if (sortBy.value === 'price-desc') {
+  } else if (sortBy.value === 'Maior preço') {
     filtered.sort((a, b) => b.price - a.price);
-  } else if (sortBy.value === 'title') {
+  } else if (sortBy.value === 'Nome (A-Z)') {
     filtered.sort((a, b) => a.title.localeCompare(b.title));
   }
 
@@ -198,6 +220,9 @@ const formatCurrency = (value: number) => {
 };
 
 const formatDeliveryTime = (time: number, unit: string) => {
+  if (unit === 'meses') {
+    return time === 1 ? '1 mês' : `${time} meses`;
+  }
   const unitLabel = unit === 'semanas' ? (time === 1 ? 'semana' : 'semanas') : (time === 1 ? 'dia' : 'dias');
   return `${time} ${unitLabel}`;
 };
@@ -247,10 +272,14 @@ const handleEditService = (serviceId: string) => {
       'por hora': 'hora',
       'por dia': 'dia',
     };
-    const deliveryUnitMap: Record<string, 'dia' | 'semana'> = {
-      'dias': 'dia',
-      'semanas': 'semana',
-    };
+    
+    // Converter prazo armazenado para dias totais
+    let totalDays = service.deliveryTime;
+    if (service.deliveryUnit === 'semanas') {
+      totalDays = service.deliveryTime * 7;
+    } else if (service.deliveryUnit === 'meses') {
+      totalDays = service.deliveryTime * 30;
+    }
     
     editingService.value = {
       id: service.id,
@@ -259,8 +288,8 @@ const handleEditService = (serviceId: string) => {
       description: service.description,
       price: service.price,
       priceType: priceTypeMap[service.priceType] || 'fixo',
-      deliveryTime: String(service.deliveryTime),
-      deliveryUnit: deliveryUnitMap[service.deliveryUnit] || 'dia',
+      workModel: normalizeWorkModel(service.workModel),
+      deliveryTime: String(totalDays),
       tags: service.tags || [],
       images: service.images || [],
       isActive: service.isActive,
@@ -290,10 +319,22 @@ const handleServiceFormSubmit = async (formData: ServiceFormData) => {
       'hora': 'HOURLY',
       'dia': 'DAILY',
     };
-    const deliveryUnitMap: Record<string, string> = {
-      'dia': 'DAYS',
-      'semana': 'WEEKS',
-    };
+    
+    // Auto-conversão de dias para a melhor unidade
+    const days = parseInt(formData.deliveryTime);
+    let deliveryTime: number;
+    let deliveryUnit: string;
+    
+    if (days >= 30) {
+      deliveryTime = Math.floor(days / 30);
+      deliveryUnit = 'MONTHS';
+    } else if (days >= 7) {
+      deliveryTime = Math.floor(days / 7);
+      deliveryUnit = 'WEEKS';
+    } else {
+      deliveryTime = days;
+      deliveryUnit = 'DAYS';
+    }
     
     const payload = {
       title: formData.title,
@@ -301,8 +342,9 @@ const handleServiceFormSubmit = async (formData: ServiceFormData) => {
       description: formData.description,
       price: formData.price,
       priceType: priceTypeMap[formData.priceType] || 'FIXED',
-      deliveryTime: parseInt(formData.deliveryTime),
-      deliveryUnit: deliveryUnitMap[formData.deliveryUnit] || 'DAYS',
+      workModel: mapWorkModelToApi(formData.workModel),
+      deliveryTime,
+      deliveryUnit,
       tags: formData.tags,
       images: formData.images,
       isActive: formData.isActive,
@@ -323,6 +365,7 @@ const handleServiceFormSubmit = async (formData: ServiceFormData) => {
       const deliveryUnitMapResponse: Record<string, string> = {
         'DAYS': 'dias',
         'WEEKS': 'semanas',
+        'MONTHS': 'meses',
       };
       
       services.value = services.value.map((s) =>
@@ -334,6 +377,7 @@ const handleServiceFormSubmit = async (formData: ServiceFormData) => {
               description: response.data.description,
               price: Number(response.data.price),
               priceType: priceTypeMapResponse[response.data.priceType] || 'fixo',
+              workModel: normalizeWorkModel(response.data.workModel),
               deliveryTime: response.data.deliveryTime,
               deliveryUnit: deliveryUnitMapResponse[response.data.deliveryUnit] || 'dias',
               tags: response.data.tags || [],
@@ -356,6 +400,7 @@ const handleServiceFormSubmit = async (formData: ServiceFormData) => {
       const deliveryUnitMapResponse: Record<string, string> = {
         'DAYS': 'dias',
         'WEEKS': 'semanas',
+        'MONTHS': 'meses',
       };
       
       services.value = [
@@ -366,6 +411,7 @@ const handleServiceFormSubmit = async (formData: ServiceFormData) => {
           description: response.data.description,
           price: Number(response.data.price),
           priceType: priceTypeMapResponse[response.data.priceType] || 'fixo',
+          workModel: normalizeWorkModel(response.data.workModel),
           deliveryTime: response.data.deliveryTime,
           deliveryUnit: deliveryUnitMapResponse[response.data.deliveryUnit] || 'dias',
           tags: response.data.tags || [],
@@ -594,7 +640,12 @@ onMounted(() => {
                     </div>
                   </td>
                   <td class="px-6 py-4 whitespace-nowrap">
-                    <Badge variant="secondary">{{ service.category }}</Badge>
+                    <div class="flex flex-wrap gap-2">
+                      <Badge variant="secondary">{{ service.category }}</Badge>
+                      <Badge variant="outline" class="bg-white text-[#435574]">
+                        {{ getWorkModelLabel(service.workModel) }}
+                      </Badge>
+                    </div>
                   </td>
                   <td class="px-6 py-4 whitespace-nowrap">
                     <p class="text-sm font-medium text-[#263238]">
@@ -671,9 +722,14 @@ onMounted(() => {
             <div class="flex items-start justify-between mb-3">
               <div class="flex-1">
                 <h3 class="font-semibold text-[#263238] mb-1">{{ service.title }}</h3>
-                <Badge variant="secondary" class="text-xs">
-                  {{ service.category }}
-                </Badge>
+                <div class="flex flex-wrap gap-2">
+                  <Badge variant="secondary" class="text-xs">
+                    {{ service.category }}
+                  </Badge>
+                  <Badge variant="outline" class="text-xs bg-white text-[#435574]">
+                    {{ getWorkModelLabel(service.workModel) }}
+                  </Badge>
+                </div>
               </div>
               <DropdownMenu>
                 <DropdownMenuTrigger as-child>

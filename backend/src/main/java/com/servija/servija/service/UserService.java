@@ -13,22 +13,30 @@ import com.servija.servija.model.Freelancer;
 import com.servija.servija.model.User;
 import com.servija.servija.repository.ContractorRepository;
 import com.servija.servija.repository.FreelancerRepository;
+import com.servija.servija.repository.ReviewRepository;
 import com.servija.servija.repository.UserRepository;
+
+import java.math.BigDecimal;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class UserService {
 
     private final UserRepository userRepository;
     private final ContractorRepository contractorRepository;
     private final FreelancerRepository freelancerRepository;
+    private final ReviewRepository reviewRepository;
     private final PasswordEncoder passwordEncoder;
     private final EntityManager entityManager;
+    private final FileStorageService fileStorageService;
+    private final WebSocketService webSocketService;
 
     @Transactional
     public void changePassword(String email, ChangePasswordRequest request) {
@@ -49,9 +57,8 @@ public class UserService {
         String newPassword = request.getNewPassword();
         if (!isValidPassword(newPassword)) {
             throw new IllegalArgumentException(
-                "A senha deve ter no mínimo 8 caracteres e conter pelo menos: " +
-                "1 letra maiúscula, 1 letra minúscula, 1 número e 1 caractere especial"
-            );
+                    "A senha deve ter no mínimo 8 caracteres e conter pelo menos: " +
+                            "1 letra maiúscula, 1 letra minúscula, 1 número e 1 caractere especial");
         }
 
         // Atualizar senha
@@ -72,46 +79,65 @@ public class UserService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
 
-        // Validar formato base64
-        String base64 = request.getAvatarBase64();
-        if (base64 == null || base64.isEmpty()) {
-            throw new IllegalArgumentException("Imagem inválida");
+        String oldAvatarUrl = user.getAvatarUrl();
+        String finalAvatarUrl = null;
+
+        // Prioridade 1: URL S3 (se fornecida)
+        if (request.getAvatarUrl() != null && !request.getAvatarUrl().isEmpty()) {
+            finalAvatarUrl = request.getAvatarUrl();
+        }
+        // Prioridade 2: Base64 (se fornecida e URL não existir)
+        else if (request.getAvatarBase64() != null && !request.getAvatarBase64().isEmpty()) {
+            String base64 = request.getAvatarBase64();
+
+            // Remover prefixo data:image se existir
+            if (base64.contains(",")) {
+                base64 = base64.substring(base64.indexOf(",") + 1);
+            }
+
+            // Validar tamanho (limite de 5MB em base64 = ~3.75MB original)
+            if (base64.length() > 6_700_000) { // ~5MB em base64
+                throw new IllegalArgumentException("Imagem muito grande. Tamanho máximo: 5MB");
+            }
+
+            // Adicionar prefixo data:image/jpeg para facilitar exibição no frontend
+            if (!request.getAvatarBase64().startsWith("data:image")) {
+                finalAvatarUrl = "data:image/jpeg;base64," + base64;
+            } else {
+                finalAvatarUrl = request.getAvatarBase64();
+            }
         }
 
-        // Remover prefixo data:image se existir
-        if (base64.contains(",")) {
-            base64 = base64.substring(base64.indexOf(",") + 1);
+        if (finalAvatarUrl == null) {
+            throw new IllegalArgumentException("Nenhuma imagem fornecida (URL ou Base64)");
         }
 
-        // Validar tamanho (limite de 2MB em base64 = ~1.5MB original)
-        if (base64.length() > 2_800_000) { // ~2MB em base64
-            throw new IllegalArgumentException("Imagem muito grande. Tamanho máximo: 2MB");
-        }
-
-        // Salvar avatar em base64
-        // Adicionar prefixo data:image/jpeg para facilitar exibição no frontend
-        String finalAvatarUrl;
-        if (!request.getAvatarBase64().startsWith("data:image")) {
-            finalAvatarUrl = "data:image/jpeg;base64," + base64;
-        } else {
-            finalAvatarUrl = request.getAvatarBase64();
-        }
-        
-        // Usar query nativa para garantir que o campo TEXT seja reconhecido
         entityManager.createNativeQuery(
-            "UPDATE users SET avatar_url = :avatarUrl, updated_at = NOW() WHERE id = :userId"
-        )
-        .setParameter("avatarUrl", finalAvatarUrl)
-        .setParameter("userId", user.getId())
-        .executeUpdate();
-        
+                "UPDATE users SET avatar_url = :avatarUrl, updated_at = NOW() WHERE id = :userId")
+                .setParameter("avatarUrl", finalAvatarUrl)
+                .setParameter("userId", user.getId())
+                .executeUpdate();
+
+        // Se o avatar antigo era um arquivo no S3 e for diferente do novo, deletamos o
+        // antigo
+        // Isso evita acumular arquivos órfãos no S3
+        if (oldAvatarUrl != null && !oldAvatarUrl.equals(finalAvatarUrl) && isS3Url(oldAvatarUrl)) {
+            try {
+                fileStorageService.deleteFile(oldAvatarUrl);
+            } catch (Exception e) {
+                log.warn("Falha ao deletar avatar antigo do S3: {}. Erro: {}", oldAvatarUrl, e.getMessage());
+            }
+        }
+
         // Forçar flush para garantir que foi salvo
         entityManager.flush();
         entityManager.clear(); // Limpar cache do Hibernate
-        
+
         // Recarregar o usuário atualizado do banco
         User updatedUser = userRepository.findById(user.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado após atualização"));
+
+        webSocketService.notifyProfileImageUpdate(email, finalAvatarUrl);
 
         return buildUserDto(updatedUser);
     }
@@ -127,7 +153,8 @@ public class UserService {
         }
 
         // Deletar do repositório apropriado
-        // Com JOINED inheritance, deletar do UserRepository deve deletar também a entidade filha
+        // Com JOINED inheritance, deletar do UserRepository deve deletar também a
+        // entidade filha
         if (user instanceof Contractor) {
             contractorRepository.delete((Contractor) user);
         } else if (user instanceof Freelancer) {
@@ -210,12 +237,17 @@ public class UserService {
                     .build());
         } else if (user instanceof Freelancer) {
             Freelancer freelancer = (Freelancer) user;
+            
+            // Calcular média das avaliações e total de reviews a partir da tabela reviews
+            Double averageRating = reviewRepository.findAverageRatingByReviewedId(freelancer.getId());
+            long totalReviewsCount = reviewRepository.countByReviewedId(freelancer.getId());
+            
             builder.freelancerProfile(ProfileResponse.FreelancerProfile.builder()
                     .bio(freelancer.getBio())
                     .professionalTitle(freelancer.getProfessionalTitle())
                     .location(freelancer.getLocation())
-                    .rating(freelancer.getRating())
-                    .totalReviews(freelancer.getTotalReviews())
+                    .rating(averageRating != null ? BigDecimal.valueOf(averageRating) : null)
+                    .totalReviews((int) totalReviewsCount)
                     .completedJobs(freelancer.getCompletedJobs())
                     .activeJobs(freelancer.getActiveJobs())
                     .kycCompleted(freelancer.getKycCompleted())
@@ -241,5 +273,8 @@ public class UserService {
                 .createdAt(user.getCreatedAt())
                 .build();
     }
-}
 
+    private boolean isS3Url(String url) {
+        return url != null && url.contains(".s3.") && url.contains("amazonaws.com");
+    }
+}

@@ -102,11 +102,11 @@ const handleFileSelect = (event: Event) => {
   const target = event.target as HTMLInputElement;
   const selectedFiles = Array.from(target.files || []);
 
-  // Validar tamanho dos arquivos (25MB max)
-  const invalidFiles = selectedFiles.filter((file) => file.size > 25 * 1024 * 1024);
+  // Validar tamanho dos arquivos (10MB max)
+  const invalidFiles = selectedFiles.filter((file) => file.size > 10 * 1024 * 1024);
 
   if (invalidFiles.length > 0) {
-    toast.error(`${invalidFiles.length} arquivo(s) excede(m) o limite de 25 MB`);
+    toast.error(`${invalidFiles.length} arquivo(s) excede(m) o limite de 10 MB`);
     return;
   }
 
@@ -316,7 +316,7 @@ const getFileIcon = (filename: string) => {
             <Upload class="h-4 w-4 mr-2" />
             Escolher arquivos
           </Button>
-          <p class="text-sm text-[#435574]">Imagens, PDFs ou documentos até 25 MB cada</p>
+          <p class="text-sm text-[#435574]">Imagens, PDFs ou documentos até 10 MB cada</p>
         </div>
 
         <!-- Uploaded Files -->

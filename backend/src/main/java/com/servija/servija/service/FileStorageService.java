@@ -1,52 +1,52 @@
 package com.servija.servija.service;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import jakarta.annotation.PostConstruct;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
+import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
+import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
-import jakarta.annotation.PostConstruct;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class FileStorageService {
 
-    @Value("${app.upload.dir:uploads}")
-    private String uploadDir;
+    private final S3Client s3Client;
 
-    @Value("${app.upload.base-url:http://3.131.85.191}")
-    private String baseUrl;
+    @Value("${aws.s3.bucket}")
+    private String bucketName;
 
-    private Path uploadPath;
+    @Value("${aws.s3.region}")
+    private String region;
+
+    @PostConstruct
+    public void init() {
+        if (bucketName != null)
+            bucketName = bucketName.trim();
+        if (region != null)
+            region = region.trim();
+        log.info("FileStorageService inicializado com balde: {} na região: {}", bucketName, region);
+    }
 
     private static final List<String> ALLOWED_CONTENT_TYPES = Arrays.asList(
             "image/jpeg",
             "image/png",
             "image/gif",
-            "image/webp"
-    );
+            "image/webp",
+            "application/pdf");
 
-    private static final long MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
-
-    @PostConstruct
-    public void init() {
-        try {
-            uploadPath = Paths.get(uploadDir).toAbsolutePath().normalize();
-            Files.createDirectories(uploadPath);
-            log.info("Diretório de upload criado: {}", uploadPath);
-        } catch (IOException e) {
-            throw new RuntimeException("Não foi possível criar o diretório de upload", e);
-        }
-    }
+    private static final long MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
     public String storeFile(MultipartFile file) {
         // Validar arquivo
@@ -58,43 +58,44 @@ public class FileStorageService {
         String newFilename = UUID.randomUUID().toString() + extension;
 
         try {
-            // Verificar se o nome do arquivo contém caracteres inválidos
-            if (newFilename.contains("..")) {
-                throw new RuntimeException("Nome de arquivo inválido: " + newFilename);
-            }
+            // Upload para S3
+            PutObjectRequest putObjectRequest = PutObjectRequest.builder()
+                    .bucket(bucketName)
+                    .key(newFilename)
+                    .contentType(file.getContentType())
+                    // Removido ACL pois o bucket já tem política pública
+                    .build();
 
-            // Copiar arquivo para o diretório de destino
-            Path targetLocation = uploadPath.resolve(newFilename);
-            Files.copy(file.getInputStream(), targetLocation, StandardCopyOption.REPLACE_EXISTING);
+            s3Client.putObject(putObjectRequest, RequestBody.fromBytes(file.getBytes()));
 
-            // Retornar URL pública
-            String fileUrl = baseUrl + "/api/files/" + newFilename;
-            log.info("Arquivo salvo: {} -> {}", originalFilename, fileUrl);
+            // Retornar URL pública (formato padrão do S3)
+            String fileUrl = String.format("https://%s.s3.%s.amazonaws.com/%s", bucketName, region, newFilename);
+            log.info("Arquivo salvo no S3: {} -> {}", originalFilename, fileUrl);
             return fileUrl;
 
         } catch (IOException e) {
-            throw new RuntimeException("Erro ao salvar arquivo: " + originalFilename, e);
+            log.error("Erro ao salvar arquivo no S3: {}", originalFilename, e);
+            throw new RuntimeException("Erro ao salvar arquivo no S3: " + originalFilename, e);
         }
     }
 
     public void deleteFile(String fileUrl) {
         try {
-            // Extrair nome do arquivo da URL
-            String filename = fileUrl.substring(fileUrl.lastIndexOf("/") + 1);
-            Path filePath = uploadPath.resolve(filename);
+            // Extrair a chave (nome do arquivo) da URL
+            // Ex: https://servija-s3.s3.sa-east-1.amazonaws.com/uuid.png -> uuid.png
+            String key = fileUrl.substring(fileUrl.lastIndexOf("/") + 1);
 
-            if (Files.exists(filePath)) {
-                Files.delete(filePath);
-                log.info("Arquivo deletado: {}", filename);
-            }
-        } catch (IOException e) {
-            log.error("Erro ao deletar arquivo: {}", fileUrl, e);
-            throw new RuntimeException("Erro ao deletar arquivo", e);
+            DeleteObjectRequest deleteObjectRequest = DeleteObjectRequest.builder()
+                    .bucket(bucketName)
+                    .key(key)
+                    .build();
+
+            s3Client.deleteObject(deleteObjectRequest);
+            log.info("Arquivo deletado do S3: {}", key);
+        } catch (Exception e) {
+            log.error("Erro ao deletar arquivo do S3: {}", fileUrl, e);
+            throw new RuntimeException("Erro ao deletar arquivo do S3", e);
         }
-    }
-
-    public Path getFilePath(String filename) {
-        return uploadPath.resolve(filename).normalize();
     }
 
     private void validateFile(MultipartFile file) {
@@ -103,12 +104,12 @@ public class FileStorageService {
         }
 
         if (file.getSize() > MAX_FILE_SIZE) {
-            throw new RuntimeException("Arquivo muito grande. Máximo permitido: 5MB");
+            throw new RuntimeException("Arquivo muito grande. Máximo permitido: 10MB");
         }
 
         String contentType = file.getContentType();
         if (contentType == null || !ALLOWED_CONTENT_TYPES.contains(contentType)) {
-            throw new RuntimeException("Tipo de arquivo não permitido. Permitidos: JPEG, PNG, GIF, WEBP");
+            throw new RuntimeException("Tipo de arquivo não permitido. Permitidos: JPEG, PNG, GIF, WEBP, PDF");
         }
     }
 

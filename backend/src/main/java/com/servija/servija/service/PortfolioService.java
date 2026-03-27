@@ -1,6 +1,7 @@
 package com.servija.servija.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.servija.servija.dto.PortfolioProjectRequest;
 import com.servija.servija.dto.PortfolioProjectResponse;
@@ -26,12 +27,21 @@ public class PortfolioService {
     private final PortfolioProjectRepository projectRepository;
     private final PortfolioImageRepository imageRepository;
     private final FreelancerService freelancerService;
+    private final FileStorageService fileStorageService;
     private final ObjectMapper objectMapper;
 
     @Transactional(readOnly = true)
     public List<PortfolioProjectResponse> getProjects() {
         Freelancer freelancer = freelancerService.getCurrentFreelancer();
         List<PortfolioProject> projects = projectRepository.findByFreelancerIdOrderByCreatedAtDesc(freelancer.getId());
+        return projects.stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<PortfolioProjectResponse> getPublicProjects(Long freelancerId) {
+        List<PortfolioProject> projects = projectRepository.findByFreelancerIdOrderByCreatedAtDesc(freelancerId);
         return projects.stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
@@ -83,7 +93,7 @@ public class PortfolioService {
                             .displayOrder(imgReq.getDisplayOrder() != null ? imgReq.getDisplayOrder() : 0)
                             .build())
                     .collect(Collectors.toList());
-            
+
             imageRepository.saveAll(images);
             project.setImages(images);
         }
@@ -95,7 +105,7 @@ public class PortfolioService {
     public PortfolioProjectResponse updateProject(Long projectId, PortfolioProjectRequest request) {
         Freelancer freelancer = freelancerService.getCurrentFreelancer();
         log.info("Tentando atualizar projeto {} do freelancer {}", projectId, freelancer.getId());
-        
+
         PortfolioProject project = projectRepository.findByIdAndFreelancerId(projectId, freelancer.getId())
                 .orElseThrow(() -> {
                     log.error("Projeto {} não encontrado para o freelancer {}", projectId, freelancer.getId());
@@ -140,12 +150,18 @@ public class PortfolioService {
         // Atualizar imagens (remover antigas e adicionar novas)
         if (request.getImages() != null) {
             log.info("Atualizando {} imagens", request.getImages().size());
-            
+
+            // Coletar URLs das imagens antigas para deletar do S3
+            List<String> oldImagesUrls = project.getImages().stream()
+                    .map(PortfolioImage::getImageUrl)
+                    .collect(Collectors.toList());
+
             // Limpar a coleção existente (não substituir a referência!)
             project.getImages().clear();
-            
+
             // Adicionar novas imagens à mesma coleção
             final PortfolioProject finalProject = project;
+            List<String> newImagesUrls = new ArrayList<>();
             for (var imgReq : request.getImages()) {
                 PortfolioImage newImage = PortfolioImage.builder()
                         .project(finalProject)
@@ -154,6 +170,18 @@ public class PortfolioService {
                         .displayOrder(imgReq.getDisplayOrder() != null ? imgReq.getDisplayOrder() : 0)
                         .build();
                 project.getImages().add(newImage);
+                newImagesUrls.add(imgReq.getImageUrl());
+            }
+
+            // Deletar as imagens que não estão mais na lista e são URLs do S3
+            for (String oldUrl : oldImagesUrls) {
+                if (!newImagesUrls.contains(oldUrl) && isS3Url(oldUrl)) {
+                    try {
+                        fileStorageService.deleteFile(oldUrl);
+                    } catch (Exception e) {
+                        log.warn("Falha ao deletar imagem antiga do S3: {}. Erro: {}", oldUrl, e.getMessage());
+                    }
+                }
             }
         }
 
@@ -167,15 +195,35 @@ public class PortfolioService {
         Freelancer freelancer = freelancerService.getCurrentFreelancer();
         PortfolioProject project = projectRepository.findByIdAndFreelancerId(projectId, freelancer.getId())
                 .orElseThrow(() -> new RuntimeException("Projeto não encontrado"));
-        
+
+        // Coletar URLs para deletar do S3
+        List<String> imageUrls = project.getImages().stream()
+                .map(PortfolioImage::getImageUrl)
+                .collect(Collectors.toList());
+
         projectRepository.delete(project);
+
+        // Deletar imagens do S3
+        for (String url : imageUrls) {
+            if (isS3Url(url)) {
+                try {
+                    fileStorageService.deleteFile(url);
+                } catch (Exception e) {
+                    log.warn("Falha ao deletar imagem do S3 ao excluir projeto: {}. Erro: {}", url, e.getMessage());
+                }
+            }
+        }
+    }
+
+    private boolean isS3Url(String url) {
+        return url != null && url.contains(".s3.") && url.contains("amazonaws.com");
     }
 
     private PortfolioProjectResponse mapToResponse(PortfolioProject project) {
         List<String> tags = new ArrayList<>();
         if (project.getTags() != null && !project.getTags().isEmpty()) {
             try {
-                tags = objectMapper.readValue(project.getTags(), List.class);
+                tags = objectMapper.readValue(project.getTags(), new TypeReference<List<String>>() {});
             } catch (JsonProcessingException e) {
                 log.error("Erro ao desserializar tags", e);
             }

@@ -51,8 +51,44 @@ export const deleteImage = async (url: string): Promise<void> => {
   });
 };
 
+/**
+ * Upload de avatar do usuário atual
+ */
+export const uploadAvatar = async (file: File): Promise<string> => {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const response = await api.put<{ avatarUrl: string }>('/users/me/avatar/upload', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+
+  return response.data.avatarUrl;
+};
+
+/**
+ * Upload de arquivos genéricos (imagens, PDFs, docs, etc.)
+ */
+export const uploadFiles = async (files: File[]): Promise<string[]> => {
+  const formData = new FormData();
+  files.forEach((file) => {
+    formData.append('files', file);
+  });
+
+  const response = await api.post<MultipleUploadResponse>('/upload/images', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+
+  return response.data.urls;
+};
+
 export default {
   uploadImage,
   uploadImages,
+  uploadFiles,
   deleteImage,
+  uploadAvatar,
 };

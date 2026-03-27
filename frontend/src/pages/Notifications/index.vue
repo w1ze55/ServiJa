@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router';
 import MainLayout from '@/components/layout/MainLayout.vue';
+import NotificationsPage from '@/components/pages/NotificationsPage.vue';
 import { useNavigation } from '@/utils/navigation';
 import { ref, onMounted } from 'vue';
-import { Bell } from 'lucide-vue-next';
 
 const router = useRouter();
 const { navigate, logout } = useNavigation();
@@ -19,22 +19,48 @@ onMounted(() => {
 });
 
 const handleNavigate = (page: string, params?: any) => {
+  // Tratamento especial para checkout
+  if (page === 'checkout') {
+    router.push({
+      name: 'checkout',
+      query: params,
+    });
+    return;
+  }
+
+  // Tratamento especial para outras páginas com params
+  if (page === 'service-timeline' || page === 'quote-detail') {
+    router.push({
+      name: 'cliente-request-detail',
+      query: params,
+    });
+    return;
+  }
+
+  if (page === 'chat' || page === 'messages') {
+    router.push({
+      name: 'messages',
+      query: params,
+    });
+    return;
+  }
+
+  if (page === 'contracts') {
+    router.push('/contracts');
+    return;
+  }
+
+  // Fallback para navegação padrão
   const userType = user.value?.type === 'provider' ? 'provider' : 'contractor';
   navigate(page, userType, params);
 };
+
 const handleLogout = () => logout();
 const handleSearch = (query: string) => router.push({ path: '/search', query: { q: query } });
 </script>
 
 <template>
   <MainLayout v-if="user" :user="user" current-page="notifications" :on-navigate="handleNavigate" :on-logout="handleLogout" :on-search="handleSearch">
-    <div class="max-w-4xl mx-auto text-center py-16">
-      <div class="inline-flex p-6 bg-blue-100 rounded-full mb-6">
-        <Bell class="h-16 w-16 text-blue-600" />
-      </div>
-      <h1 class="text-3xl font-bold text-gray-900 mb-4">Notificações</h1>
-      <p class="text-gray-600 mb-8">Esta página está em desenvolvimento.</p>
-      <p class="text-sm text-gray-500">Em breve você poderá ver suas notificações aqui.</p>
-    </div>
+    <NotificationsPage :user-type="user.type === 'provider' ? 'provider' : 'contractor'" />
   </MainLayout>
 </template>

@@ -38,9 +38,9 @@ export type Page =
   | 'freelancer-proposal-detail'
   | 'freelancer-deliveries'
   | 'freelancer-wallet'
-  | 'freelancer-invoices'
+
   | 'freelancer-portfolio'
-  | 'freelancer-schedule'
+
   | 'freelancer-kyc'
   | 'freelancer-account-settings'
   | 'add-address'
@@ -115,6 +115,8 @@ const getStatusColor = (status: string) => {
       return 'bg-yellow-100 text-yellow-800';
     case 'accepted':
       return 'bg-green-100 text-green-800';
+    case 'in_progress':
+      return 'bg-purple-100 text-purple-800';
     case 'rejected':
       return 'bg-red-100 text-red-800';
     case 'completed':
@@ -130,6 +132,8 @@ const getStatusIcon = (status: string) => {
       return Clock;
     case 'accepted':
       return CheckCircle;
+    case 'in_progress':
+      return Clock;
     case 'rejected':
       return XCircle;
     case 'completed':
@@ -167,7 +171,7 @@ const filteredQuotes = computed(() =>
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <!-- Welcome Section -->
       <div class="mb-8">
-        <h1 class="text-gray-900 mb-2">Bem-vindo, {{ user.name }}!</h1>
+        <h1 class="text-gray-900 mb-2 text-3xl font-bold">Bem-vindo, {{ user.name }}!</h1>
         <p class="text-gray-600">Gerencie suas solicitações e serviços contratados</p>
       </div>
 
@@ -221,7 +225,7 @@ const filteredQuotes = computed(() =>
             <h3 class="text-gray-900 mb-1">Precisa de um novo serviço?</h3>
             <p class="text-gray-600">Busque entre centenas de profissionais qualificados</p>
           </div>
-          <Button @click="props.onNavigate('search')">
+          <Button @click="props.onNavigate('explore')">
             <Search :size="18" class="mr-2" />
             Buscar Profissionais
           </Button>
@@ -325,7 +329,7 @@ const filteredQuotes = computed(() =>
                   {{ activeTab !== 'all' ? `no status "${getStatusText(activeTab)}"` : '' }}
                 </h3>
                 <p class="text-gray-600 mb-4">Comece buscando profissionais para seus projetos</p>
-                <Button @click="props.onNavigate('search')">Buscar Profissionais</Button>
+                <Button @click="props.onNavigate('explore')">Buscar Profissionais</Button>
               </div>
             </div>
           </TabsContent>

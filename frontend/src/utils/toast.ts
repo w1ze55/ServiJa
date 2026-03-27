@@ -29,7 +29,7 @@ const createToastContainer = (): HTMLElement => {
 
 const showToast = ({ message, type, duration = 4000 }: ToastOptions) => {
   const container = createToastContainer();
-  
+
   const toast = document.createElement('div');
   toast.style.cssText = `
     padding: 14px 20px;
@@ -46,6 +46,8 @@ const showToast = ({ message, type, duration = 4000 }: ToastOptions) => {
     pointer-events: auto;
     animation: slideIn 0.3s ease-out;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    position: relative;
+    overflow: hidden;
   `;
 
   // Cores e ícones por tipo
@@ -97,9 +99,23 @@ const showToast = ({ message, type, duration = 4000 }: ToastOptions) => {
   closeBtn.onmouseout = () => { closeBtn.style.opacity = '0.7'; };
   closeBtn.onclick = () => removeToast(toast);
 
+  // Barra de progresso
+  const progressBar = document.createElement('div');
+  progressBar.style.cssText = `
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 3px;
+    background: rgba(255, 255, 255, 0.4);
+    width: 100%;
+    transform-origin: left;
+    animation: toastProgress ${duration}ms linear forwards;
+  `;
+
   toast.appendChild(iconSpan);
   toast.appendChild(messageSpan);
   toast.appendChild(closeBtn);
+  toast.appendChild(progressBar);
 
   // Adicionar estilo de animação se não existir
   if (!document.getElementById('toast-styles')) {
@@ -126,6 +142,14 @@ const showToast = ({ message, type, duration = 4000 }: ToastOptions) => {
           opacity: 0;
         }
       }
+      @keyframes toastProgress {
+        from {
+          transform: scaleX(1);
+        }
+        to {
+          transform: scaleX(0);
+        }
+      }
     `;
     document.head.appendChild(style);
   }
@@ -133,11 +157,20 @@ const showToast = ({ message, type, duration = 4000 }: ToastOptions) => {
   container.appendChild(toast);
 
   // Auto-remover após duração
-  const timeoutId = setTimeout(() => removeToast(toast), duration);
-  
+  let timeoutId = setTimeout(() => removeToast(toast), duration);
+
   // Pausar timer ao hover
-  toast.onmouseenter = () => clearTimeout(timeoutId);
-  toast.onmouseleave = () => setTimeout(() => removeToast(toast), 1000);
+  toast.onmouseenter = () => {
+    clearTimeout(timeoutId);
+    progressBar.style.animationPlayState = 'paused';
+  };
+
+  toast.onmouseleave = () => {
+    // Quando sai o mouse, damos mais um segundo para fechar (manteve o comportamento original)
+    progressBar.style.animationPlayState = 'running';
+    // Se o bar já tava quase no fim, o comportamento de 1s ajuda.
+    timeoutId = setTimeout(() => removeToast(toast), 1000);
+  };
 };
 
 const removeToast = (toast: HTMLElement) => {

@@ -1,0 +1,738 @@
+package com.servija.servija.service;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.servija.servija.dto.CounterProposalDTO;
+import com.servija.servija.dto.FreelancerAttachmentDTO;
+import com.servija.servija.dto.FreelancerAttachmentsRequest;
+import com.servija.servija.dto.FreelancerResponseDTO;
+import com.servija.servija.dto.ServiceRequestDTO;
+import com.servija.servija.dto.ServiceRequestResponse;
+import com.servija.servija.exception.ResourceNotFoundException;
+import com.servija.servija.model.ServiceRequest;
+import com.servija.servija.model.ServiceRequest.Status;
+import com.servija.servija.model.ServiceRequestHistory.OperationType;
+import com.servija.servija.repository.ServiceRepository;
+import com.servija.servija.model.User;
+import com.servija.servija.repository.ServiceRequestRepository;
+import com.servija.servija.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+
+import java.math.BigDecimal;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.regex.Pattern;
+
+@Service
+@Slf4j
+@RequiredArgsConstructor
+public class ServiceRequestService {
+
+    private static final Pattern LEGACY_SERVICE_DESCRIPTION_PREFIX = Pattern.compile(
+            "^\\[Solicitação referente ao serviço: [^\\]]+\\]");
+
+    private final ServiceRequestRepository serviceRequestRepository;
+    private final UserRepository userRepository;
+    private final ServiceRepository serviceRepository;
+    private final FileStorageService fileStorageService;
+    private final ServiceRequestHistoryService historyService;
+    private final WebSocketService webSocketService;
+    private final NotificationService notificationService;
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
+    @Transactional
+    public ServiceRequestResponse create(String contractorEmail, ServiceRequestDTO dto) {
+        User contractor = userRepository.findByEmail(contractorEmail)
+                .orElseThrow(() -> new RuntimeException("Contractor not found"));
+
+        com.servija.servija.model.Service selectedService = null;
+        User freelancer = null;
+
+        if (dto.getServiceId() != null) {
+            selectedService = serviceRepository.findById(dto.getServiceId())
+                    .orElseThrow(() -> new RuntimeException("Service not found"));
+            freelancer = selectedService.getFreelancer();
+        } else if (dto.getFreelancerId() != null) {
+            freelancer = userRepository.findById(dto.getFreelancerId())
+                    .orElseThrow(() -> new RuntimeException("Freelancer not found"));
+        }
+
+        if (selectedService != null && dto.getFreelancerId() != null
+                && !selectedService.getFreelancer().getId().equals(dto.getFreelancerId())) {
+            throw new IllegalArgumentException("O serviço selecionado não pertence ao freelancer informado");
+        }
+
+        String normalizedAddress = StringUtils.hasText(dto.getAddress()) ? dto.getAddress().trim() : null;
+
+        ServiceRequest.WorkModel requestWorkModel = resolveRequestWorkModel(dto, selectedService);
+        if (requestWorkModel == ServiceRequest.WorkModel.PRESENCIAL
+                || requestWorkModel == ServiceRequest.WorkModel.HIBRIDO) {
+            if (!StringUtils.hasText(normalizedAddress)) {
+                throw new IllegalArgumentException("Informe o local onde o serviço será realizado");
+            }
+        } else {
+            normalizedAddress = null;
+        }
+
+        String normalizedDescription = normalizeRequestDescription(dto.getDescription());
+        if (!StringUtils.hasText(normalizedDescription)) {
+            throw new IllegalArgumentException("A descrição é obrigatória");
+        }
+
+        String attachmentsJson = null;
+        if (dto.getAttachments() != null && !dto.getAttachments().isEmpty()) {
+            try {
+                attachmentsJson = objectMapper.writeValueAsString(dto.getAttachments());
+            } catch (Exception e) {
+                log.warn("Erro ao serializar attachments: {}", e.getMessage());
+            }
+        }
+
+        // Validar orçamento (budget)
+        if (dto.getBudget() != null) {
+            BigDecimal minBudget = new BigDecimal("5.00");
+            BigDecimal maxBudget = new BigDecimal("1000000.00");
+            
+            if (dto.getBudget().compareTo(minBudget) < 0) {
+                throw new IllegalArgumentException("O orçamento mínimo é R$ 5,00");
+            }
+            if (dto.getBudget().compareTo(maxBudget) > 0) {
+                throw new IllegalArgumentException("O orçamento máximo é R$ 1.000.000,00");
+            }
+        }
+
+        // Validar prazo estimado (deadline)
+        if (dto.getDeadline() != null && !dto.getDeadline().isEmpty()) {
+            // Se for prazo estimado (ex: "30 dias"), extrair número e validar
+            String deadlineStr = dto.getDeadline().replaceAll("[^0-9]", "");
+            if (!deadlineStr.isEmpty()) {
+                try {
+                    int days = Integer.parseInt(deadlineStr);
+                    if (days < 1) {
+                        throw new IllegalArgumentException("O prazo mínimo é de 1 dia");
+                    }
+                    if (days > 365) {
+                        throw new IllegalArgumentException("O prazo máximo é de 365 dias");
+                    }
+                } catch (NumberFormatException e) {
+                    // Se não for número, pode ser uma data - ignorar validação de dias
+                }
+            }
+        }
+
+        // Validar desiredDate - não pode ser no passado
+        LocalDate parsedDesiredDate = null;
+        if (dto.getDesiredDate() != null) {
+            try {
+                parsedDesiredDate = LocalDate.parse(dto.getDesiredDate());
+                if (parsedDesiredDate.isBefore(LocalDate.now())) {
+                    throw new IllegalArgumentException("A data desejada não pode ser anterior à data atual");
+                }
+            } catch (java.time.format.DateTimeParseException e) {
+                throw new IllegalArgumentException("Formato de data inválido. Use o formato AAAA-MM-DD");
+            }
+        }
+
+        ServiceRequest request = ServiceRequest.builder()
+                .contractor(contractor)
+                .freelancer(freelancer)
+                .service(selectedService)
+                .serviceName(dto.getServiceName())
+                .category(dto.getCategory())
+                .description(normalizedDescription)
+                .budget(dto.getBudget())
+                .deadline(dto.getDeadline())
+                .workModel(requestWorkModel)
+                .address(normalizedAddress)
+                .desiredDate(parsedDesiredDate)
+                .attachments(attachmentsJson)
+                .build();
+
+        ServiceRequest saved = serviceRequestRepository.save(request);
+        historyService.record(saved, contractor, OperationType.REQUEST_OPENED);
+
+        // Notificar freelancer sobre nova solicitação
+        if (freelancer != null) {
+            webSocketService.notifyNewServiceRequest(
+                    saved.getId(),
+                    freelancer.getEmail(),
+                    contractor.getName(),
+                    dto.getServiceName());
+            notificationService.notifyNewServiceRequest(saved, contractor);
+        }
+
+        log.info("Service request created: {} for freelancer: {}", saved.getId(),
+                freelancer != null ? freelancer.getId() : "any");
+        return toResponse(saved);
+    }
+
+    public List<ServiceRequestResponse> getByContractorEmail(String email) {
+        User contractor = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Contractor not found"));
+
+        return serviceRequestRepository.findByContractorIdOrderByCreatedAtDesc(contractor.getId())
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    public List<ServiceRequestResponse> getByFreelancerEmail(String email) {
+        User freelancer = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Freelancer not found"));
+
+        return serviceRequestRepository.findByFreelancerIdOrderByCreatedAtDesc(freelancer.getId())
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    public ServiceRequestResponse getById(Long id) {
+        ServiceRequest request = serviceRequestRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Service request not found"));
+        return toResponse(request);
+    }
+
+    @Transactional
+    public ServiceRequestResponse updateStatus(Long id, String status, String reason, String userEmail) {
+        ServiceRequest request = serviceRequestRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Service request not found"));
+
+        User actionUser = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        ServiceRequest.Status newStatus = ServiceRequest.Status.valueOf(status.toUpperCase());
+
+        if (newStatus == Status.DELIVERED || newStatus == Status.COMPLETED) {
+            throw new IllegalStateException(
+                    "O status " + newStatus + " deve ser alterado através do endpoint de conclusão");
+        }
+
+        request.setStatus(newStatus);
+
+        if (newStatus == ServiceRequest.Status.CANCELLED && reason != null) {
+            request.setCancelReason(reason);
+        }
+        if (newStatus == ServiceRequest.Status.REJECTED && reason != null) {
+            request.setRejectReason(reason);
+        }
+
+        ServiceRequest saved = serviceRequestRepository.save(request);
+
+        if (newStatus == ServiceRequest.Status.REJECTED) {
+            String details = reason != null ? "Motivo: " + reason : null;
+            historyService.record(saved, actionUser, OperationType.REQUEST_REJECTED, details);
+            if (request.getFreelancer() != null && request.getFreelancer().getId().equals(actionUser.getId())) {
+                notificationService.notifyRequestRejected(saved, actionUser, reason);
+                webSocketService.notifyServiceRequestStatusChange(
+                        saved.getId(),
+                        ServiceRequest.Status.REJECTED.name(),
+                        request.getContractor().getEmail(),
+                        request.getFreelancer().getEmail());
+            }
+        } else if (newStatus == ServiceRequest.Status.ACCEPTED) {
+            historyService.record(saved, actionUser, OperationType.BUDGET_ACCEPTED);
+            if (request.getFreelancer() != null) {
+                webSocketService.notifyProposalAccepted(
+                        saved.getId(),
+                        request.getFreelancer().getEmail(),
+                        request.getContractor().getEmail());
+                notificationService.notifyProposalAccepted(saved);
+            }
+        } else if (newStatus == ServiceRequest.Status.NEGOTIATING) {
+            historyService.record(saved, actionUser, OperationType.COUNTER_PROPOSAL_SENT);
+        } else if (newStatus == ServiceRequest.Status.CANCELLED) {
+            String details = reason != null ? "Motivo: " + reason : null;
+            historyService.record(saved, actionUser, OperationType.CANCELLED, details);
+            if (request.getFreelancer() != null) {
+                webSocketService.notifyServiceRequestCancelled(
+                        saved.getId(),
+                        reason,
+                        request.getFreelancer().getEmail(),
+                        request.getContractor().getEmail());
+            }
+        }
+
+        return toResponse(saved);
+    }
+
+    @Transactional
+    public ServiceRequestResponse respondToRequest(Long id, FreelancerResponseDTO dto, String freelancerEmail) {
+        ServiceRequest request = serviceRequestRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Service request not found"));
+
+        User freelancer = userRepository.findByEmail(freelancerEmail)
+                .orElseThrow(() -> new RuntimeException("Freelancer not found"));
+
+        request.setResponseValue(dto.getValue());
+        request.setResponseDays(dto.getExecutionDays());
+        request.setResponseScope(dto.getScope());
+        request.setResponseNotes(dto.getNotes());
+        request.setRespondedAt(LocalDateTime.now());
+        request.setStatus(ServiceRequest.Status.NEGOTIATING);
+
+        if (dto.getAttachments() != null && !dto.getAttachments().isEmpty()) {
+            try {
+                request.setResponseAttachments(objectMapper.writeValueAsString(dto.getAttachments()));
+            } catch (Exception e) {
+                throw new RuntimeException("Error serializing attachments", e);
+            }
+        }
+
+        ServiceRequest saved = serviceRequestRepository.save(request);
+        String details = String.format("Valor: R$ %.2f | Prazo: %d dias", dto.getValue(), dto.getExecutionDays());
+        historyService.record(saved, freelancer, OperationType.BUDGET_SENT, details);
+
+        // Notificar contratante sobre nova proposta
+        webSocketService.notifyNewProposal(
+                saved.getId(),
+                request.getContractor().getEmail(),
+                freelancer.getName(),
+                String.format("R$ %.2f", dto.getValue()));
+        notificationService.notifyNewProposal(saved, freelancer);
+
+        return toResponse(saved);
+    }
+
+    @Transactional
+    public ServiceRequestResponse counterProposal(Long id, CounterProposalDTO dto, String contractorEmail) {
+        ServiceRequest request = serviceRequestRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Service request not found"));
+
+        User contractor = userRepository.findByEmail(contractorEmail)
+                .orElseThrow(() -> new RuntimeException("Contractor not found"));
+
+        request.setCounterValue(dto.getValue());
+        request.setCounterDays(dto.getExecutionDays());
+        request.setCounterNotes(dto.getNotes());
+        request.setStatus(ServiceRequest.Status.NEGOTIATING);
+
+        ServiceRequest saved = serviceRequestRepository.save(request);
+        String details = String.format("Valor proposto: R$ %.2f | Prazo: %d dias", dto.getValue(),
+                dto.getExecutionDays());
+        historyService.record(saved, contractor, OperationType.COUNTER_PROPOSAL_SENT, details);
+
+        // Notificar freelancer sobre contra-proposta
+        webSocketService.notifyCounterProposal(
+                saved.getId(),
+                request.getFreelancer().getEmail(),
+                contractor.getName(),
+                String.format("R$ %.2f", dto.getValue()));
+
+        return toResponse(saved);
+    }
+
+    @Transactional
+    public ServiceRequestResponse acceptCounterProposal(Long id, String freelancerEmail) {
+        ServiceRequest request = serviceRequestRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Service request not found"));
+
+        User freelancer = userRepository.findByEmail(freelancerEmail)
+                .orElseThrow(() -> new RuntimeException("Freelancer not found"));
+
+        if (request.getCounterValue() != null) {
+            request.setResponseValue(request.getCounterValue());
+            request.setResponseDays(request.getCounterDays());
+            request.setResponseNotes(request.getCounterNotes());
+
+            // Clear counter fields after accepting
+            request.setCounterValue(null);
+            request.setCounterDays(null);
+            request.setCounterNotes(null);
+
+            request.setStatus(ServiceRequest.Status.ACCEPTED);
+
+            ServiceRequest saved = serviceRequestRepository.save(request);
+            String details = String.format("Contra proposta aceita. Novo valor: R$ %.2f", request.getResponseValue());
+            historyService.record(saved, freelancer, OperationType.COUNTER_PROPOSAL_ACCEPTED, details);
+
+            // Notificar ambas as partes sobre aceitação
+            webSocketService.notifyProposalAccepted(
+                    saved.getId(),
+                    freelancer.getEmail(),
+                    request.getContractor().getEmail());
+            notificationService.notifyProposalAccepted(saved);
+
+            return toResponse(saved);
+        }
+
+        throw new RuntimeException("No counter proposal to accept");
+    }
+
+    @Transactional
+    public ServiceRequestResponse rejectCounterProposal(Long id, String reason, String freelancerEmail) {
+        ServiceRequest request = serviceRequestRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Service request not found"));
+
+        User freelancer = userRepository.findByEmail(freelancerEmail)
+                .orElseThrow(() -> new RuntimeException("Freelancer not found"));
+
+        // Clear counter fields
+        request.setCounterValue(null);
+        request.setCounterDays(null);
+        request.setCounterNotes(null);
+
+        // Status remains NEGOTIATING as we still have the original proposal
+        request.setStatus(ServiceRequest.Status.NEGOTIATING);
+
+        ServiceRequest saved = serviceRequestRepository.save(request);
+
+        String details = "Contra proposta recusada. Mantendo termos originais.";
+        if (reason != null && !reason.trim().isEmpty()) {
+            details += " Motivo: " + reason;
+        }
+        historyService.record(saved, freelancer, OperationType.COUNTER_PROPOSAL_REJECTED, details);
+
+        // Notificar contratante sobre rejeição da contra proposta
+        webSocketService.notifyCounterProposalRejected(
+                saved.getId(),
+                request.getContractor().getEmail(),
+                freelancer.getName(),
+                reason);
+        notificationService.notifyStatusUpdated(
+                saved,
+                request.getContractor(),
+                freelancer,
+                StringUtils.hasText(reason)
+                        ? freelancer.getName() + " recusou sua contra-proposta. Motivo: " + reason.trim()
+                        : freelancer.getName() + " recusou sua contra-proposta. O orçamento original segue ativo.",
+                ServiceRequest.Status.NEGOTIATING.name(),
+                "cliente-request-detail");
+
+        return toResponse(saved);
+    }
+
+    @Transactional
+    public ServiceRequestResponse completeService(Long id, String userEmail) {
+        ServiceRequest request = serviceRequestRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Solicitação não encontrada"));
+
+        User user = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
+
+        // Phase 1: Freelancer marks as Delivered
+        if (request.getFreelancer() != null && request.getFreelancer().getId().equals(user.getId())) {
+            if (request.getStatus() != Status.IN_PROGRESS) {
+                throw new IllegalStateException("O serviço só pode ser entregue quando está em andamento");
+            }
+
+            request.setStatus(Status.DELIVERED);
+            ServiceRequest saved = serviceRequestRepository.save(request);
+
+            historyService.record(saved, user, OperationType.SERVICE_DELIVERED,
+                    "Serviço marcado como entregue pelo profissional");
+
+            // Notificar o cliente sobre a entrega
+            webSocketService.notifyServiceRequestStatusChange(
+                    saved.getId(), "DELIVERED",
+                    request.getContractor().getEmail(), userEmail);
+            notificationService.notifyProjectCompleted(saved, user);
+
+            return toResponse(saved);
+        }
+
+        // Phase 2: Client marks as Completed
+        if (request.getContractor().getId().equals(user.getId())) {
+            if (request.getStatus() != Status.DELIVERED) {
+                throw new IllegalStateException("O serviço só pode ser concluído após a entrega pelo profissional");
+            }
+
+            request.setStatus(Status.COMPLETED);
+            ServiceRequest saved = serviceRequestRepository.save(request);
+
+            historyService.record(saved, user, OperationType.SERVICE_COMPLETED,
+                    "Serviço marcado como concluído pelo cliente");
+
+            log.info("Serviço concluído pelo cliente - ID: {}, Contratante: {}", id, userEmail);
+
+            // Notificar o freelancer sobre a conclusão
+            webSocketService.notifyServiceRequestStatusChange(
+                    saved.getId(), "COMPLETED",
+                    userEmail, request.getFreelancer().getEmail());
+            notificationService.notifyDeliveryApproved(saved, user);
+
+            // Notificar ambos que a avaliação está pendente
+            webSocketService.notifyReviewPending(
+                    saved.getId(),
+                    userEmail,
+                    request.getFreelancer().getEmail(),
+                    saved.getServiceName());
+
+            return toResponse(saved);
+        }
+
+        throw new IllegalStateException("Usuário não autorizado a realizar esta ação");
+    }
+
+    @Transactional
+    public void delete(Long id) {
+        ServiceRequest request = serviceRequestRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Service request not found"));
+
+        String attachments = request.getAttachments();
+        serviceRequestRepository.delete(request);
+
+        // Deletar anexos do S3 se existirem
+        if (attachments != null && !attachments.isEmpty()) {
+            // Supondo que anexos são armazenados como lista de URLs (ex: JSON ou CSV)
+            // Analisando como possível JSON ou apenas uma URL
+            String[] urls;
+            if (attachments.startsWith("[")) {
+                // Muito simplificado, o ideal seria usar ObjectMapper mas vamos ser genéricos
+                urls = attachments.replace("[", "").replace("]", "").replace("\"", "").split(",");
+            } else {
+                urls = attachments.split(",");
+            }
+
+            for (String url : urls) {
+                String trimmedUrl = url.trim();
+                if (isS3Url(trimmedUrl)) {
+                    try {
+                        fileStorageService.deleteFile(trimmedUrl);
+                    } catch (Exception e) {
+                        log.warn("Falha ao deletar anexo de solicitação do S3: {}. Erro: {}", trimmedUrl,
+                                e.getMessage());
+                    }
+                }
+            }
+        }
+    }
+
+    @Transactional
+    public ServiceRequestResponse addFreelancerAttachments(Long id, FreelancerAttachmentsRequest body, String freelancerEmail) {
+        ServiceRequest request = serviceRequestRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Solicitação não encontrada"));
+
+        User freelancer = userRepository.findByEmail(freelancerEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
+
+        if (request.getFreelancer() == null || !request.getFreelancer().getId().equals(freelancer.getId())) {
+            throw new IllegalStateException("Apenas o freelancer da solicitação pode enviar arquivos");
+        }
+
+        List<FreelancerAttachmentDTO> attachmentsToAdd = resolveFreelancerAttachments(body);
+        if (attachmentsToAdd.isEmpty()) {
+            throw new IllegalArgumentException("Informe pelo menos um arquivo");
+        }
+
+        List<FreelancerAttachmentDTO> existing = parseFreelancerAttachmentDetails(request.getFreelancerAttachments());
+        existing.addAll(attachmentsToAdd);
+
+        try {
+            request.setFreelancerAttachments(objectMapper.writeValueAsString(existing));
+        } catch (Exception e) {
+            log.error("Erro ao serializar freelancer attachments", e);
+            throw new RuntimeException("Erro ao salvar arquivos");
+        }
+
+        ServiceRequest saved = serviceRequestRepository.save(request);
+        notificationService.notifyAttachmentAdded(saved, freelancer, attachmentsToAdd.size());
+        log.info("Freelancer attachments adicionados à solicitação {}: {} arquivos", id, attachmentsToAdd.size());
+        return toResponse(saved);
+    }
+
+    private List<String> parseAttachmentUrls(String json) {
+        if (!StringUtils.hasText(json)) {
+            return new ArrayList<>();
+        }
+
+        try {
+            JsonNode root = objectMapper.readTree(json);
+            if (!root.isArray()) {
+                return new ArrayList<>();
+            }
+
+            List<String> urls = new ArrayList<>();
+            for (JsonNode node : root) {
+                if (node.isTextual() && StringUtils.hasText(node.asText())) {
+                    urls.add(node.asText());
+                } else if (node.isObject()) {
+                    String url = node.path("url").asText(null);
+                    if (StringUtils.hasText(url)) {
+                        urls.add(url);
+                    }
+                }
+            }
+            return urls;
+        } catch (Exception e) {
+            log.warn("Erro ao deserializar attachments: {}", e.getMessage());
+            return new ArrayList<>();
+        }
+    }
+
+    private List<FreelancerAttachmentDTO> parseFreelancerAttachmentDetails(String json) {
+        if (!StringUtils.hasText(json)) {
+            return new ArrayList<>();
+        }
+
+        try {
+            JsonNode root = objectMapper.readTree(json);
+            if (!root.isArray()) {
+                return new ArrayList<>();
+            }
+
+            List<FreelancerAttachmentDTO> attachments = new ArrayList<>();
+            for (JsonNode node : root) {
+                if (node.isTextual()) {
+                    String url = node.asText();
+                    if (StringUtils.hasText(url)) {
+                        attachments.add(buildFreelancerAttachment(url, null, null));
+                    }
+                    continue;
+                }
+
+                if (!node.isObject()) {
+                    continue;
+                }
+
+                String url = node.path("url").asText(null);
+                if (!StringUtils.hasText(url)) {
+                    continue;
+                }
+
+                attachments.add(buildFreelancerAttachment(
+                        url,
+                        node.path("name").asText(null),
+                        node.path("description").asText(null)));
+            }
+            return attachments;
+        } catch (Exception e) {
+            log.warn("Erro ao deserializar freelancer attachment details: {}", e.getMessage());
+            return new ArrayList<>();
+        }
+    }
+
+    private List<FreelancerAttachmentDTO> resolveFreelancerAttachments(FreelancerAttachmentsRequest body) {
+        List<FreelancerAttachmentDTO> resolved = new ArrayList<>();
+        if (body == null) {
+            return resolved;
+        }
+
+        if (body.getAttachments() != null && !body.getAttachments().isEmpty()) {
+            for (FreelancerAttachmentDTO attachment : body.getAttachments()) {
+                if (attachment == null || !StringUtils.hasText(attachment.getUrl())) {
+                    continue;
+                }
+                resolved.add(buildFreelancerAttachment(
+                        attachment.getUrl(),
+                        attachment.getName(),
+                        attachment.getDescription()));
+            }
+        }
+
+        if (resolved.isEmpty() && body.getUrls() != null && !body.getUrls().isEmpty()) {
+            for (String url : body.getUrls()) {
+                if (!StringUtils.hasText(url)) {
+                    continue;
+                }
+                resolved.add(buildFreelancerAttachment(url, null, null));
+            }
+        }
+
+        return resolved;
+    }
+
+    private FreelancerAttachmentDTO buildFreelancerAttachment(String url, String name, String description) {
+        String normalizedUrl = url.trim();
+        String normalizedName = StringUtils.hasText(name) ? name.trim() : extractFileName(normalizedUrl);
+        String normalizedDescription = StringUtils.hasText(description) ? description.trim() : null;
+
+        return FreelancerAttachmentDTO.builder()
+                .url(normalizedUrl)
+                .name(normalizedName)
+                .description(normalizedDescription)
+                .build();
+    }
+
+    private String extractFileName(String url) {
+        try {
+            String path = java.net.URI.create(url).getPath();
+            if (!StringUtils.hasText(path)) {
+                return "arquivo";
+            }
+
+            String encoded = path.substring(path.lastIndexOf('/') + 1);
+            return StringUtils.hasText(encoded)
+                    ? URLDecoder.decode(encoded, StandardCharsets.UTF_8)
+                    : "arquivo";
+        } catch (Exception e) {
+            String fallback = url.substring(url.lastIndexOf('/') + 1);
+            return StringUtils.hasText(fallback) ? fallback : "arquivo";
+        }
+    }
+
+    private boolean isS3Url(String url) {
+        return url != null && url.contains(".s3.") && url.contains("amazonaws.com");
+    }
+
+    private ServiceRequest.WorkModel resolveRequestWorkModel(
+            ServiceRequestDTO dto,
+            com.servija.servija.model.Service service) {
+        if (service != null && service.getWorkModel() != null) {
+            return ServiceRequest.WorkModel.valueOf(service.getWorkModel().name());
+        }
+
+        if (!StringUtils.hasText(dto.getWorkModel())) {
+            throw new IllegalArgumentException("Informe o modelo de trabalho");
+        }
+
+        try {
+            return ServiceRequest.WorkModel.valueOf(dto.getWorkModel().trim().toUpperCase());
+        } catch (IllegalArgumentException ex) {
+            throw new IllegalArgumentException("Modelo de trabalho inválido");
+        }
+    }
+
+    private ServiceRequestResponse toResponse(ServiceRequest request) {
+        return ServiceRequestResponse.builder()
+                .id(request.getId())
+                .contractorId(request.getContractor().getId())
+                .contractorName(request.getContractor().getName())
+                .contractorAvatar(request.getContractor().getAvatarUrl())
+                .freelancerId(request.getFreelancer() != null ? request.getFreelancer().getId() : null)
+                .freelancerName(request.getFreelancer() != null ? request.getFreelancer().getName() : null)
+                .freelancerAvatar(request.getFreelancer() != null ? request.getFreelancer().getAvatarUrl() : null)
+                .serviceName(request.getServiceName())
+                .category(request.getCategory())
+                .description(normalizeRequestDescription(request.getDescription()))
+                .budget(request.getBudget())
+                .deadline(request.getDeadline())
+                .workModel(request.getWorkModel() != null ? request.getWorkModel().name() : null)
+                .status(request.getStatus().name())
+                .address(request.getAddress())
+                .desiredDate(request.getDesiredDate())
+                .responseValue(request.getResponseValue())
+                .responseDays(request.getResponseDays())
+                .responseScope(request.getResponseScope())
+                .responseNotes(request.getResponseNotes())
+                .respondedAt(request.getRespondedAt())
+                .counterValue(request.getCounterValue())
+                .counterDays(request.getCounterDays())
+                .counterNotes(request.getCounterNotes())
+                .cancelReason(request.getCancelReason())
+                .rejectReason(request.getRejectReason())
+                .attachments(parseAttachmentUrls(request.getAttachments()))
+                .freelancerAttachments(parseAttachmentUrls(request.getFreelancerAttachments()))
+                .freelancerAttachmentDetails(parseFreelancerAttachmentDetails(request.getFreelancerAttachments()))
+                .responseAttachments(parseAttachmentUrls(request.getResponseAttachments()))
+                .createdAt(request.getCreatedAt())
+                .updatedAt(request.getUpdatedAt())
+                .build();
+    }
+
+    private String normalizeRequestDescription(String description) {
+        if (!StringUtils.hasText(description)) {
+            return description;
+        }
+
+        String withoutLegacyPrefix = LEGACY_SERVICE_DESCRIPTION_PREFIX.matcher(description).replaceFirst("");
+        return withoutLegacyPrefix.stripLeading();
+    }
+}

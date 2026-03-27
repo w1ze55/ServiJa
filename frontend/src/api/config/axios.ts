@@ -20,7 +20,7 @@ api.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     // Primeiro tenta pegar o token direto
     let token = localStorage.getItem('token');
-    
+
     // Se não encontrar, tenta pegar do objeto user (compatibilidade)
     if (!token) {
       const user = localStorage.getItem('user');
@@ -33,7 +33,7 @@ api.interceptors.request.use(
         }
       }
     }
-    
+
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -52,7 +52,12 @@ api.interceptors.response.use(
       // Token inválido ou expirado
       localStorage.removeItem('token');
       localStorage.removeItem('user');
-      // Não redireciona automaticamente para evitar loops
+
+      // Se não estiver na página principal ou de login, redireciona 
+      // para forçar a limpeza do estado da aplicação (ex: store do Pinia)
+      if (window.location.pathname !== '/login' && window.location.pathname !== '/') {
+        window.location.href = '/login?expired=true';
+      }
     }
     return Promise.reject(error);
   }

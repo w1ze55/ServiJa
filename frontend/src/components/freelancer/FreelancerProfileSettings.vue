@@ -33,6 +33,7 @@ import api from '@/api/config/axios'
 import { toast } from '@/utils/toast'
 import { formatCPF, formatPhone } from '@/utils/masks'
 import { useUserStore } from '@/stores/userStore'
+import { uploadAvatar } from '@/api/uploadService'
 
 const userStore = useUserStore()
 
@@ -328,39 +329,28 @@ const handleFileUpload = async (event: Event) => {
     return
   }
 
-  if (file.size > 2 * 1024 * 1024) {
-    toast.error('A imagem deve ter no máximo 2MB')
+  if (file.size > 10 * 1024 * 1024) {
+    toast.error('A imagem deve ter no máximo 10MB')
     return
   }
 
   isUploadingAvatar.value = true
   try {
-    const reader = new FileReader()
-    reader.onload = async (e) => {
-      const base64 = e.target?.result as string
-      
-      try {
-        await api.put('/users/me/avatar', {
-          avatarBase64: base64,
-        })
-        
-        personalData.value.avatarUrl = base64
-        editedPersonalData.value.avatarUrl = base64
-        
-        // Atualizar store global para refletir as mudanças no header imediatamente
-        userStore.updateUser({ avatar: base64 })
-        
-        toast.success('Foto atualizada com sucesso!')
-      } catch (error: any) {
-        const errorMessage = error.response?.data?.message || 'Erro ao atualizar foto'
-        toast.error(errorMessage)
-      } finally {
-        isUploadingAvatar.value = false
-      }
-    }
-    reader.readAsDataURL(file)
-  } catch (error) {
-    toast.error('Erro ao processar imagem')
+    const url = await uploadAvatar(file)
+    
+    console.log('Avatar uploaded, URL:', url)
+    
+    personalData.value.avatarUrl = url
+    editedPersonalData.value.avatarUrl = url
+    
+    // Atualizar store global para refletir as mudanças no header imediatamente
+    userStore.updateUser({ avatar: url })
+    
+    toast.success('Foto atualizada com sucesso!')
+  } catch (error: any) {
+    const errorMessage = error.response?.data?.message || 'Erro ao atualizar foto'
+    toast.error(errorMessage)
+  } finally {
     isUploadingAvatar.value = false
   }
 }
@@ -679,6 +669,7 @@ const getInitials = (name: string) => {
             <Button 
               variant="outline" 
               size="sm" 
+              class="avatar-upload-btn"
               @click="handleAvatarClick"
               :disabled="isUploadingAvatar"
             >
@@ -864,9 +855,9 @@ const getInitials = (name: string) => {
 
       <!-- Addresses Section -->
       <Card class="p-6">
-        <div class="flex items-center justify-between mb-4">
+        <div class="address-header flex items-center justify-between mb-4">
           <h3 class="text-lg font-semibold text-[#263238]">Endereços</h3>
-          <Button @click="openAddAddressDialog" variant="outline" size="sm">
+          <Button @click="openAddAddressDialog" variant="outline" size="sm" class="add-address-btn">
             <Plus class="h-4 w-4 mr-2" />
             Adicionar Endereço
           </Button>
@@ -1214,3 +1205,114 @@ const getInitials = (name: string) => {
     </AlertDialog>
   </div>
 </template>
+
+<style scoped>
+/* Responsividade para Avatar Section */
+@media (max-width: 768px) {
+  .max-w-4xl {
+    padding: 1rem !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .max-w-4xl {
+    padding: 0.75rem !important;
+  }
+
+  /* Avatar Section - empilhar verticalmente */
+  :deep(.p-6) .flex.items-center.gap-6 {
+    flex-direction: column;
+    text-align: center;
+    gap: 1rem !important;
+  }
+
+  /* Centralizar avatar */
+  :deep(.p-6) .flex.items-center.gap-6 > div:first-child {
+    margin: 0 auto;
+  }
+
+  /* Container de texto e botão */
+  :deep(.p-6) .flex-1 {
+    width: 100%;
+  }
+
+  /* Quebrar email com word-break */
+  :deep(.p-6) .flex-1 p {
+    word-break: break-all;
+    overflow-wrap: break-word;
+    font-size: 0.875rem;
+  }
+
+  /* Título menor */
+  :deep(.p-6) .flex-1 h2 {
+    font-size: 1.125rem;
+    word-break: break-word;
+  }
+
+  /* Botão Alterar Foto responsivo */
+  :deep(.avatar-upload-btn) {
+    width: 100%;
+    max-width: 250px;
+    margin: 0 auto;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 0.875rem;
+    padding: 0.625rem 1rem;
+  }
+
+  :deep(.avatar-upload-btn svg) {
+    width: 1rem;
+    height: 1rem;
+  }
+}
+
+@media (max-width: 408px) {
+  /* Ajustes específicos para 408px e abaixo */
+  :deep(.p-6) .flex-1 h2 {
+    font-size: 1rem;
+  }
+
+  :deep(.p-6) .flex-1 p {
+    font-size: 0.8125rem;
+    margin-bottom: 0.75rem !important;
+  }
+
+  /* Botão menor em telas muito pequenas */
+  :deep(.avatar-upload-btn) {
+    max-width: 200px;
+    font-size: 0.8125rem;
+    padding: 0.5rem 0.875rem;
+  }
+
+  :deep(.avatar-upload-btn svg) {
+    width: 0.875rem;
+    height: 0.875rem;
+    margin-right: 0.375rem;
+  }
+
+  /* Reduzir tamanho do avatar */
+  :deep(.h-24.w-24) {
+    height: 5rem !important;
+    width: 5rem !important;
+  }
+
+  :deep(.h-24.w-24 .text-2xl) {
+    font-size: 1.5rem !important;
+  }
+}
+
+@media (max-width: 375px) {
+  /* Botão Adicionar Endereço abaixo do título */
+  .address-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 0.75rem;
+  }
+
+  .add-address-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+</style>

@@ -20,6 +20,7 @@ public class ServiceRequest {
     private String priceType; // FIXED, HOURLY, DAILY
     private Integer deliveryTime;
     private String deliveryUnit; // DAYS, WEEKS
+    private String workModel; // PRESENCIAL, REMOTO, HIBRIDO
     private List<String> tags;
     private List<String> images;
     private Boolean isActive;

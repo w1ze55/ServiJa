@@ -46,12 +46,16 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/api/auth/**",
                                 "/api/freelancer/nearby",
+                                "/api/freelancer/*/profile",
+                                "/api/portfolio/freelancer/**",
                                 "/api/services/public/**",
                                 "/api/files/**",
                                 "/error",
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**",
-                                "/swagger-ui.html")
+                                "/swagger-ui.html",
+                                "/ws/**",
+                                "/api/webhooks/**")
                         .permitAll()
                         .anyRequest().authenticated())
                 .sessionManagement(session -> session

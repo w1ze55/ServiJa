@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import {
   FileText,
   Clock,
@@ -10,6 +10,7 @@ import {
   Filter,
   Eye,
   Trash2,
+  RefreshCw,
 } from 'lucide-vue-next';
 import Button from '../ui/button.vue';
 import Badge from '../ui/badge.vue';
@@ -27,6 +28,7 @@ import AlertDialogFooter from '../ui/alert-dialog-footer.vue';
 import AlertDialogHeader from '../ui/alert-dialog-header.vue';
 import AlertDialogTitle from '../ui/alert-dialog-title.vue';
 import { toast } from '../../utils/toast';
+import api from '@/api/config/axios';
 
 interface QuoteRequest {
   id: string;
@@ -35,7 +37,9 @@ interface QuoteRequest {
   freelancerAvatar?: string;
   service: string;
   description: string;
-  status: 'pending' | 'responded' | 'accepted' | 'rejected' | 'cancelled';
+  budget?: number;
+  deadline?: string;
+  status: 'pending' | 'sent' | 'negotiating' | 'responded' | 'accepted' | 'in_progress' | 'rejected' | 'completed' | 'cancelled';
   createdAt: string;
   lastMessage?: string;
   lastMessageDate?: string;
@@ -51,62 +55,40 @@ const props = defineProps<Props>();
 const filterStatus = ref<string>('all');
 const sortBy = ref<string>('date-desc');
 const cancelRequest = ref<QuoteRequest | null>(null);
+const isLoading = ref(false);
 
-// Mock data - substituir por dados reais da API
-const requests = ref<QuoteRequest[]>([
-  {
-    id: '1',
-    freelancerId: '1',
-    freelancerName: 'João Silva',
-    service: 'Instalação Elétrica Residencial',
-    description: 'Preciso de instalação elétrica completa em apartamento de 80m²',
-    status: 'responded',
-    createdAt: '2024-11-10T10:30:00',
-    lastMessage: 'Olá! Vi sua solicitação e posso realizar o serviço. Preparei um orçamento...',
-    lastMessageDate: '2024-11-10T14:20:00',
-    hasUnreadMessages: true,
-  },
-  {
-    id: '2',
-    freelancerId: '2',
-    freelancerName: 'Maria Santos',
-    service: 'Design Gráfico',
-    description: 'Criação de logo e identidade visual para minha empresa',
-    status: 'pending',
-    createdAt: '2024-11-09T15:45:00',
-  },
-  {
-    id: '3',
-    freelancerId: '3',
-    freelancerName: 'Carlos Oliveira',
-    service: 'Encanamento',
-    description: 'Troca de encanamento da cozinha e banheiro',
-    status: 'accepted',
-    createdAt: '2024-11-08T09:15:00',
-    lastMessage: 'Perfeito! Vou começar amanhã às 8h conforme combinado.',
-    lastMessageDate: '2024-11-08T16:30:00',
-  },
-  {
-    id: '4',
-    freelancerId: '4',
-    freelancerName: 'Ana Costa',
-    service: 'Desenvolvimento Web',
-    description: 'Desenvolvimento de site institucional responsivo',
-    status: 'rejected',
-    createdAt: '2024-11-07T11:20:00',
-    lastMessage: 'Infelizmente não poderei aceitar este projeto no momento.',
-    lastMessageDate: '2024-11-07T18:45:00',
-  },
-  {
-    id: '5',
-    freelancerId: '5',
-    freelancerName: 'Pedro Almeida',
-    service: 'Pintura',
-    description: 'Pintura externa de casa de 2 andares',
-    status: 'pending',
-    createdAt: '2024-11-06T13:00:00',
-  },
-]);
+const requests = ref<QuoteRequest[]>([]);
+
+const loadRequests = async () => {
+  isLoading.value = true;
+  try {
+    const response = await api.get('/service-requests/my');
+    requests.value = response.data.map((req: any) => ({
+      id: String(req.id),
+      freelancerId: String(req.freelancerId ?? ''),
+      freelancerName: req.freelancerName ?? 'Freelancer',
+      freelancerAvatar: req.freelancerAvatar,
+      service: req.serviceName ?? req.service ?? '',
+      description: req.description ?? '',
+      budget: req.budget,
+      deadline: req.deadline,
+      status: (req.status ?? 'pending').toLowerCase() as QuoteRequest['status'],
+      createdAt: req.createdAt,
+      lastMessage: req.responseScope,
+      lastMessageDate: req.respondedAt,
+      hasUnreadMessages: req.status?.toLowerCase() === 'negotiating' && !!req.responseScope,
+    }));
+  } catch (err: any) {
+    toast.error('Erro ao carregar solicitações');
+    console.error('Erro ao carregar solicitações:', err);
+  } finally {
+    isLoading.value = false;
+  }
+};
+
+onMounted(() => {
+  loadRequests();
+});
 
 const getStatusConfig = (status: QuoteRequest['status']) => {
   const configs = {
@@ -115,6 +97,18 @@ const getStatusConfig = (status: QuoteRequest['status']) => {
       icon: Clock,
       color: 'bg-yellow-100 text-yellow-700 border-yellow-200',
       iconColor: 'text-yellow-600',
+    },
+    sent: {
+      label: 'Enviada',
+      icon: Clock,
+      color: 'bg-blue-50 text-blue-600 border-blue-100',
+      iconColor: 'text-blue-500',
+    },
+    negotiating: {
+      label: 'Negociando',
+      icon: MessageSquare,
+      color: 'bg-amber-100 text-amber-700 border-amber-200',
+      iconColor: 'text-amber-600',
     },
     responded: {
       label: 'Respondido',
@@ -128,11 +122,23 @@ const getStatusConfig = (status: QuoteRequest['status']) => {
       color: 'bg-green-100 text-green-700 border-green-200',
       iconColor: 'text-green-600',
     },
+    in_progress: {
+      label: 'Em Andamento',
+      icon: Clock,
+      color: 'bg-purple-100 text-purple-700 border-purple-200',
+      iconColor: 'text-purple-600',
+    },
     rejected: {
       label: 'Recusado',
       icon: XCircle,
       color: 'bg-red-100 text-red-700 border-red-200',
       iconColor: 'text-red-600',
+    },
+    completed: {
+      label: 'Concluído',
+      icon: CheckCircle,
+      color: 'bg-teal-100 text-teal-700 border-teal-200',
+      iconColor: 'text-teal-600',
     },
     cancelled: {
       label: 'Cancelado',
@@ -141,7 +147,7 @@ const getStatusConfig = (status: QuoteRequest['status']) => {
       iconColor: 'text-gray-600',
     },
   };
-  return configs[status];
+  return configs[status] ?? configs['pending'];
 };
 
 const handleCancelRequest = (request: QuoteRequest) => {
@@ -197,6 +203,28 @@ const formatDate = (dateString: string) => {
   if (diffDays < 7) return `${diffDays}d atrás`;
   return date.toLocaleDateString('pt-BR');
 };
+
+const getSortLabel = (value: string) => {
+  const options: Record<string, string> = {
+    'date-desc': 'Mais recentes',
+    'date-asc': 'Mais antigas',
+    'name-asc': 'Nome (A-Z)',
+    'name-desc': 'Nome (Z-A)',
+  };
+  return options[value] || value;
+};
+
+const getFilterStatusLabel = (value: string) => {
+  const labels: Record<string, string> = {
+    all: 'Todos os status',
+    pending: 'Pendente',
+    responded: 'Respondido',
+    accepted: 'Aceito',
+    rejected: 'Recusado',
+    cancelled: 'Cancelado',
+  };
+  return labels[value] || value;
+};
 </script>
 
 <template>
@@ -214,7 +242,7 @@ const formatDate = (dateString: string) => {
           <Select :model-value="filterStatus" @update:model-value="(val: string) => filterStatus = val">
             <SelectTrigger>
               <Filter class="h-4 w-4 mr-2" />
-              <SelectValue />
+              <SelectValue :label="getFilterStatusLabel(filterStatus)" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos os status</SelectItem>
@@ -231,7 +259,7 @@ const formatDate = (dateString: string) => {
           <Select :model-value="sortBy" @update:model-value="(val: string) => sortBy = val">
             <SelectTrigger>
               <ArrowUpDown class="h-4 w-4 mr-2" />
-              <SelectValue />
+              <SelectValue :label="getSortLabel(sortBy)" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="date-desc">Mais recentes</SelectItem>
@@ -429,7 +457,6 @@ const formatDate = (dateString: string) => {
     </AlertDialog>
   </div>
 </template>
-
 
 
 

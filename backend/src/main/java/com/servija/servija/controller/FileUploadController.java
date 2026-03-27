@@ -55,6 +55,7 @@ public class FileUploadController {
         } catch (Exception e) {
             Map<String, Object> error = new HashMap<>();
             error.put("error", e.getMessage());
+            error.put("type", e.getClass().getName());
             return ResponseEntity.badRequest().body(error);
         }
     }

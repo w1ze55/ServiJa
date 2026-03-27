@@ -30,6 +30,7 @@ import Avatar from '../ui/avatar.vue';
 import AvatarImage from '../ui/avatar-image.vue';
 import AvatarFallback from '../ui/avatar-fallback.vue';
 import { toast } from '../../utils/toast';
+import { CATEGORIES } from '@/constants/categories';
 import { formatCPF, formatPhone } from '@/utils/masks';
 
 interface OnboardingData {
@@ -41,7 +42,6 @@ interface OnboardingData {
   profession: string;
   category: string;
   bio: string;
-  hourlyRate: string;
   skills: string[];
   portfolioItems: Array<{
     id: string;
@@ -76,16 +76,7 @@ const steps = [
   { id: 5, title: 'Verificação', icon: CheckCircle },
 ];
 
-const categories = [
-  'Eletricista',
-  'Encanador',
-  'Pintor',
-  'Designer',
-  'Desenvolvedor',
-  'Fotógrafo',
-  'Marceneiro',
-  'Pedreiro',
-];
+const categories = CATEGORIES;
 
 const availableSkills = [
   'Instalação',
@@ -110,7 +101,6 @@ const data = ref<OnboardingData>({
   profession: '',
   category: '',
   bio: '',
-  hourlyRate: '',
   skills: [],
   portfolioItems: [],
   workingDays: [],
@@ -189,7 +179,7 @@ const validateStep = (step: number): boolean => {
       return true;
 
     case 2:
-      if (!data.value.profession || !data.value.category || !data.value.bio || !data.value.hourlyRate) {
+      if (!data.value.profession || !data.value.category || !data.value.bio) {
         toast.error('Preencha todos os campos obrigatórios');
         return false;
       }
@@ -426,8 +416,8 @@ const handleServiceAreaKeyPress = (e: KeyboardEvent) => {
                   <SelectValue placeholder="Selecione uma categoria" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem v-for="cat in categories" :key="cat" :value="cat">
-                    {{ cat }}
+                  <SelectItem v-for="cat in categories" :key="cat.value" :value="cat.value">
+                    {{ cat.label }}
                   </SelectItem>
                 </SelectContent>
               </Select>
@@ -444,22 +434,6 @@ const handleServiceAreaKeyPress = (e: KeyboardEvent) => {
               :rows="4"
             />
             <p class="text-xs text-[#435574]">{{ data.bio.length }}/500 caracteres</p>
-          </div>
-
-          <div class="space-y-2">
-            <Label for="hourlyRate">Preço Base por Hora *</Label>
-            <div class="relative">
-              <span class="absolute left-3 top-1/2 -translate-y-1/2 text-[#435574]">
-                R$
-              </span>
-              <Input
-                id="hourlyRate"
-                :model-value="data.hourlyRate"
-                @update:model-value="(val) => data.hourlyRate = val as string"
-                placeholder="0,00"
-                class="pl-10"
-              />
-            </div>
           </div>
 
           <div class="space-y-2">

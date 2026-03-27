@@ -38,6 +38,7 @@ public class Service {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "price_type", nullable = false)
+    @Builder.Default
     private PriceType priceType = PriceType.FIXED;
 
     @Column(name = "delivery_time", nullable = false)
@@ -45,7 +46,12 @@ public class Service {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "delivery_unit", nullable = false)
+    @Builder.Default
     private DeliveryUnit deliveryUnit = DeliveryUnit.DAYS;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "work_model", nullable = false, length = 20)
+    private WorkModel workModel;
 
     @Column(columnDefinition = "TEXT")
     private String tags;
@@ -54,6 +60,7 @@ public class Service {
     private String images;
 
     @Column(name = "is_active", nullable = false)
+    @Builder.Default
     private Boolean isActive = true;
 
     @CreationTimestamp
@@ -69,6 +76,10 @@ public class Service {
     }
 
     public enum DeliveryUnit {
-        DAYS, WEEKS
+        DAYS, WEEKS, MONTHS
+    }
+
+    public enum WorkModel {
+        PRESENCIAL, REMOTO, HIBRIDO
     }
 }

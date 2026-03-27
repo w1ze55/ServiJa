@@ -34,9 +34,9 @@ export type Page =
   | 'freelancer-proposal-detail'
   | 'freelancer-deliveries'
   | 'freelancer-wallet'
-  | 'freelancer-invoices'
+
   | 'freelancer-portfolio'
-  | 'freelancer-schedule'
+
   | 'freelancer-kyc'
   | 'freelancer-account-settings'
   | 'add-address'
@@ -70,7 +70,7 @@ interface Quote {
   providerName: string;
   providerAvatar: string;
   serviceTitle: string;
-  status: 'pending' | 'accepted' | 'rejected' | 'completed';
+  status: 'pending' | 'accepted' | 'in_progress' | 'rejected' | 'completed';
   price?: string;
   description: string;
   date: string;

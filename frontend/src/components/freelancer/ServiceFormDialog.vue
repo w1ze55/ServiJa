@@ -17,6 +17,7 @@ import SelectValue from '../ui/select-value.vue';
 import Badge from '../ui/badge.vue';
 import { toast } from '../../utils/toast';
 import { uploadImages, deleteImage } from '../../api/uploadService';
+import { CATEGORIES } from '@/constants/categories';
 
 export interface ServiceFormData {
   id?: string;
@@ -25,8 +26,8 @@ export interface ServiceFormData {
   description: string;
   price: number;
   priceType: 'fixo' | 'hora' | 'dia';
+  workModel: 'presencial' | 'remoto' | 'hibrido';
   deliveryTime: string;
-  deliveryUnit: 'dia' | 'semana';
   tags: string[];
   images: string[];
   isActive: boolean;
@@ -41,6 +42,12 @@ interface Props {
 
 const props = defineProps<Props>();
 
+const WORK_MODELS = [
+  { value: 'presencial', label: 'Presencial' },
+  { value: 'remoto', label: 'Remoto' },
+  { value: 'hibrido', label: 'Híbrido' },
+] as const;
+
 const formData = ref<ServiceFormData>({
   id: props.service?.id,
   title: props.service?.title || '',
@@ -48,8 +55,8 @@ const formData = ref<ServiceFormData>({
   description: props.service?.description || '',
   price: props.service?.price || 0,
   priceType: props.service?.priceType || 'fixo',
+  workModel: props.service?.workModel || 'presencial',
   deliveryTime: props.service?.deliveryTime || '',
-  deliveryUnit: props.service?.deliveryUnit || 'dia',
   tags: props.service?.tags || [],
   images: props.service?.images || [],
   isActive: props.service?.isActive ?? true,
@@ -59,31 +66,7 @@ const tagInput = ref('');
 const errors = ref<Record<string, string>>({});
 const isUploading = ref(false);
 
-const categories = [
-  'Eletricista',
-  'Encanador',
-  'Pintor',
-  'Pedreiro',
-  'Marceneiro',
-  'Serralheiro',
-  'Jardineiro',
-  'Mecânico',
-  'Designer Gráfico',
-  'Desenvolvedor Web',
-  'Fotógrafo',
-  'Videomaker',
-  'Redator',
-  'Social Media',
-  'Professor Particular',
-  'Cozinheiro',
-  'Diarista',
-  'Cuidador',
-  'Personal Trainer',
-  'Advogado',
-  'Contador',
-  'Arquiteto',
-  'Outro',
-];
+const categories = CATEGORIES;
 
 watch(() => props.service, (newService) => {
   if (newService) {
@@ -94,12 +77,13 @@ watch(() => props.service, (newService) => {
       description: newService.description || '',
       price: newService.price || 0,
       priceType: newService.priceType || 'fixo',
+      workModel: newService.workModel || 'presencial',
       deliveryTime: newService.deliveryTime || '',
-      deliveryUnit: newService.deliveryUnit || 'dia',
       tags: newService.tags || [],
       images: newService.images || [],
       isActive: newService.isActive ?? true,
     };
+    formattedPrice.value = formatPriceDisplay(newService.price || 0);
   }
 }, { immediate: true });
 
@@ -151,10 +135,65 @@ const handleRemoveTag = (tagToRemove: string) => {
 };
 
 const handleKeyPress = (e: KeyboardEvent) => {
-  if (e.key === 'Enter') {
+  if (e.key === 'Enter' || e.key === ',') {
     e.preventDefault();
     handleAddTag();
   }
+};
+
+// Formatação de preço no padrão brasileiro (XX.XXX.XXX,XX)
+const formatPriceDisplay = (value: number): string => {
+  if (!value) return '';
+  const parts = value.toFixed(2).split('.');
+  const intPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  return `${intPart},${parts[1]}`;
+};
+
+const formattedPrice = ref(formatPriceDisplay(formData.value.price));
+
+const handlePriceInput = (val: string) => {
+  // Remove tudo que não é dígito
+  let digits = val.replace(/\D/g, '');
+  
+  // Limitar a 10 dígitos (XX.XXX.XXX,XX = 99.999.999,99)
+  if (digits.length > 10) {
+    digits = digits.slice(0, 10);
+  }
+  
+  if (!digits) {
+    formattedPrice.value = '';
+    handleInputChange('price', 0);
+    return;
+  }
+  
+  // Converter para centavos: últimos 2 dígitos são decimais
+  const numValue = parseInt(digits) / 100;
+  
+  // Formatar para exibição
+  const parts = numValue.toFixed(2).split('.');
+  const intPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  formattedPrice.value = `${intPart},${parts[1]}`;
+  
+  handleInputChange('price', numValue);
+};
+
+// Prazo de entrega em dias (apenas dígitos, max 3 chars = 365 dias)
+const handleDeliveryTimeChange = (val: string) => {
+  const digits = val.replace(/\D/g, '').slice(0, 3);
+  const num = parseInt(digits) || 0;
+  
+  if (!digits) {
+    handleInputChange('deliveryTime', '');
+    return;
+  }
+
+  // Limite máximo: 365 dias (~12 meses)
+  if (num > 365) {
+    handleInputChange('deliveryTime', '365');
+    return;
+  }
+
+  handleInputChange('deliveryTime', digits);
 };
 
 const validateForm = () => {
@@ -162,6 +201,8 @@ const validateForm = () => {
 
   if (!formData.value.title.trim()) {
     newErrors.title = 'Título é obrigatório';
+  } else if (formData.value.title.length > 50) {
+    newErrors.title = 'Título deve ter no máximo 50 caracteres';
   }
 
   if (!formData.value.category) {
@@ -178,8 +219,14 @@ const validateForm = () => {
     newErrors.price = 'Preço deve ser maior que zero';
   }
 
+  if (!formData.value.workModel) {
+    newErrors.workModel = 'Modelo de trabalho é obrigatório';
+  }
+
   if (!formData.value.deliveryTime || parseInt(formData.value.deliveryTime) <= 0) {
     newErrors.deliveryTime = 'Prazo de entrega é obrigatório';
+  } else if (parseInt(formData.value.deliveryTime) > 365) {
+    newErrors.deliveryTime = 'Prazo máximo é de 365 dias (12 meses)';
   }
 
   errors.value = newErrors;
@@ -206,13 +253,14 @@ const handleClose = () => {
     description: '',
     price: 0,
     priceType: 'fixo',
+    workModel: 'presencial',
     deliveryTime: '',
-    deliveryUnit: 'dia',
     tags: [],
     images: [],
     isActive: true,
   };
   tagInput.value = '';
+  formattedPrice.value = '';
   errors.value = {};
   props.onClose();
 };
@@ -227,9 +275,16 @@ const handleImageUpload = async (e: Event) => {
       return;
     }
 
+    // Validar tamanho dos arquivos (10MB max)
+    const fileArray = Array.from(files);
+    const oversizedFiles = fileArray.filter((file) => file.size > 10 * 1024 * 1024);
+    if (oversizedFiles.length > 0) {
+      toast.error('Cada imagem deve ter no máximo 10MB');
+      return;
+    }
+
     isUploading.value = true;
     try {
-      const fileArray = Array.from(files);
       const uploadedUrls = await uploadImages(fileArray);
       handleInputChange('images', [...formData.value.images, ...uploadedUrls]);
       toast.success(`${files.length} imagem(ns) enviada(s) com sucesso`);
@@ -280,13 +335,19 @@ const handleRemoveImage = async (index: number) => {
           <Label for="title">
             Título do Serviço <span class="text-red-500">*</span>
           </Label>
-          <Input
-            id="title"
-            placeholder="Ex: Instalação Elétrica Residencial"
-            :model-value="formData.title"
-            @update:model-value="(val) => handleInputChange('title', val)"
-            :class="errors.title ? 'border-red-500' : ''"
-          />
+          <div class="relative">
+            <Input
+              id="title"
+              placeholder="Ex: Instalação Elétrica Residencial"
+              :model-value="formData.title"
+              @update:model-value="(val) => handleInputChange('title', val)"
+              :class="['h-14 pr-28', errors.title ? 'border-red-500' : '']"
+              maxlength="50"
+            />
+            <span class="pointer-events-none absolute bottom-1.5 right-3 text-[11px] text-gray-400">
+              {{ formData.title.length }}/50
+            </span>
+          </div>
           <p v-if="errors.title" class="text-sm text-red-500">{{ errors.title }}</p>
         </div>
 
@@ -302,8 +363,8 @@ const handleRemoveImage = async (index: number) => {
               <SelectValue placeholder="Selecione uma categoria" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem v-for="category in categories" :key="category" :value="category">
-                {{ category }}
+              <SelectItem v-for="cat in categories" :key="cat.value" :value="cat.value">
+                {{ cat.label }}
               </SelectItem>
             </SelectContent>
           </Select>
@@ -315,19 +376,20 @@ const handleRemoveImage = async (index: number) => {
           <Label for="description">
             Descrição <span class="text-red-500">*</span>
           </Label>
-          <Textarea
-            id="description"
-            placeholder="Descreva em detalhes o serviço que você oferece..."
-            v-model="formData.description"
-            :rows="5"
-            :class="errors.description ? 'border-red-500' : ''"
-          />
-          <div class="flex items-center justify-between">
-            <p v-if="errors.description" class="text-sm text-red-500">{{ errors.description }}</p>
-            <p class="text-sm text-gray-500 ml-auto">
-              {{ formData.description.length }} / 500 caracteres
-            </p>
+          <div class="relative">
+            <Textarea
+              id="description"
+              placeholder="Descreva em detalhes o serviço que você oferece..."
+              v-model="formData.description"
+              :rows="5"
+              maxlength="500"
+              :class="['resize-none pb-8 pr-24', errors.description ? 'border-red-500' : '']"
+            />
+            <span class="pointer-events-none absolute bottom-2 right-3 text-[11px] text-gray-400">
+              {{ formData.description.length }}/500
+            </span>
           </div>
+          <p v-if="errors.description" class="text-sm text-red-500">{{ errors.description }}</p>
         </div>
 
         <!-- Preço e Tipo -->
@@ -342,12 +404,12 @@ const handleRemoveImage = async (index: number) => {
               </span>
               <Input
                 id="price"
-                type="number"
-                min="0"
-                step="0.01"
+                type="text"
+                inputmode="numeric"
+                maxlength="13"
                 placeholder="0,00"
-                :model-value="String(formData.price || '')"
-                @update:model-value="(val: string) => handleInputChange('price', parseFloat(val as string) || 0)"
+                :model-value="formattedPrice"
+                @update:model-value="(val: string) => handlePriceInput(val)"
                 :class="`pl-10 ${errors.price ? 'border-red-500' : ''}`"
               />
             </div>
@@ -372,37 +434,44 @@ const handleRemoveImage = async (index: number) => {
         </div>
 
         <!-- Prazo de Entrega -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div class="space-y-2">
-            <Label for="deliveryTime">
-              Prazo de Entrega <span class="text-red-500">*</span>
-            </Label>
-            <Input
-              id="deliveryTime"
-              type="number"
-              min="1"
-              placeholder="Ex: 7"
-              :model-value="formData.deliveryTime"
-              @update:model-value="(val: string) => handleInputChange('deliveryTime', val)"
-              :class="errors.deliveryTime ? 'border-red-500' : ''"
-            />
-            <p v-if="errors.deliveryTime" class="text-sm text-red-500">{{ errors.deliveryTime }}</p>
-          </div>
+        <div class="space-y-2">
+          <Label for="workModel">
+            Modelo de Trabalho <span class="text-red-500">*</span>
+          </Label>
+          <Select v-model="formData.workModel">
+            <SelectTrigger :class="errors.workModel ? 'border-red-500' : ''">
+              <SelectValue placeholder="Selecione o modelo" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem v-for="model in WORK_MODELS" :key="model.value" :value="model.value">
+                {{ model.label }}
+              </SelectItem>
+            </SelectContent>
+          </Select>
+          <p v-if="errors.workModel" class="text-sm text-red-500">{{ errors.workModel }}</p>
 
-          <div class="space-y-2">
-            <Label for="deliveryUnit">Unidade</Label>
-            <Select
-              v-model="formData.deliveryUnit"
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="dia">Dias</SelectItem>
-                <SelectItem value="semana">Semanas</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          <Label for="deliveryTime">
+            Prazo de Entrega (em dias) <span class="text-red-500">*</span>
+          </Label>
+          <Input
+            id="deliveryTime"
+            type="text"
+            inputmode="numeric"
+            maxlength="3"
+            placeholder="Ex: 7"
+            :model-value="formData.deliveryTime"
+            @update:model-value="(val: string) => handleDeliveryTimeChange(val)"
+            :class="errors.deliveryTime ? 'border-red-500' : ''"
+          />
+          <p v-if="errors.deliveryTime" class="text-sm text-red-500">{{ errors.deliveryTime }}</p>
+          <p v-if="formData.deliveryTime && parseInt(formData.deliveryTime) > 0" class="text-sm text-gray-500">
+            ≈ {{ parseInt(formData.deliveryTime) >= 30 
+              ? `${Math.floor(parseInt(formData.deliveryTime) / 30)} ${Math.floor(parseInt(formData.deliveryTime) / 30) === 1 ? 'mês' : 'meses'}` 
+              : parseInt(formData.deliveryTime) >= 7 
+                ? `${Math.floor(parseInt(formData.deliveryTime) / 7)} ${Math.floor(parseInt(formData.deliveryTime) / 7) === 1 ? 'semana' : 'semanas'}` 
+                : `${formData.deliveryTime} ${parseInt(formData.deliveryTime) === 1 ? 'dia' : 'dias'}` 
+            }}
+          </p>
         </div>
 
         <!-- Tags/Habilidades -->
@@ -460,7 +529,7 @@ const handleRemoveImage = async (index: number) => {
                 Clique para fazer upload ou arraste as imagens aqui
               </p>
               <p class="text-xs text-gray-400 mt-1">
-                PNG, JPG até 5MB (máximo 5 imagens)
+                PNG, JPG até 10MB (máximo 5 imagens)
               </p>
               <input
                 id="images"
@@ -515,4 +584,3 @@ const handleRemoveImage = async (index: number) => {
     </DialogContent>
   </Dialog>
 </template>
-
