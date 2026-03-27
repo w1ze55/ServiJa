@@ -29,7 +29,6 @@ import MyRequestsPage from "@/pages/MyRequests/index.vue";
 import FavoritesPage from "@/pages/Favorites/index.vue";
 import ContractsPage from "@/pages/Contracts/index.vue";
 import FreelancerKYCPage from "@/pages/FreelancerKYC/index.vue";
-import FreelancerAccountSettingsPage from "@/pages/FreelancerAccountSettings/index.vue";
 import ProviderProfilePage from "@/pages/ProviderProfile/index.vue";
 import ServiceDetailPage from "@/pages/ServiceDetail/index.vue";
 import NotFoundPage from "@/pages/NotFound/index.vue";
@@ -264,14 +263,6 @@ const routes: RouteRecordRaw[] = [
     path: "/freelancer-kyc",
     name: "freelancer-kyc",
     component: FreelancerKYCPage,
-    meta: { requiresAuth: true, userType: "provider" },
-  },
-
-  // Freelancer Account Settings
-  {
-    path: "/freelancer-account-settings",
-    name: "freelancer-account-settings",
-    component: FreelancerAccountSettingsPage,
     meta: { requiresAuth: true, userType: "provider" },
   },
 
