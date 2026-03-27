@@ -302,16 +302,16 @@ const getStatusColor = (status: string) => {
       <div class="lg:col-span-2 space-y-6">
         <Tabs v-model="activeTab">
           <TabsList class="grid w-full grid-cols-4 bg-white border shadow-sm">
-            <TabsTrigger value="details" class="data-[state=active]:text-blue-600">
+            <TabsTrigger value="details">
               Detalhes
             </TabsTrigger>
-            <TabsTrigger value="messages" class="data-[state=active]:text-blue-600">
+            <TabsTrigger value="messages">
               Mensagens
             </TabsTrigger>
-            <TabsTrigger value="history" class="data-[state=active]:text-blue-600">
+            <TabsTrigger value="history">
               Histórico
             </TabsTrigger>
-            <TabsTrigger value="files" class="data-[state=active]:text-blue-600">
+            <TabsTrigger value="files">
               Anexo
             </TabsTrigger>
           </TabsList>
