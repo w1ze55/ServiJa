@@ -220,10 +220,8 @@ const handleServiceRequestNotification = (event: any) => {
       proposalStore.loadProposals();
       break;
     case 'SERVICE_COMPLETED_REVIEW_PENDING':
-      toast.success('Serviço concluído! Avalie o cliente.');
-      setTimeout(() => {
-        router.push('/rate-client?requestId=' + notification.serviceRequestId);
-      }, 2000);
+      toast.success('Serviço concluído pelo cliente!');
+      proposalStore.loadProposals();
       break;
     case 'NEW_REVIEW':
       toast.info(notification.reviewerName + ' enviou uma avaliação!');

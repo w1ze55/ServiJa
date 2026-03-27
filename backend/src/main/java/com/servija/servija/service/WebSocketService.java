@@ -245,19 +245,10 @@ public class WebSocketService {
         messageContractor.put("message", "Serviço concluído! Avalie o freelancer.");
         messageContractor.put("timestamp", System.currentTimeMillis());
 
-        Map<String, Object> messageFreelancer = new HashMap<>();
-        messageFreelancer.put("type", "SERVICE_COMPLETED_REVIEW_PENDING");
-        messageFreelancer.put("serviceRequestId", serviceRequestId);
-        messageFreelancer.put("serviceName", serviceName);
-        messageFreelancer.put("message", "Serviço concluído! Avalie o cliente.");
-        messageFreelancer.put("timestamp", System.currentTimeMillis());
-
         String destinationContractor = "/topic/service-request/" + contractorEmail;
-        String destinationFreelancer = "/topic/service-request/" + freelancerEmail;
         messagingTemplate.convertAndSend(destinationContractor, (Object) messageContractor);
-        messagingTemplate.convertAndSend(destinationFreelancer, (Object) messageFreelancer);
 
-        log.info("Notificação de avaliação pendente enviada: solicitação {}", serviceRequestId);
+        log.info("Notificação de avaliação pendente enviada para o cliente: solicitação {}", serviceRequestId);
     }
 
     /**

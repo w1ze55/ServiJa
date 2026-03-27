@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import { Star, MessageCircle, Award, Loader2, User, ChevronLeft, ChevronRight } from 'lucide-vue-next';
+import { Star, MessageCircle, Award, Loader2, User, ChevronLeft, ChevronRight, Briefcase } from 'lucide-vue-next';
 import Card from '@/components/ui/card.vue';
 import Badge from '@/components/ui/badge.vue';
 import Avatar from '@/components/ui/avatar.vue';
@@ -14,6 +14,7 @@ export interface ReviewItem {
   comment: string;
   clientName: string;
   clientPhoto?: string;
+  serviceName?: string;
   createdAt: string;
 }
 
@@ -155,7 +156,7 @@ const formatDate = (dateStr: string) =>
                 <p class="font-semibold text-[#263238]">{{ review.clientName }}</p>
                 <p class="text-xs text-gray-400">{{ formatDate(review.createdAt) }}</p>
               </div>
-              <div class="flex items-center gap-1 mt-1 mb-3">
+              <div class="flex items-center gap-1 mt-1 mb-2">
                 <Star
                   v-for="s in 5"
                   :key="s"
@@ -163,7 +164,11 @@ const formatDate = (dateStr: string) =>
                   :class="s <= review.rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-200'"
                 />
               </div>
-              <p class="text-[#435574] text-sm leading-relaxed">{{ review.comment }}</p>
+              <p v-if="review.serviceName" class="flex items-center gap-1.5 text-xs text-[#435574] mb-2">
+                <Briefcase class="h-3 w-3 text-[#286AD8]" />
+                <span>{{ review.serviceName }}</span>
+              </p>
+              <p v-if="review.comment" class="text-[#435574] text-sm leading-relaxed">{{ review.comment }}</p>
             </div>
           </div>
         </Card>

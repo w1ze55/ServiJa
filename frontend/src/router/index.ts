@@ -39,7 +39,6 @@ import ClienteProjectsPage from "@/pages/ClienteProjects/index.vue";
 import ClienteDeliveryApprovalPage from "@/pages/ClienteDeliveryApproval/index.vue";
 import ClienteProjectDetailPage from "@/pages/ClienteProjectDetail/index.vue";
 import RateFreelancerPage from "@/pages/RateFreelancer/index.vue";
-import RateClientPage from "@/pages/RateClient/index.vue";
 
 const routes: RouteRecordRaw[] = [
   // ============ ROTAS PÚBLICAS ============
@@ -306,12 +305,6 @@ const routes: RouteRecordRaw[] = [
     name: "rate-freelancer",
     component: RateFreelancerPage,
     meta: { requiresAuth: true, userType: "contractor" },
-  },
-  {
-    path: "/rate-client",
-    name: "rate-client",
-    component: RateClientPage,
-    meta: { requiresAuth: true, userType: "provider" },
   },
 
   // ============ PÁGINA 404 - DEVE SER A ÚLTIMA ROTA ============

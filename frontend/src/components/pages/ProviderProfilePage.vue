@@ -352,6 +352,7 @@ const loadFreelancerReviews = async () => {
       comment: review.comment || '',
       clientName: review.reviewerName,
       clientPhoto: review.reviewerAvatar,
+      serviceName: review.serviceName,
       createdAt: review.createdAt,
     }));
   } catch (err) {

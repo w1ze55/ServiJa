@@ -10,6 +10,7 @@ import com.servija.servija.model.ServiceRequest;
 import com.servija.servija.model.User;
 import com.servija.servija.repository.FreelancerRepository;
 import com.servija.servija.repository.ReviewRepository;
+import com.servija.servija.repository.ServiceRepository;
 import com.servija.servija.repository.ServiceRequestRepository;
 import com.servija.servija.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +32,7 @@ public class ReviewService {
 
     private final ReviewRepository reviewRepository;
     private final ServiceRequestRepository serviceRequestRepository;
+    private final ServiceRepository serviceRepository;
     private final UserRepository userRepository;
     private final FreelancerRepository freelancerRepository;
     private final WebSocketService webSocketService;
@@ -51,22 +53,14 @@ public class ReviewService {
             throw new IllegalStateException("Você já avaliou este serviço");
         }
 
-        User reviewed;
-        Review.ReviewerType reviewerType;
-
         boolean isContractor = serviceRequest.getContractor().getId().equals(reviewer.getId());
-        boolean isFreelancer = serviceRequest.getFreelancer() != null
-                && serviceRequest.getFreelancer().getId().equals(reviewer.getId());
 
-        if (isContractor) {
-            reviewerType = Review.ReviewerType.CONTRACTOR;
-            reviewed = serviceRequest.getFreelancer();
-        } else if (isFreelancer) {
-            reviewerType = Review.ReviewerType.FREELANCER;
-            reviewed = serviceRequest.getContractor();
-        } else {
-            throw new IllegalStateException("Usuário não autorizado a avaliar este serviço");
+        if (!isContractor) {
+            throw new IllegalStateException("Apenas o cliente pode avaliar o freelancer");
         }
+
+        Review.ReviewerType reviewerType = Review.ReviewerType.CONTRACTOR;
+        User reviewed = serviceRequest.getFreelancer();
 
         String tagsString = request.getTags() != null && !request.getTags().isEmpty()
                 ? String.join(",", request.getTags())
@@ -107,6 +101,20 @@ public class ReviewService {
         return reviews.stream().map(this::toResponse).collect(Collectors.toList());
     }
 
+    public List<ReviewResponse> getReviewsByServiceId(Long serviceId) {
+        List<Review> reviews = reviewRepository.findByServiceId(serviceId);
+
+        if (reviews.isEmpty()) {
+            com.servija.servija.model.Service service = serviceRepository.findById(serviceId).orElse(null);
+            if (service != null) {
+                reviews = reviewRepository.findByFreelancerIdAndServiceName(
+                        service.getFreelancer().getId(), service.getTitle());
+            }
+        }
+
+        return reviews.stream().map(this::toResponse).collect(Collectors.toList());
+    }
+
     public boolean canReview(Long serviceRequestId, String userEmail) {
         ServiceRequest serviceRequest = serviceRequestRepository.findById(serviceRequestId)
                 .orElseThrow(() -> new ResourceNotFoundException("Solicitação de serviço não encontrada"));
@@ -118,11 +126,8 @@ public class ReviewService {
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
 
-        boolean isParticipant = serviceRequest.getContractor().getId().equals(user.getId())
-                || (serviceRequest.getFreelancer() != null
-                    && serviceRequest.getFreelancer().getId().equals(user.getId()));
-
-        if (!isParticipant) {
+        boolean isContractor = serviceRequest.getContractor().getId().equals(user.getId());
+        if (!isContractor) {
             return false;
         }
 
@@ -142,29 +147,24 @@ public class ReviewService {
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
 
-        List<ServiceRequest> completedRequests;
-
-        if (user.getUserType() == User.UserType.CONTRACTOR) {
-            completedRequests = serviceRequestRepository.findByContractorIdAndStatus(
-                    user.getId(), ServiceRequest.Status.COMPLETED);
-        } else {
-            completedRequests = serviceRequestRepository.findByFreelancerIdAndStatus(
-                    user.getId(), ServiceRequest.Status.COMPLETED);
+        if (user.getUserType() != User.UserType.CONTRACTOR) {
+            return Collections.emptyList();
         }
+
+        List<ServiceRequest> completedRequests = serviceRequestRepository.findByContractorIdAndStatus(
+                user.getId(), ServiceRequest.Status.COMPLETED);
 
         return completedRequests.stream()
                 .filter(sr -> !reviewRepository.existsByServiceRequestIdAndReviewerId(sr.getId(), user.getId()))
                 .map(sr -> {
-                    boolean isContractor = sr.getContractor().getId().equals(user.getId());
-                    User target = isContractor ? sr.getFreelancer() : sr.getContractor();
-                    String targetType = isContractor ? "FREELANCER" : "CONTRACTOR";
+                    User target = sr.getFreelancer();
 
                     return PendingReviewResponse.builder()
                             .serviceRequestId(sr.getId())
                             .serviceName(sr.getServiceName())
                             .targetName(target != null ? target.getName() : "Usuário")
                             .targetAvatar(target != null ? target.getAvatarUrl() : null)
-                            .targetType(targetType)
+                            .targetType("FREELANCER")
                             .completedAt(sr.getUpdatedAt())
                             .build();
                 })

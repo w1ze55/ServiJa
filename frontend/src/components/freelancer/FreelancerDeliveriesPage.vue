@@ -92,7 +92,6 @@ const handleServiceRequestNotification = (event: Event) => {
       proposalStore.loadProposals();
       break;
     case 'SERVICE_COMPLETED_REVIEW_PENDING':
-      toast.success('Serviço concluído! Avalie o cliente.');
       proposalStore.loadProposals();
       break;
     case 'ADJUSTMENTS_REQUESTED':

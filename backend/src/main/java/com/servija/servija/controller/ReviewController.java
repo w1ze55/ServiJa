@@ -36,6 +36,12 @@ public class ReviewController {
         return ResponseEntity.ok(reviews);
     }
 
+    @GetMapping("/service/{serviceId}")
+    public ResponseEntity<List<ReviewResponse>> getReviewsByService(@PathVariable Long serviceId) {
+        List<ReviewResponse> reviews = reviewService.getReviewsByServiceId(serviceId);
+        return ResponseEntity.ok(reviews);
+    }
+
     @GetMapping("/can-review/{serviceRequestId}")
     public ResponseEntity<Map<String, Boolean>> canReview(
             @PathVariable Long serviceRequestId,

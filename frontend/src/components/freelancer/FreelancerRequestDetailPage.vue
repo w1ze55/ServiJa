@@ -258,10 +258,7 @@ const handleServiceRequestNotification = async (event: any) => {
     }
 
     if (notification.type === 'SERVICE_COMPLETED_REVIEW_PENDING') {
-      toast.success('Serviço concluído! Avalie o cliente.');
-      setTimeout(() => {
-        router.push('/rate-client?requestId=' + notification.serviceRequestId);
-      }, 2000);
+      toast.success('Serviço concluído pelo cliente!');
     }
 
     if (notification.type === 'NEW_REVIEW') {

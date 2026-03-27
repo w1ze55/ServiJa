@@ -144,6 +144,7 @@ public class ServiceRequestService {
         ServiceRequest request = ServiceRequest.builder()
                 .contractor(contractor)
                 .freelancer(freelancer)
+                .service(selectedService)
                 .serviceName(dto.getServiceName())
                 .category(dto.getCategory())
                 .description(normalizedDescription)

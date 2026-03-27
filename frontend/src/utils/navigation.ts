@@ -20,7 +20,6 @@ export const freelancerRoutes: Record<string, string> = {
   'freelancer-kyc': '/freelancer-kyc',
   'freelancer-account-settings': '/freelancer-account-settings',
   'my-account': '/freelancer-profile-settings',
-  'rate-client': '/rate-client',
   'messages': '/messages',
   'notifications': '/notifications',
   'settings': '/settings',
