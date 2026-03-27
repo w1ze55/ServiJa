@@ -34,6 +34,7 @@ import { useServiceRequestWebSocket, type ServiceRequestNotification } from '@/c
 import { formatApiDate } from '@/utils/apiDate';
 import { toast } from '@/utils/toast';
 import { getStatusLabel } from '@/utils/statusTranslations';
+import api from '@/api/config/axios';
 
 interface Props {
   onNavigate: (page: string, params?: any) => void;
@@ -45,6 +46,8 @@ const store = useClientRequestStore();
 const adjustmentStore = useDeliveryAdjustmentStore();
 
 const request = ref<ServiceRequest | null>(null);
+const freelancerRating = ref<number | null>(null);
+const freelancerTotalReviews = ref(0);
 const activeTab = ref('details');
 const newMessage = ref('');
 const isSendingMessage = ref(false);
@@ -82,6 +85,19 @@ const loadAdjustments = async () => {
   await adjustmentStore.getAdjustmentsByServiceRequest(parseInt(props.requestId));
 };
 
+const loadFreelancerRating = async () => {
+  const freelancerId = request.value?.freelancerId;
+  if (!freelancerId) return;
+  try {
+    const response = await api.get(`/freelancer/${freelancerId}/profile`);
+    freelancerRating.value = response.data.rating ?? null;
+    freelancerTotalReviews.value = response.data.totalReviews ?? 0;
+  } catch {
+    freelancerRating.value = null;
+    freelancerTotalReviews.value = 0;
+  }
+};
+
 const getUserEmail = () => {
   const token = localStorage.getItem('token');
   if (!token) return null;
@@ -113,6 +129,7 @@ const handleServiceRequestNotification = async (event: Event) => {
 
 onMounted(async () => {
   await loadData();
+  await loadFreelancerRating();
   await loadAdjustments();
 
   const userEmail = getUserEmail();
@@ -302,16 +319,16 @@ const getStatusColor = (status: string) => {
       <div class="lg:col-span-2 space-y-6">
         <Tabs v-model="activeTab">
           <TabsList class="grid w-full grid-cols-4 bg-white border shadow-sm">
-            <TabsTrigger value="details" class="data-[state=active]:text-blue-600 data-[state=active]:border-b-2 data-[state=active]:border-blue-600">
+            <TabsTrigger value="details">
               Detalhes
             </TabsTrigger>
-            <TabsTrigger value="messages" class="data-[state=active]:text-blue-600 data-[state=active]:border-b-2 data-[state=active]:border-blue-600">
+            <TabsTrigger value="messages">
               Mensagens
             </TabsTrigger>
-            <TabsTrigger value="history" class="data-[state=active]:text-blue-600 data-[state=active]:border-b-2 data-[state=active]:border-blue-600">
+            <TabsTrigger value="history">
               Histórico
             </TabsTrigger>
-            <TabsTrigger value="files" class="data-[state=active]:text-blue-600 data-[state=active]:border-b-2 data-[state=active]:border-blue-600">
+            <TabsTrigger value="files">
               Anexo
             </TabsTrigger>
           </TabsList>
@@ -439,12 +456,13 @@ const getStatusColor = (status: string) => {
               <p class="text-xs text-[#435574] uppercase mb-1 font-semibold tracking-tighter">Avaliação</p>
               <div class="flex items-center justify-center gap-1">
                 <Sparkles class="h-3 w-3 text-amber-500" />
-                <span class="font-bold">5.0</span>
+                <span class="font-bold">{{ freelancerRating != null ? freelancerRating.toFixed(1) : 'N/A' }}</span>
               </div>
+              <p class="text-[10px] text-gray-400">{{ freelancerTotalReviews }} {{ freelancerTotalReviews === 1 ? 'avaliação' : 'avaliações' }}</p>
             </div>
             <div class="text-center">
-              <p class="text-xs text-[#435574] uppercase mb-1 font-semibold tracking-tighter">Visto por último</p>
-              <p class="text-xs font-bold text-gray-400">Hoje</p>
+              <p class="text-xs text-[#435574] uppercase mb-1 font-semibold tracking-tighter">Serviços</p>
+              <p class="text-xs font-bold text-gray-400">{{ freelancerTotalReviews }} concluídos</p>
             </div>
           </div>
 

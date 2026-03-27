@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, type Component } from 'vue';
 import { ArrowLeft, Star, Send, AlertCircle, Sparkles, CheckCircle2 } from 'lucide-vue-next';
 import Button from '../ui/button.vue';
 import Card from '../ui/card.vue';
@@ -13,7 +13,7 @@ import Separator from '../ui/separator.vue';
 export interface RatingTag {
   id: string;
   label: string;
-  icon: string;
+  icon: string | Component;
 }
 
 export interface RatingFormProps {
@@ -175,7 +175,12 @@ defineExpose({ reset });
             :key="tagId"
             variant="secondary"
           >
-            {{ getSelectedTagLabel(tagId)?.icon }}
+            <component
+              :is="getSelectedTagLabel(tagId)?.icon"
+              v-if="getSelectedTagLabel(tagId) && typeof getSelectedTagLabel(tagId)?.icon !== 'string'"
+              class="h-4 w-4"
+            />
+            <span v-else>{{ getSelectedTagLabel(tagId)?.icon }}</span>
             {{ getSelectedTagLabel(tagId)?.label }}
           </Badge>
         </div>
@@ -292,7 +297,12 @@ defineExpose({ reset });
             `"
           >
             <div class="flex items-center gap-2">
-              <span class="text-xl">{{ tag.icon }}</span>
+              <component
+                :is="tag.icon"
+                v-if="typeof tag.icon !== 'string'"
+                class="h-5 w-5 text-[#286AD8]"
+              />
+              <span v-else class="text-xl">{{ tag.icon }}</span>
               <span class="text-sm text-[#263238]">{{ tag.label }}</span>
             </div>
           </button>

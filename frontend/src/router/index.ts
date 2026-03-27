@@ -29,7 +29,6 @@ import MyRequestsPage from "@/pages/MyRequests/index.vue";
 import FavoritesPage from "@/pages/Favorites/index.vue";
 import ContractsPage from "@/pages/Contracts/index.vue";
 import FreelancerKYCPage from "@/pages/FreelancerKYC/index.vue";
-import FreelancerAccountSettingsPage from "@/pages/FreelancerAccountSettings/index.vue";
 import ProviderProfilePage from "@/pages/ProviderProfile/index.vue";
 import ServiceDetailPage from "@/pages/ServiceDetail/index.vue";
 import NotFoundPage from "@/pages/NotFound/index.vue";
@@ -40,7 +39,6 @@ import ClienteProjectsPage from "@/pages/ClienteProjects/index.vue";
 import ClienteDeliveryApprovalPage from "@/pages/ClienteDeliveryApproval/index.vue";
 import ClienteProjectDetailPage from "@/pages/ClienteProjectDetail/index.vue";
 import RateFreelancerPage from "@/pages/RateFreelancer/index.vue";
-import RateClientPage from "@/pages/RateClient/index.vue";
 
 const routes: RouteRecordRaw[] = [
   // ============ ROTAS PÚBLICAS ============
@@ -267,14 +265,6 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, userType: "provider" },
   },
 
-  // Freelancer Account Settings
-  {
-    path: "/freelancer-account-settings",
-    name: "freelancer-account-settings",
-    component: FreelancerAccountSettingsPage,
-    meta: { requiresAuth: true, userType: "provider" },
-  },
-
   // Provider Profile (público)
   {
     path: "/provider-profile/:providerId",
@@ -315,12 +305,6 @@ const routes: RouteRecordRaw[] = [
     name: "rate-freelancer",
     component: RateFreelancerPage,
     meta: { requiresAuth: true, userType: "contractor" },
-  },
-  {
-    path: "/rate-client",
-    name: "rate-client",
-    component: RateClientPage,
-    meta: { requiresAuth: true, userType: "provider" },
   },
 
   // ============ PÁGINA 404 - DEVE SER A ÚLTIMA ROTA ============

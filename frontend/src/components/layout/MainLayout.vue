@@ -42,6 +42,7 @@ import api from "@/api/config/axios";
 import { useUserStore } from "@/stores/userStore";
 import { useNotificationStore } from "@/stores/notificationStore";
 import { useNotificationsRealtime } from "@/composables/useNotificationsRealtime";
+import { useProfileWebSocket } from "@/composables/useProfileWebSocket";
 import PendingReviewBanner from "../shared/PendingReviewBanner.vue";
 import NotificationsDropdown from "@/components/notifications/NotificationsDropdown.vue";
 import type { NotificationStreamEvent } from "@/types/notifications";
@@ -79,23 +80,15 @@ const props = defineProps<Props>();
 // Usar o usuário da store se disponível, caso contrário usar das props
 const currentUser = computed(() => userStore.user || props.user);
 let notificationConnection: ReturnType<typeof useNotificationsRealtime> | null = null;
-
-// Watch para debug
-watch(
-  () => currentUser.value.avatar,
-  (newAvatar, oldAvatar) => {
-    console.log("Avatar changed in MainLayout:", {
-      old: oldAvatar,
-      new: newAvatar,
-    });
-  },
-);
+let profileConnection: ReturnType<typeof useProfileWebSocket> | null = null;
 
 watch(
   () => currentUser.value?.email,
   (email) => {
     notificationConnection?.disconnect();
     notificationConnection = null;
+    profileConnection?.disconnect();
+    profileConnection = null;
 
     if (!email) {
       return;
@@ -104,6 +97,11 @@ watch(
     notificationConnection = useNotificationsRealtime(email);
     notificationConnection.connect().catch((error) => {
       console.error("Erro ao conectar stream de notificações:", error);
+    });
+
+    profileConnection = useProfileWebSocket(email);
+    profileConnection.connect().catch((error) => {
+      console.error("Erro ao conectar stream de perfil:", error);
     });
   },
   { immediate: true },
@@ -236,6 +234,8 @@ onUnmounted(() => {
   window.removeEventListener("notification-stream-event", handleNotificationStreamEvent as EventListener);
   notificationConnection?.disconnect();
   notificationConnection = null;
+  profileConnection?.disconnect();
+  profileConnection = null;
 });
 
 const toggleSidebarPin = () => {

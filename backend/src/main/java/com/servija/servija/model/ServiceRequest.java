@@ -30,6 +30,10 @@ public class ServiceRequest {
     @JoinColumn(name = "freelancer_id")
     private User freelancer;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "service_id")
+    private Service service;
+
     @Column(name = "service_name", nullable = false)
     private String serviceName;
 

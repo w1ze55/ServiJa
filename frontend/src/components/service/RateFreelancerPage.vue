@@ -1,5 +1,15 @@
 <script setup lang="ts">
 import RatingForm from '@/components/shared/RatingForm.vue';
+import {
+  Wrench,
+  Clock3,
+  MessageSquare,
+  Briefcase,
+  Lightbulb,
+  RefreshCw,
+  Search,
+  DollarSign,
+} from 'lucide-vue-next';
 
 interface Props {
   serviceId: string;
@@ -13,14 +23,14 @@ interface Props {
 const props = defineProps<Props>();
 
 const freelancerTags = [
-  { id: 'quality', label: 'Qualidade Técnica', icon: '⚡' },
-  { id: 'punctuality', label: 'Pontualidade', icon: '⏰' },
-  { id: 'communication', label: 'Comunicação', icon: '💬' },
-  { id: 'professionalism', label: 'Profissionalismo', icon: '👔' },
-  { id: 'creativity', label: 'Criatividade', icon: '🎨' },
-  { id: 'flexibility', label: 'Flexibilidade', icon: '🔄' },
-  { id: 'attention', label: 'Atenção aos Detalhes', icon: '🔍' },
-  { id: 'price', label: 'Bom Custo-Benefício', icon: '💰' },
+  { id: 'quality', label: 'Qualidade Técnica', icon: Wrench },
+  { id: 'punctuality', label: 'Pontualidade', icon: Clock3 },
+  { id: 'communication', label: 'Comunicação', icon: MessageSquare },
+  { id: 'professionalism', label: 'Profissionalismo', icon: Briefcase },
+  { id: 'creativity', label: 'Criatividade', icon: Lightbulb },
+  { id: 'flexibility', label: 'Flexibilidade', icon: RefreshCw },
+  { id: 'attention', label: 'Atenção aos Detalhes', icon: Search },
+  { id: 'price', label: 'Bom Custo-Benefício', icon: DollarSign },
 ];
 </script>
 

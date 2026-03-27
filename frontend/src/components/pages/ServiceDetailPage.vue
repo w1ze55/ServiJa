@@ -237,18 +237,17 @@ const loadData = async () => {
 const loadReviews = async () => {
   isLoadingReviews.value = true;
   try {
-    // Busca reviews do freelancer que oferece o serviço
-    const res = await api.get(`/reviews/user/${props.providerId}`);
+    const res = await api.get(`/reviews/service/${props.serviceId}`);
     reviews.value = (res.data || []).map((r: any) => ({
       id: r.id,
       rating: r.rating,
       comment: r.comment,
       clientName: r.reviewerName,
       clientPhoto: r.reviewerAvatar,
+      serviceName: r.serviceName,
       createdAt: r.createdAt,
     }));
   } catch {
-    // Reviews not available - silently fail
     reviews.value = [];
   } finally {
     isLoadingReviews.value = false;

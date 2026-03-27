@@ -1,13 +1,28 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { User, Settings, Shield, FileText, Bell, HelpCircle, LogOut, ChevronRight, MessageSquare, CreditCard } from 'lucide-vue-next';
+import { User, Settings, Shield, FileText, Bell, HelpCircle, LogOut, ChevronRight, MessageSquare, CreditCard, Construction } from 'lucide-vue-next';
 import Card from '@/components/ui/card.vue';
 import MainLayout from '@/components/layout/MainLayout.vue';
 import { useNavigation } from '@/utils/navigation';
+import AlertDialog from '@/components/ui/alert-dialog.vue';
+import AlertDialogAction from '@/components/ui/alert-dialog-action.vue';
+import AlertDialogContent from '@/components/ui/alert-dialog-content.vue';
+import AlertDialogDescription from '@/components/ui/alert-dialog-description.vue';
+import AlertDialogFooter from '@/components/ui/alert-dialog-footer.vue';
+import AlertDialogHeader from '@/components/ui/alert-dialog-header.vue';
+import AlertDialogTitle from '@/components/ui/alert-dialog-title.vue';
 
 const router = useRouter();
 const { navigate, logout } = useNavigation();
+
+const showDevelopmentModal = ref(false);
+const developmentFeatureTitle = ref('');
+
+const openDevelopmentModal = (title: string) => {
+  developmentFeatureTitle.value = title;
+  showDevelopmentModal.value = true;
+};
 
 // Obter usuário do localStorage
 const userString = localStorage.getItem('user');
@@ -35,7 +50,7 @@ const settingsOptions = computed<SettingsOption[]>(() => {
         id: 'notifications',
         icon: Bell,
         title: 'Notificações',
-        description: 'Configure suas preferências de notificações',
+        description: 'Visualize suas notificações',
         onClick: () => router.push('/notifications'),
       },
       {
@@ -43,14 +58,14 @@ const settingsOptions = computed<SettingsOption[]>(() => {
         icon: CreditCard,
         title: 'Formas de Pagamento',
         description: 'Gerencie seus cartões e métodos de pagamento',
-        onClick: () => alert('Em desenvolvimento'),
+        onClick: () => openDevelopmentModal('Formas de Pagamento'),
       },
       {
         id: 'help',
         icon: HelpCircle,
         title: 'Ajuda e Suporte',
         description: 'Central de ajuda e contato',
-        onClick: () => alert('Em desenvolvimento'),
+        onClick: () => openDevelopmentModal('Ajuda e Suporte'),
       },
     ];
   } else {
@@ -58,8 +73,8 @@ const settingsOptions = computed<SettingsOption[]>(() => {
       {
         id: 'profile',
         icon: User,
-        title: 'Perfil Profissional',
-        description: 'Edite sua biografia, serviços e portfólio',
+        title: 'Configurações de Conta',
+        description: 'Gerencie suas informações pessoais',
         onClick: () => router.push('/freelancer-profile-settings'),
       },
       {
@@ -67,28 +82,21 @@ const settingsOptions = computed<SettingsOption[]>(() => {
         icon: Shield,
         title: 'Verificação de Identidade',
         description: 'Gerencie seus documentos KYC',
-        onClick: () => alert('Em desenvolvimento'),
-      },
-      {
-        id: 'account',
-        icon: Settings,
-        title: 'Configurações de Conta',
-        description: 'Senha, 2FA e exclusão de conta',
-        onClick: () => router.push('/freelancer-profile-settings'),
+        onClick: () => openDevelopmentModal('Verificação de Identidade'),
       },
       {
         id: 'notifications',
         icon: Bell,
         title: 'Notificações',
-        description: 'Configure suas preferências de notificações',
-        onClick: () => alert('Em desenvolvimento'),
+        description: 'Visualize suas notificações',
+        onClick: () => router.push('/notifications'),
       },
       {
         id: 'help',
         icon: HelpCircle,
         title: 'Ajuda e Suporte',
         description: 'Central de ajuda e contato',
-        onClick: () => alert('Em desenvolvimento'),
+        onClick: () => openDevelopmentModal('Ajuda e Suporte'),
       },
     ];
   }
@@ -157,6 +165,31 @@ const handleLogout = () => {
         </Card>
       </div>
     </div>
+
+    <!-- Modal de Funcionalidade em Desenvolvimento -->
+    <AlertDialog :open="showDevelopmentModal" @update:open="(val) => showDevelopmentModal = val">
+      <AlertDialogContent class="max-w-md">
+        <AlertDialogHeader>
+          <div class="flex justify-center mb-4">
+            <div class="w-16 h-16 rounded-full bg-amber-100 flex items-center justify-center">
+              <Construction class="w-8 h-8 text-amber-600" />
+            </div>
+          </div>
+          <AlertDialogTitle class="text-center text-xl">
+            {{ developmentFeatureTitle }}
+          </AlertDialogTitle>
+          <AlertDialogDescription class="text-center">
+            Esta funcionalidade ainda está em desenvolvimento e estará disponível em breve.
+            Agradecemos sua paciência!
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter class="sm:justify-center">
+          <AlertDialogAction @click="showDevelopmentModal = false" class="bg-[#286AD8] hover:bg-[#1e5bb8]">
+            Entendi
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   </MainLayout>
 </template>
 

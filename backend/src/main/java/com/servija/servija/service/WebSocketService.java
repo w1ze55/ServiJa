@@ -245,19 +245,10 @@ public class WebSocketService {
         messageContractor.put("message", "Serviço concluído! Avalie o freelancer.");
         messageContractor.put("timestamp", System.currentTimeMillis());
 
-        Map<String, Object> messageFreelancer = new HashMap<>();
-        messageFreelancer.put("type", "SERVICE_COMPLETED_REVIEW_PENDING");
-        messageFreelancer.put("serviceRequestId", serviceRequestId);
-        messageFreelancer.put("serviceName", serviceName);
-        messageFreelancer.put("message", "Serviço concluído! Avalie o cliente.");
-        messageFreelancer.put("timestamp", System.currentTimeMillis());
-
         String destinationContractor = "/topic/service-request/" + contractorEmail;
-        String destinationFreelancer = "/topic/service-request/" + freelancerEmail;
         messagingTemplate.convertAndSend(destinationContractor, (Object) messageContractor);
-        messagingTemplate.convertAndSend(destinationFreelancer, (Object) messageFreelancer);
 
-        log.info("Notificação de avaliação pendente enviada: solicitação {}", serviceRequestId);
+        log.info("Notificação de avaliação pendente enviada para o cliente: solicitação {}", serviceRequestId);
     }
 
     /**
@@ -275,6 +266,21 @@ public class WebSocketService {
         messagingTemplate.convertAndSend(destination, (Object) notification);
         
         log.info("Notificação {} enviada para {}: solicitação {}", eventType, userEmail, serviceRequestId);
+    }
+
+    /**
+     * Notifica sobre atualização de imagem de perfil do usuário.
+     */
+    public void notifyProfileImageUpdate(String userEmail, String avatarUrl) {
+        Map<String, Object> message = new HashMap<>();
+        message.put("type", "PROFILE_IMAGE_UPDATED");
+        message.put("avatarUrl", avatarUrl);
+        message.put("timestamp", System.currentTimeMillis());
+
+        String destination = "/topic/profile-update/" + userEmail;
+        messagingTemplate.convertAndSend(destination, (Object) message);
+
+        log.info("Notificação de atualização de avatar enviada para {}", userEmail);
     }
 
     /**

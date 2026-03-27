@@ -14,8 +14,7 @@ const route = useRoute();
 const reviewStore = useReviewStore();
 
 const isOnRatingPage = computed(() => {
-  const path = route.path;
-  return path === '/rate-freelancer' || path === '/rate-client';
+  return route.path === '/rate-freelancer';
 });
 
 const showBanner = ref(true);
@@ -72,13 +71,9 @@ const checkAndShowModal = () => {
   }
 };
 
-const goToReview = (serviceRequestId: number, targetType: string) => {
+const goToReview = (serviceRequestId: number) => {
   showModal.value = false;
-  if (targetType === 'FREELANCER') {
-    router.push('/rate-freelancer?requestId=' + serviceRequestId);
-  } else {
-    router.push('/rate-client?requestId=' + serviceRequestId);
-  }
+  router.push('/rate-freelancer?requestId=' + serviceRequestId);
 };
 
 const snoozeReminder = () => {
@@ -139,7 +134,7 @@ onUnmounted(() => {
         <Button
           size="sm"
           class="bg-amber-600 hover:bg-amber-700 text-white text-xs"
-          @click="currentPending && goToReview(currentPending.serviceRequestId, currentPending.targetType)"
+          @click="currentPending && goToReview(currentPending.serviceRequestId)"
         >
           Avaliar agora
           <ArrowRight class="h-3 w-3 ml-1" />
@@ -207,7 +202,7 @@ onUnmounted(() => {
             <Button
               class="w-full bg-[#286AD8] hover:bg-[#435574] text-white"
               size="lg"
-              @click="goToReview(currentPending.serviceRequestId, currentPending.targetType)"
+              @click="goToReview(currentPending.serviceRequestId)"
             >
               <Star class="h-4 w-4 mr-2" />
               Avaliar agora
