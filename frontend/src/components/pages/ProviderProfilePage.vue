@@ -62,6 +62,8 @@ import AvatarFallback from '../ui/avatar-fallback.vue';
 import api from '@/api/config/axios';
 import { toast } from '@/utils/toast';
 import { useFavoritesStore } from '@/stores/favorites';
+import { getServicePriceDisplay, type ServicePriceRangeData } from '@/utils/servicePricing';
+import { formatServiceRatingDisplay, hasServiceRating, type ServiceReviewSummary } from '@/utils/serviceReviews';
 
 interface FreelancerData {
   id: number;
@@ -87,15 +89,13 @@ interface FreelancerData {
   };
 }
 
-interface ServiceItem {
+interface ServiceItem extends ServicePriceRangeData, ServiceReviewSummary {
   id: number;
   freelancerId: number;
   freelancerName: string;
   title: string;
   category: string;
   description: string;
-  price: number;
-  priceType: string;
   deliveryTime: number;
   deliveryUnit: string;
   workModel?: string | null;
@@ -380,17 +380,6 @@ const getInitials = (name: string) => {
     .join('')
     .toUpperCase()
     .slice(0, 2);
-};
-
-const formatPrice = (price: number, priceType: string) => {
-  const formatted = new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  }).format(price);
-  const suffix = priceType === 'HOURLY' ? '/hora' : priceType === 'DAILY' ? '/dia' : '';
-  return `${formatted}${suffix}`;
 };
 
 const formatPriceDisplay = (value: number): string => {
@@ -1068,13 +1057,18 @@ onMounted(() => {
                         <h3 class="font-semibold text-[#263238] mb-2 line-clamp-1 group-hover:text-[#286AD8]">
                           {{ service.title }}
                         </h3>
-                        <div v-if="service.workModel" class="mb-3">
-                          <Badge variant="outline" class="bg-white text-[#435574]">
-                            {{ getWorkModelLabel(normalizeWorkModel(service.workModel)) }}
-                          </Badge>
+                        <div class="flex items-center justify-between gap-3 mb-3">
+                          <div>
+                            <Badge v-if="service.workModel" variant="outline" class="bg-white text-[#435574]">
+                              {{ getWorkModelLabel(normalizeWorkModel(service.workModel)) }}
+                            </Badge>
+                          </div>
+                          <div class="flex items-center gap-1.5 text-xs text-[#435574] flex-shrink-0">
+                            <Star :class="`h-3.5 w-3.5 ${hasServiceRating(service) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`" />
+                            <span>{{ formatServiceRatingDisplay(service) }}</span>
+                          </div>
                         </div>
                         <p class="text-sm text-[#435574] mb-3 line-clamp-2">{{ service.description }}</p>
-
                         <!-- Tags -->
                         <div v-if="service.tags && service.tags.length > 0" class="flex flex-wrap gap-1 mb-3">
                           <Badge v-for="tag in service.tags.slice(0, 2)" :key="tag" variant="secondary" class="text-xs">
@@ -1089,7 +1083,7 @@ onMounted(() => {
                         <div class="flex items-center justify-between pt-3 border-t border-gray-100">
                           <div class="flex items-center gap-1 text-[#286AD8]">
                             <DollarSign class="h-4 w-4" />
-                            <span class="font-bold text-sm">{{ formatPrice(service.price, service.priceType) }}</span>
+                            <span class="font-bold text-sm">{{ getServicePriceDisplay(service) }}</span>
                           </div>
                           <div class="flex items-center gap-1 text-[#435574]">
                             <Clock class="h-3.5 w-3.5" />
