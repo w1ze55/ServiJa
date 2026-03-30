@@ -5,8 +5,6 @@ import {
   ArrowLeft,
   Star,
   MapPin,
-  Clock,
-  DollarSign,
   CheckCircle,
   Send,
   Heart,
@@ -35,7 +33,7 @@ import Label from '@/components/ui/label.vue';
 import api from '@/api/config/axios';
 import { toast } from '@/utils/toast';
 import { useFavoritesStore } from '@/stores/favorites';
-import { normalizeWorkModel } from '@/utils/workModel';
+import { getWorkModelLabel, normalizeWorkModel } from '@/utils/workModel';
 import ImageGallery from '@/components/shared/ImageGallery.vue';
 import ReviewList from '@/components/shared/ReviewList.vue';
 import type { ReviewItem } from '@/components/shared/ReviewList.vue';
@@ -51,6 +49,10 @@ interface ServiceItem {
   category: string;
   description: string;
   price: number;
+  completedServicesCount?: number | null;
+  averageCompletedPrice?: number | null;
+  averagePriceMin?: number | null;
+  averagePriceMax?: number | null;
   priceType: string;
   deliveryTime: number;
   deliveryUnit: string;
@@ -142,14 +144,37 @@ function createEmptyAddressErrors(): QuoteAddressErrors {
 }
 
 const formatPrice = (price: number, priceType: string) => {
-  const f = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(price);
-  const suffix = priceType === 'HOURLY' ? '/hora' : priceType === 'DAILY' ? '/dia' : '';
+  const f = formatCurrency(price);
+  const suffix = getPriceTypeSuffix(priceType);
   return `${f}${suffix}`;
 };
 
-const formatDelivery = (time: number, unit: string) => {
-  const unitLabel = unit === 'HOURS' ? 'hora(s)' : unit === 'DAYS' ? 'dia(s)' : 'semana(s)';
-  return `${time} ${unitLabel}`;
+const formatCurrency = (price: number) =>
+  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(price);
+
+const getPriceTypeSuffix = (priceType: string) =>
+  priceType === 'HOURLY' ? '/hora' : priceType === 'DAILY' ? '/dia' : '';
+
+const roundAverageRangeValue = (value: number) => {
+  const normalized = (value + 0.1) / 10;
+  const lowerCandidate = (Math.floor(normalized) * 10) - 0.1;
+  const upperCandidate = (Math.ceil(normalized) * 10) - 0.1;
+
+  if (lowerCandidate <= 0) {
+    return Number(upperCandidate.toFixed(2));
+  }
+
+  const nearestCandidate = Math.abs(value - lowerCandidate) <= Math.abs(upperCandidate - value)
+    ? lowerCandidate
+    : upperCandidate;
+
+  return Number(nearestCandidate.toFixed(2));
+};
+
+const formatAveragePriceRange = (min: number, max: number) => {
+  const roundedMin = roundAverageRangeValue(min);
+  const roundedMax = Math.max(roundAverageRangeValue(max), roundedMin);
+  return `${formatCurrency(roundedMin)} - ${formatCurrency(roundedMax)}`;
 };
 
 const getInitials = (name: string) =>
@@ -187,6 +212,30 @@ const getDeadlineApproximation = (days: string) => {
 const isFavorite = computed(() => favoritesStore.isFavoriteService(props.serviceId));
 const workModel = computed(() => service.value ? normalizeWorkModel(service.value.workModel) : null);
 const serviceRequiresAddress = computed(() => workModel.value === 'PRESENCIAL' || workModel.value === 'HIBRIDO');
+const serviceWorkModelLabel = computed(() => getWorkModelLabel(service.value?.workModel));
+const serviceExperienceLabel = computed(() => {
+  const completedServicesCount = service.value?.completedServicesCount ?? 0;
+
+  if (completedServicesCount <= 0) {
+    return 'Primeiras entregas';
+  }
+
+  return `${completedServicesCount} ${completedServicesCount === 1 ? 'entrega concluída' : 'entregas concluídas'}`;
+});
+const hasAveragePriceRange = computed(() =>
+  Boolean(
+    service.value
+    && (service.value.completedServicesCount ?? 0) > 0
+    && service.value.averagePriceMin != null
+    && service.value.averagePriceMax != null
+  )
+);
+const servicePriceLabel = computed(() => hasAveragePriceRange.value ? 'Valor médio do serviço' : 'Valor aproximado');
+const servicePriceDisplay = computed(() => {
+  if (!service.value) return '';
+  if (!hasAveragePriceRange.value) return formatPrice(service.value.price, service.value.priceType);
+  return formatAveragePriceRange(service.value.averagePriceMin!, service.value.averagePriceMax!);
+});
 const averageRating = computed(() => {
   if (!reviews.value.length) return null;
   return reviews.value.reduce((sum, r) => sum + r.rating, 0) / reviews.value.length;
@@ -505,7 +554,6 @@ onMounted(() => {
                 <Badge class="bg-blue-50 text-[#286AD8] border-none font-semibold uppercase tracking-wide text-[10px]">
                   {{ service.category }}
                 </Badge>
-                <WorkModelBadge v-if="workModel" :work-model="workModel" />
               </div>
               <h1 class="text-2xl sm:text-3xl font-bold text-[#263238] leading-tight">{{ service.title }}</h1>
             </div>
@@ -514,21 +562,21 @@ onMounted(() => {
             <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
               <div class="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm flex items-center gap-3">
                 <div class="p-2.5 bg-blue-50 rounded-xl text-[#286AD8]">
-                  <DollarSign class="h-5 w-5" />
+                  <CheckCircle class="h-5 w-5" />
                 </div>
                 <div>
-                  <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Investimento</p>
-                  <p class="text-lg font-black text-[#263238]">{{ formatPrice(service.price, service.priceType) }}</p>
+                  <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Experiência neste serviço</p>
+                  <p class="text-base font-bold leading-tight text-[#263238]">{{ serviceExperienceLabel }}</p>
                 </div>
               </div>
 
               <div class="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm flex items-center gap-3">
                 <div class="p-2.5 bg-green-50 rounded-xl text-green-600">
-                  <Clock class="h-5 w-5" />
+                  <Briefcase class="h-5 w-5" />
                 </div>
                 <div>
-                  <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Prazo</p>
-                  <p class="text-base font-bold text-[#263238]">{{ formatDelivery(service.deliveryTime, service.deliveryUnit) }}</p>
+                  <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Modalidade</p>
+                  <p class="text-base font-bold text-[#263238]">{{ serviceWorkModelLabel }}</p>
                 </div>
               </div>
 
@@ -594,9 +642,12 @@ onMounted(() => {
 
               <!-- Price CTA card -->
               <Card class="p-6 border-2 border-[#286AD8]/20">
-                <div class="mb-5">
-                  <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Valor aproximado</p>
-                  <p class="text-3xl font-black text-[#263238]">{{ formatPrice(service.price, service.priceType) }}</p>
+                <div class="mb-1">
+                  <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">{{ servicePriceLabel }}</p>
+                  <p class="text-3xl font-black leading-tight text-[#263238]">{{ servicePriceDisplay }}</p>
+                  <p v-if="hasAveragePriceRange" class="mt-2 text-xs text-[#435574]">
+                    Faixa calculada com base nos serviços concluídos.
+                  </p>
                 </div>
                 <Button
                   @click="handleRequestService"
