@@ -97,8 +97,8 @@ const cardData = ref({
   cvv: '',
 });
 
-const platformFee = computed(() => props.proposal.price * 0.1);
-const totalAmount = computed(() => props.proposal.price + platformFee.value);
+const platformFee = computed(() => 0); // Cliente não paga taxa - desconto é do freelancer
+const totalAmount = computed(() => props.proposal.price);
 
 const formatCardNumber = (value: string) => {
   const cleaned = value.replace(/\s/g, '');
@@ -1063,10 +1063,6 @@ const onLeave = (el: Element, done: () => void) => {
             <div class="flex justify-between text-[#435574]">
               <span>Valor do serviço</span>
               <span>R$ {{ proposal.price.toFixed(2) }}</span>
-            </div>
-            <div class="flex justify-between text-[#435574]">
-              <span>Taxa da plataforma (10%)</span>
-              <span>R$ {{ platformFee.toFixed(2) }}</span>
             </div>
           </div>
 

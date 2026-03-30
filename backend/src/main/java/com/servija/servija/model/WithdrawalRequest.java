@@ -41,6 +41,15 @@ public class WithdrawalRequest {
     @Column(name = "pix_key_type", length = 50)
     private String pixKeyType; // CPF, CNPJ, EMAIL, PHONE, RANDOM
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "withdrawal_method", nullable = false, length = 20)
+    @Builder.Default
+    private WithdrawalMethod withdrawalMethod = WithdrawalMethod.PIX;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "bank_account_id")
+    private FreelancerBankAccount bankAccount;
+
     @Column(name = "asaas_transfer_id", length = 255)
     private String asaasTransferId;
 
@@ -63,5 +72,9 @@ public class WithdrawalRequest {
 
     public enum WithdrawalStatus {
         PENDING, PROCESSING, COMPLETED, FAILED, CANCELLED
+    }
+
+    public enum WithdrawalMethod {
+        PIX, TED
     }
 }

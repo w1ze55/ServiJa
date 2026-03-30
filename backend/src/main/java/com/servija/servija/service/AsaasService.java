@@ -392,12 +392,75 @@ public class AsaasService {
             if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
                 JsonNode jsonNode = objectMapper.readTree(response.getBody());
                 return jsonNode.get("status").asText();
-            }
+        }
 
             throw new RuntimeException("Erro ao consultar status da transferência");
         } catch (Exception e) {
             log.error("Erro ao consultar status da transferência", e);
             throw new RuntimeException("Erro ao consultar transferência: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Cria transferência TED para conta bancária
+     */
+    public Map<String, Object> createTedTransfer(
+            BigDecimal value,
+            String bankCode,
+            String agency,
+            String accountNumber,
+            String accountDigit,
+            String accountType,
+            String holderName,
+            String holderCpfCnpj,
+            String description) {
+        try {
+            HttpHeaders headers = createHeaders();
+
+            Map<String, Object> bankAccount = new HashMap<>();
+            bankAccount.put("bank", Map.of("code", bankCode));
+            bankAccount.put("accountName", holderName);
+            bankAccount.put("ownerName", holderName);
+            bankAccount.put("cpfCnpj", holderCpfCnpj);
+            bankAccount.put("agency", agency);
+            bankAccount.put("account", accountNumber);
+            bankAccount.put("accountDigit", accountDigit);
+            bankAccount.put("bankAccountType",
+                    "CONTA_POUPANCA".equals(accountType) ? "CONTA_POUPANCA" : "CONTA_CORRENTE");
+
+            Map<String, Object> transferData = new HashMap<>();
+            transferData.put("value", value);
+            transferData.put("bankAccount", bankAccount);
+            transferData.put("operationType", "TED");
+
+            if (description != null && !description.isEmpty()) {
+                transferData.put("description", description);
+            }
+
+            HttpEntity<Map<String, Object>> request = new HttpEntity<>(transferData, headers);
+
+            ResponseEntity<String> response = restTemplate.exchange(
+                    asaasApiUrl + "/v3/transfers",
+                    HttpMethod.POST,
+                    request,
+                    String.class);
+
+            if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
+                JsonNode jsonNode = objectMapper.readTree(response.getBody());
+
+                Map<String, Object> result = new HashMap<>();
+                result.put("id", jsonNode.get("id").asText());
+                result.put("status", jsonNode.get("status").asText());
+                result.put("value", jsonNode.get("value").asDouble());
+
+                log.info("Transferência TED criada no Asaas: {}", result.get("id"));
+                return result;
+            }
+
+            throw new RuntimeException("Erro ao criar transferência TED");
+        } catch (Exception e) {
+            log.error("Erro ao criar transferência TED no Asaas", e);
+            throw new RuntimeException("Erro ao processar transferência TED: " + e.getMessage());
         }
     }
 }

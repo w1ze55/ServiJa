@@ -39,7 +39,7 @@ public class PaymentService {
     private final WebSocketService webSocketService;
     private final NotificationService notificationService;
 
-    private static final BigDecimal PLATFORM_FEE_PERCENTAGE = new BigDecimal("0.10"); // 10%
+    private static final BigDecimal PLATFORM_FEE_PERCENTAGE = new BigDecimal("0.05"); // 5%
     private static final BigDecimal ASAAS_PIX_FEE = new BigDecimal("0.99"); // Taxa Asaas para PIX (promocional)
     private static final BigDecimal ASAAS_BOLETO_FEE = new BigDecimal("0.99"); // Taxa Asaas para Boleto (promocional)
     private static final BigDecimal ASAAS_CREDIT_CARD_FIXED_FEE = new BigDecimal("0.49"); // Taxa fixa cartão
@@ -69,9 +69,18 @@ public class PaymentService {
             throw new IllegalStateException("Já existe um pagamento para esta solicitação");
         }
 
-        BigDecimal amount = request.getAmount(); // Valor que o CLIENTE paga
+        BigDecimal agreedAmount = request.getAmount(); // Valor acordado entre cliente e freelancer
 
-        // Calcular taxa do gateway baseado no método de pagamento
+        // NOVA REGRA: Cliente paga 100% do valor acordado
+        BigDecimal totalAmount = agreedAmount;
+
+        // Taxa da plataforma (5% do valor acordado) - descontada do freelancer
+        BigDecimal platformFee = agreedAmount.multiply(PLATFORM_FEE_PERCENTAGE);
+
+        // Valor que o freelancer receberá (95% do valor acordado)
+        BigDecimal freelancerAmount = agreedAmount.subtract(platformFee);
+
+        // Calcular taxa do gateway (custo interno da plataforma, não repassado)
         BigDecimal gatewayFee = BigDecimal.ZERO;
         switch (request.getPaymentMethod().toLowerCase()) {
             case "pix":
@@ -82,21 +91,9 @@ public class PaymentService {
                 break;
             case "credit-card":
                 gatewayFee = ASAAS_CREDIT_CARD_FIXED_FEE
-                        .add(amount.multiply(ASAAS_CREDIT_CARD_PERCENTAGE));
+                        .add(agreedAmount.multiply(ASAAS_CREDIT_CARD_PERCENTAGE));
                 break;
         }
-
-        // Valor líquido após deduzir taxa do gateway
-        BigDecimal netAmount = amount.subtract(gatewayFee);
-
-        // Taxa da plataforma (10% do valor líquido)
-        BigDecimal platformFee = netAmount.multiply(PLATFORM_FEE_PERCENTAGE);
-
-        // Valor que o freelancer receberá (após todas as deduções)
-        BigDecimal freelancerAmount = netAmount.subtract(platformFee);
-
-        // totalAmount é o que o cliente paga (não muda)
-        BigDecimal totalAmount = amount;
 
         // Obter CPF do contratante (usar CPF do request se fornecido, senão usar do
         // perfil)

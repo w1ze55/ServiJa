@@ -1,60 +1,39 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import {
   Wallet,
   DollarSign,
-  ArrowUpRight,
-  ArrowDownLeft,
   Clock,
+  TrendingUp,
+  ArrowDownToLine,
+  ArrowUpFromLine,
+  Plus,
+  Trash2,
+  Download,
+  Star,
+  CreditCard,
+  Building2,
+  QrCode,
   CheckCircle,
   XCircle,
-  CreditCard,
-  Building,
-  Plus,
-  Eye,
-  EyeOff,
-  Download,
-  Filter,
+  AlertCircle,
+  Loader2,
+  ChevronDown,
+  X,
 } from 'lucide-vue-next';
+import Card from '../ui/card.vue';
+import Badge from '../ui/badge.vue';
 import Button from '../ui/button.vue';
 import Input from '../ui/input.vue';
 import Label from '../ui/label.vue';
-import Card from '../ui/card.vue';
-import Badge from '../ui/badge.vue';
-import Dialog from '../ui/dialog.vue';
-import DialogContent from '../ui/dialog-content.vue';
-import DialogDescription from '../ui/dialog-description.vue';
-import DialogFooter from '../ui/dialog-footer.vue';
-import DialogHeader from '../ui/dialog-header.vue';
-import DialogTitle from '../ui/dialog-title.vue';
-import Select from '../ui/select.vue';
-import SelectContent from '../ui/select-content.vue';
-import SelectItem from '../ui/select-item.vue';
-import SelectTrigger from '../ui/select-trigger.vue';
-import SelectValue from '../ui/select-value.vue';
-import { toast } from '../../utils/toast';
-
-interface BankAccount {
-  id: string;
-  bankName: string;
-  accountType: 'checking' | 'savings';
-  accountNumber: string;
-  agency: string;
-  holderName: string;
-  holderDocument: string;
-  isDefault: boolean;
-}
-
-interface Transaction {
-  id: string;
-  type: 'withdrawal' | 'earning' | 'refund';
-  amount: number;
-  status: 'pending' | 'processing' | 'completed' | 'failed';
-  description: string;
-  date: string;
-  bankAccount?: string;
-  serviceName?: string;
-}
+import Separator from '../ui/separator.vue';
+import { toast } from '@/utils/toast';
+import walletService, {
+  type WalletBalance,
+  type WalletTransaction,
+  type BankAccount,
+  type CreateBankAccountRequest,
+} from '@/api/services/walletService';
 
 interface Props {
   onNavigate: (page: string, params?: any) => void;
@@ -62,658 +41,683 @@ interface Props {
 
 const props = defineProps<Props>();
 
-const showWithdrawalDialog = ref(false);
-const showBankAccountDialog = ref(false);
-const showBalance = ref(true);
-const withdrawalAmount = ref('');
-const selectedBankAccount = ref('');
-const filterStatus = ref('all');
-const currentPage = ref(1);
-const itemsPerPage = 10;
+// State
+const loading = ref(true);
+const wallet = ref<WalletBalance | null>(null);
+const transactions = ref<WalletTransaction[]>([]);
+const bankAccounts = ref<BankAccount[]>([]);
+const transactionFilter = ref<'ALL' | 'EARNING' | 'WITHDRAWAL'>('ALL');
 
-// Bank account form
-const bankForm = ref({
-  bankName: '',
-  accountType: 'checking' as 'checking' | 'savings',
-  accountNumber: '',
-  agency: '',
-  holderName: '',
-  holderDocument: '',
-});
+// Modals
+const showWithdrawModal = ref(false);
+const showAddAccountModal = ref(false);
+const isProcessing = ref(false);
 
-// Mock data
-const balance = ref({
-  available: 3250.5,
-  pending: 1500.0,
-  total: 4750.5,
-});
+// Withdraw form
+const withdrawAmount = ref('');
+const withdrawPixKey = ref('');
+const withdrawPixKeyType = ref('CPF');
 
-const bankAccounts = ref<BankAccount[]>([
-  {
-    id: '1',
-    bankName: 'Banco do Brasil',
-    accountType: 'checking',
-    accountNumber: '****5678',
-    agency: '1234',
-    holderName: 'João Silva',
-    holderDocument: '***.***.***-**',
-    isDefault: true,
-  },
-]);
+// Add account form
+const newAccountType = ref<'PIX_KEY' | 'BANK_ACCOUNT'>('PIX_KEY');
+const newPixKey = ref('');
+const newPixKeyType = ref('CPF');
+const newBankName = ref('');
+const newBankCode = ref('');
+const newAgency = ref('');
+const newAccountNumber = ref('');
+const newAccountDigit = ref('');
+const newAccountBankType = ref('CONTA_CORRENTE');
+const newHolderName = ref('');
+const newHolderCpfCnpj = ref('');
 
-const transactions = ref<Transaction[]>([
-  {
-    id: '1',
-    type: 'earning',
-    amount: 2500,
-    status: 'completed',
-    description: 'Pagamento recebido',
-    date: '2026-11-10 14:30',
-    serviceName: 'Instalação Elétrica Residencial',
-  },
-  {
-    id: '2',
-    type: 'withdrawal',
-    amount: 1500,
-    status: 'completed',
-    description: 'Saque realizado',
-    date: '2026-11-08 10:15',
-    bankAccount: 'Banco do Brasil - Ag. 1234',
-  },
-  {
-    id: '3',
-    type: 'earning',
-    amount: 800,
-    status: 'completed',
-    description: 'Pagamento recebido',
-    date: '2026-11-05 16:45',
-    serviceName: 'Manutenção Preventiva',
-  },
-  {
-    id: '4',
-    type: 'withdrawal',
-    amount: 1000,
-    status: 'processing',
-    description: 'Saque em processamento',
-    date: '2026-11-11 09:00',
-    bankAccount: 'Banco do Brasil - Ag. 1234',
-  },
-  {
-    id: '5',
-    type: 'earning',
-    amount: 1500,
-    status: 'pending',
-    description: 'Aguardando liberação',
-    date: '2026-11-09 11:20',
-    serviceName: 'Automação Residencial',
-  },
-  {
-    id: '6',
-    type: 'withdrawal',
-    amount: 500,
-    status: 'failed',
-    description: 'Saque falhou - dados bancários incorretos',
-    date: '2026-11-03 15:10',
-    bankAccount: 'Banco do Brasil - Ag. 1234',
-  },
-]);
-
-// Filter transactions
+// Computed
 const filteredTransactions = computed(() => {
-  if (filterStatus.value === 'all') {
-    return transactions.value;
-  }
-  return transactions.value.filter((t) => t.status === filterStatus.value);
+  if (transactionFilter.value === 'ALL') return transactions.value;
+  return transactions.value.filter((t) => t.type === transactionFilter.value);
 });
 
-// Pagination
-const totalPages = computed(() => Math.ceil(filteredTransactions.value.length / itemsPerPage));
-const startIndex = computed(() => (currentPage.value - 1) * itemsPerPage);
-const currentTransactions = computed(() =>
-  filteredTransactions.value.slice(startIndex.value, startIndex.value + itemsPerPage)
-);
+const totalBalance = computed(() => {
+  if (!wallet.value) return 0;
+  return wallet.value.availableBalance + wallet.value.pendingBalance;
+});
 
+const maxWithdrawAmount = computed(() => wallet.value?.availableBalance ?? 0);
+
+// Methods
 const formatCurrency = (value: number) => {
-  return new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
-  }).format(value);
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 };
 
-const maskDocument = (doc: string) => {
-  return doc.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '***.$2.***-**');
+const formatDate = (dateStr: string) => {
+  return new Date(dateStr).toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 };
 
-const maskAccount = (account: string) => {
-  return account.replace(/\d(?=\d{4})/g, '*');
+const getStatusBadge = (status: string) => {
+  const map: Record<string, { label: string; class: string }> = {
+    COMPLETED: { label: 'Concluído', class: 'bg-green-100 text-green-700' },
+    PENDING: { label: 'Pendente', class: 'bg-yellow-100 text-yellow-700' },
+    PROCESSING: { label: 'Processando', class: 'bg-blue-100 text-blue-700' },
+    FAILED: { label: 'Falhou', class: 'bg-red-100 text-red-700' },
+    CANCELLED: { label: 'Cancelado', class: 'bg-gray-100 text-gray-700' },
+  };
+  return map[status] || { label: status, class: 'bg-gray-100 text-gray-700' };
 };
 
-const handleWithdrawal = () => {
-  const amount = parseFloat(withdrawalAmount.value);
-
-  if (!amount || amount <= 0) {
-    toast.error('Digite um valor válido');
-    return;
+const loadData = async () => {
+  loading.value = true;
+  try {
+    const [walletData, txData, accountsData] = await Promise.all([
+      walletService.getWallet(),
+      walletService.getTransactions('ALL'),
+      walletService.getBankAccounts(),
+    ]);
+    wallet.value = walletData;
+    transactions.value = txData;
+    bankAccounts.value = accountsData;
+  } catch (error: any) {
+    console.error('Erro ao carregar dados da carteira:', error);
+    toast.error('Erro ao carregar dados da carteira');
+  } finally {
+    loading.value = false;
   }
-
-  if (amount > balance.value.available) {
-    toast.error('Saldo insuficiente para saque');
-    return;
-  }
-
-  if (!selectedBankAccount.value) {
-    toast.error('Selecione uma conta bancária');
-    return;
-  }
-
-  toast.success('Solicitação de saque enviada! O valor será transferido em até 2 dias úteis.');
-  showWithdrawalDialog.value = false;
-  withdrawalAmount.value = '';
 };
 
-const handleAddBankAccount = () => {
-  if (
-    !bankForm.value.bankName ||
-    !bankForm.value.accountNumber ||
-    !bankForm.value.agency ||
-    !bankForm.value.holderName ||
-    !bankForm.value.holderDocument
-  ) {
-    toast.error('Preencha todos os campos obrigatórios');
+const handleWithdraw = async () => {
+  const amount = parseFloat(withdrawAmount.value);
+  if (isNaN(amount) || amount <= 0) {
+    toast.error('Informe um valor válido');
+    return;
+  }
+  if (amount > maxWithdrawAmount.value) {
+    toast.error('Valor excede o saldo disponível');
+    return;
+  }
+  if (!withdrawPixKey.value.trim()) {
+    toast.error('Informe a chave PIX');
     return;
   }
 
-  // Validate CPF/CNPJ (simplified)
-  if (
-    bankForm.value.holderDocument.replace(/\D/g, '').length !== 11 &&
-    bankForm.value.holderDocument.replace(/\D/g, '').length !== 14
-  ) {
-    toast.error('CPF/CNPJ inválido');
+  isProcessing.value = true;
+  try {
+    await walletService.requestWithdrawal({
+      amount,
+      pixKey: withdrawPixKey.value,
+      pixKeyType: withdrawPixKeyType.value,
+    });
+    toast.success('Saque solicitado com sucesso!');
+    showWithdrawModal.value = false;
+    withdrawAmount.value = '';
+    withdrawPixKey.value = '';
+    await loadData();
+  } catch (error: any) {
+    toast.error(error.response?.data?.message || 'Erro ao solicitar saque');
+  } finally {
+    isProcessing.value = false;
+  }
+};
+
+const handleAddAccount = async () => {
+  if (!newHolderName.value.trim() || !newHolderCpfCnpj.value.trim()) {
+    toast.error('Preencha nome e CPF/CNPJ do titular');
     return;
   }
 
-  const newAccount: BankAccount = {
-    id: Date.now().toString(),
-    ...bankForm.value,
-    accountNumber: maskAccount(bankForm.value.accountNumber),
-    holderDocument: maskDocument(bankForm.value.holderDocument),
+  const data: CreateBankAccountRequest = {
+    accountType: newAccountType.value,
+    holderName: newHolderName.value,
+    holderCpfCnpj: newHolderCpfCnpj.value.replace(/\D/g, ''),
     isDefault: bankAccounts.value.length === 0,
   };
 
-  bankAccounts.value = [...bankAccounts.value, newAccount];
-  toast.success('Conta bancária cadastrada com sucesso!');
-  showBankAccountDialog.value = false;
-  bankForm.value = {
-    bankName: '',
-    accountType: 'checking',
-    accountNumber: '',
-    agency: '',
-    holderName: '',
-    holderDocument: '',
-  };
-};
-
-const getTransactionIcon = (type: Transaction['type']) => {
-  switch (type) {
-    case 'earning':
-      return { component: ArrowDownLeft, class: 'h-5 w-5 text-green-600' };
-    case 'withdrawal':
-      return { component: ArrowUpRight, class: 'h-5 w-5 text-blue-600' };
-    case 'refund':
-      return { component: ArrowDownLeft, class: 'h-5 w-5 text-yellow-600' };
-  }
-};
-
-const handleRequestWithdrawal = () => {
-  if (bankAccounts.value.length === 0) {
-    toast.error('Cadastre uma conta bancária primeiro');
-    showBankAccountDialog.value = true;
+  if (newAccountType.value === 'PIX_KEY') {
+    if (!newPixKey.value.trim()) {
+      toast.error('Informe a chave PIX');
+      return;
+    }
+    data.pixKey = newPixKey.value;
+    data.pixKeyType = newPixKeyType.value;
   } else {
-    showWithdrawalDialog.value = true;
+    if (!newBankCode.value || !newAgency.value || !newAccountNumber.value) {
+      toast.error('Preencha todos os dados bancários');
+      return;
+    }
+    data.bankName = newBankName.value;
+    data.bankCode = newBankCode.value;
+    data.agency = newAgency.value;
+    data.accountNumber = newAccountNumber.value;
+    data.accountDigit = newAccountDigit.value;
+    data.accountBankType = newAccountBankType.value;
+  }
+
+  isProcessing.value = true;
+  try {
+    await walletService.addBankAccount(data);
+    toast.success('Conta cadastrada com sucesso!');
+    showAddAccountModal.value = false;
+    resetAccountForm();
+    await loadData();
+  } catch (error: any) {
+    toast.error(error.response?.data?.message || 'Erro ao cadastrar conta');
+  } finally {
+    isProcessing.value = false;
   }
 };
+
+const handleDeleteAccount = async (id: number) => {
+  try {
+    await walletService.deleteBankAccount(id);
+    toast.success('Conta removida');
+    await loadData();
+  } catch (error: any) {
+    toast.error('Erro ao remover conta');
+  }
+};
+
+const handleSetDefault = async (id: number) => {
+  try {
+    await walletService.setDefaultAccount(id);
+    toast.success('Conta definida como padrão');
+    await loadData();
+  } catch (error: any) {
+    toast.error('Erro ao definir padrão');
+  }
+};
+
+const handleDownloadReport = async () => {
+  try {
+    await walletService.downloadReport();
+    toast.success('Relatório baixado com sucesso');
+  } catch (error: any) {
+    toast.error('Erro ao gerar relatório');
+  }
+};
+
+const resetAccountForm = () => {
+  newAccountType.value = 'PIX_KEY';
+  newPixKey.value = '';
+  newPixKeyType.value = 'CPF';
+  newBankName.value = '';
+  newBankCode.value = '';
+  newAgency.value = '';
+  newAccountNumber.value = '';
+  newAccountDigit.value = '';
+  newHolderName.value = '';
+  newHolderCpfCnpj.value = '';
+};
+
+const useAccountForWithdraw = (account: BankAccount) => {
+  if (account.accountType === 'PIX_KEY' && account.pixKey) {
+    withdrawPixKey.value = account.pixKey;
+    withdrawPixKeyType.value = account.pixKeyType || 'CPF';
+  }
+  showWithdrawModal.value = true;
+};
+
+onMounted(loadData);
 </script>
 
 <template>
-  <div class="max-w-6xl mx-auto space-y-6">
-    <!-- Header -->
-    <div class="flex items-start justify-between">
-      <div>
-        <h1 class="text-[#263238] mb-2">Carteira & Saques</h1>
-        <p class="text-[#435574]">Gerencie seus ganhos e solicite saques</p>
-      </div>
-      <Button @click="handleRequestWithdrawal" variant="default">
-        <ArrowUpRight class="h-4 w-4 mr-2" />
-        Solicitar Saque
-      </Button>
+  <div class="max-w-7xl mx-auto space-y-6">
+    <!-- Loading State -->
+    <div v-if="loading" class="flex items-center justify-center py-20">
+      <Loader2 class="h-8 w-8 animate-spin text-[#286AD8]" />
     </div>
 
-    <!-- Balance Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-      <Card class="p-6 bg-gradient-to-br from-[#286AD8] to-[#435574] text-white">
-        <div class="flex items-start justify-between mb-4">
-          <div>
-            <p class="text-white/80 text-sm mb-1">Saldo Total</p>
-            <div class="flex items-center gap-2">
-              <h2 v-if="showBalance" class="text-white">{{ formatCurrency(balance.total) }}</h2>
-              <h2 v-else class="text-white">••••••</h2>
-              <button
-                @click="showBalance = !showBalance"
-                class="text-white/80 hover:text-white"
-              >
-                <EyeOff v-if="showBalance" class="h-5 w-5" />
-                <Eye v-else class="h-5 w-5" />
-              </button>
+    <template v-else>
+      <!-- Header -->
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 class="text-[#263238] flex items-center gap-3">
+            <div class="w-10 h-10 rounded-full bg-gradient-to-br from-[#286AD8] to-[#1a4fa0] flex items-center justify-center">
+              <Wallet class="h-5 w-5 text-white" />
             </div>
-          </div>
-          <div class="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center">
-            <Wallet class="h-6 w-6 text-white" />
-          </div>
+            Carteira &amp; Saques
+          </h1>
+          <p class="text-[#435574] mt-1">Gerencie seus ganhos, contas e saques</p>
         </div>
-      </Card>
-
-      <Card class="p-6">
-        <div class="flex items-start justify-between">
-          <div>
-            <p class="text-[#435574] text-sm mb-1">Disponível para Saque</p>
-            <h3 class="text-[#263238]">
-              {{ showBalance ? formatCurrency(balance.available) : '••••••' }}
-            </h3>
-          </div>
-          <div class="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
-            <DollarSign class="h-5 w-5 text-green-600" />
-          </div>
+        <div class="flex gap-3">
+          <Button @click="handleDownloadReport" variant="outline" size="sm">
+            <Download class="h-4 w-4 mr-2" />
+            Exportar Relatório
+          </Button>
+          <Button @click="showWithdrawModal = true" size="sm">
+            <ArrowDownToLine class="h-4 w-4 mr-2" />
+            Solicitar Saque
+          </Button>
         </div>
-      </Card>
-
-      <Card class="p-6">
-        <div class="flex items-start justify-between">
-          <div>
-            <p class="text-[#435574] text-sm mb-1">Pendente de Liberação</p>
-            <h3 class="text-[#263238]">
-              {{ showBalance ? formatCurrency(balance.pending) : '••••••' }}
-            </h3>
-          </div>
-          <div class="w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center">
-            <Clock class="h-5 w-5 text-yellow-600" />
-          </div>
-        </div>
-      </Card>
-    </div>
-
-    <!-- Bank Accounts -->
-    <Card class="p-6">
-      <div class="flex items-center justify-between mb-4">
-        <h3 class="text-[#263238]">Contas Bancárias</h3>
-        <Button
-          @click="showBankAccountDialog = true"
-          variant="outline"
-          size="sm"
-        >
-          <Plus class="h-4 w-4 mr-2" />
-          Adicionar Conta
-        </Button>
       </div>
 
-      <div v-if="bankAccounts.length === 0" class="text-center py-8">
-        <Building class="h-12 w-12 text-gray-400 mx-auto mb-4" />
-        <p class="text-[#435574] mb-4">Nenhuma conta bancária cadastrada</p>
-        <Button
-          @click="showBankAccountDialog = true"
-          variant="default"
-        >
-          Cadastrar Conta Bancária
-        </Button>
-      </div>
-      <div v-else class="space-y-3">
-        <div
-          v-for="account in bankAccounts"
-          :key="account.id"
-          class="flex items-center justify-between p-4 border rounded-lg"
-        >
-          <div class="flex items-center gap-4">
-            <div class="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
-              <Building class="h-6 w-6 text-[#286AD8]" />
+      <!-- Balance Cards -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <!-- Total Balance -->
+        <Card class="p-6 bg-gradient-to-br from-[#286AD8] to-[#1a4fa0] text-white border-0">
+          <div class="flex items-start justify-between mb-3">
+            <div class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
+              <DollarSign class="h-5 w-5 text-white" />
             </div>
-            <div>
+            <TrendingUp class="h-5 w-5 text-white/60" />
+          </div>
+          <p class="text-white/80 text-sm mb-1">Saldo Total</p>
+          <p class="text-3xl font-bold">{{ formatCurrency(totalBalance) }}</p>
+          <p class="text-white/60 text-xs mt-2">
+            Total ganho: {{ formatCurrency(wallet?.totalEarned ?? 0) }}
+          </p>
+        </Card>
+
+        <!-- Available -->
+        <Card class="p-6">
+          <div class="flex items-start justify-between mb-3">
+            <div class="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
+              <CheckCircle class="h-5 w-5 text-green-600" />
+            </div>
+          </div>
+          <p class="text-[#435574] text-sm mb-1">Disponível para Saque</p>
+          <p class="text-2xl text-[#263238] font-bold">
+            {{ formatCurrency(wallet?.availableBalance ?? 0) }}
+          </p>
+          <p class="text-[#435574] text-xs mt-2">
+            Total sacado: {{ formatCurrency(wallet?.totalWithdrawn ?? 0) }}
+          </p>
+        </Card>
+
+        <!-- Pending -->
+        <Card class="p-6">
+          <div class="flex items-start justify-between mb-3">
+            <div class="w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center">
+              <Clock class="h-5 w-5 text-yellow-600" />
+            </div>
+          </div>
+          <p class="text-[#435574] text-sm mb-1">Pendente de Liberação</p>
+          <p class="text-2xl text-[#263238] font-bold">
+            {{ formatCurrency(wallet?.pendingBalance ?? 0) }}
+          </p>
+          <p class="text-[#435574] text-xs mt-2">Serviços aguardando aprovação do cliente</p>
+        </Card>
+      </div>
+
+      <!-- Bank Accounts Section -->
+      <Card class="p-6">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h3 class="text-[#263238]">Contas &amp; Chaves PIX</h3>
+            <p class="text-sm text-[#435574]">Gerencie suas contas para recebimento</p>
+          </div>
+          <Button @click="showAddAccountModal = true" variant="outline" size="sm">
+            <Plus class="h-4 w-4 mr-2" />
+            Adicionar
+          </Button>
+        </div>
+
+        <div v-if="bankAccounts.length === 0" class="text-center py-8 text-[#435574]">
+          <Building2 class="h-10 w-10 mx-auto mb-3 opacity-40" />
+          <p class="text-sm">Nenhuma conta cadastrada</p>
+          <p class="text-xs mt-1">Cadastre uma conta para solicitar saques</p>
+        </div>
+
+        <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div
+            v-for="account in bankAccounts"
+            :key="account.id"
+            :class="`p-4 rounded-lg border-2 transition-colors ${
+              account.isDefault
+                ? 'border-[#286AD8] bg-blue-50/50'
+                : 'border-gray-200 hover:border-gray-300'
+            }`"
+          >
+            <div class="flex items-start justify-between mb-2">
               <div class="flex items-center gap-2">
-                <h4 class="text-[#263238]">{{ account.bankName }}</h4>
-                <Badge v-if="account.isDefault" variant="secondary" class="text-xs">
+                <div :class="`w-8 h-8 rounded-full flex items-center justify-center ${
+                  account.accountType === 'PIX_KEY' ? 'bg-green-100' : 'bg-blue-100'
+                }`">
+                  <QrCode v-if="account.accountType === 'PIX_KEY'" class="h-4 w-4 text-green-600" />
+                  <Building2 v-else class="h-4 w-4 text-[#286AD8]" />
+                </div>
+                <div>
+                  <p class="text-sm text-[#263238] font-medium">
+                    {{ account.accountType === 'PIX_KEY' ? 'Chave PIX' : 'Conta Bancária' }}
+                  </p>
+                  <p class="text-xs text-[#435574]">
+                    {{
+                      account.accountType === 'PIX_KEY'
+                        ? `${account.pixKeyType}: ${account.pixKey}`
+                        : `${account.bankName || 'Banco'} · Ag ${account.agency} · CC ${account.accountNumber}`
+                    }}
+                  </p>
+                </div>
+              </div>
+              <div class="flex items-center gap-1">
+                <Badge v-if="account.isDefault" class="bg-[#286AD8] text-white text-xs hover:bg-[#286AD8]">
                   Padrão
                 </Badge>
-              </div>
-              <p class="text-sm text-[#435574]">
-                {{ account.accountType === 'checking' ? 'Conta Corrente' : 'Conta Poupança' }} •
-                Ag. {{ account.agency }} • C/C {{ account.accountNumber }}
-              </p>
-              <p class="text-xs text-[#435574]">
-                {{ account.holderName }} • CPF {{ account.holderDocument }}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </Card>
-
-    <!-- Transactions History -->
-    <Card class="p-6">
-      <div class="flex items-center justify-between mb-4">
-        <h3 class="text-[#263238]">Histórico de Transações</h3>
-        <div class="flex gap-2">
-          <Select :model-value="filterStatus" @update:model-value="(val) => filterStatus = val as string">
-            <SelectTrigger class="w-[180px]">
-              <SelectValue placeholder="Filtrar por status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos</SelectItem>
-              <SelectItem value="completed">Concluídos</SelectItem>
-              <SelectItem value="processing">Processando</SelectItem>
-              <SelectItem value="pending">Pendentes</SelectItem>
-              <SelectItem value="failed">Falhos</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button variant="outline" size="icon">
-            <Download class="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
-
-      <div class="space-y-3">
-        <div
-          v-for="transaction in currentTransactions"
-          :key="transaction.id"
-          class="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors"
-        >
-          <div class="flex items-center gap-4">
-            <div
-              :class="`w-10 h-10 rounded-full flex items-center justify-center ${
-                transaction.type === 'earning'
-                  ? 'bg-green-100'
-                  : transaction.type === 'withdrawal'
-                  ? 'bg-blue-100'
-                  : 'bg-yellow-100'
-              }`"
-            >
-              <component 
-                :is="getTransactionIcon(transaction.type).component" 
-                :class="getTransactionIcon(transaction.type).class"
-              />
-            </div>
-            <div>
-              <div class="flex items-center gap-2 mb-1">
-                <p class="text-[#263238]">{{ transaction.description }}</p>
-                <template v-if="transaction.status === 'pending'">
-                  <Badge class="bg-yellow-100 text-yellow-700 hover:bg-yellow-100">
-                    <Clock class="h-3 w-3 mr-1" />
-                    Pendente
-                  </Badge>
-                </template>
-                <template v-else-if="transaction.status === 'processing'">
-                  <Badge class="bg-blue-100 text-blue-700 hover:bg-blue-100">
-                    <Clock class="h-3 w-3 mr-1" />
-                    Processando
-                  </Badge>
-                </template>
-                <template v-else-if="transaction.status === 'completed'">
-                  <Badge class="bg-green-100 text-green-700 hover:bg-green-100">
-                    <CheckCircle class="h-3 w-3 mr-1" />
-                    Concluído
-                  </Badge>
-                </template>
-                <template v-else-if="transaction.status === 'failed'">
-                  <Badge class="bg-red-100 text-red-700 hover:bg-red-100">
-                    <XCircle class="h-3 w-3 mr-1" />
-                    Falhou
-                  </Badge>
-                </template>
-              </div>
-              <p class="text-sm text-[#435574]">
-                {{ transaction.date }}
-                <span v-if="transaction.serviceName"> • {{ transaction.serviceName }}</span>
-                <span v-if="transaction.bankAccount"> • {{ transaction.bankAccount }}</span>
-              </p>
-            </div>
-          </div>
-          <div class="text-right">
-            <p
-              :class="`text-lg ${
-                transaction.type === 'earning' ? 'text-green-600' : 'text-[#263238]'
-              }`"
-            >
-              {{ transaction.type === 'earning' ? '+' : '-' }}
-              {{ formatCurrency(transaction.amount) }}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <!-- Pagination -->
-      <div v-if="totalPages > 1" class="flex items-center justify-center gap-2 mt-6">
-        <Button
-          @click="currentPage = Math.max(1, currentPage - 1)"
-          :disabled="currentPage === 1"
-          variant="outline"
-          size="sm"
-        >
-          Anterior
-        </Button>
-        <div class="flex items-center gap-1">
-          <Button
-            v-for="pageNum in Array.from({ length: Math.min(5, totalPages) }, (_, i) => i + 1)"
-            :key="pageNum"
-            @click="currentPage = pageNum"
-            :variant="currentPage === pageNum ? 'default' : 'outline'"
-            size="sm"
-          >
-            {{ pageNum }}
-          </Button>
-        </div>
-        <Button
-          @click="currentPage = Math.min(totalPages, currentPage + 1)"
-          :disabled="currentPage === totalPages"
-          variant="outline"
-          size="sm"
-        >
-          Próxima
-        </Button>
-      </div>
-    </Card>
-
-    <!-- Withdrawal Dialog -->
-    <Dialog :open="showWithdrawalDialog" @update:open="(val) => showWithdrawalDialog = val">
-      <DialogContent class="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Solicitar Saque</DialogTitle>
-          <DialogDescription>
-            Transfira seus ganhos para sua conta bancária
-          </DialogDescription>
-        </DialogHeader>
-
-        <div class="space-y-4">
-          <div class="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <p class="text-sm text-[#263238] mb-1">Saldo Disponível</p>
-            <p class="text-2xl text-[#286AD8]">{{ formatCurrency(balance.available) }}</p>
-          </div>
-
-          <div class="space-y-2">
-            <Label for="amount">Valor do Saque *</Label>
-            <Input
-              id="amount"
-              type="number"
-              :model-value="withdrawalAmount"
-              @update:model-value="(val) => withdrawalAmount = val as string"
-              placeholder="0,00"
-              min="0"
-              :max="balance.available"
-              step="0.01"
-            />
-            <div class="flex gap-2">
-              <Button
-                @click="withdrawalAmount = (balance.available * 0.25).toFixed(2)"
-                variant="outline"
-                size="sm"
-              >
-                25%
-              </Button>
-              <Button
-                @click="withdrawalAmount = (balance.available * 0.5).toFixed(2)"
-                variant="outline"
-                size="sm"
-              >
-                50%
-              </Button>
-              <Button
-                @click="withdrawalAmount = (balance.available * 0.75).toFixed(2)"
-                variant="outline"
-                size="sm"
-              >
-                75%
-              </Button>
-              <Button
-                @click="withdrawalAmount = balance.available.toFixed(2)"
-                variant="outline"
-                size="sm"
-              >
-                100%
-              </Button>
-            </div>
-          </div>
-
-          <div class="space-y-2">
-            <Label for="bank-account">Conta Bancária *</Label>
-            <Select
-              :model-value="selectedBankAccount"
-              @update:model-value="(val) => selectedBankAccount = val as string"
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione a conta" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem
-                  v-for="account in bankAccounts"
-                  :key="account.id"
-                  :value="account.id"
+                <Button
+                  v-if="!account.isDefault"
+                  @click="handleSetDefault(account.id)"
+                  variant="ghost"
+                  size="sm"
+                  class="text-xs h-7 px-2"
                 >
-                  {{ account.bankName }} - Ag. {{ account.agency }} - C/C
-                  {{ account.accountNumber }}
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div class="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <p class="text-sm text-yellow-800">
-              ⏱ O valor será transferido em até 2 dias úteis
-            </p>
+                  <Star class="h-3 w-3" />
+                </Button>
+                <Button
+                  @click="handleDeleteAccount(account.id)"
+                  variant="ghost"
+                  size="sm"
+                  class="text-xs h-7 px-2 text-red-500 hover:text-red-700"
+                >
+                  <Trash2 class="h-3 w-3" />
+                </Button>
+              </div>
+            </div>
+            <div class="flex items-center justify-between mt-2">
+              <p class="text-xs text-[#435574]">{{ account.holderName }}</p>
+              <Button
+                v-if="account.accountType === 'PIX_KEY'"
+                @click="useAccountForWithdraw(account)"
+                variant="outline"
+                size="sm"
+                class="text-xs h-7"
+              >
+                Usar para saque
+              </Button>
+            </div>
           </div>
         </div>
+      </Card>
 
-        <DialogFooter>
-          <Button @click="showWithdrawalDialog = false" variant="outline">
-            Cancelar
-          </Button>
-          <Button @click="handleWithdrawal" variant="default">
-            Confirmar Saque
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-
-    <!-- Add Bank Account Dialog -->
-    <Dialog :open="showBankAccountDialog" @update:open="(val) => showBankAccountDialog = val">
-      <DialogContent class="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Cadastrar Conta Bancária</DialogTitle>
-          <DialogDescription>
-            Adicione seus dados bancários para receber pagamentos
-          </DialogDescription>
-        </DialogHeader>
-
-        <div class="space-y-4">
-          <div class="space-y-2">
-            <Label for="bank-name">Banco *</Label>
-            <Input
-              id="bank-name"
-              :model-value="bankForm.bankName"
-              @update:model-value="(val) => bankForm.bankName = val as string"
-              placeholder="Ex: Banco do Brasil"
-            />
+      <!-- Transaction History -->
+      <Card class="p-6">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+          <div>
+            <h3 class="text-[#263238]">Histórico de Transações</h3>
+            <p class="text-sm text-[#435574]">{{ transactions.length }} transações registradas</p>
           </div>
-
-          <div class="space-y-2">
-            <Label for="account-type">Tipo de Conta *</Label>
-            <Select
-              :model-value="bankForm.accountType"
-              @update:model-value="(val) => bankForm.accountType = val as 'checking' | 'savings'"
+          <div class="flex gap-2">
+            <Button
+              @click="transactionFilter = 'ALL'"
+              :variant="transactionFilter === 'ALL' ? 'default' : 'outline'"
+              size="sm"
             >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="checking">Conta Corrente</SelectItem>
-                <SelectItem value="savings">Conta Poupança</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div class="grid grid-cols-2 gap-4">
-            <div class="space-y-2">
-              <Label for="agency">Agência *</Label>
-              <Input
-                id="agency"
-                :model-value="bankForm.agency"
-                @update:model-value="(val) => bankForm.agency = val as string"
-                placeholder="1234"
-              />
-            </div>
-            <div class="space-y-2">
-              <Label for="account-number">Conta *</Label>
-              <Input
-                id="account-number"
-                :model-value="bankForm.accountNumber"
-                @update:model-value="(val) => bankForm.accountNumber = val as string"
-                placeholder="12345-6"
-              />
-            </div>
-          </div>
-
-          <div class="space-y-2">
-            <Label for="holder-name">Nome do Titular *</Label>
-            <Input
-              id="holder-name"
-              :model-value="bankForm.holderName"
-              @update:model-value="(val) => bankForm.holderName = val as string"
-              placeholder="Nome completo"
-            />
-          </div>
-
-          <div class="space-y-2">
-            <Label for="holder-document">CPF/CNPJ *</Label>
-            <Input
-              id="holder-document"
-              :model-value="bankForm.holderDocument"
-              @update:model-value="(val) => bankForm.holderDocument = val as string"
-              placeholder="000.000.000-00"
-            />
-          </div>
-
-          <div class="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-            <p class="text-sm text-blue-800">
-              🔒 Seus dados bancários são criptografados e protegidos
-            </p>
+              Todos
+            </Button>
+            <Button
+              @click="transactionFilter = 'EARNING'"
+              :variant="transactionFilter === 'EARNING' ? 'default' : 'outline'"
+              size="sm"
+            >
+              Recebimentos
+            </Button>
+            <Button
+              @click="transactionFilter = 'WITHDRAWAL'"
+              :variant="transactionFilter === 'WITHDRAWAL' ? 'default' : 'outline'"
+              size="sm"
+            >
+              Saques
+            </Button>
           </div>
         </div>
 
-        <DialogFooter>
-          <Button @click="showBankAccountDialog = false" variant="outline">
-            Cancelar
-          </Button>
-          <Button @click="handleAddBankAccount" variant="default">
-            Cadastrar Conta
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        <div v-if="filteredTransactions.length === 0" class="text-center py-12 text-[#435574]">
+          <DollarSign class="h-10 w-10 mx-auto mb-3 opacity-40" />
+          <p class="text-sm">Nenhuma transação encontrada</p>
+        </div>
+
+        <div v-else class="space-y-3">
+          <div
+            v-for="tx in filteredTransactions"
+            :key="`${tx.type}-${tx.id}`"
+            class="flex items-center gap-4 p-4 rounded-lg border border-gray-200 hover:border-gray-300 transition-colors"
+          >
+            <div :class="`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+              tx.type === 'EARNING'
+                ? 'bg-green-100'
+                : 'bg-red-100'
+            }`">
+              <ArrowDownToLine v-if="tx.type === 'EARNING'" class="h-5 w-5 text-green-600" />
+              <ArrowUpFromLine v-else class="h-5 w-5 text-red-600" />
+            </div>
+
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 mb-1">
+                <p class="text-sm text-[#263238] font-medium truncate">
+                  {{ tx.description }}
+                </p>
+                <Badge :class="getStatusBadge(tx.status).class + ' text-xs'">
+                  {{ getStatusBadge(tx.status).label }}
+                </Badge>
+              </div>
+              <div class="flex items-center gap-3 text-xs text-[#435574]">
+                <span v-if="tx.clientName">{{ tx.clientName }}</span>
+                <span v-if="tx.paymentMethod">{{ tx.paymentMethod }}</span>
+                <span>{{ formatDate(tx.date) }}</span>
+              </div>
+            </div>
+
+            <p :class="`text-sm font-semibold whitespace-nowrap ${tx.amount >= 0 ? 'text-green-600' : 'text-red-600'}`">
+              {{ tx.amount >= 0 ? '+' : '' }}{{ formatCurrency(Math.abs(tx.amount)) }}
+            </p>
+          </div>
+        </div>
+      </Card>
+    </template>
+
+    <!-- MODAL: SOLICITAR SAQUE -->
+    <Teleport to="body">
+      <Transition name="fade">
+        <div
+          v-if="showWithdrawModal"
+          class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          @click.self="showWithdrawModal = false"
+        >
+          <div class="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 relative">
+            <button @click="showWithdrawModal = false"
+              class="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
+              <X class="h-5 w-5" />
+            </button>
+
+            <h3 class="text-[#263238] text-lg mb-1">Solicitar Saque</h3>
+            <p class="text-sm text-[#435574] mb-4">
+              Disponível: <span class="font-semibold text-green-600">{{ formatCurrency(maxWithdrawAmount) }}</span>
+            </p>
+
+            <div class="space-y-4">
+              <div class="space-y-2">
+                <Label>Valor do saque (R$)</Label>
+                <Input
+                  v-model="withdrawAmount"
+                  type="number"
+                  :max="maxWithdrawAmount"
+                  min="1"
+                  step="0.01"
+                  placeholder="0,00"
+                />
+                <Button
+                  @click="withdrawAmount = String(maxWithdrawAmount)"
+                  variant="ghost"
+                  size="sm"
+                  class="text-xs text-[#286AD8]"
+                >
+                  Sacar tudo
+                </Button>
+              </div>
+
+              <div class="space-y-2">
+                <Label>Tipo de chave PIX</Label>
+                <select
+                  v-model="withdrawPixKeyType"
+                  class="w-full h-10 px-3 rounded-md border border-gray-300 text-sm"
+                >
+                  <option value="CPF">CPF</option>
+                  <option value="CNPJ">CNPJ</option>
+                  <option value="EMAIL">E-mail</option>
+                  <option value="PHONE">Telefone</option>
+                  <option value="RANDOM">Chave aleatória</option>
+                </select>
+              </div>
+
+              <div class="space-y-2">
+                <Label>Chave PIX</Label>
+                <Input
+                  v-model="withdrawPixKey"
+                  placeholder="Informe sua chave PIX"
+                />
+              </div>
+
+              <Separator />
+
+              <Button
+                @click="handleWithdraw"
+                :disabled="isProcessing || !withdrawAmount || !withdrawPixKey"
+                class="w-full"
+              >
+                <Loader2 v-if="isProcessing" class="h-4 w-4 mr-2 animate-spin" />
+                {{ isProcessing ? 'Processando...' : 'Confirmar Saque' }}
+              </Button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
+    <!-- MODAL: ADICIONAR CONTA -->
+    <Teleport to="body">
+      <Transition name="fade">
+        <div
+          v-if="showAddAccountModal"
+          class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          @click.self="showAddAccountModal = false"
+        >
+          <div class="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 relative max-h-[80vh] overflow-y-auto">
+            <button @click="showAddAccountModal = false"
+              class="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
+              <X class="h-5 w-5" />
+            </button>
+
+            <h3 class="text-[#263238] text-lg mb-4">Cadastrar Conta</h3>
+
+            <div class="space-y-4">
+              <!-- Type selector -->
+              <div class="flex gap-2">
+                <Button
+                  @click="newAccountType = 'PIX_KEY'"
+                  :variant="newAccountType === 'PIX_KEY' ? 'default' : 'outline'"
+                  size="sm"
+                  class="flex-1"
+                >
+                  <QrCode class="h-4 w-4 mr-2" />
+                  Chave PIX
+                </Button>
+                <Button
+                  @click="newAccountType = 'BANK_ACCOUNT'"
+                  :variant="newAccountType === 'BANK_ACCOUNT' ? 'default' : 'outline'"
+                  size="sm"
+                  class="flex-1"
+                >
+                  <Building2 class="h-4 w-4 mr-2" />
+                  Conta Bancária
+                </Button>
+              </div>
+
+              <!-- PIX fields -->
+              <template v-if="newAccountType === 'PIX_KEY'">
+                <div class="space-y-2">
+                  <Label>Tipo de chave</Label>
+                  <select
+                    v-model="newPixKeyType"
+                    class="w-full h-10 px-3 rounded-md border border-gray-300 text-sm"
+                  >
+                    <option value="CPF">CPF</option>
+                    <option value="CNPJ">CNPJ</option>
+                    <option value="EMAIL">E-mail</option>
+                    <option value="PHONE">Telefone</option>
+                    <option value="RANDOM">Chave aleatória</option>
+                  </select>
+                </div>
+                <div class="space-y-2">
+                  <Label>Chave PIX</Label>
+                  <Input v-model="newPixKey" placeholder="Informe sua chave PIX" />
+                </div>
+              </template>
+
+              <!-- Bank Account fields -->
+              <template v-else>
+                <div class="space-y-2">
+                  <Label>Nome do banco</Label>
+                  <Input v-model="newBankName" placeholder="Ex.: Banco do Brasil" />
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                  <div class="space-y-2">
+                    <Label>Código do banco</Label>
+                    <Input v-model="newBankCode" placeholder="001" maxlength="4" />
+                  </div>
+                  <div class="space-y-2">
+                    <Label>Agência</Label>
+                    <Input v-model="newAgency" placeholder="1234" maxlength="6" />
+                  </div>
+                </div>
+                <div class="grid grid-cols-3 gap-3">
+                  <div class="col-span-2 space-y-2">
+                    <Label>Conta</Label>
+                    <Input v-model="newAccountNumber" placeholder="12345" />
+                  </div>
+                  <div class="space-y-2">
+                    <Label>Dígito</Label>
+                    <Input v-model="newAccountDigit" placeholder="0" maxlength="2" />
+                  </div>
+                </div>
+                <div class="space-y-2">
+                  <Label>Tipo de conta</Label>
+                  <select
+                    v-model="newAccountBankType"
+                    class="w-full h-10 px-3 rounded-md border border-gray-300 text-sm"
+                  >
+                    <option value="CONTA_CORRENTE">Conta Corrente</option>
+                    <option value="CONTA_POUPANCA">Conta Poupança</option>
+                  </select>
+                </div>
+              </template>
+
+              <Separator />
+
+              <!-- Holder info -->
+              <div class="space-y-2">
+                <Label>Nome do titular</Label>
+                <Input v-model="newHolderName" placeholder="Nome completo" />
+              </div>
+              <div class="space-y-2">
+                <Label>CPF/CNPJ do titular</Label>
+                <Input v-model="newHolderCpfCnpj" placeholder="000.000.000-00" />
+              </div>
+
+              <Button
+                @click="handleAddAccount"
+                :disabled="isProcessing"
+                class="w-full"
+              >
+                <Loader2 v-if="isProcessing" class="h-4 w-4 mr-2 animate-spin" />
+                {{ isProcessing ? 'Salvando...' : 'Salvar Conta' }}
+              </Button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
+<style scoped>
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+</style>
