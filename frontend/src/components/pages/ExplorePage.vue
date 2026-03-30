@@ -53,6 +53,14 @@ interface ServiceItem {
   updatedAt: string;
 }
 
+interface FreelancerProfileData {
+  id: number;
+  location?: string | null;
+  rating?: number | null;
+  totalReviews?: number | null;
+  available?: boolean | null;
+}
+
 interface Props {
   onNavigate: (page: string, params?: any) => void;
 }
@@ -67,6 +75,7 @@ const selectedCategory = ref('all');
 const sortBy = ref('recent');
 const searchMode = ref<'services' | 'professionals'>('services');
 const viewMode = ref<'grid' | 'list'>('grid');
+const freelancerProfiles = ref<Record<number, FreelancerProfileData>>({});
 
 const favoritesStore = useFavoritesStore();
 
@@ -106,6 +115,29 @@ const loadServices = async () => {
     toast.error('Erro ao carregar serviços');
   } finally {
     isLoading.value = false;
+  }
+};
+
+const loadFreelancerProfiles = async (freelancerIds: number[]) => {
+  if (freelancerIds.length === 0) {
+    freelancerProfiles.value = {};
+    return;
+  }
+
+  try {
+    const profiles = await Promise.all(
+      freelancerIds.map(async (freelancerId) => {
+        const response = await api.get(`/freelancer/${freelancerId}/profile`);
+        return response.data as FreelancerProfileData;
+      })
+    );
+
+    freelancerProfiles.value = profiles.reduce<Record<number, FreelancerProfileData>>((acc, profile) => {
+      acc[profile.id] = profile;
+      return acc;
+    }, {});
+  } catch (err) {
+    console.error('Erro ao carregar perfis de freelancers:', err);
   }
 };
 
@@ -170,17 +202,22 @@ const freelancerGroups = computed(() => {
 });
 
 const freelancerResults = computed(() =>
-  freelancerGroups.value.map((group) => ({
-    id: group.freelancerId,
-    name: group.freelancerName,
-    avatar: group.freelancerProfilePhoto,
-    category: Array.from(new Set(group.services.map((s) => s.category))).join(', '),
-    categories: Array.from(new Set(group.services.map((s) => s.category))),
-    servicesCount: group.services.length,
-    rating: 5.0,
-    reviewCount: 0,
-    isAvailable: true,
-  }))
+  freelancerGroups.value.map((group) => {
+    const profile = freelancerProfiles.value[group.freelancerId];
+
+    return {
+      id: group.freelancerId,
+      name: group.freelancerName,
+      avatar: group.freelancerProfilePhoto,
+      location: profile?.location || undefined,
+      category: Array.from(new Set(group.services.map((s) => s.category))).join(', '),
+      categories: Array.from(new Set(group.services.map((s) => s.category))),
+      servicesCount: group.services.length,
+      rating: profile?.rating ?? 5.0,
+      reviewCount: profile?.totalReviews ?? 0,
+      isAvailable: profile?.available ?? true,
+    };
+  })
 );
 
 const totalFreelancers = computed(() => freelancerResults.value.length);
@@ -224,6 +261,14 @@ const getInitials = (name: string) => {
 onMounted(() => {
   loadServices();
 });
+
+watch(
+  freelancerGroups,
+  (groups) => {
+    loadFreelancerProfiles(groups.map((group) => group.freelancerId));
+  },
+  { immediate: true }
+);
 </script>
 
 <template>

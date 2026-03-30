@@ -81,7 +81,7 @@ const handleToggleFavorite = (e: MouseEvent) => {
         <p v-if="freelancer.servicesCount !== undefined" class="text-xs text-[#435574]">
           {{ freelancer.servicesCount }} {{ freelancer.servicesCount === 1 ? 'serviço cadastrado' : 'serviços cadastrados' }}
         </p>
-        <div v-else class="flex items-center gap-1 text-[#435574] mt-1">
+        <div class="flex items-center gap-1 text-[#435574] mt-1">
           <Star class="h-3 w-3 fill-yellow-400 text-yellow-400" />
           <span class="text-xs font-semibold text-[#263238]">{{ freelancer.rating.toFixed(1) }}</span>
           <span class="text-[10px]">({{ freelancer.reviewCount }})</span>
