@@ -301,6 +301,11 @@ const loadReviews = async () => {
 // ─── Navigation ───────────────────────────────────────────────────────────────
 
 const goBack = () => {
+  if (window.history.state?.back) {
+    router.back();
+    return;
+  }
+
   router.push({ name: 'provider-profile', params: { providerId: props.providerId } });
 };
 
@@ -522,7 +527,7 @@ onMounted(() => {
           class="text-[#435574] hover:text-[#286AD8]"
         >
           <ArrowLeft class="h-4 w-4 mr-2" />
-          Voltar ao perfil
+          Voltar 
         </Button>
         <div class="flex items-center gap-2">
           <Button

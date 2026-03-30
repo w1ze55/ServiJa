@@ -201,7 +201,7 @@ const handleViewProfile = (providerId: string | number) => {
 };
 
 const handleViewService = (params: { providerId: number; serviceId: number }) => {
-  props.onNavigate('provider-profile', params);
+  props.onNavigate('service-detail', params);
 };
 
 const clearFilters = () => {
