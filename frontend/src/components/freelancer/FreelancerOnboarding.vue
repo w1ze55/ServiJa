@@ -556,7 +556,6 @@ const handleServiceAreaKeyPress = (e: KeyboardEvent) => {
                 @click="toggleWorkingDay(day.value)"
                 :variant="data.workingDays.includes(day.value) ? 'default' : 'outline'"
                 size="sm"
-                :class="data.workingDays.includes(day.value) ? 'bg-[#286AD8] hover:bg-[#435574]' : ''"
               >
                 {{ day.label }}
               </Button>
@@ -590,7 +589,6 @@ const handleServiceAreaKeyPress = (e: KeyboardEvent) => {
               <Button
                 @click="data.serviceType = 'presencial'"
                 :variant="data.serviceType === 'presencial' ? 'default' : 'outline'"
-                :class="data.serviceType === 'presencial' ? 'bg-[#286AD8] hover:bg-[#435574]' : ''"
               >
                 <MapPin class="h-4 w-4 mr-2" />
                 Presencial
@@ -598,14 +596,12 @@ const handleServiceAreaKeyPress = (e: KeyboardEvent) => {
               <Button
                 @click="data.serviceType = 'remoto'"
                 :variant="data.serviceType === 'remoto' ? 'default' : 'outline'"
-                :class="data.serviceType === 'remoto' ? 'bg-[#286AD8] hover:bg-[#435574]' : ''"
               >
                 Remoto
               </Button>
               <Button
                 @click="data.serviceType = 'hibrido'"
                 :variant="data.serviceType === 'hibrido' ? 'default' : 'outline'"
-                :class="data.serviceType === 'hibrido' ? 'bg-[#286AD8] hover:bg-[#435574]' : ''"
               >
                 Híbrido
               </Button>
@@ -710,7 +706,6 @@ const handleServiceAreaKeyPress = (e: KeyboardEvent) => {
         <Button
           v-if="currentStep < steps.length"
           @click="handleNext"
-          class="bg-[#286AD8] hover:bg-[#435574]"
         >
           Próximo
           <ArrowRight class="h-4 w-4 ml-2" />
@@ -718,7 +713,7 @@ const handleServiceAreaKeyPress = (e: KeyboardEvent) => {
         <Button
           v-else
           @click="handlePublish"
-          class="bg-green-600 hover:bg-green-700"
+          variant="success"
         >
           <CheckCircle class="h-4 w-4 mr-2" />
           Publicar Perfil

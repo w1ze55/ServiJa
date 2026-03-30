@@ -151,7 +151,7 @@ const formatDate = (dateString: string) => {
           <Button
             @click="send"
             :disabled="(!newMessage.trim() && messageAttachments.length === 0) || isSending"
-            class="bg-[#286AD8] hover:bg-[#435574]"
+            variant="default"
           >
             <Send class="h-4 w-4" />
           </Button>

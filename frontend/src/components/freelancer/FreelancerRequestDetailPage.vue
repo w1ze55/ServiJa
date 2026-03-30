@@ -707,7 +707,7 @@ const getStatusBadge = (currentProposal: Proposal) => {
             <Button
               v-if="(proposal.status === 'pending' || proposal.status === 'negotiating') && !proposal.freelancerResponse"
               @click="showSendProposalDialog = true"
-              class="bg-[#286AD8] hover:bg-[#435574]"
+              variant="default"
             >
               <Send class="h-4 w-4 mr-2" />
               {{ proposal.freelancerResponse ? 'Atualizar Proposta' : 'Enviar Proposta' }}
@@ -715,7 +715,7 @@ const getStatusBadge = (currentProposal: Proposal) => {
             <Button
               v-if="proposal.status === 'in_progress'"
               @click="showCompleteDialog = true"
-              class="bg-green-600 hover:bg-green-700"
+              variant="success"
             >
               <CheckCircle class="h-4 w-4 mr-2" />
               Marcar como Entregue
@@ -778,7 +778,7 @@ const getStatusBadge = (currentProposal: Proposal) => {
           Mensagens
           <Badge
             v-if="clientMessagesCount > 0"
-            class="ml-1 bg-[#286AD8] text-white text-xs"
+            class="ml-1 bg-primary text-white text-xs"
           >
             {{ clientMessagesCount }}
           </Badge>
@@ -851,7 +851,8 @@ const getStatusBadge = (currentProposal: Proposal) => {
               <Button
                 @click="handleAcceptCounterProposal"
                 :disabled="isLoading"
-                class="flex-1 min-w-[150px] bg-green-600 hover:bg-green-700"
+                variant="success"
+                class="flex-1 min-w-[150px]"
               >
                 <Check class="h-4 w-4 mr-2" />
                 Aceitar Contra Proposta
@@ -860,7 +861,7 @@ const getStatusBadge = (currentProposal: Proposal) => {
                 @click="showRejectCounterDialog = true"
                 variant="outline"
                 :disabled="isLoading"
-                class="flex-1 min-w-[150px] border-[#286AD8] text-[#286AD8] hover:bg-blue-50"
+                class="flex-1 min-w-[150px]"
               >
                 <XCircle class="h-4 w-4 mr-2" />
                 Manter Proposta Inicial
@@ -960,7 +961,7 @@ const getStatusBadge = (currentProposal: Proposal) => {
                         v-if="milestone.status === 'in_progress'"
                         @click="handleUpdateMilestoneStatus(milestone.id, 'completed')"
                         size="sm"
-                        class="bg-green-600 hover:bg-green-700"
+                        variant="success"
                       >
                         <Check class="h-3 w-3 mr-1" />
                         Concluir
@@ -1328,7 +1329,7 @@ const getStatusBadge = (currentProposal: Proposal) => {
           <Button @click="showSendProposalDialog = false" variant="outline">
             Cancelar
           </Button>
-          <Button @click="handlePrepareProposal" class="bg-[#286AD8] hover:bg-[#435574]">
+          <Button @click="handlePrepareProposal" variant="default">
             <Send class="h-4 w-4 mr-2" />
             Enviar Proposta
           </Button>
@@ -1360,7 +1361,6 @@ const getStatusBadge = (currentProposal: Proposal) => {
           <AlertDialogCancel @click="showConfirmDialog = false">Revisar</AlertDialogCancel>
           <AlertDialogAction
             @click="handleConfirmSendProposal"
-            class="bg-[#286AD8] hover:bg-[#435574]"
             :disabled="isLoading"
           >
             {{ isLoading ? 'Enviando...' : 'Confirmar Envio' }}
@@ -1394,7 +1394,7 @@ const getStatusBadge = (currentProposal: Proposal) => {
           <Button @click="showRejectDialog = false" variant="outline">
             Cancelar
           </Button>
-          <Button @click="handleRejectProposal" class="bg-red-600 hover:bg-red-700" :disabled="isLoading">
+          <Button @click="handleRejectProposal" variant="destructive" :disabled="isLoading">
             {{ isLoading ? 'Recusando...' : 'Confirmar Recusa' }}
           </Button>
         </DialogFooter>
@@ -1426,7 +1426,7 @@ const getStatusBadge = (currentProposal: Proposal) => {
           <Button @click="showRejectCounterDialog = false" variant="outline">
             Cancelar
           </Button>
-          <Button @click="handleRejectCounterProposal" class="bg-[#286AD8] hover:bg-[#435574] text-white" :disabled="isLoading">
+          <Button @click="handleRejectCounterProposal" variant="default" :disabled="isLoading">
             {{ isLoading ? 'Enviando...' : 'Confirmar e Manter Inicial' }}
           </Button>
         </DialogFooter>
@@ -1448,7 +1448,6 @@ const getStatusBadge = (currentProposal: Proposal) => {
           <AlertDialogCancel @click="showCompleteDialog = false">Cancelar</AlertDialogCancel>
           <AlertDialogAction
             @click="handleCompleteProposal"
-            class="bg-[#286AD8] hover:bg-[#435574]"
             :disabled="isLoading"
           >
             {{ isLoading ? 'Enviando...' : 'Confirmar Entrega' }}

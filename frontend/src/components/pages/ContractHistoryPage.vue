@@ -244,7 +244,7 @@ const averageAmount = computed(() =>
           <Button variant="outline" class="relative">
             <Filter class="h-4 w-4 mr-2" />
             Filtros
-            <Badge v-if="activeFiltersCount > 0" class="ml-2 bg-[#286AD8] hover:bg-[#286AD8]">
+            <Badge v-if="activeFiltersCount > 0" class="ml-2 bg-primary hover:bg-primary">
               {{ activeFiltersCount }}
             </Badge>
           </Button>
@@ -539,7 +539,6 @@ const averageAmount = computed(() =>
           @click="currentPage = pageNum"
           :variant="currentPage === pageNum ? 'default' : 'outline'"
           size="sm"
-          :class="currentPage === pageNum ? 'bg-[#286AD8] hover:bg-[#435574]' : ''"
         >
           {{ pageNum }}
         </Button>

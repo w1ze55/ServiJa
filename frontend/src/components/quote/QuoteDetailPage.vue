@@ -292,14 +292,14 @@ const getEventIcon = (type: TimelineEvent['type']) => {
 
           <!-- Actions -->
           <div class="flex flex-col sm:flex-row gap-3">
-            <Button @click="showAcceptDialog = true" class="flex-1 bg-green-600 hover:bg-green-700">
+            <Button @click="showAcceptDialog = true" variant="success" class="flex-1">
               <CheckCircle class="h-4 w-4 mr-2" />
               Aceitar Proposta
             </Button>
             <Button
               @click="showCounterDialog = true"
               variant="outline"
-              class="flex-1 border-[#286AD8] text-[#286AD8] hover:bg-blue-50"
+              class="flex-1 text-primary border-primary"
             >
               <DollarSign class="h-4 w-4 mr-2" />
               Enviar Contraproposta
@@ -367,7 +367,7 @@ const getEventIcon = (type: TimelineEvent['type']) => {
 
           <Button
             @click="props.onNavigate('chat', { freelancerId: request.freelancerId })"
-            class="w-full bg-[#286AD8] hover:bg-[#435574]"
+            class="w-full"
           >
             <MessageCircle class="h-4 w-4 mr-2" />
             Abrir chat
@@ -435,7 +435,7 @@ const getEventIcon = (type: TimelineEvent['type']) => {
                 deliveryTime: currentProposal.deliveryTime,
               });
             "
-            class="bg-green-600 hover:bg-green-700"
+            class="bg-success hover:bg-success/90"
           >
             Confirmar e Ir para Pagamento
           </AlertDialogAction>
@@ -457,7 +457,7 @@ const getEventIcon = (type: TimelineEvent['type']) => {
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancelar</AlertDialogCancel>
-          <AlertDialogAction @click="handleReject" class="bg-red-600 hover:bg-red-700">
+          <AlertDialogAction @click="handleReject" class="bg-destructive hover:bg-destructive/90">
             Confirmar recusa
           </AlertDialogAction>
         </AlertDialogFooter>
@@ -518,7 +518,7 @@ const getEventIcon = (type: TimelineEvent['type']) => {
             <Button @click="showCounterDialog = false" variant="outline" class="flex-1">
               Cancelar
             </Button>
-            <Button @click="handleCounter" class="flex-1 bg-[#286AD8] hover:bg-[#435574]">
+            <Button @click="handleCounter" class="flex-1">
               Enviar
             </Button>
           </div>

@@ -225,7 +225,7 @@ const handleDownloadAll = () => {
         <Button
           @click="handleDownloadAll"
           variant="outline"
-          class="w-full border-[#286AD8] text-[#286AD8] hover:bg-blue-50"
+          class="w-full text-primary border-primary"
         >
           <Download class="h-4 w-4 mr-2" />
           Visualizar Todos os Arquivos
@@ -238,8 +238,8 @@ const handleDownloadAll = () => {
       <Button
         @click="showAdjustmentsModal = true"
         :disabled="props.isLoading"
-        variant="outline"
-        class="flex-1 border-yellow-600 text-yellow-600 hover:bg-yellow-50"
+        variant="warning"
+        class="flex-1"
         size="lg"
       >
         <AlertCircle class="h-4 w-4 mr-2" />
@@ -248,7 +248,8 @@ const handleDownloadAll = () => {
       <Button
         @click="showApprovalDialog = true"
         :disabled="props.isLoading"
-        class="flex-1 bg-green-600 hover:bg-green-700"
+        variant="success"
+        class="flex-1"
         size="lg"
       >
         <CheckCircle2 class="h-4 w-4 mr-2" />
@@ -277,7 +278,7 @@ const handleDownloadAll = () => {
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel @click="showApprovalDialog = false">Cancelar</AlertDialogCancel>
-          <AlertDialogAction @click="handleApprove" class="bg-green-600 hover:bg-green-700">
+          <AlertDialogAction @click="handleApprove" class="bg-success hover:bg-success/90">
             Sim, Aprovar Entrega
           </AlertDialogAction>
         </AlertDialogFooter>

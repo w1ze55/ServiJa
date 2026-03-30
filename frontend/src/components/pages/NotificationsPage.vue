@@ -158,7 +158,7 @@ onMounted(async () => {
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancelar</AlertDialogCancel>
-          <AlertDialogAction class="bg-red-600 hover:bg-red-700" @click="handleClearAll">
+          <AlertDialogAction class="bg-destructive hover:bg-destructive/90" @click="handleClearAll">
             Limpar tudo
           </AlertDialogAction>
         </AlertDialogFooter>

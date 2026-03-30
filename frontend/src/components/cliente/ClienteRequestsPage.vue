@@ -752,7 +752,6 @@ watch(currentTab, () => {
                 @click="currentPage = pageNum"
                 :variant="currentPage === pageNum ? 'default' : 'outline'"
                 size="sm"
-                :class="currentPage === pageNum ? 'bg-[#286AD8] hover:bg-[#435574]' : ''"
               >
                 {{ pageNum }}
               </Button>
@@ -880,7 +879,7 @@ watch(currentTab, () => {
           </Button>
           <Button
             @click="handleCreateRequest"
-            class="bg-[#286AD8] hover:bg-[#435574]"
+            variant="default"
             :disabled="isCreating"
           >
             <Plus class="h-4 w-4 mr-2" />
@@ -915,7 +914,7 @@ watch(currentTab, () => {
           <Button @click="showCancelDialog = false" variant="outline">
             Manter
           </Button>
-          <Button @click="handleCancelRequest" class="bg-red-600 hover:bg-red-700">
+          <Button @click="handleCancelRequest" variant="destructive">
             Confirmar Cancelamento
           </Button>
         </DialogFooter>

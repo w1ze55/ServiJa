@@ -126,7 +126,7 @@ const handleGoToChat = () => {
                 v-if="props.onGoToChat"
                 @click="handleGoToChat"
                 variant="outline"
-                class="border-[#286AD8] text-[#286AD8] hover:bg-blue-50"
+                class="border-primary text-primary"
               >
                 <MessageSquare class="mr-2 h-4 w-4" />
                 Ir para o Chat
@@ -169,7 +169,7 @@ const handleGoToChat = () => {
           <Button
             @click="showConfirmationDialog = true"
             :disabled="!adjustmentsReason.trim() || isBusy"
-            class="bg-yellow-600 hover:bg-yellow-700"
+            variant="warning"
           >
             Enviar Solicitacao
           </Button>
@@ -203,7 +203,7 @@ const handleGoToChat = () => {
         <AlertDialogAction
           @click="handleSubmit"
           :disabled="isBusy"
-          class="bg-yellow-600 hover:bg-yellow-700"
+          class="bg-warning hover:bg-warning/90"
         >
           Sim, Enviar Solicitacao
         </AlertDialogAction>

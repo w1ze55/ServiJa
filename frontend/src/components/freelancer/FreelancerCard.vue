@@ -115,7 +115,7 @@ const handleToggleFavorite = (e: MouseEvent) => {
         </Badge>
       </div>
 
-      <Button class="w-full bg-white text-[#286AD8] border-[#286AD8] hover:bg-blue-50 hover:text-[#286AD8]" variant="outline">
+      <Button class="w-full" variant="outline">
         Ver Perfil Completo
       </Button>
     </div>

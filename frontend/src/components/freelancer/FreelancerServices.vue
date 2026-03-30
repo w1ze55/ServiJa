@@ -154,7 +154,6 @@ const handleRequestQuote = (e?: MouseEvent) => {
               <Button
                 @click="handleRequestQuote"
                 size="sm"
-                class="bg-[#286AD8] hover:bg-[#435574]"
               >
                 <FileText class="h-4 w-4 mr-2" />
                 Solicitar
@@ -196,7 +195,6 @@ const handleRequestQuote = (e?: MouseEvent) => {
           <Button
             @click="handleRequestQuote"
             size="sm"
-            class="bg-[#286AD8] hover:bg-[#435574]"
           >
             Solicitar
           </Button>
@@ -243,7 +241,7 @@ const handleRequestQuote = (e?: MouseEvent) => {
           <div class="flex gap-3 pt-4">
             <Button
               @click="handleRequestQuote"
-              class="flex-1 bg-[#286AD8] hover:bg-[#435574]"
+              class="flex-1"
             >
               <FileText class="h-4 w-4 mr-2" />
               Solicitar Orçamento

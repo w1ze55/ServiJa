@@ -491,7 +491,7 @@ onMounted(() => {
       <AlertCircle class="h-12 w-12 text-red-400" />
       <h3 class="text-lg font-semibold text-[#263238]">Ops, algo deu errado</h3>
       <p class="text-[#435574]">{{ error }}</p>
-      <Button @click="loadData" class="bg-[#286AD8]">Tentar novamente</Button>
+      <Button @click="loadData">Tentar novamente</Button>
     </div>
 
     <!-- ── Content ────────────────────────────────────────────── -->
@@ -632,7 +632,7 @@ onMounted(() => {
                 </div>
                 <Button
                   @click="handleRequestService"
-                  class="w-full bg-[#286AD8] hover:bg-[#435574] h-13 text-base font-bold shadow-lg shadow-[#286AD8]/20 transition-all active:scale-95 rounded-xl mb-3"
+                  class="w-full h-13 text-base font-bold shadow-lg shadow-primary/20 transition-all active:scale-95 rounded-xl mb-3"
                 >
                   <Send class="h-5 w-5 mr-2" />
                   Solicitar este serviço
@@ -681,7 +681,7 @@ onMounted(() => {
                   <Badge v-else variant="secondary">Indisponível</Badge>
                 </div>
 
-                <Button variant="outline" class="w-full text-[#286AD8] border-[#286AD8]/30 hover:bg-blue-50" @click="goBack">
+                <Button variant="outline" class="w-full text-primary border-primary/30" @click="goBack">
                   Ver perfil completo
                 </Button>
               </Card>
@@ -935,7 +935,7 @@ onMounted(() => {
             </div>
 
             <!-- Submit -->
-            <Button @click="handleSendQuote" class="w-full bg-[#286AD8]" :disabled="isSendingQuote">
+            <Button @click="handleSendQuote" class="w-full" :disabled="isSendingQuote">
               <Loader2 v-if="isSendingQuote" class="h-4 w-4 mr-2 animate-spin" />
               <Send v-else class="h-4 w-4 mr-2" />
               {{ isSendingQuote ? 'Enviando...' : 'Enviar Solicitação' }}

@@ -187,7 +187,7 @@ defineExpose({ reset });
         <p v-if="comment" class="text-sm text-[#435574] mt-2 italic">"{{ comment }}"</p>
       </div>
 
-      <Button @click="onBack" class="w-full bg-[#286AD8] hover:bg-[#435574]" size="lg">
+      <Button @click="onBack" variant="default" class="w-full" size="lg">
         {{ backButtonText }}
       </Button>
     </Card>
@@ -357,7 +357,8 @@ defineExpose({ reset });
     <Button
       @click="handleSubmit"
       :disabled="rating === 0 || isSubmitting"
-      class="w-full bg-[#286AD8] hover:bg-[#435574] transition-colors"
+      variant="default"
+      class="w-full"
       size="lg"
     >
       <span v-if="isSubmitting" class="flex items-center gap-2">

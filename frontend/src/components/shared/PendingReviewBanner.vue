@@ -132,8 +132,9 @@ onUnmounted(() => {
       </div>
       <div class="flex items-center gap-2 flex-shrink-0">
         <Button
+          variant="warning"
           size="sm"
-          class="bg-amber-600 hover:bg-amber-700 text-white text-xs"
+          class="text-xs"
           @click="currentPending && goToReview(currentPending.serviceRequestId)"
         >
           Avaliar agora
@@ -200,7 +201,8 @@ onUnmounted(() => {
           <!-- Botoes -->
           <div class="space-y-3">
             <Button
-              class="w-full bg-[#286AD8] hover:bg-[#435574] text-white"
+              variant="default"
+              class="w-full"
               size="lg"
               @click="goToReview(currentPending.serviceRequestId)"
             >

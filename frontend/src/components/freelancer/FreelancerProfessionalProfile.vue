@@ -606,7 +606,7 @@ const getLinkLabel = (link: ProfessionalLink) => {
           <div class="flex gap-2 pt-4">
             <Button 
               @click="handleSaveServiceSettings" 
-              class="bg-[#286AD8] hover:bg-[#435574]"
+              variant="default"
               :disabled="isSaving"
             >
               <Check class="h-4 w-4 mr-2" />
@@ -697,7 +697,7 @@ const getLinkLabel = (link: ProfessionalLink) => {
           <div class="flex gap-2 pt-4">
             <Button 
               @click="handleSaveBio" 
-              class="bg-[#286AD8] hover:bg-[#435574]"
+              variant="default"
               :disabled="isSaving"
             >
               <Check class="h-4 w-4 mr-2" />
@@ -871,7 +871,6 @@ const getLinkLabel = (link: ProfessionalLink) => {
           <AlertDialogCancel @click="closeCityDialog">Cancelar</AlertDialogCancel>
           <AlertDialogAction 
             @click="handleSaveCity" 
-            class="bg-[#286AD8] hover:bg-[#435574]"
             :disabled="isSavingCity || isLoadingCEP"
           >
             {{ isSavingCity ? 'Salvando...' : (editingCity ? 'Salvar Alterações' : 'Adicionar') }}
@@ -891,7 +890,7 @@ const getLinkLabel = (link: ProfessionalLink) => {
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel @click="cityToDelete = null">Cancelar</AlertDialogCancel>
-          <AlertDialogAction @click="handleDeleteCity" class="bg-red-600 hover:bg-red-700">
+          <AlertDialogAction @click="handleDeleteCity" class="bg-destructive hover:bg-destructive/90">
             Sim, Remover
           </AlertDialogAction>
         </AlertDialogFooter>
@@ -962,7 +961,6 @@ const getLinkLabel = (link: ProfessionalLink) => {
           <AlertDialogCancel @click="closeLinkDialog">Cancelar</AlertDialogCancel>
           <AlertDialogAction 
             @click="handleSaveLink" 
-            class="bg-[#286AD8] hover:bg-[#435574]"
             :disabled="isSavingLink"
           >
             {{ isSavingLink ? 'Salvando...' : (editingLink ? 'Salvar Alterações' : 'Adicionar') }}
@@ -982,7 +980,7 @@ const getLinkLabel = (link: ProfessionalLink) => {
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel @click="linkToDelete = null">Cancelar</AlertDialogCancel>
-          <AlertDialogAction @click="handleDeleteLink" class="bg-red-600 hover:bg-red-700">
+          <AlertDialogAction @click="handleDeleteLink" class="bg-destructive hover:bg-destructive/90">
             Sim, Remover
           </AlertDialogAction>
         </AlertDialogFooter>

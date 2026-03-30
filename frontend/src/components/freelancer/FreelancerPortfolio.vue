@@ -274,7 +274,7 @@ const confirmReport = () => {
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancelar</AlertDialogCancel>
-          <AlertDialogAction @click="confirmReport" class="bg-red-600 hover:bg-red-700">
+          <AlertDialogAction @click="confirmReport" class="bg-destructive hover:bg-destructive/90">
             Confirmar denúncia
           </AlertDialogAction>
         </AlertDialogFooter>

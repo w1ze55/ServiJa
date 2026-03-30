@@ -194,7 +194,6 @@ const handleViewProfile = (freelancerId: string) => {
           </p>
           <Button
             @click="props.onNavigate('explore')"
-            class="bg-[#286AD8] hover:bg-[#435574]"
           >
             Explorar Serviços
           </Button>
@@ -295,7 +294,7 @@ const handleViewProfile = (freelancerId: string) => {
           <div class="flex gap-2">
             <Button
               @click="handleViewProfile(freelancer.id)"
-              class="flex-1 bg-[#286AD8] hover:bg-[#435574]"
+              class="flex-1"
               size="sm"
             >
               Ver Perfil
@@ -308,7 +307,7 @@ const handleViewProfile = (freelancerId: string) => {
                 })
               "
               variant="outline"
-              class="flex-1 border-[#286AD8] text-[#286AD8] hover:bg-blue-50"
+              class="flex-1 text-primary border-primary hover:bg-blue-50"
               size="sm"
             >
               Solicitar Orçamento
@@ -334,7 +333,6 @@ const handleViewProfile = (freelancerId: string) => {
             @click="currentPage = page"
             :variant="currentPage === page ? 'default' : 'outline'"
             size="sm"
-            :class="currentPage === page ? 'bg-[#286AD8] hover:bg-[#435574]' : ''"
           >
             {{ page }}
           </Button>
@@ -364,7 +362,7 @@ const handleViewProfile = (freelancerId: string) => {
           <AlertDialogCancel>Cancelar</AlertDialogCancel>
           <AlertDialogAction
             @click="handleRemoveFavorite"
-            class="bg-red-600 hover:bg-red-700"
+            class="bg-destructive hover:bg-destructive/90"
           >
             Sim, Remover
           </AlertDialogAction>

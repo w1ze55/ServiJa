@@ -2,6 +2,7 @@
 import { useRouter } from 'vue-router';
 import { Vue3Lottie } from 'vue3-lottie';
 import animationData from './404-animation.json';
+import Button from '@/components/ui/button.vue';
 
 const router = useRouter();
 
@@ -35,7 +36,7 @@ const goHome = () => {
         <p class="text-lg text-gray-600 max-w-md mx-auto fade-in-up" style="animation-delay: 0.4s">
           Ops! A página que você está procurando não existe ou foi movida.
         </p>
-        <button @click="goHome" class="btn-primary btn-voltar-home fade-in-up" style="animation-delay: 0.6s">Voltar para a página inicial</button>
+        <Button variant="default" size="lg" @click="goHome" class="mt-8 fade-in-up" style="animation-delay: 0.6s">Voltar para a página inicial</Button>
       </div>
     </div>
   </div>
@@ -57,23 +58,6 @@ const goHome = () => {
 .fade-in-up {
   animation: fadeInUp 0.8s ease-out forwards;
   opacity: 0;
-}
-
-.btn-voltar-home {
-  margin-top: 2rem;
-  background-color: #265cff;
-  color: white;
-  font-weight: 600;
-  font-size: 1.125rem;
-  padding: 0.5rem 1rem;
-  border-radius: 0.75rem;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-  transition: all 0.3s ease;
-}
-
-.btn-voltar-home:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
 }
 
 .lottie-container {
@@ -100,15 +84,6 @@ const goHome = () => {
 }
 
 @media (max-width: 768px) {
-  .btn-voltar-home {
-    font-size: 0.8rem;
-    padding: 0.5rem 1rem;
-  }
-  .btn-voltar-home:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
-  }
-
   .min-h-screen {
     padding: 1rem;
   }

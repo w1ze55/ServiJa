@@ -282,7 +282,7 @@ const handleRequestWithdrawal = () => {
         <h1 class="text-[#263238] mb-2">Carteira & Saques</h1>
         <p class="text-[#435574]">Gerencie seus ganhos e solicite saques</p>
       </div>
-      <Button @click="handleRequestWithdrawal" class="bg-[#286AD8] hover:bg-[#435574]">
+      <Button @click="handleRequestWithdrawal" variant="default">
         <ArrowUpRight class="h-4 w-4 mr-2" />
         Solicitar Saque
       </Button>
@@ -349,7 +349,6 @@ const handleRequestWithdrawal = () => {
           @click="showBankAccountDialog = true"
           variant="outline"
           size="sm"
-          class="border-[#286AD8] text-[#286AD8] hover:bg-blue-50"
         >
           <Plus class="h-4 w-4 mr-2" />
           Adicionar Conta
@@ -361,7 +360,7 @@ const handleRequestWithdrawal = () => {
         <p class="text-[#435574] mb-4">Nenhuma conta bancária cadastrada</p>
         <Button
           @click="showBankAccountDialog = true"
-          class="bg-[#286AD8] hover:bg-[#435574]"
+          variant="default"
         >
           Cadastrar Conta Bancária
         </Button>
@@ -505,7 +504,6 @@ const handleRequestWithdrawal = () => {
             @click="currentPage = pageNum"
             :variant="currentPage === pageNum ? 'default' : 'outline'"
             size="sm"
-            :class="currentPage === pageNum ? 'bg-[#286AD8] hover:bg-[#435574]' : ''"
           >
             {{ pageNum }}
           </Button>
@@ -614,7 +612,7 @@ const handleRequestWithdrawal = () => {
           <Button @click="showWithdrawalDialog = false" variant="outline">
             Cancelar
           </Button>
-          <Button @click="handleWithdrawal" class="bg-[#286AD8] hover:bg-[#435574]">
+          <Button @click="handleWithdrawal" variant="default">
             Confirmar Saque
           </Button>
         </DialogFooter>
@@ -710,7 +708,7 @@ const handleRequestWithdrawal = () => {
           <Button @click="showBankAccountDialog = false" variant="outline">
             Cancelar
           </Button>
-          <Button @click="handleAddBankAccount" class="bg-[#286AD8] hover:bg-[#435574]">
+          <Button @click="handleAddBankAccount" variant="default">
             Cadastrar Conta
           </Button>
         </DialogFooter>

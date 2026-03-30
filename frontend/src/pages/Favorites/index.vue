@@ -46,7 +46,7 @@
         <p class="text-[#435574] mb-6">
           Você ainda não favoritou nenhum {{ activeTab === 'professionals' ? 'profissional' : 'serviço' }}.
         </p>
-        <Button @click="handleNavigate('explore')" class="bg-[#286AD8]">
+        <Button @click="handleNavigate('explore')">
           Explorar Plataforma
         </Button>
       </div>

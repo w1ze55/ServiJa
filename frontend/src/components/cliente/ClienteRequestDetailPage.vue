@@ -359,7 +359,7 @@ const getStatusColor = (status: string) => {
             </p>
             <Button
               @click="handleGoToCheckout"
-              class="bg-green-600 hover:bg-green-700"
+              variant="success"
               size="sm"
             >
               <CreditCard class="h-4 w-4 mr-2" />
@@ -406,7 +406,7 @@ const getStatusColor = (status: string) => {
             Mensagens
             <Badge
               v-if="request.messages && request.messages.length > 0"
-              class="ml-1 bg-[#286AD8] text-white text-xs"
+              class="ml-1 bg-primary text-white text-xs"
             >
               {{ request.messages.length }}
             </Badge>
@@ -524,7 +524,8 @@ const getStatusColor = (status: string) => {
               <div class="flex items-center gap-3 flex-wrap">
                 <Button
                   @click="handleAcceptResponse"
-                  class="bg-green-600 hover:bg-green-700 flex-1 min-w-[150px]"
+                  variant="success"
+                  class="flex-1 min-w-[150px]"
                 >
                   <CheckCircle class="h-4 w-4 mr-2" />
                   Aceitar Proposta
@@ -541,7 +542,7 @@ const getStatusColor = (status: string) => {
                   v-if="!request.counterValue && !wasCounterProposalRejected"
                   @click="handleOpenCounterProposalDialog"
                   variant="outline"
-                  class="text-[#286AD8] border-[#286AD8] hover:bg-blue-50 flex-1 min-w-[150px]"
+                  class="text-primary border-primary flex-1 min-w-[150px]"
                 >
                   <FileEdit class="h-4 w-4 mr-2" />
                   Contra Proposta
@@ -733,7 +734,7 @@ const getStatusColor = (status: string) => {
         </div>
         <DialogFooter>
           <Button @click="showCancelDialog = false" variant="outline">Manter</Button>
-          <Button @click="handleCancelRequest" class="bg-red-600 hover:bg-red-700">
+          <Button @click="handleCancelRequest" variant="destructive">
             Confirmar Cancelamento
           </Button>
         </DialogFooter>
@@ -763,7 +764,7 @@ const getStatusColor = (status: string) => {
         </div>
         <DialogFooter>
           <Button @click="showRejectDialog = false" variant="outline">Cancelar</Button>
-          <Button @click="handleRejectResponse" class="bg-red-600 hover:bg-red-700">
+          <Button @click="handleRejectResponse" variant="destructive">
             Confirmar Recusa
           </Button>
         </DialogFooter>
@@ -813,7 +814,7 @@ const getStatusColor = (status: string) => {
           <Button @click="showCounterProposalDialog = false" variant="outline">Cancelar</Button>
           <Button 
             @click="handleSendCounterProposal" 
-            class="bg-[#286AD8] hover:bg-[#435574]"
+            variant="default"
             :disabled="isSubmittingCounter"
           >
             {{ isSubmittingCounter ? 'Enviando...' : 'Enviar Contra Proposta' }}
@@ -877,7 +878,8 @@ const getStatusColor = (status: string) => {
           <div class="space-y-3 pt-4">
             <Button
               @click="handleGoToCheckout"
-              class="w-full bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white py-6 text-lg"
+              variant="success"
+              class="w-full py-6 text-lg"
               size="lg"
             >
               <CreditCard class="h-6 w-6 mr-2" />

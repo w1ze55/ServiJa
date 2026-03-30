@@ -335,8 +335,9 @@ const getDocumentForType = (type: string) => {
               </div>
               <Button
                 @click="handleReupload(getDocumentForType(docType.value)!)"
+                variant="destructive"
                 size="sm"
-                class="mt-3 bg-red-600 hover:bg-red-700"
+                class="mt-3"
               >
                 <Upload class="h-4 w-4 mr-2" />
                 Reenviar Documento
@@ -368,7 +369,6 @@ const getDocumentForType = (type: string) => {
           </p>
           <Button
             @click="handleFileUpload(docType.value)"
-            class="bg-[#286AD8] hover:bg-[#435574]"
           >
             Selecionar Arquivo
           </Button>
@@ -410,7 +410,7 @@ const getDocumentForType = (type: string) => {
           <AlertDialogCancel>Cancelar</AlertDialogCancel>
           <AlertDialogAction
             @click="handleDeleteDocument"
-            class="bg-red-600 hover:bg-red-700"
+            class="bg-destructive hover:bg-destructive/90"
           >
             Sim, Excluir
           </AlertDialogAction>

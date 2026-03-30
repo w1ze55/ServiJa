@@ -735,7 +735,6 @@ const getInitials = (name: string) => {
           <div class="flex gap-2 pt-4">
             <Button 
               @click="handleSavePersonalData" 
-              class="bg-[#286AD8] hover:bg-[#435574]"
               :disabled="isSavingPersonal"
             >
               <Check class="h-4 w-4 mr-2" />
@@ -834,7 +833,6 @@ const getInitials = (name: string) => {
           <div class="flex gap-2 pt-4">
             <Button 
               @click="handleSavePassword" 
-              class="bg-[#286AD8] hover:bg-[#435574]"
               :disabled="isSavingPassword"
             >
               <Check class="h-4 w-4 mr-2" />
@@ -879,7 +877,7 @@ const getInitials = (name: string) => {
               <div class="flex-1">
                 <div class="flex items-center gap-2 mb-2">
                   <h4 class="font-medium text-[#263238]">{{ address.label }}</h4>
-                  <span v-if="address.isDefault" class="text-xs bg-[#286AD8] text-white px-2 py-0.5 rounded">
+                  <span v-if="address.isDefault" class="text-xs bg-primary text-white px-2 py-0.5 rounded">
                     Padrão
                   </span>
                 </div>
@@ -940,7 +938,7 @@ const getInitials = (name: string) => {
               incluindo histórico de serviços, avaliações e mensagens. Esta ação não pode ser desfeita.
             </p>
           </div>
-          <Button @click="showDeleteDialog = true" variant="destructive" class="bg-red-600 hover:bg-red-700">
+          <Button @click="showDeleteDialog = true" variant="destructive">
             <Trash2 class="h-4 w-4 mr-2" />
             Excluir Conta
           </Button>
@@ -1111,7 +1109,6 @@ const getInitials = (name: string) => {
           <AlertDialogCancel @click="closeAddressDialog">Cancelar</AlertDialogCancel>
           <AlertDialogAction
             @click="handleSaveAddress"
-            class="bg-[#286AD8] hover:bg-[#435574]"
             :disabled="isSavingAddress"
           >
             {{ isSavingAddress ? 'Salvando...' : (editingAddress ? 'Salvar Alterações' : 'Adicionar') }}
@@ -1132,7 +1129,7 @@ const getInitials = (name: string) => {
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel @click="addressToDelete = null">Cancelar</AlertDialogCancel>
-          <AlertDialogAction @click="handleDeleteAddress" class="bg-red-600 hover:bg-red-700">
+          <AlertDialogAction @click="handleDeleteAddress" class="bg-destructive hover:bg-destructive/90">
             Sim, Remover
           </AlertDialogAction>
         </AlertDialogFooter>
@@ -1167,7 +1164,7 @@ const getInitials = (name: string) => {
           <AlertDialogCancel @click="showDeleteDialog = false">Cancelar</AlertDialogCancel>
           <AlertDialogAction
             @click="showDeleteDialog = false; showDeleteConfirmation = true"
-            class="bg-red-600 hover:bg-red-700"
+            class="bg-destructive hover:bg-destructive/90"
           >
             Prosseguir com Exclusão
           </AlertDialogAction>
@@ -1195,7 +1192,7 @@ const getInitials = (name: string) => {
           <AlertDialogCancel @click="showDeleteConfirmation = false; deletePassword = ''">Cancelar</AlertDialogCancel>
           <AlertDialogAction 
             @click="handleDeleteAccount" 
-            class="bg-red-600 hover:bg-red-700"
+            class="bg-destructive hover:bg-destructive/90"
             :disabled="isDeletingAccount"
           >
             {{ isDeletingAccount ? 'Excluindo...' : 'Confirmar Exclusão' }}

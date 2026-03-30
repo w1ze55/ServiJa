@@ -371,7 +371,7 @@ const handleTagKeyPress = (e: KeyboardEvent) => {
           resetForm();
           showAddDialog = true;
         "
-        class="bg-[#286AD8] hover:bg-[#435574]"
+        variant="default"
       >
         <Plus class="h-4 w-4 mr-2" />
         Novo Projeto
@@ -478,7 +478,7 @@ const handleTagKeyPress = (e: KeyboardEvent) => {
           resetForm();
           showAddDialog = true;
         "
-        class="bg-[#286AD8] hover:bg-[#435574]"
+        variant="default"
       >
         <Plus class="h-4 w-4 mr-2" />
         Adicionar Projeto
@@ -508,10 +508,10 @@ const handleTagKeyPress = (e: KeyboardEvent) => {
             </Badge>
           </div>
           <div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-            <Button @click="handleViewProject(project)" size="icon" class="bg-white text-[#263238] hover:bg-gray-100">
+            <Button @click="handleViewProject(project)" size="icon" variant="secondary" class="bg-white hover:bg-gray-100">
               <Eye class="h-4 w-4" />
             </Button>
-            <Button @click="handleEditProject(project)" size="icon" class="bg-white text-[#263238] hover:bg-gray-100">
+            <Button @click="handleEditProject(project)" size="icon" variant="secondary" class="bg-white hover:bg-gray-100">
               <Edit class="h-4 w-4" />
             </Button>
             <Button
@@ -781,7 +781,7 @@ const handleTagKeyPress = (e: KeyboardEvent) => {
                 <img :src="url" :alt="`Preview ${index + 1}`" class="w-full h-full object-cover" />
                 <button
                   @click="handleRemoveImage(index)"
-                  class="absolute top-2 right-2 bg-red-600 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                  class="absolute top-2 right-2 bg-destructive text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
                 >
                   <X class="h-4 w-4" />
                 </button>
@@ -831,7 +831,7 @@ const handleTagKeyPress = (e: KeyboardEvent) => {
           <Button @click="showAddDialog = false" variant="outline">
             Cancelar
           </Button>
-          <Button @click="handleSaveProject" class="bg-[#286AD8] hover:bg-[#435574]">
+          <Button @click="handleSaveProject" variant="default">
             {{ editingProject ? 'Atualizar Projeto' : 'Adicionar Projeto' }}
           </Button>
         </DialogFooter>
@@ -945,7 +945,7 @@ const handleTagKeyPress = (e: KeyboardEvent) => {
                 showViewDialog = false;
                 handleEditProject(viewingProject);
               "
-              class="bg-[#286AD8] hover:bg-[#435574]"
+              variant="default"
             >
               <Edit class="h-4 w-4 mr-2" />
               Editar Projeto
@@ -969,7 +969,7 @@ const handleTagKeyPress = (e: KeyboardEvent) => {
           <AlertDialogCancel>Cancelar</AlertDialogCancel>
           <AlertDialogAction
             @click="handleDeleteProject"
-            class="bg-red-600 hover:bg-red-700"
+            class="bg-destructive hover:bg-destructive/90"
           >
             Excluir
         </AlertDialogAction>

@@ -611,7 +611,7 @@ watch(currentTab, () => {
                     <div class="flex-1 min-w-0 cursor-pointer" @click="handleViewDetails(proposal)">
                       <div class="flex flex-wrap items-center gap-2 mb-1">
                         <h3 class="font-semibold text-[#263238] hover:text-[#286AD8] truncate">{{ proposal.service }}</h3>
-                        <Badge v-if="!proposal.viewed" class="bg-[#286AD8] hover:bg-[#286AD8] text-xs flex-shrink-0">
+                        <Badge v-if="!proposal.viewed" class="bg-primary hover:bg-primary text-xs flex-shrink-0">
                           Novo
                         </Badge>
                       </div>
@@ -785,7 +785,6 @@ watch(currentTab, () => {
                 @click="currentPage = pageNum"
                 :variant="currentPage === pageNum ? 'default' : 'outline'"
                 size="sm"
-                :class="currentPage === pageNum ? 'bg-[#286AD8] hover:bg-[#435574]' : ''"
               >
                 {{ pageNum }}
               </Button>
@@ -828,7 +827,7 @@ watch(currentTab, () => {
           <Button @click="showRejectDialog = false" variant="outline">
             Cancelar
           </Button>
-          <Button @click="handleRejectProposal" class="bg-red-600 hover:bg-red-700">
+          <Button @click="handleRejectProposal" variant="destructive">
             Confirmar Recusa
           </Button>
         </DialogFooter>
@@ -847,7 +846,7 @@ watch(currentTab, () => {
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel @click="showArchiveDialog = false">Cancelar</AlertDialogCancel>
-          <AlertDialogAction @click="handleArchiveProposal" class="bg-[#286AD8] hover:bg-[#435574]">
+          <AlertDialogAction @click="handleArchiveProposal">
             Arquivar
           </AlertDialogAction>
         </AlertDialogFooter>
