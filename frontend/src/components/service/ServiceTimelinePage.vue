@@ -309,7 +309,6 @@ const handleFileUpload = (milestoneId: string) => {
               <div class="flex gap-2">
                 <Button
                   @click="handleAddComment(milestone.id)"
-                  class="bg-[#286AD8] hover:bg-[#435574]"
                   size="sm"
                 >
                   <Send class="h-4 w-4 mr-2" />
@@ -342,7 +341,7 @@ const handleFileUpload = (milestoneId: string) => {
               <div class="flex gap-2">
                 <Button
                   @click="handleRequestRevision(milestone.id)"
-                  class="bg-yellow-600 hover:bg-yellow-700"
+                  variant="warning"
                   size="sm"
                 >
                   Solicitar Revisão
@@ -366,7 +365,7 @@ const handleFileUpload = (milestoneId: string) => {
                 @click="selectedMilestone = milestone.id"
                 variant="outline"
                 size="sm"
-                class="border-[#286AD8] text-[#286AD8]"
+                class="text-primary border-primary"
               >
                 <MessageSquare class="h-4 w-4 mr-2" />
                 Adicionar Comentário

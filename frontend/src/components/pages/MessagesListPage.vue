@@ -175,7 +175,7 @@ const handleConversationClick = (conversation: Conversation) => {
                 </span>
                 <Badge
                   v-if="conversation.unreadCount > 0"
-                  class="bg-[#286AD8] hover:bg-[#286AD8] text-white rounded-full h-5 min-w-[20px] px-1.5"
+                  class="bg-primary hover:bg-primary text-white rounded-full h-5 min-w-[20px] px-1.5"
                 >
                   {{ conversation.unreadCount }}
                 </Badge>

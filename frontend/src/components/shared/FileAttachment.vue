@@ -118,7 +118,7 @@ const iconClasses = {
       <Button 
         variant="ghost" 
         size="icon" 
-        class="h-8 w-8 text-[#435574] hover:text-[#286AD8] hover:bg-blue-50"
+        class="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-blue-50"
         title="Visualizar"
         @click="handleView"
       >
@@ -127,7 +127,7 @@ const iconClasses = {
       <Button 
         variant="ghost" 
         size="icon" 
-        class="h-8 w-8 text-[#435574] hover:text-[#286AD8] hover:bg-blue-50"
+        class="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-blue-50"
         title="Baixar"
         @click="handleDownload"
       >

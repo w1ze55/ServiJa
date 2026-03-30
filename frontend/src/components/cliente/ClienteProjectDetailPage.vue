@@ -279,13 +279,12 @@ const getStatusColor = (status: string) => {
       <div v-if="request?.status === 'delivered'" class="flex items-center gap-2">
         <Button
           @click="handleOpenAdjustmentModal"
-          variant="outline"
-          class="border-yellow-500 text-yellow-700 hover:bg-yellow-50"
+          variant="warning"
         >
           <AlertCircle class="h-4 w-4 mr-2" />
           Solicitar Ajustes
         </Button>
-        <Button @click="handleApproveDelivery" class="bg-green-600 hover:bg-green-700">
+        <Button @click="handleApproveDelivery" variant="success">
           <CheckCircle class="h-4 w-4 mr-2" />
           Aprovar Entrega
         </Button>
@@ -386,7 +385,7 @@ const getStatusColor = (status: string) => {
               <div class="p-4 border-t bg-white">
                 <div class="flex gap-2">
                   <Input v-model="newMessage" placeholder="Digite sua mensagem..." @keyup.enter="handleSendMessage" class="flex-1 rounded-full px-6" />
-                  <Button @click="handleSendMessage" :disabled="!newMessage.trim() || isSendingMessage" class="bg-blue-600 hover:bg-blue-700 rounded-full w-12 h-12 p-0 flex items-center justify-center">
+                  <Button @click="handleSendMessage" :disabled="!newMessage.trim() || isSendingMessage" variant="default" class="rounded-full w-12 h-12 p-0 flex items-center justify-center">
                     <Send class="h-5 w-5 text-white" />
                   </Button>
                 </div>
@@ -402,7 +401,7 @@ const getStatusColor = (status: string) => {
             <Card class="p-6">
               <div class="flex items-center justify-between mb-6">
                 <h3 class="font-bold text-[#263238]">Anexos do Projeto</h3>
-                <Button variant="outline" size="sm" class="text-blue-600 border-blue-200">
+                <Button variant="outline" size="sm" class="text-primary border-primary">
                   <Upload class="h-4 w-4 mr-2" />
                   Enviar Arquivo
                 </Button>
@@ -467,7 +466,7 @@ const getStatusColor = (status: string) => {
             </div>
           </div>
 
-          <Button variant="outline" class="w-full mt-6 rounded-full border-blue-200 text-blue-600 hover:bg-blue-50" @click="activeTab = 'messages'">
+          <Button variant="outline" class="w-full mt-6 rounded-full border-primary text-primary" @click="activeTab = 'messages'">
             <MessageSquare class="h-4 w-4 mr-2" />
             Abrir Chat
           </Button>

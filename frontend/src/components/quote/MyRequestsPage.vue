@@ -336,7 +336,6 @@ const getFilterStatusLabel = (value: string) => {
                     })
                   "
                   size="sm"
-                  class="bg-[#286AD8] hover:bg-[#435574]"
                 >
                   <Eye class="h-4 w-4 mr-2" />
                   Ver detalhes
@@ -409,7 +408,7 @@ const getFilterStatusLabel = (value: string) => {
               })
             "
             size="sm"
-            class="flex-1 bg-[#286AD8] hover:bg-[#435574]"
+            class="flex-1"
           >
             Ver detalhes
           </Button>
@@ -449,7 +448,7 @@ const getFilterStatusLabel = (value: string) => {
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Voltar</AlertDialogCancel>
-          <AlertDialogAction @click="confirmCancel" class="bg-red-600 hover:bg-red-700">
+          <AlertDialogAction @click="confirmCancel" class="bg-destructive hover:bg-destructive/90">
             Confirmar cancelamento
           </AlertDialogAction>
         </AlertDialogFooter>

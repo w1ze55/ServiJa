@@ -108,7 +108,7 @@ const handleConfirmPayment = async (paymentMethod: string, paymentData: any) => 
         </div>
         <h2 class="text-2xl font-bold text-[#263238] mb-2">Ops!</h2>
         <p class="text-[#435574] mb-6">{{ error }}</p>
-        <Button @click="handleBack" class="bg-[#286AD8] hover:bg-[#435574]">
+        <Button @click="handleBack" variant="default">
           Voltar para Minhas Solicitações
         </Button>
       </div>

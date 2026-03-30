@@ -289,7 +289,6 @@ onUnmounted(() => {
         @click="selectedPeriod = 'week'"
         :variant="selectedPeriod === 'week' ? 'default' : 'outline'"
         size="sm"
-        :class="selectedPeriod === 'week' ? 'bg-[#286AD8] hover:bg-[#435574]' : ''"
       >
         Semana
       </Button>
@@ -297,7 +296,6 @@ onUnmounted(() => {
         @click="selectedPeriod = 'month'"
         :variant="selectedPeriod === 'month' ? 'default' : 'outline'"
         size="sm"
-        :class="selectedPeriod === 'month' ? 'bg-[#286AD8] hover:bg-[#435574]' : ''"
       >
         Mês
       </Button>
@@ -305,7 +303,6 @@ onUnmounted(() => {
         @click="selectedPeriod = 'year'"
         :variant="selectedPeriod === 'year' ? 'default' : 'outline'"
         size="sm"
-        :class="selectedPeriod === 'year' ? 'bg-[#286AD8] hover:bg-[#435574]' : ''"
       >
         Ano
       </Button>
@@ -569,7 +566,7 @@ onUnmounted(() => {
               </div>
             </div>
             <div class="flex gap-2">
-              <Button size="sm" class="flex-1 bg-[#286AD8] hover:bg-[#435574]">
+              <Button size="sm" variant="default" class="flex-1">
                 Responder
               </Button>
               <Button size="sm" variant="outline" class="flex-1">

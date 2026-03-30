@@ -482,7 +482,7 @@ onMounted(() => {
           <h1 class="text-2xl font-bold text-[#263238] mb-2">Meus Serviços</h1>
           <p class="text-[#435574]">Gerencie os serviços que você oferece</p>
         </div>
-        <Button @click="handleAddService" class="bg-[#286AD8] hover:bg-[#435574]">
+        <Button variant="default" @click="handleAddService">
           <Plus class="h-4 w-4 mr-2" />
           Novo Serviço
         </Button>
@@ -587,8 +587,8 @@ onMounted(() => {
             </p>
             <Button
               v-if="!searchQuery && categoryFilter === 'Todos'"
+              variant="default"
               @click="handleAddService"
-              class="bg-[#286AD8] hover:bg-[#435574]"
             >
               <Plus class="h-4 w-4 mr-2" />
               Criar Primeiro Serviço
@@ -816,7 +816,6 @@ onMounted(() => {
               @click="currentPage = pageNum"
               :variant="currentPage === pageNum ? 'default' : 'outline'"
               size="sm"
-              :class="currentPage === pageNum ? 'bg-[#286AD8] hover:bg-[#435574]' : ''"
             >
               {{ pageNum }}
             </Button>
@@ -846,7 +845,7 @@ onMounted(() => {
             <AlertDialogCancel @click="serviceToDelete = null">Cancelar</AlertDialogCancel>
             <AlertDialogAction
               @click="handleDeleteService"
-              class="bg-red-600 hover:bg-red-700"
+              class="bg-destructive hover:bg-destructive/90"
             >
               Sim, Excluir
             </AlertDialogAction>
@@ -871,7 +870,7 @@ onMounted(() => {
             <AlertDialogCancel @click="serviceToToggle = null">Cancelar</AlertDialogCancel>
             <AlertDialogAction
               @click="handleToggleService"
-              class="bg-[#286AD8] hover:bg-[#435574]"
+              class="bg-primary hover:bg-primary/90"
             >
               Confirmar
             </AlertDialogAction>

@@ -383,7 +383,7 @@ const getFileIcon = (filename: string) => {
         </Button>
         <Button
           type="submit"
-          class="flex-1 bg-[#286AD8] hover:bg-[#435574]"
+          class="flex-1"
           :disabled="isSubmitting"
         >
           <template v-if="isSubmitting">

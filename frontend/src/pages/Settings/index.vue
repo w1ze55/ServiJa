@@ -184,7 +184,7 @@ const handleLogout = () => {
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter class="sm:justify-center">
-          <AlertDialogAction @click="showDevelopmentModal = false" class="bg-[#286AD8] hover:bg-[#1e5bb8]">
+          <AlertDialogAction @click="showDevelopmentModal = false" class="bg-primary hover:bg-primary/90">
             Entendi
           </AlertDialogAction>
         </AlertDialogFooter>

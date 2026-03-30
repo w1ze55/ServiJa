@@ -310,7 +310,6 @@ onMounted(() => {
             :variant="viewMode === 'grid' ? 'default' : 'outline'"
             size="icon"
             @click="viewMode = 'grid'"
-            :class="viewMode === 'grid' ? 'bg-[#286AD8]' : ''"
           >
             <Grid3x3 class="h-4 w-4" />
           </Button>
@@ -318,7 +317,6 @@ onMounted(() => {
             :variant="viewMode === 'list' ? 'default' : 'outline'"
             size="icon"
             @click="viewMode = 'list'"
-            :class="viewMode === 'list' ? 'bg-[#286AD8]' : ''"
           >
             <List class="h-4 w-4" />
           </Button>
@@ -359,7 +357,7 @@ onMounted(() => {
       <AlertCircle class="h-12 w-12 text-red-400 mx-auto mb-4" />
       <h3 class="text-lg font-semibold text-[#263238] mb-2">Ops, algo deu errado</h3>
       <p class="text-[#435574] mb-4">{{ error }}</p>
-      <Button @click="loadServices" class="bg-[#286AD8]">
+      <Button @click="loadServices">
         <RefreshCw class="h-4 w-4 mr-2" /> Tentar novamente
       </Button>
     </div>
@@ -377,7 +375,7 @@ onMounted(() => {
         </div>
         <h3 class="text-[#263238] mb-2">Nenhum profissional encontrado</h3>
         <p class="text-[#435574] mb-6">Tente ajustar seus filtros ou fazer uma nova busca</p>
-        <Button @click="clearFilters" variant="outline" class="border-[#286AD8] text-[#286AD8]">
+        <Button @click="clearFilters" variant="outline" class="text-primary border-primary">
           Limpar filtros
         </Button>
       </div>
@@ -479,7 +477,7 @@ onMounted(() => {
         </div>
         <h3 class="text-[#263238] mb-2">Nenhum serviço encontrado</h3>
         <p class="text-[#435574] mb-6">Tente ajustar seus filtros ou fazer uma nova busca</p>
-        <Button @click="clearFilters" variant="outline" class="border-[#286AD8] text-[#286AD8]">
+        <Button @click="clearFilters" variant="outline" class="text-primary border-primary">
           Limpar filtros
         </Button>
       </div>

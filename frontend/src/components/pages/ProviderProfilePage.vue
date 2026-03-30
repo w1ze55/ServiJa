@@ -939,7 +939,7 @@ onMounted(() => {
         <AlertCircle class="h-12 w-12 text-red-400 mx-auto mb-4" />
         <h3 class="text-lg font-semibold text-[#263238] mb-2">Ops, algo deu errado</h3>
         <p class="text-[#435574] mb-4">{{ error }}</p>
-        <Button @click="loadFreelancerData" class="bg-[#286AD8]">
+        <Button @click="loadFreelancerData">
           Tentar novamente
         </Button>
       </div>
@@ -1119,7 +1119,6 @@ onMounted(() => {
                         :variant="currentServicePage === page ? 'default' : 'outline'"
                         @click="goToServicePage(page as number)"
                         class="h-9 w-9 p-0"
-                        :class="currentServicePage === page ? 'bg-[#286AD8] hover:bg-[#286AD8]/90' : ''"
                       >
                         {{ page }}
                       </Button>
@@ -1448,7 +1447,7 @@ onMounted(() => {
 
                 <!-- NEW: Project Links in Modal -->
                 <div v-if="selectedProject?.projectUrl || selectedProject?.videoUrl" class="flex flex-col sm:flex-row gap-3 pt-6 border-t border-gray-100">
-                  <Button v-if="selectedProject?.projectUrl" asChild class="flex-1 bg-[#286AD8] hover:bg-[#435574]">
+                  <Button v-if="selectedProject?.projectUrl" asChild class="flex-1">
                     <a :href="selectedProject.projectUrl" target="_blank" class="flex items-center justify-center">
                       <ExternalLink class="h-4 w-4 mr-2" />
                       Acessar Projeto
@@ -1744,7 +1743,7 @@ onMounted(() => {
 
           <Button
             @click="handleSendQuote"
-            class="w-full bg-[#286AD8]"
+            class="w-full"
             :disabled="isSendingQuote"
           >
             <Loader2 v-if="isSendingQuote" class="h-4 w-4 mr-2 animate-spin" />

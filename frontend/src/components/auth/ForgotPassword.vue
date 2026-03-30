@@ -128,13 +128,14 @@ const handleSubmit = async (e: Event) => {
     class="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4"
   >
     <div class="w-full max-w-md bg-white rounded-lg shadow-xl p-8">
-      <button
+      <Button
+        variant="ghost"
         @click="props.onBack"
-        class="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6"
+        class="mb-6"
       >
         <ArrowLeft class="h-4 w-4" />
         Voltar para login
-      </button>
+      </Button>
 
       <div class="text-center mb-8">
         <div class="inline-flex p-4 bg-blue-100 rounded-full mb-4">

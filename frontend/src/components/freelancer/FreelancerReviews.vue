@@ -299,7 +299,6 @@ const clearFilters = () => {
         :key="page"
         @click="currentPage = page"
         :variant="currentPage === page ? 'default' : 'outline'"
-        :class="currentPage === page ? 'bg-[#286AD8]' : ''"
       >
         {{ page }}
       </Button>

@@ -576,7 +576,7 @@ const handleRemoveImage = async (index: number) => {
           <Button type="button" variant="outline" @click="handleClose">
             Cancelar
           </Button>
-          <Button type="submit" class="bg-[#286AD8] hover:bg-[#435574]">
+          <Button type="submit">
             {{ service?.id ? 'Salvar Alterações' : 'Cadastrar Serviço' }}
           </Button>
         </div>

@@ -18,21 +18,6 @@
   padding: 2rem;
 }
 
-.signup-account-type-back-button {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  color: rgb(75, 85, 99);
-  background: none;
-  border: none;
-  cursor: pointer;
-  margin-bottom: 1.5rem;
-  transition: color 0.2s;
-}
-
-.signup-account-type-back-button:hover {
-  color: rgb(17, 24, 39);
-}
 
 .signup-account-type-header {
   margin-bottom: 2rem;
@@ -180,30 +165,10 @@
   color: rgb(37, 99, 235);
 }
 
-.signup-account-type-submit-button {
-  width: 100%;
-}
-
 .signup-account-type-back-wrapper {
   margin-top: 1rem;
   text-align: center;
 }
 
-.signup-account-type-back-link {
-  font-size: 0.875rem;
-  color: rgb(107, 114, 128);
-  background: none;
-  border: none;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.25rem;
-  margin: 0 auto;
-  transition: color 0.2s;
-}
 
-.signup-account-type-back-link:hover {
-  color: rgb(55, 65, 81);
-}
 

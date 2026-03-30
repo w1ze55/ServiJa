@@ -526,7 +526,7 @@ onMounted(async () => {
                 v-if="provider.available"
                 @click.stop="contactProvider(provider)"
                 size="sm"
-                class="flex-1 bg-blue-600 hover:bg-blue-700"
+                class="flex-1"
               >
                 <MessageSquare class="h-4 w-4 mr-1" />
                 Contatar
@@ -614,7 +614,6 @@ onMounted(async () => {
                   v-if="provider.available"
                   @click.stop="contactProvider(provider)"
                   size="sm"
-                  class="bg-blue-600"
                 >
                   <MessageSquare class="h-4 w-4" />
                 </Button>

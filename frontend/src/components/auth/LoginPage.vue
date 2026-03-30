@@ -154,7 +154,7 @@ const handleSubmit = async (e: Event) => {
         </div>
 
         <!-- Entrar -->
-        <Button type="submit" class="login-page-submit-button" :disabled="isLoading">
+        <Button type="submit" class="w-full" :disabled="isLoading">
           {{ isLoading ? 'Entrando...' : 'Entrar' }}
         </Button>
       </form>
@@ -163,34 +163,38 @@ const handleSubmit = async (e: Event) => {
       <div class="login-page-signup-wrapper">
         <p class="login-page-signup-text">
           Não tem uma conta?
-          <button
+          <Button
+            variant="link"
             @click="props.onSignUp"
-            class="login-page-signup-button"
           >
             Cadastre-se
-          </button>
+          </Button>
         </p>
       </div>
 
       <!-- Voltar -->
       <div v-if="props.onBack" class="login-page-back-wrapper">
-        <button
+        <Button
+          variant="ghost"
+          size="sm"
           @click="props.onBack"
-          class="login-page-back-button"
+          class="mx-auto"
         >
           <ArrowLeft class="h-4 w-4" />
           Voltar para o início
-        </button>
+        </Button>
       </div>
 
       <div v-if="props.onBackToLanding" class="login-page-back-wrapper">
-        <button
+        <Button
+          variant="ghost"
+          size="sm"
           @click="props.onBackToLanding"
-          class="login-page-back-button"
+          class="mx-auto"
         >
           <ArrowLeft class="h-4 w-4" />
           Voltar para a página inicial
-        </button>
+        </Button>
       </div>
     </div>
   </div>

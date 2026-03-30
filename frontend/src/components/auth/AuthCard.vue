@@ -1,14 +1,15 @@
 <template>
   <div class="auth-card-container">
     <div class="auth-card-wrapper">
-      <button
+      <Button
         v-if="onBackToLanding"
+        variant="ghost"
         @click="onBackToLanding"
-        class="auth-card-back-button"
+        class="mb-4"
       >
         <ArrowLeft class="h-4 w-4" />
         Voltar para a página inicial
-      </button>
+      </Button>
 
       <div class="auth-card-main">
         <div class="auth-card-grid">
@@ -69,7 +70,7 @@
 
                 <Button
                   type="submit"
-                  class="auth-card-submit-button"
+                  class="w-full"
                   size="lg"
                   :disabled="isLoggingIn"
                 >
@@ -79,13 +80,13 @@
                 <div class="md:hidden text-center mt-6">
                   <p class="auth-card-switch-text">
                     Não tem uma conta?
-                    <button
+                    <Button
                       type="button"
+                      variant="link"
                       @click="handleSwitchToSignup"
-                      class="auth-card-switch-button"
                     >
                       Cadastre-se
-                    </button>
+                    </Button>
                   </p>
                 </div>
               </form>
@@ -142,13 +143,13 @@
                   <div class="md:hidden text-center mt-6">
                     <p class="text-gray-600">
                       Já tem uma conta?
-                      <button 
-                        type="button" 
-                        @click="handleSwitchToLogin" 
-                        class="auth-card-switch-button"
+                      <Button 
+                        type="button"
+                        variant="link"
+                        @click="handleSwitchToLogin"
                       >
                         Entrar
-                      </button>
+                      </Button>
                     </p>
                   </div>
                 </form>
@@ -157,13 +158,14 @@
               <!-- Signup Step 2: Personal Data -->
               <template v-else-if="signupStep === 'data' && selectedAccountType">
                 <div class="w-full">
-                  <button
+                  <Button
+                    variant="ghost"
                     @click="signupStep = 'type'"
-                    class="auth-card-back-button"
+                    class="mb-4"
                   >
                     <ArrowLeft class="h-4 w-4" />
                     Voltar
-                  </button>
+                  </Button>
 
                   <div class="mb-6">
                     <h3 class="text-gray-900 mb-2">Dados pessoais</h3>

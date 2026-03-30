@@ -200,8 +200,8 @@ const userTypeLabel = computed(() => {
         </div>
         <Button
           v-if="!isEditing"
+          variant="default"
           @click="handleEdit"
-          class="btn-edit"
         >
           <Edit2 :size="18" />
           Editar Perfil
@@ -332,7 +332,7 @@ const userTypeLabel = computed(() => {
               <Button
                 variant="outline"
                 :disabled="!isEditing"
-                class="btn-avatar"
+                class="w-full justify-center"
               >
                 <Camera :size="18" />
                 Alterar Foto
@@ -351,15 +351,14 @@ const userTypeLabel = computed(() => {
           variant="outline"
           @click="handleCancel"
           :disabled="isLoading"
-          class="btn-cancel"
         >
           <X :size="18" />
           Cancelar
         </Button>
         <Button
+          variant="success"
           @click="handleSave"
           :disabled="isLoading"
-          class="btn-save"
         >
           <Save :size="18" />
           {{ isLoading ? 'Salvando...' : 'Salvar Alterações' }}
@@ -406,24 +405,6 @@ const userTypeLabel = computed(() => {
 .account-subtitle {
   color: #6b7280;
   font-size: 1rem;
-}
-
-.btn-edit {
-  background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
-  color: white;
-  font-weight: 600;
-  padding: 0.75rem 1.5rem;
-  border-radius: 0.5rem;
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
-  transition: all 0.3s ease;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.btn-edit:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
 }
 
 .alert {
@@ -599,11 +580,6 @@ const userTypeLabel = computed(() => {
   width: 100%;
 }
 
-.btn-avatar {
-  width: 100%;
-  justify-content: center;
-}
-
 .avatar-note {
   font-size: 0.75rem;
   color: #9ca3af;
@@ -620,42 +596,5 @@ const userTypeLabel = computed(() => {
   flex-wrap: wrap;
 }
 
-.btn-cancel,
-.btn-save {
-  padding: 0.75rem 1.5rem;
-  border-radius: 0.5rem;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  transition: all 0.3s ease;
-}
-
-.btn-cancel {
-  background: white;
-  border: 2px solid #e5e7eb;
-  color: #374151;
-}
-
-.btn-cancel:hover {
-  background: #f9fafb;
-  border-color: #d1d5db;
-}
-
-.btn-save {
-  background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
-  color: white;
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
-}
-
-.btn-save:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
-}
-
-.btn-save:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
 </style>
 

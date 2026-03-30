@@ -191,10 +191,7 @@ const formatDate = (dateStr: string) =>
             :variant="currentPage === page ? 'default' : 'outline'"
             size="sm"
             @click="goToPage(page)"
-            :class="[
-              'h-9 w-9 p-0',
-              currentPage === page ? 'bg-[#286AD8] hover:bg-[#286AD8]/90' : 'hover:bg-gray-100'
-            ]"
+            class="h-9 w-9 p-0"
           >
             {{ page }}
           </Button>
