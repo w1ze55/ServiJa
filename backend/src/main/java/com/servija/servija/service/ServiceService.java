@@ -9,6 +9,7 @@ import com.servija.servija.model.Freelancer;
 import com.servija.servija.model.Service;
 import com.servija.servija.model.User;
 import com.servija.servija.repository.FreelancerRepository;
+import com.servija.servija.repository.ReviewRepository;
 import com.servija.servija.repository.ServiceRepository;
 import com.servija.servija.repository.ServiceRequestRepository;
 import com.servija.servija.repository.UserRepository;
@@ -35,6 +36,7 @@ public class ServiceService {
     private final UserRepository userRepository;
     private final FileStorageService fileStorageService;
     private final ServiceRequestRepository serviceRequestRepository;
+    private final ReviewRepository reviewRepository;
     private final ObjectMapper objectMapper;
     private static final BigDecimal AVERAGE_PRICE_RANGE_SPREAD = new BigDecimal("0.20");
 
@@ -260,7 +262,7 @@ public class ServiceService {
     public List<ServiceResponse> getPublicServicesByFreelancer(Long freelancerId) {
         List<Service> services = serviceRepository.findByFreelancerIdAndIsActiveOrderByCreatedAtDesc(freelancerId,
                 true);
-        return services.stream().map(this::toResponse).collect(Collectors.toList());
+        return toPublicResponses(services);
     }
 
     @Transactional(readOnly = true)
@@ -281,7 +283,7 @@ public class ServiceService {
     @Transactional(readOnly = true)
     public List<ServiceResponse> getAllActiveServices() {
         List<Service> services = serviceRepository.findByIsActiveOrderByCreatedAtDesc(true);
-        return services.stream().map(this::toResponse).collect(Collectors.toList());
+        return toPublicResponses(services);
     }
 
     /**
@@ -290,7 +292,7 @@ public class ServiceService {
     @Transactional(readOnly = true)
     public List<ServiceResponse> getServicesByCategory(String category) {
         List<Service> services = serviceRepository.findByCategoryAndIsActiveOrderByCreatedAtDesc(category, true);
-        return services.stream().map(this::toResponse).collect(Collectors.toList());
+        return toPublicResponses(services);
     }
 
     /**
@@ -299,7 +301,7 @@ public class ServiceService {
     @Transactional(readOnly = true)
     public List<ServiceResponse> searchPublicServices(String query) {
         List<Service> services = serviceRepository.searchServices(query);
-        return services.stream().map(this::toResponse).collect(Collectors.toList());
+        return toPublicResponses(services);
     }
 
     /**
@@ -345,6 +347,8 @@ public class ServiceService {
 
     private ServiceResponse toPublicResponse(Service service) {
         ServiceResponse response = toResponse(service);
+        populateServiceReviewSummary(service.getId(), response);
+
         long completedServicesCount = serviceRequestRepository.countByService_IdAndStatusAndResponseValueIsNotNull(
                 service.getId(),
                 com.servija.servija.model.ServiceRequest.Status.COMPLETED);
@@ -367,6 +371,26 @@ public class ServiceService {
         response.setAveragePriceMin(calculateAveragePriceBound(normalizedAverage, true));
         response.setAveragePriceMax(calculateAveragePriceBound(normalizedAverage, false));
         return response;
+    }
+
+    private List<ServiceResponse> toPublicResponses(List<Service> services) {
+        return services.stream().map(this::toPublicResponse).collect(Collectors.toList());
+    }
+
+    private void populateServiceReviewSummary(Long serviceId, ServiceResponse response) {
+        long serviceReviewCount = reviewRepository.countByServiceId(serviceId);
+        response.setServiceReviewCount(Math.toIntExact(serviceReviewCount));
+
+        if (serviceReviewCount == 0) {
+            return;
+        }
+
+        Double averageRating = reviewRepository.findAverageRatingByServiceId(serviceId);
+        if (averageRating == null) {
+            return;
+        }
+
+        response.setServiceRating(BigDecimal.valueOf(averageRating).setScale(1, RoundingMode.HALF_UP));
     }
 
     private BigDecimal calculateAveragePriceBound(BigDecimal averagePrice, boolean lowerBound) {

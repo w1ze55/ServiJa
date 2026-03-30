@@ -14,6 +14,7 @@ import {
   ChevronRight,
   DollarSign,
   Clock,
+  Star,
 } from 'lucide-vue-next';
 import Button from '../ui/button.vue';
 import Card from '../ui/card.vue';
@@ -32,16 +33,16 @@ import api from '@/api/config/axios';
 import { toast } from '@/utils/toast';
 import { useFavoritesStore } from '@/stores/favorites';
 import { CATEGORIES } from '@/constants/categories';
+import { getServicePriceDisplay, getServicePriceSortValue, type ServicePriceRangeData } from '@/utils/servicePricing';
+import { formatServiceRatingDisplay, hasServiceRating, type ServiceReviewSummary } from '@/utils/serviceReviews';
 
-interface ServiceItem {
+interface ServiceItem extends ServicePriceRangeData, ServiceReviewSummary {
   id: number;
   freelancerId: number;
   freelancerName: string;
   title: string;
   category: string;
   description: string;
-  price: number;
-  priceType: string;
   deliveryTime: number;
   deliveryUnit: string;
   workModel?: string | null;
@@ -168,10 +169,10 @@ const filteredServices = computed(() => {
 
   switch (sortBy.value) {
     case 'price-asc':
-      result.sort((a, b) => a.price - b.price);
+      result.sort((a, b) => getServicePriceSortValue(a) - getServicePriceSortValue(b));
       break;
     case 'price-desc':
-      result.sort((a, b) => b.price - a.price);
+      result.sort((a, b) => getServicePriceSortValue(b) - getServicePriceSortValue(a));
       break;
     case 'name-asc':
       result.sort((a, b) => a.title.localeCompare(b.title));
@@ -604,12 +605,15 @@ watch(
 
               <p class="text-sm text-[#435574] mb-3 line-clamp-2">{{ service.description }}</p>
 
+              <div class="flex items-center gap-1.5 text-xs text-[#435574] mb-3">
+                <Star :class="`h-3.5 w-3.5 ${hasServiceRating(service) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`" />
+                <span>{{ formatServiceRatingDisplay(service) }}</span>
+              </div>
+
               <div class="flex items-center gap-4">
                 <div class="flex items-center gap-1 text-[#286AD8]">
                   <DollarSign class="h-4 w-4" />
-                  <span class="font-bold text-sm">
-                    {{ new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(service.price) }}{{ service.priceType === 'HOURLY' ? '/hora' : service.priceType === 'DAILY' ? '/dia' : '' }}
-                  </span>
+                  <span class="font-bold text-sm">{{ getServicePriceDisplay(service) }}</span>
                 </div>
                 <div class="flex items-center gap-1 text-[#435574]">
                   <Clock class="h-3.5 w-3.5" />

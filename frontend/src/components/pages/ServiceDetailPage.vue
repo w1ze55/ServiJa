@@ -33,6 +33,7 @@ import Label from '@/components/ui/label.vue';
 import api from '@/api/config/axios';
 import { toast } from '@/utils/toast';
 import { useFavoritesStore } from '@/stores/favorites';
+import { formatBaseServicePrice, getServicePriceDisplay, hasAveragePriceRange as hasAveragePriceRangeData, type ServicePriceRangeData } from '@/utils/servicePricing';
 import { getWorkModelLabel, normalizeWorkModel } from '@/utils/workModel';
 import ImageGallery from '@/components/shared/ImageGallery.vue';
 import ReviewList from '@/components/shared/ReviewList.vue';
@@ -41,19 +42,13 @@ import WorkModelBadge from '@/components/shared/WorkModelBadge.vue';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-interface ServiceItem {
+interface ServiceItem extends ServicePriceRangeData {
   id: number;
   freelancerId: number;
   freelancerName: string;
   title: string;
   category: string;
   description: string;
-  price: number;
-  completedServicesCount?: number | null;
-  averageCompletedPrice?: number | null;
-  averagePriceMin?: number | null;
-  averagePriceMax?: number | null;
-  priceType: string;
   deliveryTime: number;
   deliveryUnit: string;
   workModel?: string | null;
@@ -143,40 +138,6 @@ function createEmptyAddressErrors(): QuoteAddressErrors {
   return { zipCode: '', street: '', number: '', neighborhood: '', city: '', state: '' };
 }
 
-const formatPrice = (price: number, priceType: string) => {
-  const f = formatCurrency(price);
-  const suffix = getPriceTypeSuffix(priceType);
-  return `${f}${suffix}`;
-};
-
-const formatCurrency = (price: number) =>
-  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(price);
-
-const getPriceTypeSuffix = (priceType: string) =>
-  priceType === 'HOURLY' ? '/hora' : priceType === 'DAILY' ? '/dia' : '';
-
-const roundAverageRangeValue = (value: number) => {
-  const normalized = (value + 0.1) / 10;
-  const lowerCandidate = (Math.floor(normalized) * 10) - 0.1;
-  const upperCandidate = (Math.ceil(normalized) * 10) - 0.1;
-
-  if (lowerCandidate <= 0) {
-    return Number(upperCandidate.toFixed(2));
-  }
-
-  const nearestCandidate = Math.abs(value - lowerCandidate) <= Math.abs(upperCandidate - value)
-    ? lowerCandidate
-    : upperCandidate;
-
-  return Number(nearestCandidate.toFixed(2));
-};
-
-const formatAveragePriceRange = (min: number, max: number) => {
-  const roundedMin = roundAverageRangeValue(min);
-  const roundedMax = Math.max(roundAverageRangeValue(max), roundedMin);
-  return `${formatCurrency(roundedMin)} - ${formatCurrency(roundedMax)}`;
-};
-
 const getInitials = (name: string) =>
   name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2);
 
@@ -222,19 +183,12 @@ const serviceExperienceLabel = computed(() => {
 
   return `${completedServicesCount} ${completedServicesCount === 1 ? 'entrega concluída' : 'entregas concluídas'}`;
 });
-const hasAveragePriceRange = computed(() =>
-  Boolean(
-    service.value
-    && (service.value.completedServicesCount ?? 0) > 0
-    && service.value.averagePriceMin != null
-    && service.value.averagePriceMax != null
-  )
-);
+const hasAveragePriceRange = computed(() => hasAveragePriceRangeData(service.value));
 const servicePriceLabel = computed(() => hasAveragePriceRange.value ? 'Valor médio do serviço' : 'Valor aproximado');
 const servicePriceDisplay = computed(() => {
   if (!service.value) return '';
-  if (!hasAveragePriceRange.value) return formatPrice(service.value.price, service.value.priceType);
-  return formatAveragePriceRange(service.value.averagePriceMin!, service.value.averagePriceMax!);
+  if (!hasAveragePriceRange.value) return formatBaseServicePrice(service.value.price, service.value.priceType);
+  return getServicePriceDisplay(service.value);
 });
 const averageRating = computed(() => {
   if (!reviews.value.length) return null;
