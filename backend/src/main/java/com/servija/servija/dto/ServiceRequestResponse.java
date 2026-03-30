@@ -38,14 +38,12 @@ public class ServiceRequestResponse {
     private List<FreelancerAttachmentDTO> freelancerAttachmentDetails;
     private List<String> responseAttachments;
 
-    // Freelancer response
     private BigDecimal responseValue;
     private Integer responseDays;
     private String responseScope;
     private String responseNotes;
     private LocalDateTime respondedAt;
 
-    // Counter-proposal
     private BigDecimal counterValue;
     private Integer counterDays;
     private String counterNotes;

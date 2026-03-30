@@ -147,7 +147,8 @@ watch(() => props.requestId, async (newId, oldId) => {
   }
 });
 
-const formatCurrency = (value: number) => {
+const formatCurrency = (value?: number | null) => {
+  if (value == null) return 'A combinar';
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
     currency: 'BRL',

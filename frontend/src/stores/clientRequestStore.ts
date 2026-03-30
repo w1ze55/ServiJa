@@ -49,7 +49,7 @@ export interface ServiceRequest {
     service: string;
     category: string;
     description: string;
-    budget: number;
+    budget?: number | null;
     deadline: string;
     workModel?: WorkModelValue | null;
     status: 'pending' | 'sent' | 'negotiating' | 'accepted' | 'in_progress' | 'delivered' | 'rejected' | 'completed' | 'cancelled';
@@ -74,7 +74,7 @@ export interface CreateServiceRequestInput {
     service: string;
     category: string;
     description: string;
-    budget: number;
+    budget?: number;
     deadline: string;
     workModel: WorkModelValue;
     address?: string;
@@ -175,6 +175,7 @@ export const useClientRequestStore = defineStore('clientRequest', () => {
         ...req,
         id: String(req.id),
         service: req.serviceName,
+        budget: req.budget ?? existingRequest?.budget ?? null,
         workModel: normalizeWorkModel(req.workModel),
         status: mapApiStatusToLocal(req.status),
         updatedAt: req.updatedAt || req.createdAt,
@@ -261,7 +262,6 @@ export const useClientRequestStore = defineStore('clientRequest', () => {
                 serviceName: input.service,
                 category: input.category,
                 description: input.description,
-                budget: input.budget,
                 deadline: input.deadline,
                 workModel: input.workModel,
                 address: input.address,

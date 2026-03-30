@@ -18,10 +18,16 @@ import com.servija.servija.repository.ServiceRequestRepository;
 import com.servija.servija.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.support.GeneratedKeyHolder;
+import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.sql.Date;
+import java.sql.PreparedStatement;
+import java.sql.Statement;
 import java.math.BigDecimal;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
@@ -46,7 +52,9 @@ public class ServiceRequestService {
     private final ServiceRequestHistoryService historyService;
     private final WebSocketService webSocketService;
     private final NotificationService notificationService;
+    private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private static final BigDecimal LEGACY_BUDGET_PLACEHOLDER = new BigDecimal("5.00");
 
     @Transactional
     public ServiceRequestResponse create(String contractorEmail, ServiceRequestDTO dto) {
@@ -148,7 +156,6 @@ public class ServiceRequestService {
                 .serviceName(dto.getServiceName())
                 .category(dto.getCategory())
                 .description(normalizedDescription)
-                .budget(dto.getBudget())
                 .deadline(dto.getDeadline())
                 .workModel(requestWorkModel)
                 .address(normalizedAddress)
@@ -156,7 +163,7 @@ public class ServiceRequestService {
                 .attachments(attachmentsJson)
                 .build();
 
-        ServiceRequest saved = serviceRequestRepository.save(request);
+        ServiceRequest saved = saveNewRequest(request);
         historyService.record(saved, contractor, OperationType.REQUEST_OPENED);
 
         // Notificar freelancer sobre nova solicitação
@@ -172,6 +179,94 @@ public class ServiceRequestService {
         log.info("Service request created: {} for freelancer: {}", saved.getId(),
                 freelancer != null ? freelancer.getId() : "any");
         return toResponse(saved);
+    }
+
+    private ServiceRequest saveNewRequest(ServiceRequest request) {
+        if (!hasLegacyBudgetColumn()) {
+            return serviceRequestRepository.save(request);
+        }
+
+        log.warn("Tabela service_requests ainda possui a coluna legada budget. Aplicando insert compatível.");
+        Long generatedId = insertRequestWithLegacyBudget(request);
+        return serviceRequestRepository.findById(generatedId)
+                .orElseThrow(() -> new IllegalStateException("Não foi possível carregar a solicitação criada"));
+    }
+
+    private boolean hasLegacyBudgetColumn() {
+        Integer count = jdbcTemplate.queryForObject(
+                """
+                        SELECT COUNT(*)
+                        FROM information_schema.COLUMNS
+                        WHERE TABLE_SCHEMA = DATABASE()
+                          AND TABLE_NAME = 'service_requests'
+                          AND COLUMN_NAME = 'budget'
+                        """,
+                Integer.class);
+        return count != null && count > 0;
+    }
+
+    private Long insertRequestWithLegacyBudget(ServiceRequest request) {
+        KeyHolder keyHolder = new GeneratedKeyHolder();
+
+        jdbcTemplate.update(connection -> {
+            PreparedStatement statement = connection.prepareStatement(
+                    """
+                            INSERT INTO service_requests (
+                                contractor_id,
+                                freelancer_id,
+                                service_id,
+                                service_name,
+                                category,
+                                description,
+                                budget,
+                                deadline,
+                                work_model,
+                                status,
+                                chat_enabled,
+                                address,
+                                desired_date,
+                                attachments,
+                                created_at,
+                                updated_at
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                            """,
+                    Statement.RETURN_GENERATED_KEYS);
+
+            statement.setLong(1, request.getContractor().getId());
+            if (request.getFreelancer() != null) {
+                statement.setLong(2, request.getFreelancer().getId());
+            } else {
+                statement.setNull(2, java.sql.Types.BIGINT);
+            }
+            if (request.getService() != null) {
+                statement.setLong(3, request.getService().getId());
+            } else {
+                statement.setNull(3, java.sql.Types.BIGINT);
+            }
+            statement.setString(4, request.getServiceName());
+            statement.setString(5, request.getCategory());
+            statement.setString(6, request.getDescription());
+            statement.setBigDecimal(7, LEGACY_BUDGET_PLACEHOLDER);
+            statement.setString(8, request.getDeadline());
+            statement.setString(9, request.getWorkModel().name());
+            statement.setString(10,
+                    request.getStatus() != null ? request.getStatus().name() : ServiceRequest.Status.PENDING.name());
+            statement.setBoolean(11, Boolean.TRUE.equals(request.getChatEnabled()));
+            statement.setString(12, request.getAddress());
+            if (request.getDesiredDate() != null) {
+                statement.setDate(13, Date.valueOf(request.getDesiredDate()));
+            } else {
+                statement.setNull(13, java.sql.Types.DATE);
+            }
+            statement.setString(14, request.getAttachments());
+            return statement;
+        }, keyHolder);
+
+        Number key = keyHolder.getKey();
+        if (key == null) {
+            throw new IllegalStateException("Não foi possível obter o ID da solicitação criada");
+        }
+        return key.longValue();
     }
 
     public List<ServiceRequestResponse> getByContractorEmail(String email) {
@@ -702,7 +797,6 @@ public class ServiceRequestService {
                 .serviceName(request.getServiceName())
                 .category(request.getCategory())
                 .description(normalizeRequestDescription(request.getDescription()))
-                .budget(request.getBudget())
                 .deadline(request.getDeadline())
                 .workModel(request.getWorkModel() != null ? request.getWorkModel().name() : null)
                 .status(request.getStatus().name())

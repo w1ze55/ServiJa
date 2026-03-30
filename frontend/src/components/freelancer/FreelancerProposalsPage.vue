@@ -305,9 +305,9 @@ const filteredProposals = computed(() => {
   if (sortBy.value === 'Mais recentes') {
     filtered.sort((a, b) => new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime());
   } else if (sortBy.value === 'Maior orçamento') {
-    filtered.sort((a, b) => b.budget - a.budget);
+    filtered.sort((a, b) => (b.freelancerResponse?.value ?? b.budget ?? 0) - (a.freelancerResponse?.value ?? a.budget ?? 0));
   } else if (sortBy.value === 'Menor orçamento') {
-    filtered.sort((a, b) => a.budget - b.budget);
+    filtered.sort((a, b) => (a.freelancerResponse?.value ?? a.budget ?? 0) - (b.freelancerResponse?.value ?? b.budget ?? 0));
   }
 
   return filtered;
@@ -319,7 +319,8 @@ const currentProposals = computed(() =>
   filteredProposals.value.slice(startIndex.value, startIndex.value + itemsPerPage)
 );
 
-const formatCurrency = (value: number) => {
+const formatCurrency = (value?: number | null) => {
+  if (value == null) return 'A combinar';
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
     currency: 'BRL',

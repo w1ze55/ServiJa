@@ -286,7 +286,8 @@ const getInitials = (name: string) => {
     .slice(0, 2);
 };
 
-const formatCurrency = (value: string | number) => {
+const formatCurrency = (value?: string | number | null) => {
+  if (value == null) return 'A combinar';
   if (typeof value === 'number') {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',

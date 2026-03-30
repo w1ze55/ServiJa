@@ -158,11 +158,6 @@ const getInitials = (name: string) =>
 const formatDate = (dateStr: string) =>
   new Date(dateStr).toLocaleDateString('pt-BR', { day: 'numeric', month: 'short', year: 'numeric' });
 
-const formatPriceDisplay = (value: number): string => {
-  if (!value) return '';
-  return new Intl.NumberFormat('pt-BR', { style: 'decimal', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
-};
-
 const getDetailedApproximation = (totalDays: number) => {
   const d = Math.min(totalDays, 365);
   if (d <= 0) return '';
@@ -283,8 +278,6 @@ const handleRequestService = () => {
 
 const resetQuoteForm = () => {
   quoteMessage.value = '';
-  quoteBudget.value = '';
-  formattedQuoteBudget.value = '';
   quoteDeadline.value = '';
   quoteDeadlineDate.value = '';
   quoteDeadlineType.value = 'estimated';
@@ -294,38 +287,15 @@ const resetQuoteForm = () => {
   isLoadingCEP.value = false;
 };
 
-const handleQuoteBudgetInput = (val: string) => {
-  let digits = val.replace(/\D/g, '');
-  if (!digits) { formattedQuoteBudget.value = ''; quoteBudget.value = ''; return; }
-  if (digits.length > 9) digits = digits.slice(0, 9);
-  let numValue = parseInt(digits) / 100;
-  if (numValue > 1000000) { numValue = 1000000; digits = '100000000'; }
-  formattedQuoteBudget.value = formatPriceDisplay(numValue);
-  quoteBudget.value = numValue.toString();
-};
-
 const blockNonNumericKeys = (event: KeyboardEvent) => {
   const allowed = ['Backspace','Delete','Tab','Escape','Enter','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End'];
   if (allowed.includes(event.key) || event.ctrlKey || event.metaKey) return;
   if (!/^[0-9]$/.test(event.key)) event.preventDefault();
 };
 
-const blockBudgetExceedingMax = (event: KeyboardEvent) => {
-  const allowed = ['Backspace','Delete','Tab','Escape','Enter','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End'];
-  if (allowed.includes(event.key) || event.ctrlKey || event.metaKey) return;
-  if (!/^[0-9]$/.test(event.key)) { event.preventDefault(); return; }
-  const currentDigits = formattedQuoteBudget.value.replace(/\D/g, '');
-  if (currentDigits.length >= 9 || Number(quoteBudget.value) >= 1000000) event.preventDefault();
-};
-
-const handleBudgetPaste = (event: ClipboardEvent) => {
-  const digits = (event.clipboardData?.getData('text') || '').replace(/\D/g, '');
-  if (!digits) return;
-  let numValue = parseInt(digits) / 100;
-  if (numValue > 1000000) numValue = 1000000;
-  formattedQuoteBudget.value = formatPriceDisplay(numValue);
-  quoteBudget.value = numValue.toString();
-};
+const handleQuoteBudgetInput = (val: string) => {};
+const blockBudgetExceedingMax = () => {};
+const handleBudgetPaste = () => {};
 
 const handleDeadlineInput = (val: string) => {
   let digits = val.replace(/\D/g, '');
@@ -422,7 +392,6 @@ const formatFileSize = (bytes: number) => {
 
 const handleSendQuote = async () => {
   if (!quoteMessage.value.trim()) { toast.error('Por favor, descreva o serviço que você precisa'); return; }
-  if (!quoteBudget.value || Number(quoteBudget.value) < 5) { toast.error('Informe um orçamento de no mínimo R$ 5,00'); return; }
   if (!quoteDeadline.value && quoteDeadlineType.value === 'estimated') { toast.error('Informe a quantidade de dias'); return; }
   if (!quoteDeadlineDate.value && quoteDeadlineType.value === 'decided') { toast.error('Selecione uma data'); return; }
   if (quoteDeadlineType.value === 'decided' && quoteDeadlineDate.value) {
@@ -448,7 +417,6 @@ const handleSendQuote = async () => {
       serviceName: service.value ? `${service.value.title} - Solicitação` : 'Solicitação',
       category: service.value?.category || '',
       description: quoteMessage.value,
-      budget: Number(quoteBudget.value),
       deadline,
       workModel: workModel.value?.toUpperCase(),
       address: serviceRequiresAddress.value ? buildQuoteAddress() : null,
@@ -715,7 +683,7 @@ onMounted(() => {
             </DialogHeader>
 
             <!-- Budget -->
-            <div>
+            <div v-if="false">
               <Label class="text-[#435574] mb-2 block text-sm">
                 Orçamento estimado <span class="text-red-500">*</span>
               </Label>
@@ -743,7 +711,6 @@ onMounted(() => {
                 Valor máximo atingido: R$ 1.000.000,00
               </p>
             </div>
-
             <!-- Deadline -->
             <div class="space-y-3">
               <Label class="text-[#435574] mb-2 block text-sm">
@@ -797,7 +764,7 @@ onMounted(() => {
                 Descrição do serviço <span class="text-red-500">*</span>
               </Label>
               <Textarea
-                placeholder="Ex: Preciso instalar 3 ventiladores de teto na sala e quartos..."
+                placeholder="Insira detalhes sobre o serviço que você precisa, características, objetivos, preferências e qualquer informação relevante para que o profissional possa entender melhor sua demanda."
                 :rows="5"
                 v-model="quoteMessage"
                 class="resize-none"

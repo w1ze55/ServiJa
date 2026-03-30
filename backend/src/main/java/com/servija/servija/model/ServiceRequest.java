@@ -1,8 +1,24 @@
 package com.servija.servija.model;
 
-import jakarta.persistence.*;
-import jakarta.validation.constraints.*;
-import lombok.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
@@ -43,11 +59,6 @@ public class ServiceRequest {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String description;
 
-    @DecimalMin(value = "5.00", message = "O orçamento mínimo é R$ 5,00")
-    @DecimalMax(value = "1000000.00", message = "O orçamento máximo é R$ 1.000.000,00")
-    @Column(nullable = false, precision = 10, scale = 2)
-    private BigDecimal budget;
-
     @Column(nullable = false, length = 50)
     private String deadline;
 
@@ -80,14 +91,13 @@ public class ServiceRequest {
     @Column(name = "response_attachments", columnDefinition = "TEXT")
     private String responseAttachments;
 
-    // Freelancer response fields
-    @DecimalMin(value = "5.00", message = "O valor mínimo é R$ 5,00")
-    @DecimalMax(value = "1000000.00", message = "O valor máximo é R$ 1.000.000,00")
+    @DecimalMin(value = "5.00", message = "O valor minimo e R$ 5,00")
+    @DecimalMax(value = "1000000.00", message = "O valor maximo e R$ 1.000.000,00")
     @Column(name = "response_value", precision = 10, scale = 2)
     private BigDecimal responseValue;
 
-    @Min(value = 1, message = "O prazo mínimo é de 1 dia")
-    @Max(value = 365, message = "O prazo máximo é de 365 dias")
+    @Min(value = 1, message = "O prazo minimo e de 1 dia")
+    @Max(value = 365, message = "O prazo maximo e de 365 dias")
     @Column(name = "response_days")
     private Integer responseDays;
 
@@ -100,7 +110,6 @@ public class ServiceRequest {
     @Column(name = "responded_at")
     private LocalDateTime respondedAt;
 
-    // Counter-proposal fields
     @Column(name = "counter_value", precision = 10, scale = 2)
     private BigDecimal counterValue;
 

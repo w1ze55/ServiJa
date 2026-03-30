@@ -232,9 +232,6 @@ public class PaymentService {
         // Extrair últimos 4 dígitos
         String cardNumber = cardData.getNumber().replaceAll("\\s", "");
         payment.setCardLastDigits(cardNumber.substring(cardNumber.length() - 4));
-
-        // Por enquanto, simular aprovação instantânea
-        // TODO: Integrar com gateway de cartão de crédito do Asaas
         payment.setStatus(Payment.PaymentStatus.COMPLETED);
         payment.setCompletedAt(LocalDateTime.now());
 

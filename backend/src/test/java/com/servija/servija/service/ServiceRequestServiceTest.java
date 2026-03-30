@@ -11,11 +11,11 @@ import com.servija.servija.repository.UserRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
@@ -43,6 +43,12 @@ class ServiceRequestServiceTest {
 
     @Mock
     private WebSocketService webSocketService;
+
+    @Mock
+    private NotificationService notificationService;
+
+    @Mock
+    private JdbcTemplate jdbcTemplate;
 
     @InjectMocks
     private ServiceRequestService serviceRequestService;
@@ -112,7 +118,6 @@ class ServiceRequestServiceTest {
                 .serviceName("Desenvolvimento Web")
                 .category("Desenvolvedor Web")
                 .description("Landing page institucional")
-                .budget(new BigDecimal("150.00"))
                 .deadline("7 dias")
                 .workModel(ServiceRequest.WorkModel.REMOTO)
                 .status(ServiceRequest.Status.IN_PROGRESS)

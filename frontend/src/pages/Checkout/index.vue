@@ -36,6 +36,13 @@ onMounted(async () => {
       return;
     }
 
+    const negotiatedPrice = data.responseValue ?? data.counterValue;
+    if (!negotiatedPrice) {
+      error.value = 'O freelancer ainda nao enviou um valor para esta solicitacao';
+      isLoading.value = false;
+      return;
+    }
+
     // Montar dados da proposta para o checkout
     proposalData.value = {
       freelancerId: data.freelancerId,
@@ -44,7 +51,7 @@ onMounted(async () => {
       freelancerRating: 4.8,
       service: data.serviceName,
       description: data.description,
-      price: parseFloat(data.responseValue || data.counterValue || data.budget),
+      price: Number(negotiatedPrice),
       deliveryTime: `${data.responseDays || data.counterDays || 7} dias`,
     };
 

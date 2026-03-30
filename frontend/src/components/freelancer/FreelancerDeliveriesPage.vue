@@ -220,7 +220,7 @@ const paidAmount = computed(() => {
 const totalAmount = computed(() => {
   const project = selectedProject.value;
   if (!project) return 0;
-  return project.freelancerResponse?.value || project.budget;
+  return project.freelancerResponse?.value ?? project.budget ?? 0;
 });
 
 // Select project
@@ -229,8 +229,8 @@ const selectProject = async (id: string) => {
 };
 
 // Format currency
-const formatCurrency = (value: number) =>
-  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+const formatCurrency = (value?: number | null) =>
+  value == null ? 'A combinar' : new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 
 // Client initials
 const getInitials = (name: string) =>

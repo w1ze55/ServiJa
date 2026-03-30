@@ -79,7 +79,7 @@ const newRequest = ref({
   service: '',
   category: '',
   description: '',
-  budget: 0,
+  budget: 5,
   deadline: '',
   workModel: '' as WorkModelValue | '',
   address: '',
@@ -231,9 +231,9 @@ const filteredRequests = computed(() => {
   if (sortBy.value === 'recent') {
     filtered.sort((a, b) => getApiDateTimestamp(getLastActivityAt(b)) - getApiDateTimestamp(getLastActivityAt(a)));
   } else if (sortBy.value === 'budget-high') {
-    filtered.sort((a, b) => b.budget - a.budget);
+    filtered.sort((a, b) => (b.freelancerResponse?.value ?? b.budget ?? 0) - (a.freelancerResponse?.value ?? a.budget ?? 0));
   } else if (sortBy.value === 'budget-low') {
-    filtered.sort((a, b) => a.budget - b.budget);
+    filtered.sort((a, b) => (a.freelancerResponse?.value ?? a.budget ?? 0) - (b.freelancerResponse?.value ?? b.budget ?? 0));
   }
 
   return filtered;
@@ -245,7 +245,8 @@ const currentRequests = computed(() =>
   filteredRequests.value.slice(startIndex.value, startIndex.value + itemsPerPage)
 );
 
-const formatCurrency = (value: number) => {
+const formatCurrency = (value?: number | null) => {
+  if (value == null) return 'A combinar';
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
     currency: 'BRL',
@@ -295,7 +296,7 @@ const handleOpenCreateDialog = () => {
     service: '',
     category: '',
     description: '',
-    budget: 0,
+    budget: 5,
     deadline: '',
     workModel: '',
     address: '',
@@ -815,8 +816,12 @@ watch(currentTab, () => {
             />
           </div>
 
+          <div class="rounded-lg border border-blue-100 bg-blue-50/60 p-3 text-sm text-[#435574]">
+            O valor nao e informado nesta etapa. Descreva o escopo e o freelancer enviara o orcamento depois.
+          </div>
+
           <div class="grid grid-cols-2 gap-4">
-            <div class="space-y-2">
+            <div v-if="false" class="space-y-2">
               <Label for="budget">Orçamento (R$) *</Label>
               <Input
                 id="budget"

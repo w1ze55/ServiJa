@@ -247,7 +247,7 @@ const visibleServicePages = computed(() => {
   
   return pages;
 });
-const quoteBudget = ref('');
+const quoteBudget = ref('5');
 const formattedQuoteBudget = ref('');
 const quoteDeadline = ref('');
 const quoteDeadlineDate = ref('');
@@ -781,7 +781,6 @@ const handleSendQuote = async () => {
       serviceName: requestedServiceTitle.value ? `${requestedServiceTitle.value} - Solicitação` : `${quoteCategory.value} - Solicitação`,
       category: quoteCategory.value,
       description: quoteMessage.value,
-      budget: Number(quoteBudget.value),
       deadline: deadline,
       workModel: requestedServiceWorkModel.value?.toUpperCase(),
       address: serviceAddress,
@@ -838,7 +837,7 @@ const formatFileSize = (bytes: number) => {
 const resetQuoteForm = () => {
   quoteMessage.value = '';
   quoteCategory.value = '';
-  quoteBudget.value = '';
+  quoteBudget.value = '5';
   formattedQuoteBudget.value = '';
   quoteDeadline.value = '';
   quoteDeadlineDate.value = '';
@@ -1478,7 +1477,7 @@ onMounted(() => {
             <DialogTitle>Solicitar Orçamento</DialogTitle>
           </DialogHeader>
 
-          <div>
+          <div v-if="false">
             <Label class="text-[#435574] mb-2 block text-sm">
               Orçamento estimado <span class="text-red-500">*</span>
             </Label>
@@ -1507,6 +1506,10 @@ onMounted(() => {
             <p v-else-if="Number(quoteBudget) >= 1000000" class="text-[11px] text-amber-600 font-medium mt-1">
               Valor máximo atingido: R$ 1.000.000,00
             </p>
+          </div>
+
+          <div class="rounded-lg border border-blue-100 bg-blue-50/60 p-3 text-sm text-[#435574]">
+            O valor nao e informado nesta etapa. Descreva o escopo e o freelancer enviara o orcamento depois.
           </div>
 
           <div class="space-y-3">
