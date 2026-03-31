@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import {
   Wallet,
   DollarSign,
@@ -11,14 +11,11 @@ import {
   Trash2,
   Download,
   Star,
-  CreditCard,
   Building2,
   QrCode,
   CheckCircle,
-  XCircle,
   AlertCircle,
   Loader2,
-  ChevronDown,
   X,
 } from 'lucide-vue-next';
 import Card from '../ui/card.vue';
@@ -28,6 +25,7 @@ import Input from '../ui/input.vue';
 import Label from '../ui/label.vue';
 import Separator from '../ui/separator.vue';
 import { toast } from '@/utils/toast';
+import { formatApiDate } from '@/utils/apiDate';
 import walletService, {
   type WalletBalance,
   type WalletTransaction,
@@ -39,7 +37,7 @@ interface Props {
   onNavigate: (page: string, params?: any) => void;
 }
 
-const props = defineProps<Props>();
+defineProps<Props>();
 
 // State
 const loading = ref(true);
@@ -55,8 +53,10 @@ const isProcessing = ref(false);
 
 // Withdraw form
 const withdrawAmount = ref('');
+const withdrawalMethod = ref<'PIX' | 'TED'>('PIX');
 const withdrawPixKey = ref('');
 const withdrawPixKeyType = ref('CPF');
+const withdrawBankAccountId = ref<number | null>(null);
 
 // Add account form
 const newAccountType = ref<'PIX_KEY' | 'BANK_ACCOUNT'>('PIX_KEY');
@@ -84,13 +84,38 @@ const totalBalance = computed(() => {
 
 const maxWithdrawAmount = computed(() => wallet.value?.availableBalance ?? 0);
 
+const pixAccounts = computed(() =>
+  bankAccounts.value.filter((account) => account.accountType === 'PIX_KEY')
+);
+
+const tedAccounts = computed(() =>
+  bankAccounts.value.filter((account) => account.accountType === 'BANK_ACCOUNT')
+);
+
+const preferredTedAccountId = computed(() => {
+  const defaultAccount = tedAccounts.value.find((account) => account.isDefault);
+  return defaultAccount?.id ?? tedAccounts.value[0]?.id ?? null;
+});
+
+const withdrawSubmitDisabled = computed(() => {
+  if (isProcessing.value || !withdrawAmount.value) {
+    return true;
+  }
+
+  if (withdrawalMethod.value === 'PIX') {
+    return !withdrawPixKey.value.trim();
+  }
+
+  return withdrawBankAccountId.value === null;
+});
+
 // Methods
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 };
 
 const formatDate = (dateStr: string) => {
-  return new Date(dateStr).toLocaleDateString('pt-BR', {
+  return formatApiDate(dateStr, {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
@@ -110,6 +135,67 @@ const getStatusBadge = (status: string) => {
   return map[status] || { label: status, class: 'bg-gray-100 text-gray-700' };
 };
 
+const describeAccount = (account: BankAccount) => {
+  if (account.accountType === 'PIX_KEY') {
+    return `${account.pixKeyType || 'PIX'}: ${account.pixKey || ''}`;
+  }
+
+  return `${account.bankName || 'Banco'} · Ag ${account.agency || '--'} · CC ${account.accountNumber || '--'}`;
+};
+
+const resetWithdrawForm = () => {
+  withdrawAmount.value = '';
+  withdrawalMethod.value = 'PIX';
+  withdrawPixKey.value = '';
+  withdrawPixKeyType.value = 'CPF';
+  withdrawBankAccountId.value = preferredTedAccountId.value;
+};
+
+const closeWithdrawModal = (force = false) => {
+  if (isProcessing.value && !force) {
+    return;
+  }
+
+  showWithdrawModal.value = false;
+  resetWithdrawForm();
+};
+
+const applyPixAccountToWithdraw = (account?: BankAccount) => {
+  if (!account || account.accountType !== 'PIX_KEY') {
+    return;
+  }
+
+  withdrawPixKey.value = account.pixKeyValue || '';
+  withdrawPixKeyType.value = account.pixKeyType || 'CPF';
+};
+
+const setWithdrawalMethod = (method: 'PIX' | 'TED') => {
+  withdrawalMethod.value = method;
+
+  if (method === 'TED') {
+    withdrawBankAccountId.value = withdrawBankAccountId.value ?? preferredTedAccountId.value;
+    return;
+  }
+
+  if (!withdrawPixKey.value.trim()) {
+    applyPixAccountToWithdraw(pixAccounts.value.find((account) => account.isDefault) || pixAccounts.value[0]);
+  }
+};
+
+const openWithdrawModal = (method: 'PIX' | 'TED' = 'PIX', account?: BankAccount) => {
+  resetWithdrawForm();
+  showWithdrawModal.value = true;
+  setWithdrawalMethod(method);
+
+  if (account?.accountType === 'PIX_KEY' && method === 'PIX') {
+    applyPixAccountToWithdraw(account);
+  }
+
+  if (account?.accountType === 'BANK_ACCOUNT' && method === 'TED') {
+    withdrawBankAccountId.value = account.id;
+  }
+};
+
 const loadData = async () => {
   loading.value = true;
   try {
@@ -118,9 +204,16 @@ const loadData = async () => {
       walletService.getTransactions('ALL'),
       walletService.getBankAccounts(),
     ]);
+
     wallet.value = walletData;
     transactions.value = txData;
     bankAccounts.value = accountsData;
+
+    if (!showWithdrawModal.value) {
+      resetWithdrawForm();
+    } else if (withdrawalMethod.value === 'TED' && withdrawBankAccountId.value === null) {
+      withdrawBankAccountId.value = preferredTedAccountId.value;
+    }
   } catch (error: any) {
     console.error('Erro ao carregar dados da carteira:', error);
     toast.error('Erro ao carregar dados da carteira');
@@ -131,7 +224,7 @@ const loadData = async () => {
 
 const handleWithdraw = async () => {
   const amount = parseFloat(withdrawAmount.value);
-  if (isNaN(amount) || amount <= 0) {
+  if (Number.isNaN(amount) || amount <= 0) {
     toast.error('Informe um valor válido');
     return;
   }
@@ -139,22 +232,34 @@ const handleWithdraw = async () => {
     toast.error('Valor excede o saldo disponível');
     return;
   }
-  if (!withdrawPixKey.value.trim()) {
+  if (withdrawalMethod.value === 'PIX' && !withdrawPixKey.value.trim()) {
     toast.error('Informe a chave PIX');
+    return;
+  }
+
+  if (withdrawalMethod.value === 'TED' && withdrawBankAccountId.value === null) {
+    toast.error('Selecione uma conta bancária para TED');
     return;
   }
 
   isProcessing.value = true;
   try {
-    await walletService.requestWithdrawal({
-      amount,
-      pixKey: withdrawPixKey.value,
-      pixKeyType: withdrawPixKeyType.value,
-    });
+    await walletService.requestWithdrawal(
+      withdrawalMethod.value === 'PIX'
+        ? {
+            amount,
+            withdrawalMethod: 'PIX',
+            pixKey: withdrawPixKey.value.trim(),
+            pixKeyType: withdrawPixKeyType.value,
+          }
+        : {
+            amount,
+            withdrawalMethod: 'TED',
+            bankAccountId: withdrawBankAccountId.value!,
+          }
+    );
     toast.success('Saque solicitado com sucesso!');
-    showWithdrawModal.value = false;
-    withdrawAmount.value = '';
-    withdrawPixKey.value = '';
+    closeWithdrawModal(true);
     await loadData();
   } catch (error: any) {
     toast.error(error.response?.data?.message || 'Erro ao solicitar saque');
@@ -248,16 +353,18 @@ const resetAccountForm = () => {
   newAgency.value = '';
   newAccountNumber.value = '';
   newAccountDigit.value = '';
+  newAccountBankType.value = 'CONTA_CORRENTE';
   newHolderName.value = '';
   newHolderCpfCnpj.value = '';
 };
 
 const useAccountForWithdraw = (account: BankAccount) => {
-  if (account.accountType === 'PIX_KEY' && account.pixKey) {
-    withdrawPixKey.value = account.pixKey;
-    withdrawPixKeyType.value = account.pixKeyType || 'CPF';
+  if (account.accountType === 'PIX_KEY') {
+    openWithdrawModal('PIX', account);
+    return;
   }
-  showWithdrawModal.value = true;
+
+  openWithdrawModal('TED', account);
 };
 
 onMounted(loadData);
@@ -287,7 +394,7 @@ onMounted(loadData);
             <Download class="h-4 w-4 mr-2" />
             Exportar Relatório
           </Button>
-          <Button @click="showWithdrawModal = true" size="sm">
+          <Button @click="openWithdrawModal()" size="sm">
             <ArrowDownToLine class="h-4 w-4 mr-2" />
             Solicitar Saque
           </Button>
@@ -383,13 +490,7 @@ onMounted(loadData);
                   <p class="text-sm text-[#263238] font-medium">
                     {{ account.accountType === 'PIX_KEY' ? 'Chave PIX' : 'Conta Bancária' }}
                   </p>
-                  <p class="text-xs text-[#435574]">
-                    {{
-                      account.accountType === 'PIX_KEY'
-                        ? `${account.pixKeyType}: ${account.pixKey}`
-                        : `${account.bankName || 'Banco'} · Ag ${account.agency} · CC ${account.accountNumber}`
-                    }}
-                  </p>
+                  <p class="text-xs text-[#435574]">{{ describeAccount(account) }}</p>
                 </div>
               </div>
               <div class="flex items-center gap-1">
@@ -418,7 +519,6 @@ onMounted(loadData);
             <div class="flex items-center justify-between mt-2">
               <p class="text-xs text-[#435574]">{{ account.holderName }}</p>
               <Button
-                v-if="account.accountType === 'PIX_KEY'"
                 @click="useAccountForWithdraw(account)"
                 variant="outline"
                 size="sm"
@@ -513,10 +613,10 @@ onMounted(loadData);
         <div
           v-if="showWithdrawModal"
           class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-          @click.self="showWithdrawModal = false"
+          @click.self="closeWithdrawModal()"
         >
-          <div class="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 relative">
-            <button @click="showWithdrawModal = false"
+          <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg p-6 relative">
+            <button @click="closeWithdrawModal()"
               class="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
               <X class="h-5 w-5" />
             </button>
@@ -548,36 +648,121 @@ onMounted(loadData);
               </div>
 
               <div class="space-y-2">
-                <Label>Tipo de chave PIX</Label>
-                <select
-                  v-model="withdrawPixKeyType"
-                  class="w-full h-10 px-3 rounded-md border border-gray-300 text-sm"
-                >
-                  <option value="CPF">CPF</option>
-                  <option value="CNPJ">CNPJ</option>
-                  <option value="EMAIL">E-mail</option>
-                  <option value="PHONE">Telefone</option>
-                  <option value="RANDOM">Chave aleatória</option>
-                </select>
+                <Label>Método de saque</Label>
+                <div class="grid grid-cols-2 gap-2">
+                  <Button
+                    @click="setWithdrawalMethod('PIX')"
+                    :variant="withdrawalMethod === 'PIX' ? 'default' : 'outline'"
+                    size="sm"
+                    class="w-full"
+                  >
+                    PIX
+                  </Button>
+                  <Button
+                    @click="setWithdrawalMethod('TED')"
+                    :variant="withdrawalMethod === 'TED' ? 'default' : 'outline'"
+                    size="sm"
+                    class="w-full"
+                  >
+                    TED
+                  </Button>
+                </div>
               </div>
 
-              <div class="space-y-2">
-                <Label>Chave PIX</Label>
-                <Input
-                  v-model="withdrawPixKey"
-                  placeholder="Informe sua chave PIX"
-                />
-              </div>
+              <template v-if="withdrawalMethod === 'PIX'">
+                <div class="space-y-2">
+                  <Label>Tipo de chave PIX</Label>
+                  <select
+                    v-model="withdrawPixKeyType"
+                    class="w-full h-10 px-3 rounded-md border border-gray-300 text-sm"
+                  >
+                    <option value="CPF">CPF</option>
+                    <option value="CNPJ">CNPJ</option>
+                    <option value="EMAIL">E-mail</option>
+                    <option value="PHONE">Telefone</option>
+                    <option value="RANDOM">Chave aleatória</option>
+                  </select>
+                </div>
+
+                <div class="space-y-2">
+                  <Label>Chave PIX</Label>
+                  <Input
+                    v-model="withdrawPixKey"
+                    placeholder="Informe sua chave PIX"
+                  />
+                </div>
+              </template>
+
+              <template v-else>
+                <div v-if="tedAccounts.length === 0" class="rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-900">
+                  <div class="flex items-start gap-3">
+                    <AlertCircle class="h-5 w-5 mt-0.5 flex-shrink-0" />
+                    <div class="space-y-2">
+                      <p class="text-sm font-medium">Nenhuma conta bancária disponível para TED.</p>
+                      <p class="text-xs">
+                        Cadastre uma conta bancária primeiro para solicitar saque via TED.
+                      </p>
+                      <Button
+                        @click="closeWithdrawModal(); showAddAccountModal = true"
+                        variant="outline"
+                        size="sm"
+                        class="border-amber-300 bg-white"
+                      >
+                        Cadastrar conta bancária
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+
+                <div v-else class="space-y-2">
+                  <Label>Conta bancária para TED</Label>
+                  <div class="space-y-2 max-h-56 overflow-y-auto pr-1">
+                    <label
+                      v-for="account in tedAccounts"
+                      :key="account.id"
+                      :class="`flex items-start gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${
+                        withdrawBankAccountId === account.id
+                          ? 'border-[#286AD8] bg-blue-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`"
+                    >
+                      <input
+                        v-model="withdrawBankAccountId"
+                        type="radio"
+                        name="withdraw-bank-account"
+                        :value="account.id"
+                        class="mt-1"
+                      />
+                      <div class="min-w-0">
+                        <div class="flex items-center gap-2">
+                          <p class="text-sm text-[#263238] font-medium">
+                            {{ account.bankName || 'Conta bancária' }}
+                          </p>
+                          <Badge v-if="account.isDefault" class="bg-[#286AD8] text-white text-[10px] hover:bg-[#286AD8]">
+                            Padrão
+                          </Badge>
+                        </div>
+                        <p class="text-xs text-[#435574] mt-1">
+                          {{ describeAccount(account) }}
+                        </p>
+                        <p class="text-xs text-[#435574] mt-1">
+                          Titular: {{ account.holderName }}
+                        </p>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+              </template>
 
               <Separator />
 
               <Button
                 @click="handleWithdraw"
-                :disabled="isProcessing || !withdrawAmount || !withdrawPixKey"
+                :disabled="withdrawSubmitDisabled"
                 class="w-full"
               >
                 <Loader2 v-if="isProcessing" class="h-4 w-4 mr-2 animate-spin" />
-                {{ isProcessing ? 'Processando...' : 'Confirmar Saque' }}
+                {{ isProcessing ? 'Processando...' : `Confirmar Saque via ${withdrawalMethod}` }}
               </Button>
             </div>
           </div>

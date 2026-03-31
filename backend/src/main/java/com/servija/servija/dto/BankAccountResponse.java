@@ -25,6 +25,7 @@ public class BankAccountResponse {
 
     // Dados PIX
     private String pixKey;
+    private String pixKeyValue;
     private String pixKeyType;
 
     // Titular

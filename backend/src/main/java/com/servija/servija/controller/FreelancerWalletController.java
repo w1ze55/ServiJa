@@ -90,8 +90,10 @@ public class FreelancerWalletController {
         WithdrawalRequest withdrawal = withdrawalService.requestWithdrawal(
                 email,
                 request.getAmount(),
+                request.getWithdrawalMethod(),
                 request.getPixKey(),
-                request.getPixKeyType()
+                request.getPixKeyType(),
+                request.getBankAccountId()
         );
 
         WithdrawalResponse response = mapToResponse(withdrawal);
@@ -192,6 +194,12 @@ public class FreelancerWalletController {
                 .id(withdrawal.getId())
                 .amount(withdrawal.getAmount())
                 .status(withdrawal.getStatus().name())
+                .withdrawalMethod(withdrawal.getWithdrawalMethod() != null
+                        ? withdrawal.getWithdrawalMethod().name()
+                        : null)
+                .bankAccountId(withdrawal.getBankAccount() != null
+                        ? withdrawal.getBankAccount().getId()
+                        : null)
                 .pixKey(withdrawal.getPixKey())
                 .pixKeyType(withdrawal.getPixKeyType())
                 .transactionId(withdrawal.getTransactionId())

@@ -31,6 +31,7 @@ export interface BankAccount {
   accountNumber?: string;
   accountBankType?: string;
   pixKey?: string;
+  pixKeyValue?: string;
   pixKeyType?: string;
   holderName: string;
   holderCpfCnpj: string;
@@ -56,16 +57,20 @@ export interface CreateBankAccountRequest {
 
 export interface WithdrawalRequest {
   amount: number;
-  pixKey: string;
-  pixKeyType: string;
+  withdrawalMethod: 'PIX' | 'TED';
+  bankAccountId?: number;
+  pixKey?: string;
+  pixKeyType?: string;
 }
 
 export interface WithdrawalResponse {
   id: number;
   amount: number;
   status: string;
-  pixKey: string;
-  pixKeyType: string;
+  withdrawalMethod: 'PIX' | 'TED';
+  bankAccountId?: number;
+  pixKey?: string;
+  pixKeyType?: string;
   transactionId?: string;
   rejectionReason?: string;
   processedAt?: string;
@@ -75,13 +80,13 @@ export interface WithdrawalResponse {
 const walletService = {
   // Carteira
   async getWallet(): Promise<WalletBalance> {
-    const response = await axios.get('/api/wallet');
+    const response = await axios.get('/wallet');
     return response.data;
   },
 
   // Transações
   async getTransactions(type: string = 'ALL'): Promise<WalletTransaction[]> {
-    const response = await axios.get('/api/wallet/transactions', {
+    const response = await axios.get('/wallet/transactions', {
       params: { type },
     });
     return response.data;
@@ -89,42 +94,42 @@ const walletService = {
 
   // Contas bancárias
   async getBankAccounts(): Promise<BankAccount[]> {
-    const response = await axios.get('/api/wallet/bank-accounts');
+    const response = await axios.get('/wallet/bank-accounts');
     return response.data;
   },
 
   async addBankAccount(data: CreateBankAccountRequest): Promise<BankAccount> {
-    const response = await axios.post('/api/wallet/bank-accounts', data);
+    const response = await axios.post('/wallet/bank-accounts', data);
     return response.data;
   },
 
   async deleteBankAccount(id: number): Promise<void> {
-    await axios.delete(`/api/wallet/bank-accounts/${id}`);
+    await axios.delete(`/wallet/bank-accounts/${id}`);
   },
 
   async setDefaultAccount(id: number): Promise<BankAccount> {
-    const response = await axios.put(`/api/wallet/bank-accounts/${id}/default`);
+    const response = await axios.put(`/wallet/bank-accounts/${id}/default`);
     return response.data;
   },
 
   // Saques
   async requestWithdrawal(data: WithdrawalRequest): Promise<WithdrawalResponse> {
-    const response = await axios.post('/api/wallet/withdraw', data);
+    const response = await axios.post('/wallet/withdraw', data);
     return response.data;
   },
 
   async getWithdrawals(): Promise<WithdrawalResponse[]> {
-    const response = await axios.get('/api/wallet/withdrawals');
+    const response = await axios.get('/wallet/withdrawals');
     return response.data;
   },
 
   async cancelWithdrawal(id: number): Promise<void> {
-    await axios.delete(`/api/wallet/withdrawals/${id}`);
+    await axios.delete(`/wallet/withdrawals/${id}`);
   },
 
   // Relatório
   async downloadReport(): Promise<void> {
-    const response = await axios.get('/api/wallet/report', { responseType: 'blob' });
+    const response = await axios.get('/wallet/report', { responseType: 'blob' });
     const url = window.URL.createObjectURL(new Blob([response.data]));
     const link = document.createElement('a');
     link.href = url;

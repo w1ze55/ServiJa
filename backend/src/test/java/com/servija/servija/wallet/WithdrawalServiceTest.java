@@ -1,11 +1,13 @@
 package com.servija.servija.wallet;
 
 import com.servija.servija.exception.ResourceNotFoundException;
+import com.servija.servija.model.FreelancerBankAccount;
 import com.servija.servija.model.User;
 import com.servija.servija.model.WithdrawalRequest;
 import com.servija.servija.repository.UserRepository;
 import com.servija.servija.repository.WithdrawalRequestRepository;
 import com.servija.servija.service.AsaasService;
+import com.servija.servija.service.BankAccountService;
 import com.servija.servija.service.FreelancerWalletService;
 import com.servija.servija.service.WithdrawalService;
 import org.junit.jupiter.api.BeforeEach;
@@ -21,10 +23,16 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 
-import static org.assertj.core.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class WithdrawalServiceTest {
@@ -41,17 +49,35 @@ class WithdrawalServiceTest {
     @Mock
     private AsaasService asaasService;
 
+    @Mock
+    private BankAccountService bankAccountService;
+
     @InjectMocks
     private WithdrawalService withdrawalService;
 
     private User freelancer;
+    private FreelancerBankAccount tedAccount;
 
     @BeforeEach
     void setUp() {
         freelancer = User.builder()
                 .id(1L)
                 .email("freelancer@test.com")
-                .name("João Silva")
+                .name("Joao Silva")
+                .build();
+
+        tedAccount = FreelancerBankAccount.builder()
+                .id(10L)
+                .user(freelancer)
+                .accountType(FreelancerBankAccount.AccountType.BANK_ACCOUNT)
+                .bankName("Banco Teste")
+                .bankCode("001")
+                .agency("1234")
+                .accountNumber("12345")
+                .accountDigit("6")
+                .accountBankType(FreelancerBankAccount.BankAccountType.CONTA_CORRENTE)
+                .holderName("Joao Silva")
+                .holderCpfCnpj("12345678900")
                 .build();
     }
 
@@ -62,26 +88,135 @@ class WithdrawalServiceTest {
         @Test
         @DisplayName("deve criar saque via PIX com sucesso")
         void shouldCreatePixWithdrawal() {
+            AtomicReference<WithdrawalRequest> persisted = new AtomicReference<>();
+
             when(userRepository.findByEmail("freelancer@test.com")).thenReturn(Optional.of(freelancer));
             when(walletService.hasSufficientBalance(freelancer, new BigDecimal("500.00"))).thenReturn(true);
+            when(withdrawalRepository.save(any())).thenAnswer(invocation -> {
+                WithdrawalRequest withdrawal = invocation.getArgument(0);
+                if (withdrawal.getId() == null) {
+                    withdrawal.setId(1L);
+                }
+                persisted.set(withdrawal);
+                return withdrawal;
+            });
+            when(withdrawalRepository.findById(1L)).thenAnswer(invocation -> Optional.ofNullable(persisted.get()));
             when(asaasService.createPixTransfer(any(), any(), any(), any()))
                     .thenReturn(Map.of("id", "tr_123", "status", "PENDING"));
-            when(withdrawalRepository.save(any())).thenAnswer(inv -> {
-                WithdrawalRequest w = inv.getArgument(0);
-                w.setId(1L);
-                return w;
-            });
 
             WithdrawalRequest result = withdrawalService.requestWithdrawal(
                     "freelancer@test.com",
                     new BigDecimal("500.00"),
+                    "PIX",
                     "12345678900",
-                    "CPF"
+                    "CPF",
+                    null
             );
 
             assertThat(result).isNotNull();
             assertThat(result.getAmount()).isEqualByComparingTo(new BigDecimal("500.00"));
+            assertThat(result.getWithdrawalMethod()).isEqualTo(WithdrawalRequest.WithdrawalMethod.PIX);
+            verify(asaasService).createPixTransfer(
+                    eq(new BigDecimal("500.00")),
+                    eq("12345678900"),
+                    eq("CPF"),
+                    any()
+            );
+            verify(asaasService, never()).createTedTransfer(any(), any(), any(), any(), any(), any(), any(), any(), any());
             verify(walletService).deductAvailableBalance(freelancer, new BigDecimal("500.00"));
+        }
+
+        @Test
+        @DisplayName("deve criar saque via TED com sucesso")
+        void shouldCreateTedWithdrawal() {
+            AtomicReference<WithdrawalRequest> persisted = new AtomicReference<>();
+
+            when(userRepository.findByEmail("freelancer@test.com")).thenReturn(Optional.of(freelancer));
+            when(walletService.hasSufficientBalance(freelancer, new BigDecimal("500.00"))).thenReturn(true);
+            when(bankAccountService.getOwnedAccount("freelancer@test.com", 10L)).thenReturn(tedAccount);
+            when(withdrawalRepository.save(any())).thenAnswer(invocation -> {
+                WithdrawalRequest withdrawal = invocation.getArgument(0);
+                if (withdrawal.getId() == null) {
+                    withdrawal.setId(1L);
+                }
+                persisted.set(withdrawal);
+                return withdrawal;
+            });
+            when(withdrawalRepository.findById(1L)).thenAnswer(invocation -> Optional.ofNullable(persisted.get()));
+            when(asaasService.createTedTransfer(any(), any(), any(), any(), any(), any(), any(), any(), any()))
+                    .thenReturn(Map.of("id", "tr_456", "status", "PENDING"));
+
+            WithdrawalRequest result = withdrawalService.requestWithdrawal(
+                    "freelancer@test.com",
+                    new BigDecimal("500.00"),
+                    "TED",
+                    null,
+                    null,
+                    10L
+            );
+
+            assertThat(result).isNotNull();
+            assertThat(result.getWithdrawalMethod()).isEqualTo(WithdrawalRequest.WithdrawalMethod.TED);
+            assertThat(result.getBankAccount()).isEqualTo(tedAccount);
+            assertThat(result.getPixKey()).isNull();
+            verify(bankAccountService).getOwnedAccount("freelancer@test.com", 10L);
+            verify(asaasService).createTedTransfer(
+                    eq(new BigDecimal("500.00")),
+                    eq("001"),
+                    eq("1234"),
+                    eq("12345"),
+                    eq("6"),
+                    eq("CONTA_CORRENTE"),
+                    eq("Joao Silva"),
+                    eq("12345678900"),
+                    any()
+            );
+            verify(asaasService, never()).createPixTransfer(any(), any(), any(), any());
+        }
+
+        @Test
+        @DisplayName("deve rejeitar saque TED sem conta bancaria")
+        void shouldRejectTedWithoutBankAccount() {
+            when(userRepository.findByEmail("freelancer@test.com")).thenReturn(Optional.of(freelancer));
+            when(walletService.hasSufficientBalance(freelancer, new BigDecimal("500.00"))).thenReturn(true);
+
+            assertThatThrownBy(() -> withdrawalService.requestWithdrawal(
+                    "freelancer@test.com",
+                    new BigDecimal("500.00"),
+                    "TED",
+                    null,
+                    null,
+                    null
+            )).isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("conta bancaria");
+        }
+
+        @Test
+        @DisplayName("deve rejeitar saque TED usando chave PIX")
+        void shouldRejectTedWithPixAccount() {
+            FreelancerBankAccount pixAccount = FreelancerBankAccount.builder()
+                    .id(11L)
+                    .user(freelancer)
+                    .accountType(FreelancerBankAccount.AccountType.PIX_KEY)
+                    .pixKey("12345678900")
+                    .pixKeyType("CPF")
+                    .holderName("Joao Silva")
+                    .holderCpfCnpj("12345678900")
+                    .build();
+
+            when(userRepository.findByEmail("freelancer@test.com")).thenReturn(Optional.of(freelancer));
+            when(walletService.hasSufficientBalance(freelancer, new BigDecimal("500.00"))).thenReturn(true);
+            when(bankAccountService.getOwnedAccount("freelancer@test.com", 11L)).thenReturn(pixAccount);
+
+            assertThatThrownBy(() -> withdrawalService.requestWithdrawal(
+                    "freelancer@test.com",
+                    new BigDecimal("500.00"),
+                    "TED",
+                    null,
+                    null,
+                    11L
+            )).isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("TED");
         }
 
         @Test
@@ -93,21 +228,25 @@ class WithdrawalServiceTest {
             assertThatThrownBy(() -> withdrawalService.requestWithdrawal(
                     "freelancer@test.com",
                     new BigDecimal("2000.00"),
+                    "PIX",
                     "12345678900",
-                    "CPF"
+                    "CPF",
+                    null
             )).isInstanceOf(IllegalStateException.class);
         }
 
         @Test
-        @DisplayName("deve rejeitar usuário não encontrado")
+        @DisplayName("deve rejeitar usuario nao encontrado")
         void shouldRejectUserNotFound() {
             when(userRepository.findByEmail("nope@test.com")).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> withdrawalService.requestWithdrawal(
                     "nope@test.com",
                     new BigDecimal("100.00"),
+                    "PIX",
                     "key",
-                    "CPF"
+                    "CPF",
+                    null
             )).isInstanceOf(ResourceNotFoundException.class);
         }
     }
@@ -127,15 +266,17 @@ class WithdrawalServiceTest {
                     .build();
 
             when(withdrawalRepository.findById(1L)).thenReturn(Optional.of(withdrawal));
+            when(userRepository.findByEmail("freelancer@test.com")).thenReturn(Optional.of(freelancer));
 
             withdrawalService.cancelWithdrawal(1L, "freelancer@test.com");
 
             assertThat(withdrawal.getStatus()).isEqualTo(WithdrawalRequest.WithdrawalStatus.CANCELLED);
             verify(withdrawalRepository).save(withdrawal);
+            verify(walletService).addPendingBalance(freelancer, new BigDecimal("500.00"));
         }
 
         @Test
-        @DisplayName("deve rejeitar cancelamento de saque não-pendente")
+        @DisplayName("deve rejeitar cancelamento de saque nao pendente")
         void shouldRejectCancelNonPending() {
             WithdrawalRequest withdrawal = WithdrawalRequest.builder()
                     .id(1L)
@@ -145,9 +286,11 @@ class WithdrawalServiceTest {
                     .build();
 
             when(withdrawalRepository.findById(1L)).thenReturn(Optional.of(withdrawal));
+            when(userRepository.findByEmail("freelancer@test.com")).thenReturn(Optional.of(freelancer));
 
             assertThatThrownBy(() -> withdrawalService.cancelWithdrawal(1L, "freelancer@test.com"))
                     .isInstanceOf(IllegalStateException.class);
+            verify(walletService, never()).addPendingBalance(any(), any());
         }
     }
 

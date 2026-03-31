@@ -35,11 +35,11 @@ public class WithdrawalRequest {
     @Builder.Default
     private WithdrawalStatus status = WithdrawalStatus.PENDING;
 
-    @Column(name = "pix_key", nullable = false, length = 255)
+    @Column(name = "pix_key", length = 255)
     private String pixKey;
 
     @Column(name = "pix_key_type", length = 50)
-    private String pixKeyType; // CPF, CNPJ, EMAIL, PHONE, RANDOM
+    private String pixKeyType;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "withdrawal_method", nullable = false, length = 20)

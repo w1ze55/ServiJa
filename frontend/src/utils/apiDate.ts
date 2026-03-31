@@ -37,7 +37,7 @@ export const formatApiDate = (
     return '';
   }
 
-  return parsedDate.toLocaleDateString('pt-BR', options);
+  return parsedDate.toLocaleString('pt-BR', options);
 };
 
 export const formatTimeAgoFromApiDate = (value: string): string => {

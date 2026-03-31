@@ -47,11 +47,11 @@ public class BankAccountService {
 
         if (accountType == FreelancerBankAccount.AccountType.PIX_KEY) {
             if (dto.getPixKey() == null || dto.getPixKey().isBlank()) {
-                throw new IllegalArgumentException("Chave PIX é obrigatória");
+                throw new IllegalArgumentException("Chave PIX e obrigatoria");
             }
         } else {
             if (dto.getBankCode() == null || dto.getAgency() == null || dto.getAccountNumber() == null) {
-                throw new IllegalArgumentException("Dados bancários são obrigatórios");
+                throw new IllegalArgumentException("Dados bancarios sao obrigatorios");
             }
         }
 
@@ -81,7 +81,7 @@ public class BankAccountService {
                 .build();
 
         account = bankAccountRepository.save(account);
-        log.info("Conta bancária criada: {} para {}", account.getId(), email);
+        log.info("Conta bancaria criada: {} para {}", account.getId(), email);
         return mapToResponse(account);
     }
 
@@ -89,51 +89,66 @@ public class BankAccountService {
     public void deleteAccount(String email, Long accountId) {
         User user = findUser(email);
         FreelancerBankAccount account = bankAccountRepository.findById(accountId)
-                .orElseThrow(() -> new ResourceNotFoundException("Conta não encontrada"));
+                .orElseThrow(() -> new ResourceNotFoundException("Conta nao encontrada"));
 
         if (!account.getUser().getId().equals(user.getId())) {
-            throw new IllegalStateException("Sem permissão para remover esta conta");
+            throw new IllegalStateException("Sem permissao para remover esta conta");
         }
 
         bankAccountRepository.delete(account);
 
         if (Boolean.TRUE.equals(account.getIsDefault())) {
             bankAccountRepository.findByUserIdOrderByIsDefaultDescCreatedAtDesc(user.getId())
-                    .stream().findFirst().ifPresent(first -> {
+                    .stream()
+                    .findFirst()
+                    .ifPresent(first -> {
                         first.setIsDefault(true);
                         bankAccountRepository.save(first);
                     });
         }
 
-        log.info("Conta bancária removida: {}", accountId);
+        log.info("Conta bancaria removida: {}", accountId);
     }
 
     @Transactional
     public BankAccountResponse setDefault(String email, Long accountId) {
         User user = findUser(email);
         FreelancerBankAccount account = bankAccountRepository.findById(accountId)
-                .orElseThrow(() -> new ResourceNotFoundException("Conta não encontrada"));
+                .orElseThrow(() -> new ResourceNotFoundException("Conta nao encontrada"));
 
         if (!account.getUser().getId().equals(user.getId())) {
-            throw new IllegalStateException("Sem permissão");
+            throw new IllegalStateException("Sem permissao");
         }
 
         bankAccountRepository.clearDefaultForUser(user.getId());
         account.setIsDefault(true);
         bankAccountRepository.save(account);
 
-        log.info("Conta {} definida como padrão para {}", accountId, email);
+        log.info("Conta {} definida como padrao para {}", accountId, email);
         return mapToResponse(account);
+    }
+
+    @Transactional(readOnly = true)
+    public FreelancerBankAccount getOwnedAccount(String email, Long accountId) {
+        User user = findUser(email);
+        FreelancerBankAccount account = bankAccountRepository.findById(accountId)
+                .orElseThrow(() -> new ResourceNotFoundException("Conta nao encontrada"));
+
+        if (!account.getUser().getId().equals(user.getId())) {
+            throw new IllegalStateException("Sem permissao para usar esta conta");
+        }
+
+        return account;
     }
 
     public FreelancerBankAccount getAccountById(Long id) {
         return bankAccountRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Conta não encontrada"));
+                .orElseThrow(() -> new ResourceNotFoundException("Conta nao encontrada"));
     }
 
     private User findUser(String email) {
         return userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Usuario nao encontrado"));
     }
 
     private BankAccountResponse mapToResponse(FreelancerBankAccount account) {
@@ -146,6 +161,7 @@ public class BankAccountService {
                 .accountNumber(maskAccountNumber(account.getAccountNumber()))
                 .accountBankType(account.getAccountBankType() != null ? account.getAccountBankType().name() : null)
                 .pixKey(maskPixKey(account.getPixKey(), account.getPixKeyType()))
+                .pixKeyValue(account.getPixKey())
                 .pixKeyType(account.getPixKeyType())
                 .holderName(account.getHolderName())
                 .holderCpfCnpj(maskCpfCnpj(account.getHolderCpfCnpj()))
@@ -155,12 +171,16 @@ public class BankAccountService {
     }
 
     private String maskAccountNumber(String number) {
-        if (number == null || number.length() <= 4) return number;
+        if (number == null || number.length() <= 4) {
+            return number;
+        }
         return "****" + number.substring(number.length() - 4);
     }
 
     private String maskPixKey(String key, String type) {
-        if (key == null) return null;
+        if (key == null) {
+            return null;
+        }
         if ("CPF".equals(type) && key.length() >= 11) {
             return "***." + key.substring(3, 6) + ".***-**";
         }
@@ -175,7 +195,9 @@ public class BankAccountService {
     }
 
     private String maskCpfCnpj(String cpfCnpj) {
-        if (cpfCnpj == null) return null;
+        if (cpfCnpj == null) {
+            return null;
+        }
         String digits = cpfCnpj.replaceAll("\\D", "");
         if (digits.length() == 11) {
             return "***." + digits.substring(3, 6) + ".***-**";
