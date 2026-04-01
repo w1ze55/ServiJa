@@ -45,6 +45,7 @@ public class PaymentService {
     private static final BigDecimal ASAAS_CREDIT_CARD_FIXED_FEE = new BigDecimal("0.49"); // Taxa fixa cartão
     private static final BigDecimal ASAAS_CREDIT_CARD_PERCENTAGE = new BigDecimal("0.0199"); // 1,99% cartão
                                                                                              // (promocional)
+    private static final BigDecimal MIN_NEGOTIATED_AMOUNT = new BigDecimal("20.00");
     private static final int RELEASE_DAYS = 7; // Dias para liberar saldo ao freelancer
 
     @Transactional
@@ -69,7 +70,9 @@ public class PaymentService {
             throw new IllegalStateException("Já existe um pagamento para esta solicitação");
         }
 
-        BigDecimal agreedAmount = request.getAmount(); // Valor acordado entre cliente e freelancer
+        BigDecimal agreedAmount = resolveAgreedAmount(serviceRequest);
+        validatePaymentAmount(request.getAmount(), agreedAmount);
+        validateMinimumPaymentAmount(serviceRequest, agreedAmount);
 
         // NOVA REGRA: Cliente paga 100% do valor acordado
         BigDecimal totalAmount = agreedAmount;
@@ -191,6 +194,32 @@ public class PaymentService {
         log.info("Pagamento criado com sucesso. ID: {}, Asaas ID: {}", payment.getId(), payment.getAsaasPaymentId());
 
         return mapToResponse(payment);
+    }
+
+    private BigDecimal resolveAgreedAmount(ServiceRequest serviceRequest) {
+        BigDecimal agreedAmount = serviceRequest.getResponseValue() != null
+                ? serviceRequest.getResponseValue()
+                : serviceRequest.getCounterValue();
+
+        if (agreedAmount == null) {
+            throw new IllegalStateException("A solicitação aceita não possui valor negociado para pagamento");
+        }
+
+        return agreedAmount;
+    }
+
+    private void validatePaymentAmount(BigDecimal requestedAmount, BigDecimal agreedAmount) {
+        if (requestedAmount == null || requestedAmount.compareTo(agreedAmount) != 0) {
+            throw new IllegalStateException(
+                    "O valor do pagamento não confere com o valor aceito na solicitação. Atualize a página e tente novamente.");
+        }
+    }
+
+    private void validateMinimumPaymentAmount(ServiceRequest serviceRequest, BigDecimal agreedAmount) {
+        boolean legacyLowValueAllowed = Boolean.TRUE.equals(serviceRequest.getLegacyLowValueAllowed());
+        if (!legacyLowValueAllowed && agreedAmount.compareTo(MIN_NEGOTIATED_AMOUNT) < 0) {
+            throw new IllegalStateException("O valor mínimo para pagamento é R$ 20,00");
+        }
     }
 
     private void processPixPayment(Payment payment, String asaasCustomerId, ServiceRequest serviceRequest) {

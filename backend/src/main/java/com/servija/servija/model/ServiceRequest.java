@@ -119,6 +119,10 @@ public class ServiceRequest {
     @Column(name = "counter_notes", columnDefinition = "TEXT")
     private String counterNotes;
 
+    @Column(name = "legacy_low_value_allowed", nullable = false)
+    @Builder.Default
+    private Boolean legacyLowValueAllowed = false;
+
     @Column(name = "cancel_reason", columnDefinition = "TEXT")
     private String cancelReason;
 

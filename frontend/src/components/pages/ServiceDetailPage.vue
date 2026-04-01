@@ -709,13 +709,13 @@ onMounted(() => {
                   @paste.prevent="handleBudgetPaste"
                   class="pl-10"
                   :class="{
-                    'border-red-500 focus-visible:ring-red-500': quoteBudget && Number(quoteBudget) < 5,
+                    'border-red-500 focus-visible:ring-red-500': quoteBudget && Number(quoteBudget) < 20,
                     'border-amber-500 focus-visible:ring-amber-500': Number(quoteBudget) >= 1000000
                   }"
                 />
               </div>
-              <p v-if="quoteBudget && Number(quoteBudget) < 5" class="text-[11px] text-red-500 font-medium mt-1">
-                O orçamento mínimo é R$ 5,00
+              <p v-if="quoteBudget && Number(quoteBudget) < 20" class="text-[11px] text-red-500 font-medium mt-1">
+                O orçamento mínimo é R$ 20,00
               </p>
               <p v-else-if="Number(quoteBudget) >= 1000000" class="text-[11px] text-amber-600 font-medium mt-1">
                 Valor máximo atingido: R$ 1.000.000,00

@@ -3,8 +3,10 @@ package com.servija.servija.service;
 import com.servija.servija.dto.FreelancerAttachmentDTO;
 import com.servija.servija.dto.FreelancerAttachmentsRequest;
 import com.servija.servija.dto.ServiceRequestResponse;
+import com.servija.servija.model.Payment;
 import com.servija.servija.model.ServiceRequest;
 import com.servija.servija.model.User;
+import com.servija.servija.repository.PaymentRepository;
 import com.servija.servija.repository.ServiceRepository;
 import com.servija.servija.repository.ServiceRequestRepository;
 import com.servija.servija.repository.UserRepository;
@@ -16,11 +18,15 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -28,6 +34,9 @@ class ServiceRequestServiceTest {
 
     @Mock
     private ServiceRequestRepository serviceRequestRepository;
+
+    @Mock
+    private PaymentRepository paymentRepository;
 
     @Mock
     private UserRepository userRepository;
@@ -46,6 +55,9 @@ class ServiceRequestServiceTest {
 
     @Mock
     private NotificationService notificationService;
+
+    @Mock
+    private FreelancerWalletService walletService;
 
     @Mock
     private JdbcTemplate jdbcTemplate;
@@ -104,6 +116,92 @@ class ServiceRequestServiceTest {
         assertThat(response.getFreelancerAttachmentDetails().get(1).getName()).isEqualTo("Entrega v2.zip");
         assertThat(response.getFreelancerAttachmentDetails().get(1).getDescription())
                 .isEqualTo("Versão com ajustes aplicados");
+    }
+
+    @Test
+    @DisplayName("Deve rejeitar proposta do freelancer abaixo de R$ 20,00")
+    void respondToRequest_rejectsValueBelowTwenty() {
+        ServiceRequest request = buildRequest(null);
+
+        when(serviceRequestRepository.findById(11L)).thenReturn(Optional.of(request));
+        when(userRepository.findByEmail("freela@servija.com")).thenReturn(Optional.of(buildFreelancer()));
+
+        assertThatThrownBy(() -> serviceRequestService.respondToRequest(
+                11L,
+                com.servija.servija.dto.FreelancerResponseDTO.builder()
+                        .value(new BigDecimal("19.99"))
+                        .executionDays(5)
+                        .scope("Escopo")
+                        .notes("Notas")
+                        .build(),
+                "freela@servija.com"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("O valor mínimo é R$ 20,00");
+
+        verify(serviceRequestRepository, never()).save(any(ServiceRequest.class));
+    }
+
+    @Test
+    @DisplayName("Deve rejeitar contra proposta abaixo de R$ 20,00")
+    void counterProposal_rejectsValueBelowTwenty() {
+        ServiceRequest request = buildRequest(null);
+
+        when(serviceRequestRepository.findById(11L)).thenReturn(Optional.of(request));
+        when(userRepository.findByEmail("cliente@servija.com")).thenReturn(Optional.of(request.getContractor()));
+
+        assertThatThrownBy(() -> serviceRequestService.counterProposal(
+                11L,
+                com.servija.servija.dto.CounterProposalDTO.builder()
+                        .value(new BigDecimal("18.00"))
+                        .executionDays(7)
+                        .notes("Posso ajustar")
+                        .build(),
+                "cliente@servija.com"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("O valor mínimo é R$ 20,00");
+
+        verify(serviceRequestRepository, never()).save(any(ServiceRequest.class));
+    }
+
+    @Test
+    @DisplayName("Deve liberar saldo pendente quando o cliente aprova a entrega")
+    void completeService_releasesPendingBalanceWhenContractorApproves() {
+        User contractor = User.builder()
+                .id(21L)
+                .name("Cliente")
+                .email("cliente@servija.com")
+                .build();
+
+        ServiceRequest request = ServiceRequest.builder()
+                .id(11L)
+                .contractor(contractor)
+                .freelancer(buildFreelancer())
+                .serviceName("Desenvolvimento Web")
+                .category("Desenvolvedor Web")
+                .description("Landing page institucional")
+                .deadline("7 dias")
+                .workModel(ServiceRequest.WorkModel.REMOTO)
+                .status(ServiceRequest.Status.DELIVERED)
+                .build();
+
+        Payment payment = Payment.builder()
+                .id(99L)
+                .serviceRequest(request)
+                .freelancer(request.getFreelancer())
+                .contractor(contractor)
+                .amount(new BigDecimal("4.75"))
+                .status(Payment.PaymentStatus.COMPLETED)
+                .build();
+
+        when(serviceRequestRepository.findById(11L)).thenReturn(Optional.of(request));
+        when(userRepository.findByEmail("cliente@servija.com")).thenReturn(Optional.of(contractor));
+        when(paymentRepository.findByServiceRequestId(11L)).thenReturn(List.of(payment));
+        when(serviceRequestRepository.save(any(ServiceRequest.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ServiceRequestResponse response = serviceRequestService.completeService(11L, "cliente@servija.com");
+
+        assertThat(response.getStatus()).isEqualTo("COMPLETED");
+        verify(walletService).releasePendingBalance(payment);
     }
 
     private ServiceRequest buildRequest(String freelancerAttachmentsJson) {

@@ -9,9 +9,11 @@ import com.servija.servija.dto.FreelancerResponseDTO;
 import com.servija.servija.dto.ServiceRequestDTO;
 import com.servija.servija.dto.ServiceRequestResponse;
 import com.servija.servija.exception.ResourceNotFoundException;
+import com.servija.servija.model.Payment;
 import com.servija.servija.model.ServiceRequest;
 import com.servija.servija.model.ServiceRequest.Status;
 import com.servija.servija.model.ServiceRequestHistory.OperationType;
+import com.servija.servija.repository.PaymentRepository;
 import com.servija.servija.repository.ServiceRepository;
 import com.servija.servija.model.User;
 import com.servija.servija.repository.ServiceRequestRepository;
@@ -46,15 +48,19 @@ public class ServiceRequestService {
             "^\\[Solicitação referente ao serviço: [^\\]]+\\]");
 
     private final ServiceRequestRepository serviceRequestRepository;
+    private final PaymentRepository paymentRepository;
     private final UserRepository userRepository;
     private final ServiceRepository serviceRepository;
     private final FileStorageService fileStorageService;
     private final ServiceRequestHistoryService historyService;
     private final WebSocketService webSocketService;
     private final NotificationService notificationService;
+    private final FreelancerWalletService walletService;
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private static final BigDecimal LEGACY_BUDGET_PLACEHOLDER = new BigDecimal("5.00");
+    private static final BigDecimal MIN_NEGOTIATED_AMOUNT = new BigDecimal("20.00");
+    private static final BigDecimal MAX_NEGOTIATED_AMOUNT = new BigDecimal("1000000.00");
+    private static final BigDecimal LEGACY_BUDGET_PLACEHOLDER = MIN_NEGOTIATED_AMOUNT;
 
     @Transactional
     public ServiceRequestResponse create(String contractorEmail, ServiceRequestDTO dto) {
@@ -106,13 +112,10 @@ public class ServiceRequestService {
 
         // Validar orçamento (budget)
         if (dto.getBudget() != null) {
-            BigDecimal minBudget = new BigDecimal("5.00");
-            BigDecimal maxBudget = new BigDecimal("1000000.00");
-            
-            if (dto.getBudget().compareTo(minBudget) < 0) {
-                throw new IllegalArgumentException("O orçamento mínimo é R$ 5,00");
+            if (dto.getBudget().compareTo(MIN_NEGOTIATED_AMOUNT) < 0) {
+                throw new IllegalArgumentException("O orçamento mínimo é R$ 20,00");
             }
-            if (dto.getBudget().compareTo(maxBudget) > 0) {
+            if (dto.getBudget().compareTo(MAX_NEGOTIATED_AMOUNT) > 0) {
                 throw new IllegalArgumentException("O orçamento máximo é R$ 1.000.000,00");
             }
         }
@@ -161,6 +164,7 @@ public class ServiceRequestService {
                 .address(normalizedAddress)
                 .desiredDate(parsedDesiredDate)
                 .attachments(attachmentsJson)
+                .legacyLowValueAllowed(false)
                 .build();
 
         ServiceRequest saved = saveNewRequest(request);
@@ -226,9 +230,10 @@ public class ServiceRequestService {
                                 address,
                                 desired_date,
                                 attachments,
+                                legacy_low_value_allowed,
                                 created_at,
                                 updated_at
-                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                             """,
                     Statement.RETURN_GENERATED_KEYS);
 
@@ -259,6 +264,7 @@ public class ServiceRequestService {
                 statement.setNull(13, java.sql.Types.DATE);
             }
             statement.setString(14, request.getAttachments());
+            statement.setBoolean(15, Boolean.TRUE.equals(request.getLegacyLowValueAllowed()));
             return statement;
         }, keyHolder);
 
@@ -308,6 +314,12 @@ public class ServiceRequestService {
         if (newStatus == Status.DELIVERED || newStatus == Status.COMPLETED) {
             throw new IllegalStateException(
                     "O status " + newStatus + " deve ser alterado através do endpoint de conclusão");
+        }
+
+        if (newStatus == ServiceRequest.Status.ACCEPTED) {
+            BigDecimal acceptedValue = resolveAcceptedValue(request);
+            validateAcceptedAmount(acceptedValue, Boolean.TRUE.equals(request.getLegacyLowValueAllowed()));
+            request.setLegacyLowValueAllowed(isBelowMinimumNegotiatedAmount(acceptedValue));
         }
 
         request.setStatus(newStatus);
@@ -366,12 +378,15 @@ public class ServiceRequestService {
         User freelancer = userRepository.findByEmail(freelancerEmail)
                 .orElseThrow(() -> new RuntimeException("Freelancer not found"));
 
+        validateNewNegotiatedAmount(dto.getValue());
+
         request.setResponseValue(dto.getValue());
         request.setResponseDays(dto.getExecutionDays());
         request.setResponseScope(dto.getScope());
         request.setResponseNotes(dto.getNotes());
         request.setRespondedAt(LocalDateTime.now());
         request.setStatus(ServiceRequest.Status.NEGOTIATING);
+        request.setLegacyLowValueAllowed(false);
 
         if (dto.getAttachments() != null && !dto.getAttachments().isEmpty()) {
             try {
@@ -404,10 +419,13 @@ public class ServiceRequestService {
         User contractor = userRepository.findByEmail(contractorEmail)
                 .orElseThrow(() -> new RuntimeException("Contractor not found"));
 
+        validateNewNegotiatedAmount(dto.getValue());
+
         request.setCounterValue(dto.getValue());
         request.setCounterDays(dto.getExecutionDays());
         request.setCounterNotes(dto.getNotes());
         request.setStatus(ServiceRequest.Status.NEGOTIATING);
+        request.setLegacyLowValueAllowed(false);
 
         ServiceRequest saved = serviceRequestRepository.save(request);
         String details = String.format("Valor proposto: R$ %.2f | Prazo: %d dias", dto.getValue(),
@@ -433,7 +451,10 @@ public class ServiceRequestService {
                 .orElseThrow(() -> new RuntimeException("Freelancer not found"));
 
         if (request.getCounterValue() != null) {
-            request.setResponseValue(request.getCounterValue());
+            BigDecimal acceptedValue = request.getCounterValue();
+            validateAcceptedAmount(acceptedValue, Boolean.TRUE.equals(request.getLegacyLowValueAllowed()));
+
+            request.setResponseValue(acceptedValue);
             request.setResponseDays(request.getCounterDays());
             request.setResponseNotes(request.getCounterNotes());
 
@@ -443,6 +464,7 @@ public class ServiceRequestService {
             request.setCounterNotes(null);
 
             request.setStatus(ServiceRequest.Status.ACCEPTED);
+            request.setLegacyLowValueAllowed(isBelowMinimumNegotiatedAmount(acceptedValue));
 
             ServiceRequest saved = serviceRequestRepository.save(request);
             String details = String.format("Contra proposta aceita. Novo valor: R$ %.2f", request.getResponseValue());
@@ -459,6 +481,46 @@ public class ServiceRequestService {
         }
 
         throw new RuntimeException("No counter proposal to accept");
+    }
+
+    private void validateNewNegotiatedAmount(BigDecimal value) {
+        if (value == null) {
+            throw new IllegalArgumentException("O valor negociado é obrigatório");
+        }
+
+        if (value.compareTo(MIN_NEGOTIATED_AMOUNT) < 0) {
+            throw new IllegalArgumentException("O valor mínimo é R$ 20,00");
+        }
+
+        if (value.compareTo(MAX_NEGOTIATED_AMOUNT) > 0) {
+            throw new IllegalArgumentException("O valor máximo é R$ 1.000.000,00");
+        }
+    }
+
+    private void validateAcceptedAmount(BigDecimal value, boolean legacyAllowed) {
+        if (value == null) {
+            throw new IllegalStateException("A solicitação não possui valor negociado para ser aceita");
+        }
+
+        if (!legacyAllowed && isBelowMinimumNegotiatedAmount(value)) {
+            throw new IllegalStateException("O valor mínimo para novos orçamentos é R$ 20,00");
+        }
+
+        if (value.compareTo(MAX_NEGOTIATED_AMOUNT) > 0) {
+            throw new IllegalStateException("O valor máximo é R$ 1.000.000,00");
+        }
+    }
+
+    private BigDecimal resolveAcceptedValue(ServiceRequest request) {
+        if (request.getResponseValue() != null) {
+            return request.getResponseValue();
+        }
+
+        return request.getCounterValue();
+    }
+
+    private boolean isBelowMinimumNegotiatedAmount(BigDecimal value) {
+        return value != null && value.compareTo(MIN_NEGOTIATED_AMOUNT) < 0;
     }
 
     @Transactional
@@ -539,6 +601,7 @@ public class ServiceRequestService {
                 throw new IllegalStateException("O serviço só pode ser concluído após a entrega pelo profissional");
             }
 
+            releaseFreelancerBalanceIfNeeded(request);
             request.setStatus(Status.COMPLETED);
             ServiceRequest saved = serviceRequestRepository.save(request);
 
@@ -564,6 +627,26 @@ public class ServiceRequestService {
         }
 
         throw new IllegalStateException("Usuário não autorizado a realizar esta ação");
+    }
+
+    private void releaseFreelancerBalanceIfNeeded(ServiceRequest request) {
+        List<Payment> payments = paymentRepository.findByServiceRequestId(request.getId());
+        if (payments.isEmpty()) {
+            log.warn("Solicitacao {} concluida sem pagamento associado para liberar saldo", request.getId());
+            return;
+        }
+
+        Payment payment = payments.get(0);
+        if (payment.getStatus() != Payment.PaymentStatus.COMPLETED) {
+            log.warn(
+                    "Solicitacao {} concluida, mas pagamento {} ainda nao esta COMPLETED. Status atual: {}",
+                    request.getId(),
+                    payment.getId(),
+                    payment.getStatus());
+            return;
+        }
+
+        walletService.releasePendingBalance(payment);
     }
 
     @Transactional

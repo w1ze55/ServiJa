@@ -55,7 +55,7 @@ import { useServiceRequestWebSocket } from '@/composables/useServiceRequestWebSo
 import { formatApiDate, getApiDateTimestamp } from '@/utils/apiDate';
 import { toast } from '@/utils/toast';
 import { getStatusLabel } from '@/utils/statusTranslations';
-import { validateValueRange, extractApiErrorMessage } from '@/utils/valueValidation';
+import { extractApiErrorMessage } from '@/utils/valueValidation';
 import { type WorkModelValue } from '@/utils/workModel';
 
 interface Props {
@@ -79,7 +79,7 @@ const newRequest = ref({
   service: '',
   category: '',
   description: '',
-  budget: 5,
+  budget: 20,
   deadline: '',
   workModel: '' as WorkModelValue | '',
   address: '',
@@ -296,7 +296,7 @@ const handleOpenCreateDialog = () => {
     service: '',
     category: '',
     description: '',
-    budget: 5,
+    budget: 20,
     deadline: '',
     workModel: '',
     address: '',
@@ -320,16 +320,6 @@ const handleCreateRequest = async () => {
   }
   if (!newRequest.value.workModel) {
     toast.error('Selecione o modelo de trabalho');
-    return;
-  }
-  if (newRequest.value.budget <= 0) {
-    toast.error('Informe um orçamento válido');
-    return;
-  }
-
-  const rangeError = validateValueRange(newRequest.value.budget);
-  if (rangeError) {
-    toast.error(rangeError);
     return;
   }
 
@@ -359,7 +349,6 @@ const handleCreateRequest = async () => {
       service: newRequest.value.service,
       category: newRequest.value.category,
       description: newRequest.value.description,
-      budget: newRequest.value.budget,
       deadline: newRequest.value.deadline,
       workModel: newRequest.value.workModel as WorkModelValue,
       address: newRequest.value.address,

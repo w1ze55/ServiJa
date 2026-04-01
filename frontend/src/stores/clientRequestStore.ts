@@ -74,7 +74,6 @@ export interface CreateServiceRequestInput {
     service: string;
     category: string;
     description: string;
-    budget?: number;
     deadline: string;
     workModel: WorkModelValue;
     address?: string;

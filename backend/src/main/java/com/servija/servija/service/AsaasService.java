@@ -6,14 +6,23 @@ import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.*;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatusCode;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @Service
@@ -27,49 +36,37 @@ public class AsaasService {
     @Value("${asaas.api.key}")
     private String asaasApiKey;
 
-    private final RestTemplate restTemplate = new RestTemplate();
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final RestTemplate restTemplate;
+    private final ObjectMapper objectMapper;
 
     @PostConstruct
     public void init() {
         boolean isSandbox = asaasApiUrl != null && asaasApiUrl.contains("sandbox");
-        log.info("🏦 Asaas configurado - Ambiente: {} | URL: {}",
-                isSandbox ? "SANDBOX" : "PRODUÇÃO", asaasApiUrl);
+        log.info("Asaas configurado - Ambiente: {} | URL: {}",
+                isSandbox ? "SANDBOX" : "PRODUCAO", asaasApiUrl);
 
         if (!isSandbox) {
-            log.warn("⚠️ATENÇÃO⚠️: Asaas está configurado para PRODUÇÃO! Cobranças serão REAIS.");
+            log.warn("ATENCAO: Asaas esta configurado para PRODUCAO. Cobrancas serao reais.");
         }
     }
 
     /**
-     * Cria ou recupera um cliente no Asaas
+     * Cria ou recupera um cliente no Asaas garantindo que as notificacoes pagas
+     * fiquem desativadas.
      */
     public String getOrCreateCustomer(String email, String name, String cpfCnpj) {
         try {
-            // Primeiro tenta buscar o cliente existente
             String existingCustomerId = findCustomerByEmail(email);
             if (existingCustomerId != null) {
-                log.info("Cliente já existe no Asaas: {}", existingCustomerId);
-
-                // Se o CPF foi fornecido, atualizar o cliente para garantir que tem CPF
-                if (cpfCnpj != null && !cpfCnpj.isEmpty()) {
-                    updateCustomerCpf(existingCustomerId, cpfCnpj);
-                }
-
+                log.info("Cliente ja existe no Asaas: {}", existingCustomerId);
+                updateCustomerProfile(existingCustomerId, name, email, cpfCnpj);
+                disableCustomerNotifications(existingCustomerId);
                 return existingCustomerId;
             }
 
-            // Se não existe, cria um novo
-            HttpHeaders headers = createHeaders();
-
-            Map<String, Object> customerData = new HashMap<>();
-            customerData.put("name", name);
-            customerData.put("email", email);
-            if (cpfCnpj != null && !cpfCnpj.isEmpty()) {
-                customerData.put("cpfCnpj", cpfCnpj);
-            }
-
-            HttpEntity<Map<String, Object>> request = new HttpEntity<>(customerData, headers);
+            HttpEntity<Map<String, Object>> request = new HttpEntity<>(
+                    buildCustomerPayload(name, email, cpfCnpj),
+                    createHeaders());
 
             ResponseEntity<String> response = restTemplate.exchange(
                     asaasApiUrl + "/v3/customers",
@@ -77,42 +74,50 @@ public class AsaasService {
                     request,
                     String.class);
 
-            if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                 JsonNode jsonNode = objectMapper.readTree(response.getBody());
-                String customerId = jsonNode.get("id").asText();
-                log.info("Cliente criado no Asaas: {}", customerId);
+                String customerId = jsonNode.path("id").asText(null);
+                if (!StringUtils.hasText(customerId)) {
+                    throw new RuntimeException("Resposta invalida ao criar cliente no Asaas");
+                }
+
+                disableCustomerNotifications(customerId);
+                log.info("Cliente criado no Asaas com notificacoes desativadas: {}", customerId);
                 return customerId;
             }
 
             throw new RuntimeException("Erro ao criar cliente no Asaas");
         } catch (Exception e) {
             log.error("Erro ao criar/buscar cliente no Asaas", e);
-            throw new RuntimeException("Erro ao processar cliente no Asaas: " + e.getMessage());
+            throw new RuntimeException("Erro ao processar cliente no Asaas: " + e.getMessage(), e);
         }
     }
 
     /**
-     * Atualiza o CPF de um cliente existente no Asaas
+     * Desativa notificacoes automáticas do Asaas para evitar taxa de mensageria.
+     * O metodo e idempotente e pode ser reutilizado pelo backfill operacional.
      */
-    private void updateCustomerCpf(String customerId, String cpfCnpj) {
+    public void disableCustomerNotifications(String customerId) {
         try {
-            HttpHeaders headers = createHeaders();
+            updateCustomerNotificationPreference(customerId);
 
-            Map<String, Object> customerData = new HashMap<>();
-            customerData.put("cpfCnpj", cpfCnpj);
+            List<JsonNode> notifications = listCustomerNotifications(customerId);
+            if (notifications.isEmpty()) {
+                log.info("Cliente {} nao possui notificacoes para atualizar no Asaas", customerId);
+                return;
+            }
 
-            HttpEntity<Map<String, Object>> request = new HttpEntity<>(customerData, headers);
+            Map<String, Object> batchPayload = new HashMap<>();
+            batchPayload.put("customer", customerId);
+            batchPayload.put("notifications", notifications.stream()
+                    .map(this::buildDisabledNotificationPayload)
+                    .toList());
 
-            restTemplate.exchange(
-                    asaasApiUrl + "/v3/customers/" + customerId,
-                    HttpMethod.PUT,
-                    request,
-                    String.class);
-
-            log.info("CPF atualizado para cliente no Asaas: {}", customerId);
+            executeNotificationBatchUpdate(batchPayload);
+            log.info("Notificacoes do cliente {} desativadas no Asaas: {}", customerId, notifications.size());
         } catch (Exception e) {
-            log.warn("Erro ao atualizar CPF do cliente no Asaas: {}", e.getMessage());
-            // Não lança exceção aqui para não quebrar o fluxo
+            log.error("Erro ao desativar notificacoes do cliente {} no Asaas", customerId, e);
+            throw new RuntimeException("Erro ao desativar notificacoes do cliente no Asaas: " + e.getMessage(), e);
         }
     }
 
@@ -120,22 +125,27 @@ public class AsaasService {
      * Busca cliente por email
      */
     private String findCustomerByEmail(String email) {
+        if (!StringUtils.hasText(email)) {
+            return null;
+        }
+
         try {
-            HttpHeaders headers = createHeaders();
-            HttpEntity<?> request = new HttpEntity<>(headers);
+            String url = UriComponentsBuilder.fromUriString(asaasApiUrl + "/v3/customers")
+                    .queryParam("email", email)
+                    .toUriString();
 
             ResponseEntity<String> response = restTemplate.exchange(
-                    asaasApiUrl + "/v3/customers?email=" + email,
+                    url,
                     HttpMethod.GET,
-                    request,
+                    new HttpEntity<>(createHeaders()),
                     String.class);
 
-            if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                 JsonNode jsonNode = objectMapper.readTree(response.getBody());
-                JsonNode data = jsonNode.get("data");
+                JsonNode data = jsonNode.path("data");
 
-                if (data != null && data.isArray() && data.size() > 0) {
-                    return data.get(0).get("id").asText();
+                if (data.isArray() && data.size() > 0) {
+                    return data.get(0).path("id").asText(null);
                 }
             }
 
@@ -146,8 +156,137 @@ public class AsaasService {
         }
     }
 
+    private void updateCustomerProfile(String customerId, String name, String email, String cpfCnpj) {
+        HttpEntity<Map<String, Object>> request = new HttpEntity<>(
+                buildCustomerPayload(name, email, cpfCnpj),
+                createHeaders());
+
+        ResponseEntity<String> response = restTemplate.exchange(
+                asaasApiUrl + "/v3/customers/" + customerId,
+                HttpMethod.PUT,
+                request,
+                String.class);
+
+        if (!response.getStatusCode().is2xxSuccessful()) {
+            throw new RuntimeException("Erro ao atualizar cliente no Asaas");
+        }
+
+        log.info("Perfil do cliente atualizado no Asaas: {}", customerId);
+    }
+
+    private void updateCustomerNotificationPreference(String customerId) {
+        Map<String, Object> customerData = new HashMap<>();
+        customerData.put("notificationDisabled", true);
+
+        ResponseEntity<String> response = restTemplate.exchange(
+                asaasApiUrl + "/v3/customers/" + customerId,
+                HttpMethod.PUT,
+                new HttpEntity<>(customerData, createHeaders()),
+                String.class);
+
+        if (!response.getStatusCode().is2xxSuccessful()) {
+            throw new RuntimeException("Erro ao desativar notificacoes padrao do cliente no Asaas");
+        }
+    }
+
+    private Map<String, Object> buildCustomerPayload(String name, String email, String cpfCnpj) {
+        Map<String, Object> customerData = new HashMap<>();
+        if (StringUtils.hasText(name)) {
+            customerData.put("name", name);
+        }
+        if (StringUtils.hasText(email)) {
+            customerData.put("email", email);
+        }
+        if (StringUtils.hasText(cpfCnpj)) {
+            customerData.put("cpfCnpj", cpfCnpj);
+        }
+        customerData.put("notificationDisabled", true);
+        return customerData;
+    }
+
+    private List<JsonNode> listCustomerNotifications(String customerId) throws Exception {
+        String customerEndpoint = asaasApiUrl + "/v3/customers/" + customerId + "/notifications";
+        try {
+            return extractNotificationData(fetchJson(customerEndpoint));
+        } catch (Exception firstError) {
+            log.warn("Falha ao buscar notificacoes pelo endpoint do cliente {}. Tentando endpoint alternativo.",
+                    customerId);
+            String fallbackEndpoint = UriComponentsBuilder.fromUriString(asaasApiUrl + "/v3/notifications")
+                    .queryParam("customer", customerId)
+                    .toUriString();
+            return extractNotificationData(fetchJson(fallbackEndpoint));
+        }
+    }
+
+    private JsonNode fetchJson(String url) throws Exception {
+        ResponseEntity<String> response = restTemplate.exchange(
+                url,
+                HttpMethod.GET,
+                new HttpEntity<>(createHeaders()),
+                String.class);
+
+        if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
+            throw new RuntimeException("Resposta invalida do Asaas para " + url);
+        }
+
+        return objectMapper.readTree(response.getBody());
+    }
+
+    private List<JsonNode> extractNotificationData(JsonNode jsonNode) {
+        JsonNode data = jsonNode.path("data");
+        JsonNode notificationsNode = data.isMissingNode() || data.isNull() ? jsonNode : data;
+
+        List<JsonNode> notifications = new ArrayList<>();
+        if (notificationsNode.isArray()) {
+            notificationsNode.forEach(notifications::add);
+        }
+        return notifications;
+    }
+
+    private Map<String, Object> buildDisabledNotificationPayload(JsonNode notification) {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("id", notification.path("id").asText());
+        payload.put("enabled", false);
+        payload.put("emailEnabledForProvider", false);
+        payload.put("smsEnabledForProvider", false);
+        payload.put("emailEnabledForCustomer", false);
+        payload.put("smsEnabledForCustomer", false);
+        payload.put("phoneCallEnabledForCustomer", false);
+        payload.put("whatsappEnabledForCustomer", false);
+        return payload;
+    }
+
+    private void executeNotificationBatchUpdate(Map<String, Object> payload) {
+        HttpEntity<Map<String, Object>> request = new HttpEntity<>(payload, createHeaders());
+
+        try {
+            ResponseEntity<String> response = restTemplate.exchange(
+                    asaasApiUrl + "/v3/notifications/batch",
+                    HttpMethod.PUT,
+                    request,
+                    String.class);
+
+            if (response.getStatusCode().is2xxSuccessful()) {
+                return;
+            }
+        } catch (Exception putError) {
+            log.warn("Falha ao atualizar notificacoes do Asaas via PUT. Tentando fallback via POST.");
+        }
+
+        ResponseEntity<String> fallbackResponse = restTemplate.exchange(
+                asaasApiUrl + "/v3/notifications/batch",
+                HttpMethod.POST,
+                request,
+                String.class);
+
+        HttpStatusCode status = fallbackResponse.getStatusCode();
+        if (!status.is2xxSuccessful()) {
+            throw new RuntimeException("Erro ao atualizar notificacoes em lote no Asaas");
+        }
+    }
+
     /**
-     * Cria uma cobrança no Asaas
+     * Cria uma cobranca no Asaas
      */
     public Map<String, Object> createPayment(
             String customerId,
@@ -164,8 +303,8 @@ public class AsaasService {
             paymentData.put("value", value);
             paymentData.put("dueDate", dueDate.format(DateTimeFormatter.ISO_DATE));
 
-            // Desabilitar notificações automáticas para evitar taxa de R$ 0,99
-            paymentData.put("postalService", false); // Desabilita notificação por carta
+            // Mantem a carta desativada, mas a mensageria e cortada no nivel do cliente.
+            paymentData.put("postalService", false);
 
             if (description != null && !description.isEmpty()) {
                 paymentData.put("description", description);
@@ -179,7 +318,7 @@ public class AsaasService {
                     request,
                     String.class);
 
-            if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                 JsonNode jsonNode = objectMapper.readTree(response.getBody());
 
                 Map<String, Object> result = new HashMap<>();
@@ -195,32 +334,29 @@ public class AsaasService {
                     result.put("nossoNumero", jsonNode.get("nossoNumero").asText());
                 }
 
-                log.info("Cobrança criada no Asaas: {}", result.get("id"));
+                log.info("Cobranca criada no Asaas: {}", result.get("id"));
                 return result;
             }
 
-            throw new RuntimeException("Erro ao criar cobrança no Asaas");
+            throw new RuntimeException("Erro ao criar cobranca no Asaas");
         } catch (Exception e) {
-            log.error("Erro ao criar cobrança no Asaas", e);
-            throw new RuntimeException("Erro ao processar pagamento no Asaas: " + e.getMessage());
+            log.error("Erro ao criar cobranca no Asaas", e);
+            throw new RuntimeException("Erro ao processar pagamento no Asaas: " + e.getMessage(), e);
         }
     }
 
     /**
-     * Obtém QR Code PIX para uma cobrança
+     * Obtem QR Code PIX para uma cobranca
      */
     public Map<String, String> getPixQrCode(String paymentId) {
         try {
-            HttpHeaders headers = createHeaders();
-            HttpEntity<?> request = new HttpEntity<>(headers);
-
             ResponseEntity<String> response = restTemplate.exchange(
                     asaasApiUrl + "/v3/payments/" + paymentId + "/pixQrCode",
                     HttpMethod.GET,
-                    request,
+                    new HttpEntity<>(createHeaders()),
                     String.class);
 
-            if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                 JsonNode jsonNode = objectMapper.readTree(response.getBody());
 
                 Map<String, String> result = new HashMap<>();
@@ -238,7 +374,7 @@ public class AsaasService {
             throw new RuntimeException("Erro ao obter QR Code PIX");
         } catch (Exception e) {
             log.error("Erro ao obter QR Code PIX", e);
-            throw new RuntimeException("Erro ao obter QR Code PIX: " + e.getMessage());
+            throw new RuntimeException("Erro ao obter QR Code PIX: " + e.getMessage(), e);
         }
     }
 
@@ -247,16 +383,13 @@ public class AsaasService {
      */
     public String getPaymentStatus(String paymentId) {
         try {
-            HttpHeaders headers = createHeaders();
-            HttpEntity<?> request = new HttpEntity<>(headers);
-
             ResponseEntity<String> response = restTemplate.exchange(
                     asaasApiUrl + "/v3/payments/" + paymentId,
                     HttpMethod.GET,
-                    request,
+                    new HttpEntity<>(createHeaders()),
                     String.class);
 
-            if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                 JsonNode jsonNode = objectMapper.readTree(response.getBody());
                 return jsonNode.get("status").asText();
             }
@@ -264,26 +397,23 @@ public class AsaasService {
             throw new RuntimeException("Erro ao consultar status do pagamento");
         } catch (Exception e) {
             log.error("Erro ao consultar status do pagamento", e);
-            throw new RuntimeException("Erro ao consultar pagamento: " + e.getMessage());
+            throw new RuntimeException("Erro ao consultar pagamento: " + e.getMessage(), e);
         }
     }
 
     /**
-     * Obtém URLs de recibo/comprovante de um pagamento no Asaas
+     * Obtem URLs de recibo/comprovante de um pagamento no Asaas
      * Consulta GET /v3/payments/{id} e extrai transactionReceiptUrl e invoiceUrl
      */
     public Map<String, String> getPaymentReceiptUrl(String asaasPaymentId) {
         try {
-            HttpHeaders headers = createHeaders();
-            HttpEntity<?> request = new HttpEntity<>(headers);
-
             ResponseEntity<String> response = restTemplate.exchange(
                     asaasApiUrl + "/v3/payments/" + asaasPaymentId,
                     HttpMethod.GET,
-                    request,
+                    new HttpEntity<>(createHeaders()),
                     String.class);
 
-            if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                 JsonNode jsonNode = objectMapper.readTree(response.getBody());
 
                 Map<String, String> result = new HashMap<>();
@@ -307,12 +437,12 @@ public class AsaasService {
             throw new RuntimeException("Erro ao consultar pagamento no Asaas");
         } catch (Exception e) {
             log.error("Erro ao obter URLs de recibo do pagamento: {}", asaasPaymentId, e);
-            throw new RuntimeException("Erro ao obter recibo do pagamento: " + e.getMessage());
+            throw new RuntimeException("Erro ao obter recibo do pagamento: " + e.getMessage(), e);
         }
     }
 
     /**
-     * Cria headers para requisição ao Asaas
+     * Cria headers para requisicao ao Asaas
      */
     private HttpHeaders createHeaders() {
         HttpHeaders headers = new HttpHeaders();
@@ -322,7 +452,7 @@ public class AsaasService {
     }
 
     /**
-     * Cria transferência PIX para conta externa
+     * Cria transferencia PIX para conta externa
      */
     public Map<String, Object> createPixTransfer(
             BigDecimal value,
@@ -352,7 +482,7 @@ public class AsaasService {
                     request,
                     String.class);
 
-            if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                 JsonNode jsonNode = objectMapper.readTree(response.getBody());
 
                 Map<String, Object> result = new HashMap<>();
@@ -364,45 +494,42 @@ public class AsaasService {
                     result.put("transactionId", jsonNode.get("transactionId").asText());
                 }
 
-                log.info("Transferência PIX criada no Asaas: {}", result.get("id"));
+                log.info("Transferencia PIX criada no Asaas: {}", result.get("id"));
                 return result;
             }
 
-            throw new RuntimeException("Erro ao criar transferência PIX");
+            throw new RuntimeException("Erro ao criar transferencia PIX");
         } catch (Exception e) {
-            log.error("Erro ao criar transferência PIX no Asaas", e);
-            throw new RuntimeException("Erro ao processar transferência PIX: " + e.getMessage());
+            log.error("Erro ao criar transferencia PIX no Asaas", e);
+            throw new RuntimeException("Erro ao processar transferencia PIX: " + e.getMessage(), e);
         }
     }
 
     /**
-     * Consulta status de uma transferência
+     * Consulta status de uma transferencia
      */
     public String getTransferStatus(String transferId) {
         try {
-            HttpHeaders headers = createHeaders();
-            HttpEntity<?> request = new HttpEntity<>(headers);
-
             ResponseEntity<String> response = restTemplate.exchange(
                     asaasApiUrl + "/v3/transfers/" + transferId,
                     HttpMethod.GET,
-                    request,
+                    new HttpEntity<>(createHeaders()),
                     String.class);
 
-            if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                 JsonNode jsonNode = objectMapper.readTree(response.getBody());
                 return jsonNode.get("status").asText();
-        }
+            }
 
-            throw new RuntimeException("Erro ao consultar status da transferência");
+            throw new RuntimeException("Erro ao consultar status da transferencia");
         } catch (Exception e) {
-            log.error("Erro ao consultar status da transferência", e);
-            throw new RuntimeException("Erro ao consultar transferência: " + e.getMessage());
+            log.error("Erro ao consultar status da transferencia", e);
+            throw new RuntimeException("Erro ao consultar transferencia: " + e.getMessage(), e);
         }
     }
 
     /**
-     * Cria transferência TED para conta bancária
+     * Cria transferencia TED para conta bancaria
      */
     public Map<String, Object> createTedTransfer(
             BigDecimal value,
@@ -445,7 +572,7 @@ public class AsaasService {
                     request,
                     String.class);
 
-            if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                 JsonNode jsonNode = objectMapper.readTree(response.getBody());
 
                 Map<String, Object> result = new HashMap<>();
@@ -453,14 +580,14 @@ public class AsaasService {
                 result.put("status", jsonNode.get("status").asText());
                 result.put("value", jsonNode.get("value").asDouble());
 
-                log.info("Transferência TED criada no Asaas: {}", result.get("id"));
+                log.info("Transferencia TED criada no Asaas: {}", result.get("id"));
                 return result;
             }
 
-            throw new RuntimeException("Erro ao criar transferência TED");
+            throw new RuntimeException("Erro ao criar transferencia TED");
         } catch (Exception e) {
-            log.error("Erro ao criar transferência TED no Asaas", e);
-            throw new RuntimeException("Erro ao processar transferência TED: " + e.getMessage());
+            log.error("Erro ao criar transferencia TED no Asaas", e);
+            throw new RuntimeException("Erro ao processar transferencia TED: " + e.getMessage(), e);
         }
     }
 }
