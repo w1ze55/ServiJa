@@ -622,6 +622,7 @@ const getStatusColor = (status: string) => {
           :messages="request.messages || []"
           current-user-role="client"
           :is-locked="request.status !== 'in_progress' && request.status !== 'delivered'"
+          :service-status="request.status"
           :is-sending="isSendingMessage"
           @send-message="handleSendMessage"
         />

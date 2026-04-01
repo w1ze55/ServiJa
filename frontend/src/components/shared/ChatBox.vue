@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { Send, Paperclip, X, Lock, MessageSquare } from 'lucide-vue-next';
 import Button from '../ui/button.vue';
 import Textarea from '../ui/textarea.vue';
@@ -25,9 +25,31 @@ interface Props {
   currentUserRole: 'client' | 'freelancer';
   isLocked: boolean;
   isSending?: boolean;
+  serviceStatus?:
+    | 'pending'
+    | 'sent'
+    | 'negotiating'
+    | 'accepted'
+    | 'in_progress'
+    | 'delivered'
+    | 'rejected'
+    | 'completed'
+    | 'cancelled'
+    | 'archived';
 }
 
 const props = defineProps<Props>();
+
+const lockMessage = computed(() => {
+  if (props.serviceStatus === 'completed') {
+    return 'Serviço concluído. O chat foi encerrado.';
+  } else if (props.serviceStatus === 'rejected') {
+    return 'Serviço rejeitado. O chat foi encerrado.';
+  } else if (props.serviceStatus === 'archived') {
+    return 'Serviço arquivado. O chat foi encerrado.';
+  }
+  return 'O chat será liberado automaticamente após a confirmação do pagamento.';
+});
 
 const emit = defineEmits<{
   (e: 'send-message', message: string, attachments: File[]): void;
@@ -172,11 +194,11 @@ const formatDate = (dateString: string) => {
           </Button>
         </div>
       </div>
-    </div>
+    </div> <!-- Quando o serviço estiver concluído deve aparecer outra mensagem -->
     <div v-else class="flex items-center justify-center p-4 bg-gray-50 rounded-lg border border-dashed border-gray-200 mt-auto">
       <p class="text-sm text-[#435574] flex items-center gap-2 text-center">
         <Lock class="h-4 w-4 text-[#286AD8]" />
-        O chat será liberado automaticamente após a confirmação do pagamento.
+        {{ lockMessage }}
       </p>
     </div>
   </div>

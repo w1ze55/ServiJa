@@ -1049,6 +1049,7 @@ const getStatusBadge = (currentProposal: Proposal) => {
           :messages="proposal.messages || []"
           current-user-role="freelancer"
           :is-locked="proposal.status !== 'in_progress' && proposal.status !== 'delivered'"
+          :service-status="proposal.status"
           :is-sending="isSendingMessage"
           @send-message="handleSendMessage"
         />
