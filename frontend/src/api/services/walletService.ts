@@ -77,6 +77,8 @@ export interface WithdrawalResponse {
   createdAt: string;
 }
 
+export type WalletReportFormat = 'PDF' | 'EXCEL';
+
 const walletService = {
   // Carteira
   async getWallet(): Promise<WalletBalance> {
@@ -128,12 +130,18 @@ const walletService = {
   },
 
   // Relatório
-  async downloadReport(): Promise<void> {
-    const response = await axios.get('/wallet/report', { responseType: 'blob' });
+  async downloadReport(format: WalletReportFormat): Promise<void> {
+    const response = await axios.get('/wallet/report', {
+      params: { format },
+      responseType: 'blob',
+    });
     const url = window.URL.createObjectURL(new Blob([response.data]));
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', 'relatorio-carteira.csv');
+    const contentDisposition = response.headers['content-disposition'];
+    const filenameMatch = contentDisposition?.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/i);
+    const filename = filenameMatch?.[1]?.replace(/['"]/g, '') || `relatorio-carteira.${format === 'PDF' ? 'pdf' : 'xlsx'}`;
+    link.setAttribute('download', filename);
     document.body.appendChild(link);
     link.click();
     link.remove();

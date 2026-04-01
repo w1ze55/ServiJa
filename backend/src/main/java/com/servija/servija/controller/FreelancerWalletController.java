@@ -16,15 +16,23 @@ import com.servija.servija.service.WithdrawalService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
-import jakarta.validation.Valid;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -39,8 +47,6 @@ public class FreelancerWalletController {
     private final BankAccountService bankAccountService;
     private final WalletTransactionService transactionService;
     private final WalletReportService reportService;
-
-    // ==================== CARTEIRA ====================
 
     @GetMapping
     @Operation(summary = "Obter saldo da carteira")
@@ -62,10 +68,8 @@ public class FreelancerWalletController {
         return ResponseEntity.ok(response);
     }
 
-    // ==================== TRANSAÇÕES ====================
-
     @GetMapping("/transactions")
-    @Operation(summary = "Listar transações", description = "Lista histórico de recebimentos e saques")
+    @Operation(summary = "Listar transacoes", description = "Lista historico de recebimentos e saques")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<List<WalletTransactionResponse>> getTransactions(
             Authentication authentication,
@@ -75,8 +79,6 @@ public class FreelancerWalletController {
         List<WalletTransactionResponse> transactions = transactionService.getTransactions(email, type);
         return ResponseEntity.ok(transactions);
     }
-
-    // ==================== SAQUES ====================
 
     @PostMapping("/withdraw")
     @Operation(summary = "Solicitar saque")
@@ -126,10 +128,8 @@ public class FreelancerWalletController {
         return ResponseEntity.noContent().build();
     }
 
-    // ==================== CONTAS BANCÁRIAS ====================
-
     @GetMapping("/bank-accounts")
-    @Operation(summary = "Listar contas bancárias")
+    @Operation(summary = "Listar contas bancarias")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<List<BankAccountResponse>> getBankAccounts(Authentication authentication) {
         String email = authentication.getName();
@@ -137,7 +137,7 @@ public class FreelancerWalletController {
     }
 
     @PostMapping("/bank-accounts")
-    @Operation(summary = "Cadastrar conta bancária/chave PIX")
+    @Operation(summary = "Cadastrar conta bancaria ou chave PIX")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<BankAccountResponse> addBankAccount(
             @Valid @RequestBody BankAccountDTO request,
@@ -149,7 +149,7 @@ public class FreelancerWalletController {
     }
 
     @DeleteMapping("/bank-accounts/{id}")
-    @Operation(summary = "Remover conta bancária")
+    @Operation(summary = "Remover conta bancaria")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<Void> deleteBankAccount(
             @PathVariable Long id,
@@ -161,7 +161,7 @@ public class FreelancerWalletController {
     }
 
     @PutMapping("/bank-accounts/{id}/default")
-    @Operation(summary = "Definir conta padrão")
+    @Operation(summary = "Definir conta padrao")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<BankAccountResponse> setDefaultAccount(
             @PathVariable Long id,
@@ -171,23 +171,22 @@ public class FreelancerWalletController {
         return ResponseEntity.ok(bankAccountService.setDefault(email, id));
     }
 
-    // ==================== RELATÓRIO ====================
-
     @GetMapping("/report")
-    @Operation(summary = "Baixar relatório CSV da carteira")
+    @Operation(summary = "Baixar relatorio da carteira em PDF ou Excel")
     @SecurityRequirement(name = "bearerAuth")
-    public ResponseEntity<byte[]> downloadReport(Authentication authentication) {
+    public ResponseEntity<byte[]> downloadReport(
+            Authentication authentication,
+            @RequestParam(defaultValue = "EXCEL") WalletReportService.ReportFormat format
+    ) {
         String email = authentication.getName();
-        byte[] report = reportService.generateReport(email);
+        WalletReportService.ReportFile report = reportService.generateReport(email, format);
 
         HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.parseMediaType("text/csv; charset=UTF-8"));
-        headers.setContentDispositionFormData("attachment", "relatorio-carteira.csv");
+        headers.setContentType(MediaType.parseMediaType(report.contentType()));
+        headers.setContentDispositionFormData("attachment", report.filename());
 
-        return new ResponseEntity<>(report, headers, HttpStatus.OK);
+        return new ResponseEntity<>(report.content(), headers, HttpStatus.OK);
     }
-
-    // ==================== MAP ====================
 
     private WithdrawalResponse mapToResponse(WithdrawalRequest withdrawal) {
         return WithdrawalResponse.builder()

@@ -77,7 +77,7 @@ onMounted(async () => {
 <template>
   <div class="mx-auto max-w-5xl space-y-6">
     <div class="space-y-2">
-      <h1 class="text-3xl font-semibold text-[#263238]">Notificações</h1>
+      <h1 class="text-2xl font-bold text-[#263238] mb-2">Notificações</h1>
       <p class="text-[#435574]">
         Acompanhe propostas, pagamentos, atualizações de projeto e futuras notificações de mensagens em um só lugar.
       </p>

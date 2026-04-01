@@ -363,7 +363,7 @@ const handleTagKeyPress = (e: KeyboardEvent) => {
     <!-- Header -->
     <div class="flex items-start justify-between">
       <div>
-        <h1 class="text-[#263238] mb-2">Meu Portfólio</h1>
+        <h1 class="text-2xl font-bold text-[#263238] mb-2">Meu Portfólio</h1>
         <p class="text-[#435574]">Gerencie seus projetos e trabalhos realizados</p>
       </div>
       <Button

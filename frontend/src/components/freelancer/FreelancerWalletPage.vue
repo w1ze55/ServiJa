@@ -21,21 +21,39 @@ import {
 import Card from '../ui/card.vue';
 import Badge from '../ui/badge.vue';
 import Button from '../ui/button.vue';
+import DropdownMenu from '../ui/dropdown-menu.vue';
+import DropdownMenuContent from '../ui/dropdown-menu-content.vue';
+import DropdownMenuItem from '../ui/dropdown-menu-item.vue';
+import DropdownMenuTrigger from '../ui/dropdown-menu-trigger.vue';
 import Input from '../ui/input.vue';
 import Label from '../ui/label.vue';
 import Separator from '../ui/separator.vue';
 import { toast } from '@/utils/toast';
 import { formatApiDate } from '@/utils/apiDate';
+import { formatCPF, formatPhone, validateCPF } from '@/utils/masks';
 import walletService, {
   type WalletBalance,
   type WalletTransaction,
   type BankAccount,
   type CreateBankAccountRequest,
+  type WalletReportFormat,
 } from '@/api/services/walletService';
 
 interface Props {
   onNavigate: (page: string, params?: any) => void;
 }
+
+type PixKeyType = 'CPF' | 'CNPJ' | 'EMAIL' | 'PHONE' | 'RANDOM';
+
+const normalizePixKeyType = (value?: string): PixKeyType => {
+  const normalizedValue = value?.trim().toUpperCase();
+
+  if (normalizedValue === 'CNPJ') return 'CNPJ';
+  if (normalizedValue === 'EMAIL' || normalizedValue === 'E-MAIL') return 'EMAIL';
+  if (normalizedValue === 'PHONE' || normalizedValue === 'TELEFONE' || normalizedValue === 'CELLPHONE') return 'PHONE';
+  if (normalizedValue === 'RANDOM' || normalizedValue === 'ALEATORIA' || normalizedValue === 'CHAVE_ALEATORIA') return 'RANDOM';
+  return 'CPF';
+};
 
 defineProps<Props>();
 
@@ -55,13 +73,13 @@ const isProcessing = ref(false);
 const withdrawAmount = ref('');
 const withdrawalMethod = ref<'PIX' | 'TED'>('PIX');
 const withdrawPixKey = ref('');
-const withdrawPixKeyType = ref('CPF');
+const withdrawPixKeyType = ref<PixKeyType>('CPF');
 const withdrawBankAccountId = ref<number | null>(null);
 
 // Add account form
 const newAccountType = ref<'PIX_KEY' | 'BANK_ACCOUNT'>('PIX_KEY');
 const newPixKey = ref('');
-const newPixKeyType = ref('CPF');
+const newPixKeyType = ref<PixKeyType>('CPF');
 const newBankName = ref('');
 const newBankCode = ref('');
 const newAgency = ref('');
@@ -98,12 +116,12 @@ const preferredTedAccountId = computed(() => {
 });
 
 const withdrawSubmitDisabled = computed(() => {
-  if (isProcessing.value || !withdrawAmount.value) {
+  if (isProcessing.value || getWithdrawAmountValue() <= 0) {
     return true;
   }
 
   if (withdrawalMethod.value === 'PIX') {
-    return !withdrawPixKey.value.trim();
+    return !normalizePixKeyValue(withdrawPixKey.value, withdrawPixKeyType.value);
   }
 
   return withdrawBankAccountId.value === null;
@@ -112,6 +130,352 @@ const withdrawSubmitDisabled = computed(() => {
 // Methods
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+};
+
+const MAX_WITHDRAW_INPUT_DIGITS = 10;
+const PIX_KEY_EMAIL_MAX_LENGTH = 256;
+
+const getCurrencyDigits = (value: string) => value.replace(/\D/g, '');
+
+const getLimitedCurrencyDigits = (value: string) => getCurrencyDigits(value).slice(0, MAX_WITHDRAW_INPUT_DIGITS);
+
+const parseCurrencyInput = (value: string) => {
+  const digits = getCurrencyDigits(value);
+  if (!digits) return 0;
+  return Number(digits) / 100;
+};
+
+const formatCurrencyInput = (value: string | number) => {
+  const numericValue = typeof value === 'number' ? value : parseCurrencyInput(value);
+  return numericValue > 0 ? formatCurrency(numericValue) : '';
+};
+
+const MAX_WITHDRAW_FORMATTED_LENGTH = formatCurrencyInput('9'.repeat(MAX_WITHDRAW_INPUT_DIGITS)).length;
+
+const getWithdrawAmountValue = () => parseCurrencyInput(withdrawAmount.value);
+
+const handleWithdrawAmountInput = (value: string) => {
+  const limitedDigits = getLimitedCurrencyDigits(value);
+  withdrawAmount.value = formatCurrencyInput(limitedDigits);
+};
+
+const handleWithdrawAmountBeforeInput = (event: InputEvent) => {
+  const target = event.target as HTMLInputElement | null;
+  const insertedDigits = getCurrencyDigits(event.data ?? '');
+
+  if (!target || !insertedDigits) {
+    return;
+  }
+
+  const selectionStart = target.selectionStart ?? target.value.length;
+  const selectionEnd = target.selectionEnd ?? selectionStart;
+  const selectedDigits = getCurrencyDigits(target.value.slice(selectionStart, selectionEnd)).length;
+  const nextDigitsCount = getCurrencyDigits(target.value).length - selectedDigits + insertedDigits.length;
+
+  if (nextDigitsCount > MAX_WITHDRAW_INPUT_DIGITS) {
+    event.preventDefault();
+  }
+};
+
+const formatCNPJ = (value: string) => {
+  const numbers = value.replace(/\D/g, '').slice(0, 14);
+
+  if (numbers.length <= 2) return numbers;
+  if (numbers.length <= 5) return `${numbers.slice(0, 2)}.${numbers.slice(2)}`;
+  if (numbers.length <= 8) return `${numbers.slice(0, 2)}.${numbers.slice(2, 5)}.${numbers.slice(5)}`;
+  if (numbers.length <= 12) return `${numbers.slice(0, 2)}.${numbers.slice(2, 5)}.${numbers.slice(5, 8)}/${numbers.slice(8)}`;
+  return `${numbers.slice(0, 2)}.${numbers.slice(2, 5)}.${numbers.slice(5, 8)}/${numbers.slice(8, 12)}-${numbers.slice(12)}`;
+};
+
+const validateEmail = (value: string) => {
+  if (!value || value.length > PIX_KEY_EMAIL_MAX_LENGTH) {
+    return false;
+  }
+
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+};
+
+const getPixKeyDigits = (value: string) => value.replace(/\D/g, '');
+
+const getPixKeyDigitLimit = (type: PixKeyType) => {
+  if (type === 'CPF' || type === 'PHONE') return 11;
+  if (type === 'CNPJ') return 14;
+  return null;
+};
+
+const isNumericPixKeyType = (type: PixKeyType) => type === 'CPF' || type === 'CNPJ' || type === 'PHONE';
+
+const shouldBlockNonNumericPixKeyInput = (type: PixKeyType, event: InputEvent) => {
+  if (!isNumericPixKeyType(type)) {
+    return false;
+  }
+
+  if (!event.data) {
+    return false;
+  }
+
+  return /\D/.test(event.data);
+};
+
+const formatPixKeyValue = (value: string, type: PixKeyType) => {
+  if (type === 'CPF') return formatCPF(value);
+  if (type === 'CNPJ') return formatCNPJ(value);
+  if (type === 'PHONE') return formatPhone(value);
+  if (type === 'EMAIL') return value.trim().slice(0, PIX_KEY_EMAIL_MAX_LENGTH);
+  return value;
+};
+
+const normalizePixKeyValue = (value: string, type: PixKeyType) => {
+  if (type === 'CPF' || type === 'CNPJ' || type === 'PHONE') {
+    return getPixKeyDigits(value);
+  }
+
+  return value.trim();
+};
+
+const getPixKeyMaxLength = (type: PixKeyType) => {
+  if (type === 'CPF') return formatCPF('9'.repeat(11)).length;
+  if (type === 'CNPJ') return formatCNPJ('9'.repeat(14)).length;
+  if (type === 'PHONE') return formatPhone('9'.repeat(11)).length;
+  if (type === 'EMAIL') return PIX_KEY_EMAIL_MAX_LENGTH;
+  return undefined;
+};
+
+const getPixKeyInputMode = (type: PixKeyType) => {
+  if (type === 'EMAIL') return 'email';
+  if (type === 'RANDOM') return 'text';
+  return 'numeric';
+};
+
+const getPixKeyTypeLabel = (type: PixKeyType) => {
+  if (type === 'EMAIL') return 'E-mail';
+  if (type === 'PHONE') return 'Telefone';
+  if (type === 'RANDOM') return 'Chave aleatória';
+  return type;
+};
+
+const getPixKeyPlaceholder = (type: PixKeyType) => {
+  if (type === 'CPF') return '000.000.000-00';
+  if (type === 'CNPJ') return '00.000.000/0000-00';
+  if (type === 'EMAIL') return 'email@exemplo.com';
+  if (type === 'PHONE') return '(11) 99999-9999';
+  return 'Informe sua chave PIX';
+};
+
+const getPixKeyError = (value: string, type: PixKeyType) => {
+  const normalizedValue = normalizePixKeyValue(value, type);
+
+  if (!normalizedValue) {
+    return 'Informe a chave PIX';
+  }
+
+  if (type === 'CPF' && !validateCPF(value)) {
+    return 'Informe um CPF válido';
+  }
+
+  if (type === 'CNPJ' && normalizedValue.length !== 14) {
+    return 'Informe um CNPJ com 14 dígitos';
+  }
+
+  if (type === 'EMAIL' && !validateEmail(normalizedValue)) {
+    return 'Informe um e-mail válido';
+  }
+
+  if (type === 'PHONE' && normalizedValue.length !== 11) {
+    return 'Informe um telefone com 11 dígitos';
+  }
+
+  return '';
+};
+
+const withdrawPixKeyPlaceholder = computed(() => getPixKeyPlaceholder(withdrawPixKeyType.value));
+
+const withdrawPixKeyMaxLength = computed(() => getPixKeyMaxLength(withdrawPixKeyType.value));
+const withdrawPixKeyInputMode = computed(() => getPixKeyInputMode(withdrawPixKeyType.value));
+
+const handleWithdrawPixKeyInput = (value: string) => {
+  withdrawPixKey.value = formatPixKeyValue(value, withdrawPixKeyType.value);
+};
+
+const handleWithdrawPixKeyTypeChange = (value: PixKeyType) => {
+  withdrawPixKeyType.value = value;
+  withdrawPixKey.value = formatPixKeyValue(withdrawPixKey.value, value);
+};
+
+const handleWithdrawPixKeyTypeSelect = (event: Event) => {
+  const value = (event.target as HTMLSelectElement).value as PixKeyType;
+  handleWithdrawPixKeyTypeChange(value);
+};
+
+const handleWithdrawPixKeyBeforeInput = (event: InputEvent) => {
+  if (shouldBlockNonNumericPixKeyInput(withdrawPixKeyType.value, event)) {
+    event.preventDefault();
+    return;
+  }
+
+  const digitLimit = getPixKeyDigitLimit(withdrawPixKeyType.value);
+  const target = event.target as HTMLInputElement | null;
+  const insertedDigits = getPixKeyDigits(event.data ?? '');
+
+  if (!digitLimit || !target || !insertedDigits) {
+    return;
+  }
+
+  const selectionStart = target.selectionStart ?? target.value.length;
+  const selectionEnd = target.selectionEnd ?? selectionStart;
+  const selectedDigits = getPixKeyDigits(target.value.slice(selectionStart, selectionEnd)).length;
+  const nextDigitsCount = getPixKeyDigits(target.value).length - selectedDigits + insertedDigits.length;
+
+  if (nextDigitsCount > digitLimit) {
+    event.preventDefault();
+  }
+};
+
+const getWithdrawPixKeyError = () => {
+  const normalizedValue = normalizePixKeyValue(withdrawPixKey.value, withdrawPixKeyType.value);
+
+  if (!normalizedValue) {
+    return 'Informe a chave PIX';
+  }
+
+  if (withdrawPixKeyType.value === 'CPF' && !validateCPF(withdrawPixKey.value)) {
+    return 'Informe um CPF válido';
+  }
+
+  if (withdrawPixKeyType.value === 'CNPJ' && normalizedValue.length !== 14) {
+    return 'Informe um CNPJ com 14 dígitos';
+  }
+
+  if (withdrawPixKeyType.value === 'EMAIL' && !validateEmail(normalizedValue)) {
+    return 'Informe um e-mail válido';
+  }
+
+  if (withdrawPixKeyType.value === 'PHONE' && normalizedValue.length !== 11) {
+    return 'Informe um telefone com 11 dígitos';
+  }
+
+  return '';
+};
+
+const newPixKeyPlaceholder = computed(() => getPixKeyPlaceholder(newPixKeyType.value));
+const newPixKeyMaxLength = computed(() => getPixKeyMaxLength(newPixKeyType.value));
+const newPixKeyInputMode = computed(() => getPixKeyInputMode(newPixKeyType.value));
+
+const handleNewPixKeyInput = (value: string) => {
+  newPixKey.value = formatPixKeyValue(value, newPixKeyType.value);
+};
+
+const handleNewPixKeyTypeChange = (value: PixKeyType) => {
+  newPixKeyType.value = value;
+  newPixKey.value = formatPixKeyValue(newPixKey.value, value);
+};
+
+const handleNewPixKeyTypeSelect = (event: Event) => {
+  const value = (event.target as HTMLSelectElement).value as PixKeyType;
+  handleNewPixKeyTypeChange(value);
+};
+
+const handleNewPixKeyBeforeInput = (event: InputEvent) => {
+  if (shouldBlockNonNumericPixKeyInput(newPixKeyType.value, event)) {
+    event.preventDefault();
+    return;
+  }
+
+  const digitLimit = getPixKeyDigitLimit(newPixKeyType.value);
+  const target = event.target as HTMLInputElement | null;
+  const insertedDigits = getPixKeyDigits(event.data ?? '');
+
+  if (!digitLimit || !target || !insertedDigits) {
+    return;
+  }
+
+  const selectionStart = target.selectionStart ?? target.value.length;
+  const selectionEnd = target.selectionEnd ?? selectionStart;
+  const selectedDigits = getPixKeyDigits(target.value.slice(selectionStart, selectionEnd)).length;
+  const nextDigitsCount = getPixKeyDigits(target.value).length - selectedDigits + insertedDigits.length;
+
+  if (nextDigitsCount > digitLimit) {
+    event.preventDefault();
+  }
+};
+
+const getNewPixKeyError = () => getPixKeyError(newPixKey.value, newPixKeyType.value);
+
+const validateCNPJ = (cnpj: string) => {
+  const cleanCNPJ = cnpj.replace(/\D/g, '');
+
+  if (cleanCNPJ.length !== 14) return false;
+  if (/^(\d)\1{13}$/.test(cleanCNPJ)) return false;
+
+  const calculateDigit = (base: string, factors: number[]) => {
+    const total = base
+      .split('')
+      .reduce((sum, digit, index) => sum + Number(digit) * factors[index], 0);
+
+    const remainder = total % 11;
+    return remainder < 2 ? 0 : 11 - remainder;
+  };
+
+  const firstDigit = calculateDigit(cleanCNPJ.slice(0, 12), [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]);
+  const secondDigit = calculateDigit(cleanCNPJ.slice(0, 13), [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]);
+
+  return firstDigit === Number(cleanCNPJ[12]) && secondDigit === Number(cleanCNPJ[13]);
+};
+
+const getHolderCpfCnpjDigits = (value = newHolderCpfCnpj.value) => value.replace(/\D/g, '').slice(0, 14);
+
+const formatHolderCpfCnpj = (value: string) => {
+  const digits = getHolderCpfCnpjDigits(value);
+  return digits.length <= 11 ? formatCPF(digits) : formatCNPJ(digits);
+};
+
+const holderCpfCnpjPlaceholder = computed(() =>
+  getHolderCpfCnpjDigits().length > 11 ? '00.000.000/0000-00' : '000.000.000-00'
+);
+
+const handleHolderCpfCnpjInput = (value: string) => {
+  newHolderCpfCnpj.value = formatHolderCpfCnpj(value);
+};
+
+const handleHolderCpfCnpjBeforeInput = (event: InputEvent) => {
+  if (event.data && /\D/.test(event.data)) {
+    event.preventDefault();
+    return;
+  }
+
+  const target = event.target as HTMLInputElement | null;
+  const insertedDigits = (event.data ?? '').replace(/\D/g, '');
+
+  if (!target || !insertedDigits) {
+    return;
+  }
+
+  const selectionStart = target.selectionStart ?? target.value.length;
+  const selectionEnd = target.selectionEnd ?? selectionStart;
+  const selectedDigits = target.value.slice(selectionStart, selectionEnd).replace(/\D/g, '').length;
+  const nextDigitsCount = target.value.replace(/\D/g, '').length - selectedDigits + insertedDigits.length;
+
+  if (nextDigitsCount > 14) {
+    event.preventDefault();
+  }
+};
+
+const getHolderCpfCnpjError = () => {
+  const digits = getHolderCpfCnpjDigits();
+
+  if (!digits) {
+    return 'Informe o CPF/CNPJ do titular';
+  }
+
+  if (digits.length <= 11) {
+    return validateCPF(newHolderCpfCnpj.value) ? '' : 'Informe um CPF válido';
+  }
+
+  if (digits.length !== 14) {
+    return 'Informe um CNPJ com 14 dígitos';
+  }
+
+  return validateCNPJ(newHolderCpfCnpj.value) ? '' : 'Informe um CNPJ válido';
 };
 
 const formatDate = (dateStr: string) => {
@@ -137,7 +501,9 @@ const getStatusBadge = (status: string) => {
 
 const describeAccount = (account: BankAccount) => {
   if (account.accountType === 'PIX_KEY') {
-    return `${account.pixKeyType || 'PIX'}: ${account.pixKey || ''}`;
+    const pixKeyType = normalizePixKeyType(account.pixKeyType);
+    const pixKeyValue = account.pixKeyValue || account.pixKey || '';
+    return `${getPixKeyTypeLabel(pixKeyType)}: ${formatPixKeyValue(pixKeyValue, pixKeyType)}`;
   }
 
   return `${account.bankName || 'Banco'} · Ag ${account.agency || '--'} · CC ${account.accountNumber || '--'}`;
@@ -165,8 +531,9 @@ const applyPixAccountToWithdraw = (account?: BankAccount) => {
     return;
   }
 
-  withdrawPixKey.value = account.pixKeyValue || '';
-  withdrawPixKeyType.value = account.pixKeyType || 'CPF';
+  const pixKeyType = normalizePixKeyType(account.pixKeyType);
+  withdrawPixKeyType.value = pixKeyType;
+  withdrawPixKey.value = formatPixKeyValue(account.pixKeyValue || account.pixKey || '', pixKeyType);
 };
 
 const setWithdrawalMethod = (method: 'PIX' | 'TED') => {
@@ -223,7 +590,7 @@ const loadData = async () => {
 };
 
 const handleWithdraw = async () => {
-  const amount = parseFloat(withdrawAmount.value);
+  const amount = getWithdrawAmountValue();
   if (Number.isNaN(amount) || amount <= 0) {
     toast.error('Informe um valor válido');
     return;
@@ -232,9 +599,12 @@ const handleWithdraw = async () => {
     toast.error('Valor excede o saldo disponível');
     return;
   }
-  if (withdrawalMethod.value === 'PIX' && !withdrawPixKey.value.trim()) {
-    toast.error('Informe a chave PIX');
-    return;
+  if (withdrawalMethod.value === 'PIX') {
+    const pixKeyError = getWithdrawPixKeyError();
+    if (pixKeyError) {
+      toast.error(pixKeyError);
+      return;
+    }
   }
 
   if (withdrawalMethod.value === 'TED' && withdrawBankAccountId.value === null) {
@@ -249,7 +619,7 @@ const handleWithdraw = async () => {
         ? {
             amount,
             withdrawalMethod: 'PIX',
-            pixKey: withdrawPixKey.value.trim(),
+            pixKey: normalizePixKeyValue(withdrawPixKey.value, withdrawPixKeyType.value),
             pixKeyType: withdrawPixKeyType.value,
           }
         : {
@@ -274,19 +644,26 @@ const handleAddAccount = async () => {
     return;
   }
 
+  const holderCpfCnpjError = getHolderCpfCnpjError();
+  if (holderCpfCnpjError) {
+    toast.error(holderCpfCnpjError);
+    return;
+  }
+
   const data: CreateBankAccountRequest = {
     accountType: newAccountType.value,
     holderName: newHolderName.value,
-    holderCpfCnpj: newHolderCpfCnpj.value.replace(/\D/g, ''),
+    holderCpfCnpj: getHolderCpfCnpjDigits(),
     isDefault: bankAccounts.value.length === 0,
   };
 
   if (newAccountType.value === 'PIX_KEY') {
-    if (!newPixKey.value.trim()) {
-      toast.error('Informe a chave PIX');
+    const pixKeyError = getNewPixKeyError();
+    if (pixKeyError) {
+      toast.error(pixKeyError);
       return;
     }
-    data.pixKey = newPixKey.value;
+    data.pixKey = normalizePixKeyValue(newPixKey.value, newPixKeyType.value);
     data.pixKeyType = newPixKeyType.value;
   } else {
     if (!newBankCode.value || !newAgency.value || !newAccountNumber.value) {
@@ -335,9 +712,9 @@ const handleSetDefault = async (id: number) => {
   }
 };
 
-const handleDownloadReport = async () => {
+const handleDownloadReport = async (format: WalletReportFormat) => {
   try {
-    await walletService.downloadReport();
+    await walletService.downloadReport(format);
     toast.success('Relatório baixado com sucesso');
   } catch (error: any) {
     toast.error('Erro ao gerar relatório');
@@ -381,19 +758,28 @@ onMounted(loadData);
       <!-- Header -->
       <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 class="text-[#263238] flex items-center gap-3">
-            <div class="w-10 h-10 rounded-full bg-gradient-to-br from-[#286AD8] to-[#1a4fa0] flex items-center justify-center">
-              <Wallet class="h-5 w-5 text-white" />
-            </div>
+          <h1 class="text-2xl font-bold text-[#263238] mb-2">
             Carteira &amp; Saques
           </h1>
-          <p class="text-[#435574] mt-1">Gerencie seus ganhos, contas e saques</p>
+          <p class="text-[#435574]">Gerencie seus ganhos, contas e saques</p>
         </div>
         <div class="flex gap-3">
-          <Button @click="handleDownloadReport" variant="outline" size="sm">
+          <DropdownMenu>
+            <DropdownMenuTrigger>
+              <Button variant="outline" size="sm">
             <Download class="h-4 w-4 mr-2" />
             Exportar Relatório
-          </Button>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" class="min-w-[12rem]">
+              <DropdownMenuItem @click="handleDownloadReport('PDF')">
+                Exportar em PDF
+              </DropdownMenuItem>
+              <DropdownMenuItem @click="handleDownloadReport('EXCEL')">
+                Exportar em Excel
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button @click="openWithdrawModal()" size="sm">
             <ArrowDownToLine class="h-4 w-4 mr-2" />
             Solicitar Saque
@@ -481,9 +867,9 @@ onMounted(loadData);
             <div class="flex items-start justify-between mb-2">
               <div class="flex items-center gap-2">
                 <div :class="`w-8 h-8 rounded-full flex items-center justify-center ${
-                  account.accountType === 'PIX_KEY' ? 'bg-green-100' : 'bg-blue-100'
+                  'bg-blue-100'
                 }`">
-                  <QrCode v-if="account.accountType === 'PIX_KEY'" class="h-4 w-4 text-green-600" />
+                  <QrCode v-if="account.accountType === 'PIX_KEY'" class="h-4 w-4 text-[#286AD8]" />
                   <Building2 v-else class="h-4 w-4 text-[#286AD8]" />
                 </div>
                 <div>
@@ -569,18 +955,18 @@ onMounted(loadData);
         </div>
 
         <div v-else class="space-y-3">
-          <div
+          <div  
             v-for="tx in filteredTransactions"
             :key="`${tx.type}-${tx.id}`"
             class="flex items-center gap-4 p-4 rounded-lg border border-gray-200 hover:border-gray-300 transition-colors"
           >
             <div :class="`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
               tx.type === 'EARNING'
-                ? 'bg-green-100'
-                : 'bg-red-100'
+                ? 'bg-blue-100'
+                : 'bg-green-100'
             }`">
-              <ArrowDownToLine v-if="tx.type === 'EARNING'" class="h-5 w-5 text-green-600" />
-              <ArrowUpFromLine v-else class="h-5 w-5 text-red-600" />
+              <ArrowDownToLine v-if="tx.type === 'EARNING'" class="h-5 w-5 text-blue-600" />
+              <ArrowUpFromLine v-else class="h-5 w-5 text-green-600" />
             </div>
 
             <div class="flex-1 min-w-0">
@@ -599,7 +985,7 @@ onMounted(loadData);
               </div>
             </div>
 
-            <p :class="`text-sm font-semibold whitespace-nowrap ${tx.amount >= 0 ? 'text-green-600' : 'text-red-600'}`">
+            <p :class="`text-sm font-semibold whitespace-nowrap ${tx.type === 'EARNING' ? 'text-blue-600' : 'text-green-600'}`">
               {{ tx.amount >= 0 ? '+' : '' }}{{ formatCurrency(Math.abs(tx.amount)) }}
             </p>
           </div>
@@ -630,15 +1016,16 @@ onMounted(loadData);
               <div class="space-y-2">
                 <Label>Valor do saque (R$)</Label>
                 <Input
-                  v-model="withdrawAmount"
-                  type="number"
-                  :max="maxWithdrawAmount"
-                  min="1"
-                  step="0.01"
-                  placeholder="0,00"
+                  :model-value="withdrawAmount"
+                  type="text"
+                  inputmode="decimal"
+                  :maxlength="MAX_WITHDRAW_FORMATTED_LENGTH"
+                  placeholder="R$ 0,00"
+                  @beforeinput="handleWithdrawAmountBeforeInput"
+                  @update:model-value="handleWithdrawAmountInput"
                 />
                 <Button
-                  @click="withdrawAmount = String(maxWithdrawAmount)"
+                  @click="withdrawAmount = formatCurrencyInput(maxWithdrawAmount)"
                   variant="ghost"
                   size="sm"
                   class="text-xs text-[#286AD8]"
@@ -673,7 +1060,8 @@ onMounted(loadData);
                 <div class="space-y-2">
                   <Label>Tipo de chave PIX</Label>
                   <select
-                    v-model="withdrawPixKeyType"
+                    :value="withdrawPixKeyType"
+                    @change="handleWithdrawPixKeyTypeSelect"
                     class="w-full h-10 px-3 rounded-md border border-gray-300 text-sm"
                   >
                     <option value="CPF">CPF</option>
@@ -687,8 +1075,12 @@ onMounted(loadData);
                 <div class="space-y-2">
                   <Label>Chave PIX</Label>
                   <Input
-                    v-model="withdrawPixKey"
-                    placeholder="Informe sua chave PIX"
+                    :model-value="withdrawPixKey"
+                    :inputmode="withdrawPixKeyInputMode"
+                    :maxlength="withdrawPixKeyMaxLength"
+                    :placeholder="withdrawPixKeyPlaceholder"
+                    @beforeinput="handleWithdrawPixKeyBeforeInput"
+                    @update:model-value="handleWithdrawPixKeyInput"
                   />
                 </div>
               </template>
@@ -814,7 +1206,8 @@ onMounted(loadData);
                 <div class="space-y-2">
                   <Label>Tipo de chave</Label>
                   <select
-                    v-model="newPixKeyType"
+                    :value="newPixKeyType"
+                    @change="handleNewPixKeyTypeSelect"
                     class="w-full h-10 px-3 rounded-md border border-gray-300 text-sm"
                   >
                     <option value="CPF">CPF</option>
@@ -826,7 +1219,14 @@ onMounted(loadData);
                 </div>
                 <div class="space-y-2">
                   <Label>Chave PIX</Label>
-                  <Input v-model="newPixKey" placeholder="Informe sua chave PIX" />
+                  <Input
+                    :model-value="newPixKey"
+                    :inputmode="newPixKeyInputMode"
+                    :maxlength="newPixKeyMaxLength"
+                    :placeholder="newPixKeyPlaceholder"
+                    @beforeinput="handleNewPixKeyBeforeInput"
+                    @update:model-value="handleNewPixKeyInput"
+                  />
                 </div>
               </template>
 
@@ -877,7 +1277,14 @@ onMounted(loadData);
               </div>
               <div class="space-y-2">
                 <Label>CPF/CNPJ do titular</Label>
-                <Input v-model="newHolderCpfCnpj" placeholder="000.000.000-00" />
+                <Input
+                  :model-value="newHolderCpfCnpj"
+                  inputmode="numeric"
+                  :maxlength="18"
+                  :placeholder="holderCpfCnpjPlaceholder"
+                  @beforeinput="handleHolderCpfCnpjBeforeInput"
+                  @update:model-value="handleHolderCpfCnpjInput"
+                />
               </div>
 
               <Button

@@ -1,11 +1,27 @@
 package com.servija.servija.service;
 
+import com.lowagie.text.Document;
+import com.lowagie.text.DocumentException;
+import com.lowagie.text.FontFactory;
+import com.lowagie.text.PageSize;
+import com.lowagie.text.Paragraph;
+import com.lowagie.text.Phrase;
+import com.lowagie.text.pdf.PdfPCell;
+import com.lowagie.text.pdf.PdfPTable;
+import com.lowagie.text.pdf.PdfWriter;
 import com.servija.servija.dto.WalletTransactionResponse;
 import com.servija.servija.exception.ResourceNotFoundException;
 import com.servija.servija.model.User;
 import com.servija.servija.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.HorizontalAlignment;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayOutputStream;
@@ -14,11 +30,20 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class WalletReportService {
+
+    public enum ReportFormat {
+        PDF,
+        EXCEL
+    }
+
+    public record ReportFile(byte[] content, String contentType, String filename) {
+    }
 
     private final WalletTransactionService transactionService;
     private final FreelancerWalletService walletService;
@@ -26,58 +51,156 @@ public class WalletReportService {
 
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
 
-    /**
-     * Gera relatório CSV com as transações da carteira.
-     * Escolhi CSV ao invés de PDF para evitar dependência extra (OpenPDF/iText).
-     * CSV abre nativamente no Excel e é mais leve.
-     */
-    public byte[] generateReport(String email) {
+    public ReportFile generateReport(String email, ReportFormat format) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Usuario nao encontrado"));
 
         List<WalletTransactionResponse> transactions = transactionService.getTransactions(email, "ALL");
-        var wallet = walletService.getWalletBalance(email);
+        Map<String, BigDecimal> wallet = walletService.getWalletBalance(email);
 
-        try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
-            StringBuilder sb = new StringBuilder();
+        return switch (format) {
+            case PDF -> new ReportFile(
+                    generatePdfReport(user, email, transactions, wallet),
+                    "application/pdf",
+                    "relatorio-carteira.pdf"
+            );
+            case EXCEL -> new ReportFile(
+                    generateExcelReport(user, email, transactions, wallet),
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    "relatorio-carteira.xlsx"
+            );
+        };
+    }
 
-            // BOM para Excel reconhecer UTF-8
-            baos.write(new byte[]{(byte) 0xEF, (byte) 0xBB, (byte) 0xBF});
+    private byte[] generateExcelReport(
+            User user,
+            String email,
+            List<WalletTransactionResponse> transactions,
+            Map<String, BigDecimal> wallet
+    ) {
+        try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+            Sheet resumoSheet = workbook.createSheet("Resumo");
+            Sheet transacoesSheet = workbook.createSheet("Transacoes");
 
-            // Cabeçalho do relatório
-            sb.append("RELATÓRIO DA CARTEIRA - SERVIJÁ\n");
-            sb.append("Freelancer:,").append(user.getName()).append("\n");
-            sb.append("Email:,").append(email).append("\n");
-            sb.append("Data do relatório:,").append(LocalDateTime.now().format(DATE_FMT)).append("\n");
-            sb.append("\n");
+            CellStyle headerStyle = workbook.createCellStyle();
+            org.apache.poi.ss.usermodel.Font headerFont = workbook.createFont();
+            headerFont.setBold(true);
+            headerStyle.setFont(headerFont);
+            headerStyle.setAlignment(HorizontalAlignment.LEFT);
 
-            // Resumo
-            sb.append("RESUMO\n");
-            sb.append("Saldo Total:,").append(formatBRL(wallet.get("totalEarned"))).append("\n");
-            sb.append("Disponível para Saque:,").append(formatBRL(wallet.get("availableBalance"))).append("\n");
-            sb.append("Pendente:,").append(formatBRL(wallet.get("pendingBalance"))).append("\n");
-            sb.append("Total Sacado:,").append(formatBRL(wallet.get("totalWithdrawn"))).append("\n");
-            sb.append("\n");
+            int resumoRowIndex = 0;
+            resumoRowIndex = createKeyValueRow(resumoSheet, resumoRowIndex, "Relatorio da carteira", "Servija", headerStyle);
+            resumoRowIndex = createKeyValueRow(resumoSheet, resumoRowIndex, "Freelancer", user.getName(), null);
+            resumoRowIndex = createKeyValueRow(resumoSheet, resumoRowIndex, "Email", email, null);
+            resumoRowIndex = createKeyValueRow(resumoSheet, resumoRowIndex, "Data do relatorio", LocalDateTime.now().format(DATE_FMT), null);
+            resumoRowIndex++;
+            resumoRowIndex = createKeyValueRow(resumoSheet, resumoRowIndex, "Saldo total", formatBRL(wallet.get("totalEarned")), headerStyle);
+            resumoRowIndex = createKeyValueRow(resumoSheet, resumoRowIndex, "Disponivel para saque", formatBRL(wallet.get("availableBalance")), null);
+            resumoRowIndex = createKeyValueRow(resumoSheet, resumoRowIndex, "Pendente", formatBRL(wallet.get("pendingBalance")), null);
+            createKeyValueRow(resumoSheet, resumoRowIndex, "Total sacado", formatBRL(wallet.get("totalWithdrawn")), null);
 
-            // Transações
-            sb.append("TRANSAÇÕES\n");
-            sb.append("Tipo,Descrição,Valor,Status,Forma de Pgto,Data\n");
-
-            for (WalletTransactionResponse tx : transactions) {
-                sb.append(tx.getType().equals("EARNING") ? "Recebimento" : "Saque").append(",");
-                sb.append(escapeCsv(tx.getDescription())).append(",");
-                sb.append(formatBRL(tx.getAmount())).append(",");
-                sb.append(translateStatus(tx.getStatus())).append(",");
-                sb.append(tx.getPaymentMethod() != null ? tx.getPaymentMethod() : "-").append(",");
-                sb.append(tx.getDate() != null ? tx.getDate().format(DATE_FMT) : "-").append("\n");
+            Row headerRow = transacoesSheet.createRow(0);
+            String[] headers = {"Tipo", "Descricao", "Valor", "Status", "Forma de pagamento", "Data"};
+            for (int i = 0; i < headers.length; i++) {
+                Cell cell = headerRow.createCell(i);
+                cell.setCellValue(headers[i]);
+                cell.setCellStyle(headerStyle);
             }
 
-            baos.write(sb.toString().getBytes("UTF-8"));
+            int rowIndex = 1;
+            for (WalletTransactionResponse tx : transactions) {
+                Row row = transacoesSheet.createRow(rowIndex++);
+                row.createCell(0).setCellValue(translateTransactionType(tx.getType()));
+                row.createCell(1).setCellValue(tx.getDescription() != null ? tx.getDescription() : "-");
+                row.createCell(2).setCellValue(formatBRL(tx.getAmount()));
+                row.createCell(3).setCellValue(translateStatus(tx.getStatus()));
+                row.createCell(4).setCellValue(tx.getPaymentMethod() != null ? tx.getPaymentMethod() : "-");
+                row.createCell(5).setCellValue(tx.getDate() != null ? tx.getDate().format(DATE_FMT) : "-");
+            }
+
+            for (int i = 0; i < 2; i++) {
+                resumoSheet.autoSizeColumn(i);
+            }
+            for (int i = 0; i < headers.length; i++) {
+                transacoesSheet.autoSizeColumn(i);
+            }
+
+            workbook.write(baos);
             return baos.toByteArray();
         } catch (IOException e) {
-            log.error("Erro ao gerar relatório", e);
-            throw new RuntimeException("Erro ao gerar relatório: " + e.getMessage());
+            log.error("Erro ao gerar relatorio em Excel", e);
+            throw new RuntimeException("Erro ao gerar relatorio: " + e.getMessage());
         }
+    }
+
+    private byte[] generatePdfReport(
+            User user,
+            String email,
+            List<WalletTransactionResponse> transactions,
+            Map<String, BigDecimal> wallet
+    ) {
+        try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+            Document document = new Document(PageSize.A4.rotate(), 24, 24, 24, 24);
+            PdfWriter.getInstance(document, baos);
+            document.open();
+
+            document.add(new Paragraph("Relatorio da Carteira - Servija", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 16)));
+            document.add(new Paragraph("Freelancer: " + user.getName()));
+            document.add(new Paragraph("Email: " + email));
+            document.add(new Paragraph("Data do relatorio: " + LocalDateTime.now().format(DATE_FMT)));
+            document.add(new Paragraph(" "));
+            document.add(new Paragraph("Resumo", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12)));
+            document.add(new Paragraph("Saldo total: " + formatBRL(wallet.get("totalEarned"))));
+            document.add(new Paragraph("Disponivel para saque: " + formatBRL(wallet.get("availableBalance"))));
+            document.add(new Paragraph("Pendente: " + formatBRL(wallet.get("pendingBalance"))));
+            document.add(new Paragraph("Total sacado: " + formatBRL(wallet.get("totalWithdrawn"))));
+            document.add(new Paragraph(" "));
+
+            PdfPTable table = new PdfPTable(new float[]{1.5f, 4f, 2f, 2f, 2f, 2.5f});
+            table.setWidthPercentage(100);
+            addPdfHeaderCell(table, "Tipo");
+            addPdfHeaderCell(table, "Descricao");
+            addPdfHeaderCell(table, "Valor");
+            addPdfHeaderCell(table, "Status");
+            addPdfHeaderCell(table, "Forma de pagamento");
+            addPdfHeaderCell(table, "Data");
+
+            for (WalletTransactionResponse tx : transactions) {
+                table.addCell(createPdfCell(translateTransactionType(tx.getType())));
+                table.addCell(createPdfCell(tx.getDescription() != null ? tx.getDescription() : "-"));
+                table.addCell(createPdfCell(formatBRL(tx.getAmount())));
+                table.addCell(createPdfCell(translateStatus(tx.getStatus())));
+                table.addCell(createPdfCell(tx.getPaymentMethod() != null ? tx.getPaymentMethod() : "-"));
+                table.addCell(createPdfCell(tx.getDate() != null ? tx.getDate().format(DATE_FMT) : "-"));
+            }
+
+            document.add(table);
+            document.close();
+            return baos.toByteArray();
+        } catch (DocumentException | IOException e) {
+            log.error("Erro ao gerar relatorio em PDF", e);
+            throw new RuntimeException("Erro ao gerar relatorio: " + e.getMessage());
+        }
+    }
+
+    private int createKeyValueRow(Sheet sheet, int rowIndex, String label, String value, CellStyle labelStyle) {
+        Row row = sheet.createRow(rowIndex);
+        Cell labelCell = row.createCell(0);
+        labelCell.setCellValue(label);
+        if (labelStyle != null) {
+            labelCell.setCellStyle(labelStyle);
+        }
+        row.createCell(1).setCellValue(value);
+        return rowIndex + 1;
+    }
+
+    private void addPdfHeaderCell(PdfPTable table, String value) {
+        PdfPCell cell = new PdfPCell(new Phrase(value, FontFactory.getFont(FontFactory.HELVETICA_BOLD, 10)));
+        table.addCell(cell);
+    }
+
+    private PdfPCell createPdfCell(String value) {
+        return new PdfPCell(new Phrase(value, FontFactory.getFont(FontFactory.HELVETICA, 9)));
     }
 
     private String formatBRL(Object value) {
@@ -86,18 +209,15 @@ public class WalletReportService {
         return String.format("R$ %,.2f", bd).replace(",", "X").replace(".", ",").replace("X", ".");
     }
 
-    private String escapeCsv(String value) {
-        if (value == null) return "";
-        if (value.contains(",") || value.contains("\"") || value.contains("\n")) {
-            return "\"" + value.replace("\"", "\"\"") + "\"";
-        }
-        return value;
+    private String translateTransactionType(String type) {
+        if (type == null) return "-";
+        return "EARNING".equals(type) ? "Recebimento" : "Saque";
     }
 
     private String translateStatus(String status) {
         if (status == null) return "-";
         return switch (status) {
-            case "COMPLETED" -> "Concluído";
+            case "COMPLETED" -> "Concluido";
             case "PENDING" -> "Pendente";
             case "PROCESSING" -> "Processando";
             case "FAILED" -> "Falhou";
