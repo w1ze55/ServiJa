@@ -11,6 +11,7 @@ import AvatarFallback from '@/components/ui/avatar-fallback.vue'
 import Input from '@/components/ui/input.vue'
 import api from '@/api/config/axios'
 import { toast } from '@/utils/toast'
+import { useUserStore } from '@/stores/userStore'
 
 interface Provider {
   id: string
@@ -36,6 +37,7 @@ interface UserLocation {
 }
 
 const router = useRouter()
+const userStore = useUserStore()
 
 // Estado
 const mapContainer = ref<HTMLElement | null>(null)
@@ -158,49 +160,113 @@ const initMap = () => {
   }).addTo(map.value as L.Map)
 }
 
-// Buscar endereço do perfil
+// Buscar localização a partir do perfil cadastrado no banco
 const loadUserAddressFromProfile = async () => {
   isLocating.value = true
-  
+
+  try {
+    if (userStore.user?.type === 'provider') {
+      await loadLocationFromServiceCities()
+    } else {
+      await loadLocationFromAddress()
+    }
+  } finally {
+    isLocating.value = false
+  }
+}
+
+// Freelancer: posiciona o mapa na própria cidade de atendimento e exibe apenas a si mesmo
+const loadLocationFromServiceCities = async () => {
+  try {
+    const response = await api.get('/freelancer/profile')
+    const profile = response.data
+    const serviceCities: any[] = profile?.serviceCities || []
+
+    const citiesWithCoords = serviceCities.filter(
+      (sc: any) => sc.latitude != null && sc.longitude != null
+    )
+
+    if (citiesWithCoords.length === 0) {
+      toast.info('Cadastre uma cidade de atendimento no seu perfil para visualizá-la no mapa.')
+      return
+    }
+
+    // Centraliza no mapa pela primeira cidade cadastrada
+    const firstCity = citiesWithCoords[0]
+    userLocation.value = {
+      latitude: parseFloat(firstCity.latitude),
+      longitude: parseFloat(firstCity.longitude),
+      address: '',
+      city: firstCity.city,
+      state: firstCity.state
+    }
+
+    if (map.value) {
+      map.value.setView([userLocation.value.latitude, userLocation.value.longitude], 10)
+    }
+
+    updateUserMarker()
+
+    // Freelancer só vê a si mesmo: monta os marcadores com suas próprias cidades de atendimento
+    nearbyProviders.value = citiesWithCoords.map((sc: any) => ({
+      id: String(profile.id),
+      name: profile.name,
+      avatar: profile.profilePhoto || '',
+      professionalTitle: profile.profession || 'Profissional',
+      rating: profile.rating ? Number(profile.rating) : 0,
+      totalReviews: profile.totalReviews || 0,
+      location: `${sc.city}, ${sc.state}`,
+      latitude: parseFloat(sc.latitude),
+      longitude: parseFloat(sc.longitude),
+      distance: 0,
+      available: profile.available ?? true,
+      category: profile.category || ''
+    }))
+
+    updateProviderMarkers()
+    fitMapToBounds()
+  } catch (error) {
+    console.error('Erro ao carregar cidades de atendimento:', error)
+    toast.error('Não foi possível carregar suas cidades de atendimento.')
+  }
+}
+
+// Contratante: geocodifica o endereço padrão cadastrado
+const loadLocationFromAddress = async () => {
   try {
     const response = await api.get('/addresses')
     const addresses = response.data || []
     const defaultAddress = addresses.find((addr: any) => addr.isDefault) || addresses[0]
-    
+
     if (!defaultAddress) {
       toast.info('Cadastre um endereço no seu perfil para ver profissionais próximos.')
       return
     }
 
     const fullAddress = `${defaultAddress.street}, ${defaultAddress.number}, ${defaultAddress.neighborhood}, ${defaultAddress.city}, ${defaultAddress.state}, Brasil`
-    
-    try {
-      const geoResponse = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(fullAddress)}&limit=1`
-      )
-      const geoData = await geoResponse.json()
-      
-      if (geoData && geoData.length > 0) {
-        userLocation.value = {
-          latitude: parseFloat(geoData[0].lat),
-          longitude: parseFloat(geoData[0].lon),
-          address: defaultAddress.street,
-          city: defaultAddress.city,
-          state: defaultAddress.state
-        }
-        
-        if (map.value) {
-          map.value.setView([userLocation.value.latitude, userLocation.value.longitude], 14)
-        }
-        
-        updateUserMarker()
-        await loadNearbyProviders()
-      } else {
-        toast.error('Não foi possível localizar seu endereço no mapa. Verifique os dados cadastrados.')
+
+    const geoResponse = await fetch(
+      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(fullAddress)}&limit=1`
+    )
+    const geoData = await geoResponse.json()
+
+    if (geoData && geoData.length > 0) {
+      userLocation.value = {
+        latitude: parseFloat(geoData[0].lat),
+        longitude: parseFloat(geoData[0].lon),
+        address: defaultAddress.street,
+        city: defaultAddress.city,
+        state: defaultAddress.state
       }
-    } catch (geoError) {
-      console.error('Erro no geocoding:', geoError)
-      toast.error('Erro ao converter endereço em coordenadas.')
+
+      if (map.value) {
+        map.value.setView([userLocation.value.latitude, userLocation.value.longitude], 14)
+      }
+
+      updateUserMarker()
+      await loadNearbyProviders()
+    } else {
+      toast.error('Não foi possível localizar seu endereço no mapa. Verifique os dados cadastrados.')
     }
   } catch (error) {
     console.error('Erro ao carregar endereço:', error)
@@ -224,25 +290,23 @@ const loadNearbyProviders = async () => {
       }
     })
     
-    if (response.data && response.data.length > 0) {
-      nearbyProviders.value = response.data.map((p: any) => ({
-        id: String(p.id),
-        name: p.name,
-        avatar: p.avatar || '',
-        professionalTitle: p.professionalTitle || 'Profissional',
-        rating: p.rating ? Number(p.rating) : 0,
-        totalReviews: p.totalReviews || 0,
-        location: p.location || '',
-        latitude: Number(p.latitude),
-        longitude: Number(p.longitude),
-        distance: p.distance || 0,
-        available: p.available ?? true,
-        category: p.category || ''
-      }))
-      
-      updateProviderMarkers()
-      fitMapToBounds()
-    }
+    nearbyProviders.value = (response.data || []).map((p: any) => ({
+      id: String(p.id),
+      name: p.name,
+      avatar: p.avatar || '',
+      professionalTitle: p.professionalTitle || 'Profissional',
+      rating: p.rating ? Number(p.rating) : 0,
+      totalReviews: p.totalReviews || 0,
+      location: p.location || '',
+      latitude: Number(p.latitude),
+      longitude: Number(p.longitude),
+      distance: p.distance || 0,
+      available: p.available ?? true,
+      category: p.category || ''
+    }))
+
+    updateProviderMarkers()
+    fitMapToBounds()
   } catch (error: any) {
     console.error('Erro ao carregar profissionais:', error)
     if (error.response?.status !== 403) {
@@ -254,16 +318,21 @@ const loadNearbyProviders = async () => {
 }
 
 const fitMapToBounds = () => {
-  if (!map.value || filteredProviders.value.length === 0) return
-  
+  if (!map.value || userLocation.value.latitude === 0) return
+
+  if (filteredProviders.value.length === 0) {
+    map.value.setView([userLocation.value.latitude, userLocation.value.longitude], 14)
+    return
+  }
+
   const bounds = L.latLngBounds([
     [userLocation.value.latitude, userLocation.value.longitude]
   ])
-  
+
   filteredProviders.value.forEach(p => {
     bounds.extend([p.latitude, p.longitude])
   })
-  
+
   map.value.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 })
 }
 
