@@ -10,6 +10,7 @@ import com.servija.servija.model.ServiceRequest;
 import com.servija.servija.model.User;
 import com.servija.servija.repository.FreelancerRepository;
 import com.servija.servija.repository.ReviewRepository;
+import com.servija.servija.repository.ReviewSummaryRepository;
 import com.servija.servija.repository.ServiceRepository;
 import com.servija.servija.repository.ServiceRequestRepository;
 import com.servija.servija.repository.UserRepository;
@@ -20,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -36,6 +38,7 @@ public class ReviewService {
     private final UserRepository userRepository;
     private final FreelancerRepository freelancerRepository;
     private final WebSocketService webSocketService;
+    private final ReviewSummaryRepository reviewSummaryRepository;
 
     @Transactional
     public ReviewResponse createReview(Long serviceRequestId, ReviewRequest request, String userEmail) {
@@ -81,6 +84,12 @@ public class ReviewService {
         if (reviewerType == Review.ReviewerType.CONTRACTOR && reviewed instanceof Freelancer freelancer) {
             updateFreelancerRating(freelancer);
         }
+
+        reviewSummaryRepository.findByFreelancerId(reviewed.getId())
+                .ifPresent(summary -> {
+                    summary.setGeneratedAt(LocalDateTime.now().minusDays(2));
+                    reviewSummaryRepository.save(summary);
+                });
 
         webSocketService.notifyNewReview(
                 serviceRequestId,
