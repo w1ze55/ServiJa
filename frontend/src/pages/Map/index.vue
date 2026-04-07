@@ -49,11 +49,11 @@ const searchRadius = ref(50)
 const searchQuery = ref('')
 
 const userLocation = ref<UserLocation>({
-  latitude: -27.5954,
-  longitude: -48.5480,
+  latitude: 0,
+  longitude: 0,
   address: '',
-  city: 'Florianópolis',
-  state: 'SC'
+  city: '',
+  state: ''
 })
 
 const nearbyProviders = ref<Provider[]>([])
@@ -131,7 +131,7 @@ const createProviderIcon = (available: boolean, rating: number) => {
     html: `
       <div class="relative group cursor-pointer">
         <div class="w-10 h-10 ${bgColor} rounded-full border-2 ${borderColor} shadow-lg flex items-center justify-center text-white font-bold text-sm transition-transform hover:scale-110">
-          ${rating > 0 ? rating.toFixed(1) : '★'}
+          ${rating > 0 ? rating.toFixed(1) : '…'}
         </div>
         <div class="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-8 border-l-transparent border-r-transparent ${available ? 'border-t-green-500' : 'border-t-gray-400'}"></div>
       </div>
@@ -147,7 +147,7 @@ const initMap = () => {
 
   map.value = L.map(mapContainer.value, {
     zoomControl: false
-  }).setView([userLocation.value.latitude, userLocation.value.longitude], 14)
+  })
 
   // Adicionar controle de zoom no canto direito
   L.control.zoom({ position: 'topright' }).addTo(map.value as L.Map)
@@ -167,38 +167,43 @@ const loadUserAddressFromProfile = async () => {
     const addresses = response.data || []
     const defaultAddress = addresses.find((addr: any) => addr.isDefault) || addresses[0]
     
-    if (defaultAddress) {
-      const fullAddress = `${defaultAddress.street}, ${defaultAddress.number}, ${defaultAddress.neighborhood}, ${defaultAddress.city}, ${defaultAddress.state}, Brasil`
+    if (!defaultAddress) {
+      toast.info('Cadastre um endereço no seu perfil para ver profissionais próximos.')
+      return
+    }
+
+    const fullAddress = `${defaultAddress.street}, ${defaultAddress.number}, ${defaultAddress.neighborhood}, ${defaultAddress.city}, ${defaultAddress.state}, Brasil`
+    
+    try {
+      const geoResponse = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(fullAddress)}&limit=1`
+      )
+      const geoData = await geoResponse.json()
       
-      try {
-        const geoResponse = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(fullAddress)}&limit=1`
-        )
-        const geoData = await geoResponse.json()
-        
-        if (geoData && geoData.length > 0) {
-          userLocation.value = {
-            latitude: parseFloat(geoData[0].lat),
-            longitude: parseFloat(geoData[0].lon),
-            address: defaultAddress.street,
-            city: defaultAddress.city,
-            state: defaultAddress.state
-          }
-          
-          if (map.value) {
-            map.value.setView([userLocation.value.latitude, userLocation.value.longitude], 14)
-          }
-          
-          updateUserMarker()
-          await loadNearbyProviders()
+      if (geoData && geoData.length > 0) {
+        userLocation.value = {
+          latitude: parseFloat(geoData[0].lat),
+          longitude: parseFloat(geoData[0].lon),
+          address: defaultAddress.street,
+          city: defaultAddress.city,
+          state: defaultAddress.state
         }
-      } catch (geoError) {
-        console.error('Erro no geocoding:', geoError)
+        
+        if (map.value) {
+          map.value.setView([userLocation.value.latitude, userLocation.value.longitude], 14)
+        }
+        
+        updateUserMarker()
+        await loadNearbyProviders()
+      } else {
+        toast.error('Não foi possível localizar seu endereço no mapa. Verifique os dados cadastrados.')
       }
+    } catch (geoError) {
+      console.error('Erro no geocoding:', geoError)
+      toast.error('Erro ao converter endereço em coordenadas.')
     }
   } catch (error) {
     console.error('Erro ao carregar endereço:', error)
-    // Usar localização padrão e carregar profissionais
     updateUserMarker()
     await loadNearbyProviders()
   } finally {
@@ -206,7 +211,6 @@ const loadUserAddressFromProfile = async () => {
   }
 }
 
-// Carregar profissionais próximos
 const loadNearbyProviders = async () => {
   isLoading.value = true
   nearbyProviders.value = []
@@ -249,7 +253,6 @@ const loadNearbyProviders = async () => {
   }
 }
 
-// Ajustar zoom para mostrar todos os marcadores
 const fitMapToBounds = () => {
   if (!map.value || filteredProviders.value.length === 0) return
   
@@ -298,7 +301,7 @@ const updateProviderMarkers = () => {
         <strong class="text-lg">${provider.name}</strong>
         <p class="text-gray-600">${provider.professionalTitle}</p>
         <div class="flex items-center gap-1 mt-1">
-          <span class="text-yellow-500">★</span>
+          <span class="text-yellow-500">…</span>
           <span>${provider.rating.toFixed(1)}</span>
           <span class="text-gray-400">(${provider.totalReviews})</span>
         </div>
@@ -327,12 +330,10 @@ const contactProvider = (provider: Provider) => {
   toast.info(`Contatando ${provider.name}...`)
 }
 
-// Voltar
 const goBack = () => {
   router.back()
 }
 
-// Utilitários
 const getInitials = (name: string) => {
   return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
 }
