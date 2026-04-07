@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
-import { Star, Search, Sparkles, Calendar } from 'lucide-vue-next';
+import { Star, Search } from 'lucide-vue-next';
 import Input from '../ui/input.vue';
 import Button from '../ui/button.vue';
 import Avatar from '../ui/avatar.vue';
@@ -13,6 +13,7 @@ import SelectItem from '../ui/select-item.vue';
 import SelectTrigger from '../ui/select-trigger.vue';
 import SelectValue from '../ui/select-value.vue';
 import reviewService, { type ReviewResponse } from '@/api/services/reviewService';
+import AiReviewSummary from './AiReviewSummary.vue';
 
 interface Review {
   id: string;
@@ -156,6 +157,9 @@ const clearFilters = () => {
     </div>
 
     <template v-else>
+    <!-- AI Summary -->
+    <AiReviewSummary :freelancer-id="props.freelancerId" />
+
     <!-- Rating Overview -->
     <div class="bg-white border border-gray-200 rounded-lg p-6">
       <div class="grid md:grid-cols-2 gap-6">
