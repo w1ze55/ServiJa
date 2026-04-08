@@ -1336,7 +1336,7 @@ onMounted(() => {
 
     <!-- Project Details Modal -->
     <Dialog :open="selectedProject !== null" @update:open="(val) => !val && (selectedProject = null)">
-      <DialogContent class="max-w-4xl max-h-[90vh] p-0 border-none bg-transparent" :hide-close="true">
+      <DialogContent class="max-w-[80vw] lg:max-w-5xl xl:max-w-6xl 2xl:max-w-7xl max-h-[90vh] p-0 border-none bg-transparent" :hide-close="true">
         <div class="relative bg-white rounded-xl overflow-hidden shadow-2xl h-[80vh]">
           <!-- Custom Close Button -->
           <button

@@ -1,23 +1,19 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import { Play, Flag } from 'lucide-vue-next';
+import {
+  Play,
+  Briefcase,
+  Sparkles,
+  ExternalLink,
+  Calendar,
+  X as CloseIcon,
+  Youtube,
+} from 'lucide-vue-next';
 import Button from '../ui/button.vue';
 import Badge from '../ui/badge.vue';
 import Dialog from '../ui/dialog.vue';
 import DialogContent from '../ui/dialog-content.vue';
-import DialogDescription from '../ui/dialog-description.vue';
-import DialogHeader from '../ui/dialog-header.vue';
-import DialogTitle from '../ui/dialog-title.vue';
-import AlertDialog from '../ui/alert-dialog.vue';
-import AlertDialogAction from '../ui/alert-dialog-action.vue';
-import AlertDialogCancel from '../ui/alert-dialog-cancel.vue';
-import AlertDialogContent from '../ui/alert-dialog-content.vue';
-import AlertDialogDescription from '../ui/alert-dialog-description.vue';
-import AlertDialogFooter from '../ui/alert-dialog-footer.vue';
-import AlertDialogHeader from '../ui/alert-dialog-header.vue';
-import AlertDialogTitle from '../ui/alert-dialog-title.vue';
 import ImageWithFallback from '../figma/ImageWithFallback.vue';
-import { toast } from '../../utils/toast';
 
 interface PortfolioItem {
   id: string;
@@ -28,6 +24,9 @@ interface PortfolioItem {
   description: string;
   relatedServices: string[];
   date: string;
+  projectUrl?: string;
+  client?: string;
+  featured?: boolean;
 }
 
 interface Props {
@@ -37,7 +36,6 @@ interface Props {
 const props = defineProps<Props>();
 
 const selectedItem = ref<PortfolioItem | null>(null);
-const reportItem = ref<PortfolioItem | null>(null);
 const imageErrors = ref<Record<string, boolean>>({});
 
 // Mock data - substituir por dados reais da API
@@ -103,17 +101,13 @@ const handleImageError = (itemId: string) => {
   imageErrors.value[itemId] = true;
 };
 
-const handleReport = (item: PortfolioItem) => {
-  reportItem.value = item;
-};
+const getItemCategory = (item?: PortfolioItem | null) =>
+  item?.relatedServices[0] || (item?.type === 'video' ? 'Vídeo' : 'Projeto');
 
-const confirmReport = () => {
-  if (reportItem.value) {
-    toast.success('Denúncia enviada com sucesso. Agradecemos sua colaboração!');
-    reportItem.value = null;
-    selectedItem.value = null;
-  }
-};
+const formatCompletedDate = (value?: string) =>
+  value
+    ? new Date(value).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
+    : 'Data não informada';
 </script>
 
 <template>
@@ -193,93 +187,109 @@ const confirmReport = () => {
 
     <!-- Portfolio Item Details Modal -->
     <Dialog :open="selectedItem !== null" @update:open="(val) => !val && (selectedItem = null)">
-      <DialogContent class="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle class="text-[#263238] pr-8">{{ selectedItem?.title }}</DialogTitle>
-          <DialogDescription class="text-[#435574]">
-            Publicado em {{ selectedItem && new Date(selectedItem.date).toLocaleDateString('pt-BR') }}
-          </DialogDescription>
-        </DialogHeader>
+      <DialogContent class="max-w-[80vw] lg:max-w-5xl xl:max-w-6xl 2xl:max-w-7xl max-h-[90vh] p-0 border-none bg-transparent" :hide-close="true">
+        <div class="relative bg-white rounded-xl overflow-hidden shadow-2xl h-[80vh]">
+          <button
+            @click="selectedItem = null"
+            class="absolute top-4 right-4 p-2 bg-black/20 hover:bg-black/40 backdrop-blur-md rounded-full text-white transition-all z-50"
+          >
+            <CloseIcon class="h-5 w-5" />
+          </button>
 
-        <div class="hidden sm:block space-y-4">
-          <!-- Media -->
-          <div class="rounded-lg overflow-hidden bg-gray-100">
-            <video
-              v-if="selectedItem?.type === 'video'"
-              :src="selectedItem.url"
-              controls
-              class="w-full"
-              :poster="selectedItem.thumbnail"
-            >
-              Seu navegador não suporta a reprodução de vídeos.
-            </video>
-            <ImageWithFallback
-              v-else
-              :src="selectedItem?.url || ''"
-              :alt="selectedItem?.title || ''"
-              class="w-full h-auto"
-            />
-          </div>
-
-          <!-- Description -->
-          <div>
-            <h4 class="text-[#263238] mb-2">Descrição</h4>
-            <p class="text-[#435574]">{{ selectedItem?.description }}</p>
-          </div>
-
-          <!-- Related Services -->
-          <div v-if="selectedItem && selectedItem.relatedServices.length > 0">
-            <h4 class="text-[#263238] mb-2">Serviços Relacionados</h4>
-            <div class="flex flex-wrap gap-2">
-              <Badge
-                v-for="(service, index) in selectedItem.relatedServices"
-                :key="index"
-                variant="secondary"
-                class="bg-blue-100 text-[#286AD8]"
+          <div class="grid grid-cols-1 md:grid-cols-2 h-full">
+            <div class="relative bg-gray-900 flex items-center justify-center min-h-[300px] md:min-h-[500px]">
+              <video
+                v-if="selectedItem?.type === 'video'"
+                :src="selectedItem.url"
+                controls
+                class="w-full h-full object-contain"
+                :poster="selectedItem.thumbnail"
               >
-                {{ service }}
-              </Badge>
+                Seu navegador não suporta a reprodução de vídeos.
+              </video>
+              <ImageWithFallback
+                v-else-if="selectedItem"
+                :src="selectedItem.url"
+                :alt="selectedItem.title"
+                class="w-full h-full object-contain"
+              />
+              <div v-else class="flex flex-col items-center text-white/50">
+                <Briefcase class="h-16 w-16 mb-4" />
+                <span>Nenhuma imagem disponível</span>
+              </div>
             </div>
-          </div>
 
-          <!-- Actions -->
-          <div class="flex gap-3 pt-4 border-t border-gray-200">
-            <Button
-              @click="selectedItem && handleReport(selectedItem)"
-              variant="outline"
-              class="text-red-600 border-red-600 hover:bg-red-50"
-            >
-              <Flag class="h-4 w-4 mr-2" />
-              Denunciar conteúdo
-            </Button>
-            <Button @click="selectedItem = null" variant="outline" class="ml-auto">
-              Fechar
-            </Button>
+            <div class="p-6 md:p-8 flex flex-col h-full overflow-y-auto">
+              <div>
+                <Badge variant="secondary" class="mb-3 bg-blue-50 text-[#286AD8] border-none">
+                  {{ getItemCategory(selectedItem) }}
+                </Badge>
+                <h2 class="text-2xl font-bold text-[#263238] mb-4 break-words">{{ selectedItem?.title }}</h2>
+
+                <p class="text-[#435574] leading-relaxed mb-6 whitespace-pre-line break-words w-full">
+                  {{ selectedItem?.description }}
+                </p>
+              </div>
+
+              <div class="mt-auto pt-6 border-t border-gray-100 flex flex-col gap-4">
+                <div class="flex flex-wrap items-center gap-3">
+                  <Badge v-if="selectedItem?.featured" class="bg-yellow-500 text-white border-none">
+                    <Sparkles class="h-3 w-3 mr-1" />
+                    Projeto em Destaque
+                  </Badge>
+                  <div class="flex items-center gap-2 text-sm text-[#435574]">
+                    <div class="p-2 bg-gray-50 rounded-lg">
+                      <Calendar class="h-4 w-4 text-[#286AD8]" />
+                    </div>
+                    <div>
+                      <p class="text-[10px] uppercase font-semibold text-gray-400">Concluído em</p>
+                      <p class="font-medium">
+                        {{ formatCompletedDate(selectedItem?.date) }}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div v-if="selectedItem?.client" class="flex items-center gap-2 text-sm text-[#435574]">
+                    <div class="p-2 bg-gray-50 rounded-lg">
+                      <Sparkles class="h-4 w-4 text-[#286AD8]" />
+                    </div>
+                    <div>
+                      <p class="text-[10px] uppercase font-semibold text-gray-400">Cliente</p>
+                      <p class="font-medium">{{ selectedItem.client }}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div v-if="selectedItem?.relatedServices && selectedItem.relatedServices.length > 0" class="flex flex-wrap gap-2">
+                  <Badge
+                    v-for="service in selectedItem.relatedServices"
+                    :key="service"
+                    variant="secondary"
+                    class="bg-gray-100 hover:bg-gray-200 text-[#435574] transition-colors border-none"
+                  >
+                    {{ service }}
+                  </Badge>
+                </div>
+
+                <div v-if="selectedItem?.projectUrl || selectedItem?.type === 'video'" class="flex flex-col sm:flex-row gap-3 pt-6 border-t border-gray-100">
+                  <Button v-if="selectedItem?.projectUrl" asChild class="flex-1">
+                    <a :href="selectedItem.projectUrl" target="_blank" class="flex items-center justify-center">
+                      <ExternalLink class="h-4 w-4 mr-2" />
+                      Acessar Projeto
+                    </a>
+                  </Button>
+                  <Button v-if="selectedItem?.type === 'video'" asChild variant="outline" class="flex-1">
+                    <a :href="selectedItem.url" target="_blank" class="flex items-center justify-center">
+                      <Youtube class="h-4 w-4 mr-2" />
+                      Ver Vídeo
+                    </a>
+                  </Button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </DialogContent>
     </Dialog>
-
-    <!-- Report Confirmation Dialog -->
-    <AlertDialog :open="reportItem !== null" @update:open="(val) => !val && (reportItem = null)">
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Denunciar conteúdo inadequado</AlertDialogTitle>
-          <AlertDialogDescription>
-            Você está prestes a denunciar o item "{{ reportItem?.title }}".
-            Nossa equipe irá revisar este conteúdo e tomar as medidas necessárias.
-            <br /><br />
-            Deseja continuar?
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Cancelar</AlertDialogCancel>
-          <AlertDialogAction @click="confirmReport" class="bg-destructive hover:bg-destructive/90">
-            Confirmar denúncia
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
   </div>
 </template>
-
