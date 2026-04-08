@@ -602,7 +602,11 @@ watch(currentTab, () => {
               v-for="proposal in currentProposals"
               :key="proposal.id"
               :class="`p-6 hover:shadow-md transition-all ${
-                !proposal.viewed ? 'border-l-4 border-l-[#286AD8] bg-blue-50/30' : ''
+                proposal.status === 'pending'
+                  ? 'border-l-4 border-l-blue-500 bg-blue-50/30'
+                  : !proposal.viewed
+                    ? 'border-l-4 border-l-[#286AD8]'
+                    : ''
               }`"
             >
               <div class="flex items-start gap-3">
