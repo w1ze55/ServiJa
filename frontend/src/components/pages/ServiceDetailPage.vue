@@ -414,6 +414,7 @@ const handleSendQuote = async () => {
   }
 
   const deadline = quoteDeadlineType.value === 'decided' ? quoteDeadlineDate.value : `${quoteDeadline.value} dias`;
+  const desiredDate = quoteDeadlineType.value === 'decided' ? quoteDeadlineDate.value : undefined;
   isSendingQuote.value = true;
   try {
     let attachmentUrls: string[] = [];
@@ -426,6 +427,7 @@ const handleSendQuote = async () => {
       category: service.value?.category || '',
       description: quoteMessage.value,
       deadline,
+      desiredDate,
       workModel: workModel.value?.toUpperCase(),
       address: serviceRequiresAddress.value ? buildQuoteAddress() : null,
       serviceId: props.serviceId,
