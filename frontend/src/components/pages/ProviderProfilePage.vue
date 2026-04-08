@@ -1133,7 +1133,8 @@ onMounted(() => {
               <!-- Reviews Tab -->
               <TabsContent value="reviews">
                 <ReviewList 
-                  :reviews="reviews" 
+                  :reviews="reviews"
+                  :freelancer-id="props.providerId"
                   :is-loading="isLoadingReviews"
                   :page-size="5"
                 />

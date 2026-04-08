@@ -145,9 +145,7 @@ public class ReviewAiService {
         sb.append("Analise as avaliações abaixo de um freelancer e gere um resumo objetivo em PT-BR.\n");
         sb.append("Retorne APENAS um JSON válido (sem markdown, sem ```json) com o formato:\n");
         sb.append("{\"strengths\": [\"ponto 1\", \"ponto 2\"], \"attentionPoints\": [\"ponto 1\"], \"overall\": \"síntese curta\"}\n");
-        sb.append("- strengths: lista de 2 a 4 pontos fortes identificados\n");
-        sb.append("- attentionPoints: lista de 0 a 2 pontos de atenção (pode ser vazia)\n");
-        sb.append("- overall: parágrafo curto de 1 a 2 frases resumindo o perfil\n\n");
+        sb.append("- overall: parágrafo curto de 1 resumindo o perfil\n\n");
         sb.append("Avaliações:\n");
 
         reviews.stream().limit(20).forEach(r -> {
