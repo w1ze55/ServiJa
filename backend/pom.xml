@@ -112,6 +112,13 @@
 			<version>2.29.51</version>
 		</dependency>
 
+		<!-- Google Gemini AI -->
+		<dependency>
+			<groupId>com.google.genai</groupId>
+			<artifactId>google-genai</artifactId>
+			<version>1.46.0</version>
+		</dependency>
+
 		<!-- Reports -->
 		<dependency>
 			<groupId>org.apache.poi</groupId>

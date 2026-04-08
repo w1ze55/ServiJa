@@ -7,6 +7,7 @@ import Avatar from '@/components/ui/avatar.vue';
 import AvatarImage from '@/components/ui/avatar-image.vue';
 import AvatarFallback from '@/components/ui/avatar-fallback.vue';
 import Button from '@/components/ui/button.vue';
+import AiReviewSummary from '../freelancer/AiReviewSummary.vue';
 
 export interface ReviewItem {
   id: number;
@@ -20,6 +21,7 @@ export interface ReviewItem {
 
 interface Props {
   reviews: ReviewItem[];
+  freelancerId?: string | number;
   isLoading?: boolean;
   pageSize?: number;
 }
@@ -140,6 +142,7 @@ const formatDate = (dateStr: string) =>
           </div>
         </div>
       </Card>
+      <AiReviewSummary :freelancer-id="String(props.freelancerId)" />
 
       <!-- Individual reviews -->
       <div class="space-y-4">
