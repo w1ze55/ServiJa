@@ -65,7 +65,7 @@ class ReviewAiServiceTest {
     void suggestComment_returnsGeminiText() {
         when(geminiService.generateText(anyString())).thenReturn("Ótimo profissional, muito pontual!");
 
-        String result = reviewAiService.suggestComment(5, List.of("Pontualidade"), "Limpeza", "João");
+        String result = reviewAiService.suggestComment(5, List.of("Pontualidade"), "Limpeza", "João", null);
 
         assertThat(result).isEqualTo("Ótimo profissional, muito pontual!");
         verify(geminiService).generateText(anyString());
@@ -77,7 +77,7 @@ class ReviewAiServiceTest {
         String longText = "a".repeat(600);
         when(geminiService.generateText(anyString())).thenReturn(longText);
 
-        String result = reviewAiService.suggestComment(4, Collections.emptyList(), null, null);
+        String result = reviewAiService.suggestComment(4, Collections.emptyList(), null, null, null);
 
         assertThat(result).hasSize(480);
     }
@@ -88,7 +88,7 @@ class ReviewAiServiceTest {
         when(geminiService.generateText(anyString())).thenThrow(new RuntimeException("Gemini error"));
 
         assertThatThrownBy(() ->
-                reviewAiService.suggestComment(3, List.of("Comunicação"), "Pintura", "Maria"))
+                reviewAiService.suggestComment(3, List.of("Comunicação"), "Pintura", "Maria", null))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("Gemini error");
     }

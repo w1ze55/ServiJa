@@ -37,6 +37,7 @@ export interface AiCommentRequest {
   tags: string[];
   serviceName?: string;
   freelancerName?: string;
+  existingComment?: string | null;
 }
 
 export interface AiCommentResponse {

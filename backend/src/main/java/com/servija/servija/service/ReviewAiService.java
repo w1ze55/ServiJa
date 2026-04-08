@@ -37,8 +37,8 @@ public class ReviewAiService {
     private final FreelancerRepository freelancerRepository;
     private final ObjectMapper objectMapper;
 
-    public String suggestComment(Integer rating, List<String> tags, String serviceName, String freelancerName) {
-        String prompt = buildCommentPrompt(rating, tags, serviceName, freelancerName);
+    public String suggestComment(Integer rating, List<String> tags, String serviceName, String freelancerName, String existingComment) {
+        String prompt = buildCommentPrompt(rating, tags, serviceName, freelancerName, existingComment);
         String response = geminiService.generateText(prompt);
         if (response.length() > MAX_COMMENT_LENGTH) {
             response = response.substring(0, MAX_COMMENT_LENGTH);
@@ -119,10 +119,20 @@ public class ReviewAiService {
         }
     }
 
-    private String buildCommentPrompt(Integer rating, List<String> tags, String serviceName, String freelancerName) {
+    private String buildCommentPrompt(Integer rating, List<String> tags, String serviceName, String freelancerName, String existingComment) {
         StringBuilder sb = new StringBuilder();
         sb.append("Você é um assistente que ajuda clientes a escrever avaliações honestas e construtivas em PT-BR.\n");
-        sb.append("Gere um comentário de avaliação de serviço com base nas informações abaixo.\n");
+
+        boolean hasExisting = existingComment != null && !existingComment.isBlank();
+
+        if (hasExisting) {
+            sb.append("O cliente já começou a escrever a avaliação abaixo. Sua tarefa é REFINAR esse texto: ");
+            sb.append("corrija erros, melhore a fluência e enriqueça o conteúdo, mas PRESERVE a opinião, o tom e as ideias originais do cliente.\n");
+            sb.append("NÃO invente informações que não estejam no texto original.\n");
+        } else {
+            sb.append("Gere um comentário de avaliação de serviço com base nas informações abaixo.\n");
+        }
+
         sb.append("O comentário deve ter entre 80 e 200 caracteres, ser natural e pessoal.\n");
         sb.append("Retorne APENAS o texto do comentário, sem aspas, sem explicações.\n\n");
         sb.append("Nota dada: ").append(rating).append(" de 5 estrelas\n");
@@ -135,6 +145,9 @@ public class ReviewAiService {
         }
         if (tags != null && !tags.isEmpty()) {
             sb.append("Pontos destacados: ").append(String.join(", ", tags)).append("\n");
+        }
+        if (hasExisting) {
+            sb.append("\nTexto original do cliente (refine este):\n").append(existingComment).append("\n");
         }
 
         return sb.toString();

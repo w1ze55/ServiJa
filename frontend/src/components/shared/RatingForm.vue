@@ -127,6 +127,7 @@ const handleSuggestComment = async () => {
       tags: selectedTags.value,
       serviceName: props.subtitle,
       freelancerName: props.personName,
+      existingComment: comment.value.trim() || null,
     });
     comment.value = response.suggestion;
   } catch {
@@ -352,7 +353,7 @@ defineExpose({ reset });
             </span>
             <span v-else class="flex items-center gap-1.5">
               <Sparkles class="h-3.5 w-3.5" />
-              Sugerir com IA
+              {{ comment.trim() ? 'Refinar com IA' : 'Sugerir com IA' }}
             </span>
           </Button>
         </div>

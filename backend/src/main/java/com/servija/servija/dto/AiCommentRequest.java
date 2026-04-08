@@ -17,4 +17,5 @@ public class AiCommentRequest {
     private List<String> tags;
     private String serviceName;
     private String freelancerName;
+    private String existingComment;
 }

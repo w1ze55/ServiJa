@@ -28,7 +28,8 @@ public class ReviewAiController {
                     request.getRating(),
                     request.getTags(),
                     request.getServiceName(),
-                    request.getFreelancerName()
+                    request.getFreelancerName(),
+                    request.getExistingComment()
             );
             return ResponseEntity.ok(new AiCommentResponse(suggestion));
         } catch (Exception e) {
