@@ -28,8 +28,13 @@ import DropdownMenuTrigger from '../ui/dropdown-menu-trigger.vue';
 import Input from '../ui/input.vue';
 import Label from '../ui/label.vue';
 import Separator from '../ui/separator.vue';
+import Select from '../ui/select.vue';
+import SelectContent from '../ui/select-content.vue';
+import SelectItem from '../ui/select-item.vue';
+import SelectTrigger from '../ui/select-trigger.vue';
+import SelectValue from '../ui/select-value.vue';
 import { toast } from '@/utils/toast';
-import { formatApiDate } from '@/utils/apiDate';
+import { formatApiDate, parseApiDate } from '@/utils/apiDate';
 import { formatCPF, formatPhone, validateCPF } from '@/utils/masks';
 import walletService, {
   type WalletBalance,
@@ -63,6 +68,9 @@ const wallet = ref<WalletBalance | null>(null);
 const transactions = ref<WalletTransaction[]>([]);
 const bankAccounts = ref<BankAccount[]>([]);
 const transactionFilter = ref<'ALL' | 'EARNING' | 'WITHDRAWAL'>('ALL');
+const timeFilter = ref('Últimos 30 dias');
+const customDateFrom = ref('');
+const customDateTo = ref('');
 
 // Modals
 const showWithdrawModal = ref(false);
@@ -90,9 +98,63 @@ const newHolderName = ref('');
 const newHolderCpfCnpj = ref('');
 
 // Computed
+const matchesSelectedTimeFilter = (dateValue?: string | null) => {
+  const transactionDate = parseApiDate(dateValue);
+
+  if (Number.isNaN(transactionDate.getTime())) {
+    return false;
+  }
+
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  switch (timeFilter.value) {
+    case 'Hoje':
+      return transactionDate >= startOfToday;
+    case 'Ontem': {
+      const startOfYesterday = new Date(startOfToday);
+      startOfYesterday.setDate(startOfYesterday.getDate() - 1);
+      return transactionDate >= startOfYesterday && transactionDate < startOfToday;
+    }
+    case 'Últimos 7 dias': {
+      const sevenDaysAgo = new Date(startOfToday);
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      return transactionDate >= sevenDaysAgo;
+    }
+    case 'Últimos 30 dias': {
+      const thirtyDaysAgo = new Date(startOfToday);
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      return transactionDate >= thirtyDaysAgo;
+    }
+    case 'Mês atual':
+      return transactionDate.getMonth() === now.getMonth() && transactionDate.getFullYear() === now.getFullYear();
+    case 'Último mês': {
+      const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+      return transactionDate >= lastMonth && transactionDate <= endOfLastMonth;
+    }
+    case 'Intervalo personalizado': {
+      const from = customDateFrom.value ? new Date(customDateFrom.value + 'T00:00:00') : null;
+      const to = customDateTo.value ? new Date(customDateTo.value + 'T23:59:59') : null;
+
+      if (from && to) return transactionDate >= from && transactionDate <= to;
+      if (from) return transactionDate >= from;
+      if (to) return transactionDate <= to;
+      return true;
+    }
+    default:
+      return true;
+  }
+};
+
 const filteredTransactions = computed(() => {
-  if (transactionFilter.value === 'ALL') return transactions.value;
-  return transactions.value.filter((t) => t.type === transactionFilter.value);
+  let filtered = transactions.value;
+
+  if (transactionFilter.value !== 'ALL') {
+    filtered = filtered.filter((transaction) => transaction.type === transactionFilter.value);
+  }
+
+  return filtered.filter((transaction) => matchesSelectedTimeFilter(transaction.date));
 });
 
 const totalBalance = computed(() => {
@@ -922,30 +984,68 @@ onMounted(loadData);
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
           <div>
             <h3 class="text-[#263238]">Histórico de Transações</h3>
-            <p class="text-sm text-[#435574]">{{ transactions.length }} transações registradas</p>
+            <p class="text-sm text-[#435574]">{{ filteredTransactions.length }} transações encontradas</p>
           </div>
-          <div class="flex gap-2">
-            <Button
-              @click="transactionFilter = 'ALL'"
-              :variant="transactionFilter === 'ALL' ? 'default' : 'outline'"
-              size="sm"
-            >
-              Todos
-            </Button>
-            <Button
-              @click="transactionFilter = 'EARNING'"
-              :variant="transactionFilter === 'EARNING' ? 'default' : 'outline'"
-              size="sm"
-            >
-              Recebimentos
-            </Button>
-            <Button
-              @click="transactionFilter = 'WITHDRAWAL'"
-              :variant="transactionFilter === 'WITHDRAWAL' ? 'default' : 'outline'"
-              size="sm"
-            >
-              Saques
-            </Button>
+          <div class="flex flex-col sm:flex-row gap-2 sm:items-center">
+            <div class="flex gap-2 flex-wrap">
+              <Button
+                @click="transactionFilter = 'ALL'"
+                :variant="transactionFilter === 'ALL' ? 'default' : 'outline'"
+                size="sm"
+              >
+                Todos
+              </Button>
+              <Button
+                @click="transactionFilter = 'EARNING'"
+                :variant="transactionFilter === 'EARNING' ? 'default' : 'outline'"
+                size="sm"
+              >
+                Recebimentos
+              </Button>
+              <Button
+                @click="transactionFilter = 'WITHDRAWAL'"
+                :variant="transactionFilter === 'WITHDRAWAL' ? 'default' : 'outline'"
+                size="sm"
+              >
+                Saques
+              </Button>
+            </div>
+
+            <div class="w-full sm:w-[220px]">
+              <Select :model-value="timeFilter" @update:model-value="(val: string) => timeFilter = val">
+                <SelectTrigger>
+                  <SelectValue placeholder="Últimos 30 dias" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Hoje">Hoje</SelectItem>
+                  <SelectItem value="Ontem">Ontem</SelectItem>
+                  <SelectItem value="Últimos 7 dias">Últimos 7 dias</SelectItem>
+                  <SelectItem value="Últimos 30 dias">Últimos 30 dias</SelectItem>
+                  <SelectItem value="Mês atual">Mês atual</SelectItem>
+                  <SelectItem value="Último mês">Último mês</SelectItem>
+                  <SelectItem value="Intervalo personalizado">Intervalo personalizado</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </div>
+
+        <div v-if="timeFilter === 'Intervalo personalizado'" class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 mt-1 pt-4 border-t">
+          <div class="space-y-1">
+            <label class="text-sm font-medium text-[#435574]">De</label>
+            <Input
+              type="date"
+              :model-value="customDateFrom"
+              @update:model-value="(val: string) => customDateFrom = val"
+            />
+          </div>
+          <div class="space-y-1">
+            <label class="text-sm font-medium text-[#435574]">Até</label>
+            <Input
+              type="date"
+              :model-value="customDateTo"
+              @update:model-value="(val: string) => customDateTo = val"
+            />
           </div>
         </div>
 
