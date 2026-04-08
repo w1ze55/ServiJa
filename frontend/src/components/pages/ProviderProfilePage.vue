@@ -722,6 +722,9 @@ const handleSendQuote = async () => {
   const deadline = quoteDeadlineType.value === 'decided'
     ? quoteDeadlineDate.value
     : `${quoteDeadline.value} dias`;
+  const desiredDate = quoteDeadlineType.value === 'decided'
+    ? quoteDeadlineDate.value
+    : undefined;
 
   if (!quoteDeadline.value && quoteDeadlineType.value === 'estimated') {
     toast.error('Por favor, informe a quantidade de dias');
@@ -766,6 +769,7 @@ const handleSendQuote = async () => {
       category: quoteCategory.value,
       description: quoteMessage.value,
       deadline: deadline,
+      desiredDate,
       workModel: requestedServiceWorkModel.value?.toUpperCase(),
       address: serviceAddress,
       serviceId: requestedServiceId.value,
