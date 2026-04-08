@@ -490,8 +490,8 @@ watch(currentTab, () => {
         @click="currentTab = 'negotiating'"
       >
         <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
-            <MessageSquare class="h-5 w-5 text-amber-600" />
+          <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+            <MessageSquare class="h-5 w-5 text-blue-600" />
           </div>
           <div>
             <p class="text-sm text-[#435574]">Negociando</p>
@@ -656,7 +656,7 @@ watch(currentTab, () => {
               :key="request.id"
               :class="`p-6 hover:shadow-md transition-all cursor-pointer ${
                 request.freelancerResponse && request.status === 'negotiating'
-                  ? 'border-l-4 border-l-amber-500 bg-amber-50/30'
+                  ? 'border-l-4 border-l-blue-500 bg-blue-50/30'
                   : ''
               }`"
               @click="handleViewDetails(request)"
@@ -676,7 +676,7 @@ watch(currentTab, () => {
                         <h3 class="font-semibold text-[#263238] hover:text-[#286AD8]">{{ request.service }}</h3>
                         <Badge
                           v-if="request.freelancerResponse && request.status === 'negotiating'"
-                          class="bg-amber-100 text-amber-700 hover:bg-amber-100 text-xs"
+                          class="bg-blue-100 text-blue-700 hover:bg-blue-100 text-xs"
                         >
                           Resposta recebida
                         </Badge>
@@ -705,7 +705,7 @@ watch(currentTab, () => {
                           </Badge>
                         </template>
                         <template v-else-if="request.status === 'negotiating'">
-                          <Badge class="bg-amber-100 text-amber-700 hover:bg-amber-100">
+                          <Badge class="bg-blue-100 text-blue-700 hover:bg-blue-100">
                             <MessageSquare class="h-3 w-3 mr-1" />
                             Negociando
                           </Badge>
@@ -723,7 +723,7 @@ watch(currentTab, () => {
                           </Badge>
                         </template>
                         <template v-else-if="request.status === 'delivered'">
-                          <Badge class="bg-amber-100 text-amber-700 hover:bg-amber-100">
+                          <Badge class="bg-blue-100 text-blue-700 hover:bg-blue-100">
                             <Send class="h-3 w-3 mr-1" />
                             Entregue
                           </Badge>
@@ -759,9 +759,9 @@ watch(currentTab, () => {
                   <!-- Freelancer response preview -->
                   <div
                     v-if="request.freelancerResponse && request.status === 'negotiating'"
-                    class="bg-white border border-amber-200 rounded-lg p-3 mb-3"
+                    class="bg-white border border-blue-200 rounded-lg p-3 mb-3"
                   >
-                    <div class="flex items-center gap-2 text-sm text-amber-700 font-medium mb-1">
+                    <div class="flex items-center gap-2 text-sm text-blue-700 font-medium mb-1">
                       <Send class="h-3.5 w-3.5" />
                       Resposta do profissional
                     </div>

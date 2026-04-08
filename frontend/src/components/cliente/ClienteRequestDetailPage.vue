@@ -274,10 +274,10 @@ const getStatusColor = (status: string) => {
   const colors: Record<string, { bg: string; text: string }> = {
     pending: { bg: 'bg-blue-100', text: 'text-blue-700' },
     sent: { bg: 'bg-blue-100', text: 'text-blue-700' },
-    negotiating: { bg: 'bg-amber-100', text: 'text-amber-700' },
+    negotiating: { bg: 'bg-blue-100', text: 'text-blue-700' },
     accepted: { bg: 'bg-green-100', text: 'text-green-700' },
     in_progress: { bg: 'bg-purple-100', text: 'text-purple-700' },
-    delivered: { bg: 'bg-amber-100', text: 'text-amber-700' },
+    delivered: { bg: 'bg-blue-100', text: 'text-blue-700' },
     completed: { bg: 'bg-teal-100', text: 'text-teal-700' },
     rejected: { bg: 'bg-red-100', text: 'text-red-700' },
     cancelled: { bg: 'bg-gray-100', text: 'text-gray-700' },
@@ -348,7 +348,7 @@ const getStatusColor = (status: string) => {
             request.status === 'accepted' &&
             !request.auditLog?.some((log) => log.operationKey === 'PAYMENT_CONFIRMED')
           " 
-          class="mt-4 p-4 rounded-lg border-2 border-green-300 bg-gradient-to-r from-green-50 to-yellow-50 flex items-start gap-3"
+          class="mt-4 p-4 rounded-lg border-2 border-green-300 bg-gradient-to-r from-green-50 to-blue-50 flex items-start gap-3"
         >
           <div class="flex-shrink-0 w-10 h-10 bg-green-600 rounded-full flex items-center justify-center">
             <CreditCard class="h-5 w-5 text-white" />
@@ -457,9 +457,9 @@ const getStatusColor = (status: string) => {
           </Card>
 
           <!-- Freelancer Response -->
-          <Card v-if="request.freelancerResponse" class="p-6 border-amber-200 bg-amber-50/30">
+          <Card v-if="request.freelancerResponse" class="p-6 border-blue-200 bg-blue-50/30">
             <div class="flex items-center gap-2 mb-4">
-              <Send class="h-5 w-5 text-amber-600" />
+              <Send class="h-5 w-5 text-blue-600" />
               <h3 class="font-semibold text-[#263238]">Resposta do Profissional</h3>
             </div>
 
@@ -512,11 +512,11 @@ const getStatusColor = (status: string) => {
               </div>
 
               <!-- Rejection Alert -->
-              <div v-if="wasCounterProposalRejected" class="p-4 bg-amber-50 border border-amber-100 rounded-lg flex items-start gap-3">
-                <AlertCircle class="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+              <div v-if="wasCounterProposalRejected" class="p-4 bg-blue-50 border border-blue-100 rounded-lg flex items-start gap-3">
+                <AlertCircle class="h-5 w-5 text-blue-600 shrink-0 mt-0.5" />
                 <div>
-                  <p class="text-sm font-medium text-amber-900">Contra proposta recusada</p>
-                  <p class="text-xs text-amber-700 mt-1">
+                  <p class="text-sm font-medium text-blue-900">Contra proposta recusada</p>
+                  <p class="text-xs text-blue-700 mt-1">
                     O profissional preferiu manter a proposta original. Você pode aceitá-la ou recusar.
                   </p>
                 </div>
@@ -706,7 +706,7 @@ const getStatusColor = (status: string) => {
               :size="attachment.size"
               :description="attachment.description"
               sender-info="Enviado pelo profissional"
-              variant="amber"
+              variant="blue"
             />
           </div>
         </div>
