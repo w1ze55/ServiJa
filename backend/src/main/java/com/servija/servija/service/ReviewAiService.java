@@ -37,6 +37,26 @@ public class ReviewAiService {
     private final FreelancerRepository freelancerRepository;
     private final ObjectMapper objectMapper;
 
+    public String refineBio(String bio) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("Você é um redator profissional especializado em perfis de freelancers no Brasil.\n");
+        sb.append("Refine a biografia abaixo escrita por um freelancer para o seu perfil profissional.\n");
+        sb.append("Regras:\n");
+        sb.append("- PRESERVE todas as informações, experiências e habilidades mencionadas pelo profissional\n");
+        sb.append("- Corrija erros gramaticais e melhore a fluência em PT-BR\n");
+        sb.append("- Torne o texto mais profissional, claro e persuasivo\n");
+        sb.append("- Mantenha a voz em primeira pessoa\n");
+        sb.append("- O texto refinado deve ter no máximo 1000 caracteres\n");
+        sb.append("- Retorne APENAS o texto da biografia refinada, sem explicações, sem aspas\n\n");
+        sb.append("Biografia original:\n").append(bio).append("\n");
+
+        String response = geminiService.generateText(sb.toString());
+        if (response.length() > 1000) {
+            response = response.substring(0, 1000);
+        }
+        return response;
+    }
+
     public String suggestComment(Integer rating, List<String> tags, String serviceName, String freelancerName, String existingComment) {
         String prompt = buildCommentPrompt(rating, tags, serviceName, freelancerName, existingComment);
         String response = geminiService.generateText(prompt);
