@@ -11,7 +11,12 @@ export interface Proposal {
   clientEmail?: string;
   clientPhone?: string;
   service: string;
+  categoryId?: number | null;
   category: string;
+  categoryLabel?: string;
+  subcategoryId?: number | null;
+  subcategory?: string;
+  subcategoryLabel?: string;
   description: string;
   budget?: number | null;
   deadline: string;
@@ -92,6 +97,16 @@ export const useProposalStore = defineStore('proposal', () => {
   const isLoading = ref(false);
   const error = ref<string | null>(null);
 
+  const getFirstNonEmptyString = (...values: unknown[]): string => {
+    for (const value of values) {
+      if (typeof value === 'string' && value.trim()) {
+        return value.trim();
+      }
+    }
+
+    return '';
+  };
+
   const extractFileName = (url: string): string => {
     try {
       const path = new URL(url).pathname;
@@ -156,43 +171,54 @@ export const useProposalStore = defineStore('proposal', () => {
       const response = await api.get('/service-requests/received');
 
       // Mapear dados da API para o formato da store
-      proposals.value = response.data
-        .filter((req: any) => req.status !== 'CANCELLED')
-        .map((req: any) => ({
-        id: req.id.toString(),
-        clientName: req.contractorName,
-        clientAvatar: req.contractorAvatar,
-        clientLocation: req.address || 'Não informado',
-        service: req.serviceName,
-        category: req.category,
-        description: req.description,
-        budget: req.budget ?? null,
-        deadline: req.deadline,
-        workModel: normalizeWorkModel(req.workModel),
-        status: mapApiStatusToLocal(req.status),
-        receivedAt: req.createdAt,
-        attachments: mapAttachments(req.attachments, 'att', req.id),
-        viewed: true,
-        address: req.address,
-        desiredDate: req.desiredDate,
-        freelancerResponse: req.responseValue ? {
-          value: Number(req.responseValue),
-          executionDays: req.responseDays,
-          scope: req.responseScope,
-          notes: req.responseNotes,
-          sentAt: req.respondedAt,
-          milestones: req.milestones,
-          attachments: mapAttachments(req.responseAttachments, 'ratt', req.id)
-        } : undefined,
-        counterValue: req.counterValue,
-        counterDays: req.counterDays,
-        counterNotes: req.counterNotes,
-        cancelReason: req.cancelReason,
-        rejectReason: req.rejectReason,
-        freelancerAttachments: req.freelancerAttachmentDetails?.length
-          ? mapDetailedAttachments(req.freelancerAttachmentDetails, 'fatt', req.id)
-          : mapAttachments(req.freelancerAttachments, 'fatt', req.id),
-      }));
+      const activeRequests = response.data.filter((req: any) => req.status !== 'CANCELLED');
+
+      proposals.value = activeRequests
+        .map((req: any) => {
+          const categoryLabel = getFirstNonEmptyString(req.categoryLabel, req.category);
+          const subcategoryLabel = getFirstNonEmptyString(req.subcategoryLabel, req.subcategory);
+
+          return {
+            id: req.id.toString(),
+            clientName: req.contractorName,
+            clientAvatar: req.contractorAvatar,
+            clientLocation: req.address || 'Não informado',
+            service: req.serviceName,
+            categoryId: req.categoryId ?? null,
+            category: categoryLabel,
+            categoryLabel,
+            subcategoryId: req.subcategoryId ?? null,
+            subcategory: subcategoryLabel,
+            subcategoryLabel,
+            description: req.description,
+            budget: req.budget ?? null,
+            deadline: req.deadline,
+            workModel: normalizeWorkModel(req.workModel),
+            status: mapApiStatusToLocal(req.status),
+            receivedAt: req.createdAt,
+            attachments: mapAttachments(req.attachments, 'att', req.id),
+            viewed: true,
+            address: req.address,
+            desiredDate: req.desiredDate,
+            freelancerResponse: req.responseValue ? {
+              value: Number(req.responseValue),
+              executionDays: req.responseDays,
+              scope: req.responseScope,
+              notes: req.responseNotes,
+              sentAt: req.respondedAt,
+              milestones: req.milestones,
+              attachments: mapAttachments(req.responseAttachments, 'ratt', req.id)
+            } : undefined,
+            counterValue: req.counterValue,
+            counterDays: req.counterDays,
+            counterNotes: req.counterNotes,
+            cancelReason: req.cancelReason,
+            rejectReason: req.rejectReason,
+            freelancerAttachments: req.freelancerAttachmentDetails?.length
+              ? mapDetailedAttachments(req.freelancerAttachmentDetails, 'fatt', req.id)
+              : mapAttachments(req.freelancerAttachments, 'fatt', req.id),
+          };
+        });
     } catch (err) {
       error.value = 'Erro ao carregar propostas';
       console.error('Erro ao carregar propostas:', err);
