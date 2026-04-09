@@ -121,10 +121,14 @@ public class ServiceRequestService {
             }
         }
 
+        String normalizedDeadline = dto.getDeadline() != null ? dto.getDeadline().trim() : null;
+        boolean deadlineIsIsoDate = normalizedDeadline != null
+                && normalizedDeadline.matches("^\\d{4}-\\d{2}-\\d{2}$");
+
         // Validar prazo estimado (deadline)
-        if (dto.getDeadline() != null && !dto.getDeadline().isEmpty()) {
+        if (normalizedDeadline != null && !normalizedDeadline.isEmpty() && !deadlineIsIsoDate) {
             // Se for prazo estimado (ex: "30 dias"), extrair número e validar
-            String deadlineStr = dto.getDeadline().replaceAll("[^0-9]", "");
+            String deadlineStr = normalizedDeadline.replaceAll("[^0-9]", "");
             if (!deadlineStr.isEmpty()) {
                 try {
                     int days = Integer.parseInt(deadlineStr);
@@ -135,16 +139,21 @@ public class ServiceRequestService {
                         throw new IllegalArgumentException("O prazo máximo é de 365 dias");
                     }
                 } catch (NumberFormatException e) {
-                    // Se não for número, pode ser uma data - ignorar validação de dias
+                    // Se não for número, pode ser um texto livre - ignorar validação de dias
                 }
             }
         }
 
         // Validar desiredDate - não pode ser no passado
         LocalDate parsedDesiredDate = null;
-        if (dto.getDesiredDate() != null) {
+        String desiredDateValue = dto.getDesiredDate();
+        if ((desiredDateValue == null || desiredDateValue.isBlank()) && deadlineIsIsoDate) {
+            desiredDateValue = normalizedDeadline;
+        }
+
+        if (desiredDateValue != null && !desiredDateValue.isBlank()) {
             try {
-                parsedDesiredDate = LocalDate.parse(dto.getDesiredDate());
+                parsedDesiredDate = LocalDate.parse(desiredDateValue);
                 if (parsedDesiredDate.isBefore(LocalDate.now())) {
                     throw new IllegalArgumentException("A data desejada não pode ser anterior à data atual");
                 }
@@ -179,7 +188,7 @@ public class ServiceRequestService {
                 .serviceCategory(categorySelection.getCategory())
                 .serviceSubcategory(categorySelection.getSubcategory())
                 .description(normalizedDescription)
-                .deadline(dto.getDeadline())
+                .deadline(normalizedDeadline)
                 .workModel(requestWorkModel)
                 .address(normalizedAddress)
                 .desiredDate(parsedDesiredDate)

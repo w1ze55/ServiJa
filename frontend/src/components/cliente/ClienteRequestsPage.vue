@@ -70,6 +70,9 @@ const categoryCatalogStore = useCategoryCatalogStore();
 const searchQuery = ref('');
 const categoryFilter = ref('all');
 const sortBy = ref('recent');
+const timeFilter = ref('Últimos 30 dias');
+const customDateFrom = ref('');
+const customDateTo = ref('');
 const currentTab = ref('all');
 const currentPage = ref(1);
 const itemsPerPage = 6;
@@ -133,6 +136,56 @@ const getEmptyMessage = () => {
   };
 
   return messages[currentTab.value as keyof typeof messages] || 'Nenhuma solicitação encontrada';
+};
+
+const matchesSelectedTimeFilter = (dateValue?: string | null) => {
+  const timestamp = getApiDateTimestamp(dateValue);
+
+  if (!timestamp) {
+    return false;
+  }
+
+  const requestDate = new Date(timestamp);
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  switch (timeFilter.value) {
+    case 'Hoje':
+      return requestDate >= startOfToday;
+    case 'Ontem': {
+      const startOfYesterday = new Date(startOfToday);
+      startOfYesterday.setDate(startOfYesterday.getDate() - 1);
+      return requestDate >= startOfYesterday && requestDate < startOfToday;
+    }
+    case 'Últimos 7 dias': {
+      const sevenDaysAgo = new Date(startOfToday);
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      return requestDate >= sevenDaysAgo;
+    }
+    case 'Últimos 30 dias': {
+      const thirtyDaysAgo = new Date(startOfToday);
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      return requestDate >= thirtyDaysAgo;
+    }
+    case 'Mês atual':
+      return requestDate.getMonth() === now.getMonth() && requestDate.getFullYear() === now.getFullYear();
+    case 'Último mês': {
+      const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+      return requestDate >= lastMonth && requestDate <= endOfLastMonth;
+    }
+    case 'Intervalo personalizado': {
+      const from = customDateFrom.value ? new Date(customDateFrom.value + 'T00:00:00') : null;
+      const to = customDateTo.value ? new Date(customDateTo.value + 'T23:59:59') : null;
+
+      if (from && to) return requestDate >= from && requestDate <= to;
+      if (from) return requestDate >= from;
+      if (to) return requestDate <= to;
+      return true;
+    }
+    default:
+      return true;
+  }
 };
 
 onMounted(() => {
@@ -266,8 +319,9 @@ const filteredRequests = computed(() => {
       (currentTab.value === 'in_progress' && (request.status === 'in_progress' || request.status === 'delivered')) ||
       (currentTab.value === 'completed' && request.status === 'completed') ||
       (currentTab.value === 'cancelled' && (request.status === 'cancelled' || request.status === 'rejected'));
+    const matchesTime = matchesSelectedTimeFilter(getLastActivityAt(request));
 
-    return matchesSearch && matchesCategory && matchesTab;
+    return matchesSearch && matchesCategory && matchesTab && matchesTime;
   });
 
   if (sortBy.value === 'recent') {
@@ -488,8 +542,8 @@ watch(currentTab, () => {
         @click="currentTab = 'negotiating'"
       >
         <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
-            <MessageSquare class="h-5 w-5 text-amber-600" />
+          <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+            <MessageSquare class="h-5 w-5 text-blue-600" />
           </div>
           <div>
             <p class="text-sm text-[#435574]">Negociando</p>
@@ -546,7 +600,7 @@ watch(currentTab, () => {
 
     <!-- Filters -->
     <Card class="p-4">
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         <div class="relative">
           <Search class="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-[#435574]" />
           <Input
@@ -569,6 +623,21 @@ watch(currentTab, () => {
           </SelectContent>
         </Select>
 
+        <Select :model-value="timeFilter" @update:model-value="(val: string) => { timeFilter = val; currentPage = 1; }">
+          <SelectTrigger>
+            <SelectValue placeholder="Últimos 30 dias" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="Hoje">Hoje</SelectItem>
+            <SelectItem value="Ontem">Ontem</SelectItem>
+            <SelectItem value="Últimos 7 dias">Últimos 7 dias</SelectItem>
+            <SelectItem value="Últimos 30 dias">Últimos 30 dias</SelectItem>
+            <SelectItem value="Mês atual">Mês atual</SelectItem>
+            <SelectItem value="Último mês">Último mês</SelectItem>
+            <SelectItem value="Intervalo personalizado">Intervalo personalizado</SelectItem>
+          </SelectContent>
+        </Select>
+
         <Select :model-value="sortBy" @update:model-value="(val: string) => sortBy = val">
           <SelectTrigger>
             <SelectValue :label="getSortLabel(sortBy)" :placeholder="getSortLabel(sortBy)" />
@@ -579,6 +648,25 @@ watch(currentTab, () => {
             <SelectItem value="budget-low">Menor orçamento</SelectItem>
           </SelectContent>
         </Select>
+      </div>
+
+      <div v-if="timeFilter === 'Intervalo personalizado'" class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 pt-4 border-t">
+        <div class="space-y-1">
+          <label class="text-sm font-medium text-[#435574]">De</label>
+          <Input
+            type="date"
+            :model-value="customDateFrom"
+            @update:model-value="(val: string) => { customDateFrom = val; currentPage = 1; }"
+          />
+        </div>
+        <div class="space-y-1">
+          <label class="text-sm font-medium text-[#435574]">Até</label>
+          <Input
+            type="date"
+            :model-value="customDateTo"
+            @update:model-value="(val: string) => { customDateTo = val; currentPage = 1; }"
+          />
+        </div>
       </div>
     </Card>
 
@@ -620,7 +708,7 @@ watch(currentTab, () => {
               :key="request.id"
               :class="`p-6 hover:shadow-md transition-all cursor-pointer ${
                 request.freelancerResponse && request.status === 'negotiating'
-                  ? 'border-l-4 border-l-amber-500 bg-amber-50/30'
+                  ? 'border-l-4 border-l-blue-500 bg-blue-50/30'
                   : ''
               }`"
               @click="handleViewDetails(request)"
@@ -640,7 +728,7 @@ watch(currentTab, () => {
                         <h3 class="font-semibold text-[#263238] hover:text-[#286AD8]">{{ request.service }}</h3>
                         <Badge
                           v-if="request.freelancerResponse && request.status === 'negotiating'"
-                          class="bg-amber-100 text-amber-700 hover:bg-amber-100 text-xs"
+                          class="bg-blue-100 text-blue-700 hover:bg-blue-100 text-xs"
                         >
                           Resposta recebida
                         </Badge>
@@ -669,7 +757,7 @@ watch(currentTab, () => {
                           </Badge>
                         </template>
                         <template v-else-if="request.status === 'negotiating'">
-                          <Badge class="bg-amber-100 text-amber-700 hover:bg-amber-100">
+                          <Badge class="bg-blue-100 text-blue-700 hover:bg-blue-100">
                             <MessageSquare class="h-3 w-3 mr-1" />
                             Negociando
                           </Badge>
@@ -687,7 +775,7 @@ watch(currentTab, () => {
                           </Badge>
                         </template>
                         <template v-else-if="request.status === 'delivered'">
-                          <Badge class="bg-amber-100 text-amber-700 hover:bg-amber-100">
+                          <Badge class="bg-blue-100 text-blue-700 hover:bg-blue-100">
                             <Send class="h-3 w-3 mr-1" />
                             Entregue
                           </Badge>
@@ -723,9 +811,9 @@ watch(currentTab, () => {
                   <!-- Freelancer response preview -->
                   <div
                     v-if="request.freelancerResponse && request.status === 'negotiating'"
-                    class="bg-white border border-amber-200 rounded-lg p-3 mb-3"
+                    class="bg-white border border-blue-200 rounded-lg p-3 mb-3"
                   >
-                    <div class="flex items-center gap-2 text-sm text-amber-700 font-medium mb-1">
+                    <div class="flex items-center gap-2 text-sm text-blue-700 font-medium mb-1">
                       <Send class="h-3.5 w-3.5" />
                       Resposta do profissional
                     </div>

@@ -722,6 +722,9 @@ const handleSendQuote = async () => {
   const deadline = quoteDeadlineType.value === 'decided'
     ? quoteDeadlineDate.value
     : `${quoteDeadline.value} dias`;
+  const desiredDate = quoteDeadlineType.value === 'decided'
+    ? quoteDeadlineDate.value
+    : undefined;
 
   if (!quoteDeadline.value && quoteDeadlineType.value === 'estimated') {
     toast.error('Por favor, informe a quantidade de dias');
@@ -766,6 +769,7 @@ const handleSendQuote = async () => {
       category: quoteCategory.value,
       description: quoteMessage.value,
       deadline: deadline,
+      desiredDate,
       workModel: requestedServiceWorkModel.value?.toUpperCase(),
       address: serviceAddress,
       serviceId: requestedServiceId.value,
@@ -1133,7 +1137,8 @@ onMounted(() => {
               <!-- Reviews Tab -->
               <TabsContent value="reviews">
                 <ReviewList 
-                  :reviews="reviews" 
+                  :reviews="reviews"
+                  :freelancer-id="props.providerId"
                   :is-loading="isLoadingReviews"
                   :page-size="5"
                 />
@@ -1331,7 +1336,7 @@ onMounted(() => {
 
     <!-- Project Details Modal -->
     <Dialog :open="selectedProject !== null" @update:open="(val) => !val && (selectedProject = null)">
-      <DialogContent class="max-w-4xl max-h-[90vh] p-0 border-none bg-transparent" :hide-close="true">
+      <DialogContent class="max-w-[80vw] lg:max-w-5xl xl:max-w-6xl 2xl:max-w-7xl max-h-[90vh] p-0 border-none bg-transparent" :hide-close="true">
         <div class="relative bg-white rounded-xl overflow-hidden shadow-2xl h-[80vh]">
           <!-- Custom Close Button -->
           <button

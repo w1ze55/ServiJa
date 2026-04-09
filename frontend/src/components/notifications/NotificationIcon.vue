@@ -72,8 +72,8 @@ const palette = computed(() => {
       };
     default:
       return {
-        wrapper: 'bg-amber-100',
-        icon: 'text-amber-700',
+        wrapper: 'bg-blue-100',
+        icon: 'text-blue-700',
       };
   }
 });

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, type Component } from 'vue';
 import { ArrowLeft, Star, Send, AlertCircle, Sparkles, CheckCircle2 } from 'lucide-vue-next';
+import { toast } from '@/utils/toast';
 import Button from '../ui/button.vue';
 import Card from '../ui/card.vue';
 import Textarea from '../ui/textarea.vue';
@@ -9,6 +10,7 @@ import Avatar from '../ui/avatar.vue';
 import AvatarFallback from '../ui/avatar-fallback.vue';
 import AvatarImage from '../ui/avatar-image.vue';
 import Separator from '../ui/separator.vue';
+import reviewService from '@/api/services/reviewService';
 
 export interface RatingTag {
   id: string;
@@ -58,6 +60,7 @@ const comment = ref('');
 const selectedTags = ref<string[]>([]);
 const showPolicyAlert = ref(true);
 const isSubmitting = ref(false);
+const isSuggestingComment = ref(false);
 const submitted = ref(false);
 
 const displayRating = computed(() => hoverRating.value || rating.value);
@@ -116,6 +119,24 @@ const handleSubmit = async () => {
   }
 };
 
+const handleSuggestComment = async () => {
+  isSuggestingComment.value = true;
+  try {
+    const response = await reviewService.suggestComment({
+      rating: rating.value,
+      tags: selectedTags.value,
+      serviceName: props.subtitle,
+      freelancerName: props.personName,
+      existingComment: comment.value.trim() || null,
+    });
+    comment.value = response.suggestion;
+  } catch {
+    toast.error('Não foi possível gerar a sugestão. Tente novamente.');
+  } finally {
+    isSuggestingComment.value = false;
+  }
+};
+
 const reset = () => {
   rating.value = 0;
   hoverRating.value = 0;
@@ -123,6 +144,7 @@ const reset = () => {
   selectedTags.value = [];
   submitted.value = false;
   isSubmitting.value = false;
+  isSuggestingComment.value = false;
 };
 
 defineExpose({ reset });
@@ -315,6 +337,26 @@ defineExpose({ reset });
       <div class="space-y-3">
         <h4 class="text-[#263238]">Comentário (opcional)</h4>
         <p class="text-sm text-[#435574] mb-4">{{ commentDescription }}</p>
+
+        <div v-if="rating >= 1" class="flex justify-end mb-2">
+          <Button
+            @click="handleSuggestComment"
+            :disabled="isSuggestingComment"
+            variant="outline"
+            size="sm"
+            type="button"
+            class="text-[#286AD8] border-[#286AD8] hover:bg-blue-50"
+          >
+            <span v-if="isSuggestingComment" class="flex items-center gap-1.5">
+              <span class="animate-spin h-3.5 w-3.5 border-2 border-[#286AD8] border-t-transparent rounded-full" />
+              Gerando...
+            </span>
+            <span v-else class="flex items-center gap-1.5">
+              <Sparkles class="h-3.5 w-3.5" />
+              {{ comment.trim() ? 'Refinar com IA' : 'Sugerir com IA' }}
+            </span>
+          </Button>
+        </div>
 
         <Textarea
           :placeholder="commentPlaceholder"

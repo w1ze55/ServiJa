@@ -11,6 +11,7 @@ import {
   Calendar,
   Tag,
   X,
+  X as CloseIcon,
   Upload,
   Search,
   Filter,
@@ -19,6 +20,11 @@ import {
   Heart,
   MessageSquare,
   Share2,
+  Briefcase,
+  Sparkles,
+  ChevronLeft,
+  ChevronRight,
+  Youtube,
 } from 'lucide-vue-next';
 import Button from '../ui/button.vue';
 import Input from '../ui/input.vue';
@@ -107,6 +113,7 @@ const editingProject = ref<PortfolioProject | null>(null);
 const viewingProject = ref<PortfolioProject | null>(null);
 const projectToDelete = ref<PortfolioProject | null>(null);
 const selectedImageIndex = ref(0);
+const MAX_PROJECT_DESCRIPTION_LENGTH = 500;
 
 // Form state
 const projectForm = ref({
@@ -159,6 +166,9 @@ watch(
     projectForm.value.subcategory = selectedSubcategory?.name || '';
   }
 );
+
+const limitProjectDescription = (value: string) =>
+  value.slice(0, MAX_PROJECT_DESCRIPTION_LENGTH);
 
 // Carregar projetos do backend
 onMounted(async () => {
@@ -289,6 +299,11 @@ const handleSaveProject = async () => {
     return;
   }
 
+  if (projectForm.value.description.length > MAX_PROJECT_DESCRIPTION_LENGTH) {
+    toast.error(`A descrição deve ter no máximo ${MAX_PROJECT_DESCRIPTION_LENGTH} caracteres`);
+    return;
+  }
+
   if (selectedSubcategories.value.length > 0 && !projectForm.value.subcategoryId) {
     toast.error('Selecione uma subcategoria');
     return;
@@ -371,7 +386,7 @@ const handleEditProject = (project: PortfolioProject) => {
   editingProject.value = project;
   projectForm.value = {
     title: project.title,
-    description: project.description,
+    description: limitProjectDescription(project.description),
     categoryId: project.categoryId ?? null,
     subcategoryId: project.subcategoryId ?? null,
     category: project.category,
@@ -410,6 +425,11 @@ const handleViewProject = (project: PortfolioProject) => {
   viewingProject.value = project;
   selectedImageIndex.value = 0;
   showViewDialog.value = true;
+};
+
+const closeViewDialog = () => {
+  showViewDialog.value = false;
+  viewingProject.value = null;
 };
 
 const handleTagKeyPress = (e: KeyboardEvent) => {
@@ -725,10 +745,14 @@ const handleTagKeyPress = (e: KeyboardEvent) => {
             <Textarea
               id="description"
               :model-value="projectForm.description"
-              @update:model-value="(val: string) => projectForm.description = val"
+              @update:model-value="(val: string) => projectForm.description = limitProjectDescription(val)"
               placeholder="Descreva os detalhes do projeto..."
-              :rows="4"
+              :rows="8"
+              :maxlength="MAX_PROJECT_DESCRIPTION_LENGTH"
             />
+            <p class="text-xs text-[#435574] text-right">
+              {{ projectForm.description.length }}/{{ MAX_PROJECT_DESCRIPTION_LENGTH }}
+            </p>
           </div>
 
           <!-- Category and Date -->
@@ -926,118 +950,125 @@ const handleTagKeyPress = (e: KeyboardEvent) => {
     </Dialog>
 
     <!-- View Project Dialog -->
-    <Dialog :open="showViewDialog" @update:open="(val: boolean) => showViewDialog = val">
-      <DialogContent class="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
+    <Dialog :open="showViewDialog" @update:open="(val: boolean) => !val ? closeViewDialog() : (showViewDialog = val)">
+      <DialogContent class="max-w-[80vw] lg:max-w-5xl xl:max-w-6xl 2xl:max-w-7xl max-h-[90vh] p-0 border-none bg-transparent" :hide-close="true">
         <template v-if="viewingProject">
-          <DialogHeader>
-            <div class="flex items-center gap-2 mb-2">
-              <DialogTitle>{{ viewingProject.title }}</DialogTitle>
-              <Badge v-if="viewingProject.featured" class="bg-yellow-500 hover:bg-yellow-600 flex-shrink-0">
-                <Tag class="h-3 w-3 mr-1" />
-                Destaque
-              </Badge>
-            </div>
-            <div class="flex items-center gap-3 text-sm text-[#435574] flex-wrap">
-              <Badge variant="secondary">{{ viewingProject.category }}</Badge>
-              <span class="flex items-center gap-1">
-                <Calendar class="h-4 w-4" />
-                {{ new Date(viewingProject.completedDate).toLocaleDateString('pt-BR') }}
-              </span>
-              <span v-if="viewingProject.client">Cliente: {{ viewingProject.client }}</span>
-            </div>
-          </DialogHeader>
+          <div class="relative bg-white rounded-xl overflow-hidden shadow-2xl h-[80vh]">
+            <button
+              @click="closeViewDialog()"
+              class="absolute top-4 right-4 p-2 bg-black/20 hover:bg-black/40 backdrop-blur-md rounded-full text-white transition-all z-50"
+            >
+              <CloseIcon class="h-5 w-5" />
+            </button>
 
-          <div class="space-y-6 overflow-hidden">
-            <!-- Image Gallery -->
-            <div class="space-y-4 overflow-hidden">
-              <div class="rounded-lg bg-gray-100 flex justify-center items-center h-[350px] overflow-hidden">
+            <div class="grid grid-cols-1 md:grid-cols-2 h-full">
+              <div class="relative bg-gray-900 flex items-center justify-center min-h-[300px] md:min-h-[500px]">
                 <img
-                  :src="viewingProject.images[selectedImageIndex]?.url"
-                  :alt="viewingProject.images[selectedImageIndex]?.caption || viewingProject.title"
-                  class="max-w-full max-h-full object-contain"
+                  v-if="viewingProject.images && viewingProject.images.length > 0"
+                  :src="viewingProject.images[selectedImageIndex].url"
+                  :alt="viewingProject.title"
+                  class="w-full h-full object-contain"
                 />
+                <div v-else class="flex flex-col items-center text-white/50">
+                  <Briefcase class="h-16 w-16 mb-4" />
+                  <span>Nenhuma imagem disponível</span>
+                </div>
+
+                <template v-if="viewingProject.images && viewingProject.images.length > 1">
+                  <button
+                    @click.stop="selectedImageIndex = (selectedImageIndex - 1 + viewingProject.images.length) % viewingProject.images.length"
+                    class="absolute left-4 top-1/2 -translate-y-1/2 p-2 bg-black/40 hover:bg-black/60 text-white rounded-full transition-colors"
+                  >
+                    <ChevronLeft class="h-6 w-6" />
+                  </button>
+                  <button
+                    @click.stop="selectedImageIndex = (selectedImageIndex + 1) % viewingProject.images.length"
+                    class="absolute right-4 top-1/2 -translate-y-1/2 p-2 bg-black/40 hover:bg-black/60 text-white rounded-full transition-colors"
+                  >
+                    <ChevronRight class="h-6 w-6" />
+                  </button>
+
+                  <div class="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5">
+                    <span
+                      v-for="(_, index) in viewingProject.images"
+                      :key="index"
+                      class="w-2 h-2 rounded-full transition-all"
+                      :class="selectedImageIndex === index ? 'bg-[#286AD8] w-4' : 'bg-white/40'"
+                    ></span>
+                  </div>
+                </template>
               </div>
 
-              <div v-if="viewingProject.images.length > 1" class="flex gap-3 overflow-x-auto pb-2">
-                <button
-                  v-for="(img, idx) in viewingProject.images"
-                  :key="img.id"
-                  @click="selectedImageIndex = idx"
-                  :class="`relative flex-shrink-0 w-24 h-16 rounded-lg overflow-hidden transition-all mt-2 ml-1 mr-1 ${
-                    selectedImageIndex === idx ? 'ring-2 ring-[#286AD8] ring-offset-2' : 'hover:opacity-80'
-                  }`"
-                >
-                  <img :src="img.url" :alt="img.caption || ''" class="w-full h-full object-cover" />
-                </button>
-              </div>
+              <div class="p-6 md:p-8 flex flex-col h-full overflow-y-auto">
+                <div>
+                  <Badge variant="secondary" class="mb-3 bg-blue-50 text-[#286AD8] border-none">
+                    {{ viewingProject.category }}
+                  </Badge>
+                  <h2 class="text-2xl font-bold text-[#263238] mb-4 break-words">{{ viewingProject.title }}</h2>
 
-              <p
-                v-if="viewingProject.images[selectedImageIndex]?.caption"
-                class="text-sm text-[#435574] text-center"
-              >
-                {{ viewingProject.images[selectedImageIndex].caption }}
-              </p>
-            </div>
+                  <p class="text-[#435574] leading-relaxed mb-6 whitespace-pre-line break-words w-full">
+                    {{ viewingProject.description }}
+                  </p>
+                </div>
 
-            <!-- Description -->
-            <div>
-              <h4 class="text-[#263238] mb-2">Descrição do Projeto</h4>
-              <p class="text-[#435574] whitespace-pre-wrap break-words">{{ viewingProject.description }}</p>
-            </div>
+                <div class="mt-auto pt-6 border-t border-gray-100 flex flex-col gap-4">
+                  <div class="flex flex-wrap items-center gap-3">
+                    <Badge v-if="viewingProject.featured" class="bg-yellow-500 text-white border-none">
+                      <Sparkles class="h-3 w-3 mr-1" />
+                      Projeto em Destaque
+                    </Badge>
+                    <div class="flex items-center gap-2 text-sm text-[#435574]">
+                      <div class="p-2 bg-gray-50 rounded-lg">
+                        <Calendar class="h-4 w-4 text-[#286AD8]" />
+                      </div>
+                      <div>
+                        <p class="text-[10px] uppercase font-semibold text-gray-400">Concluído em</p>
+                        <p class="font-medium">
+                          {{ viewingProject.completedDate ? new Date(viewingProject.completedDate).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }) : 'Data não informada' }}
+                        </p>
+                      </div>
+                    </div>
 
-            <!-- Tags -->
-            <div v-if="viewingProject.tags.length > 0">
-              <h4 class="text-[#263238] mb-2">Tags</h4>
-              <div class="flex flex-wrap gap-2">
-                <Badge v-for="tag in viewingProject.tags" :key="tag" variant="secondary">
-                  {{ tag }}
-                </Badge>
-              </div>
-            </div>
+                    <div v-if="viewingProject.client" class="flex items-center gap-2 text-sm text-[#435574]">
+                      <div class="p-2 bg-gray-50 rounded-lg">
+                        <Sparkles class="h-4 w-4 text-[#286AD8]" />
+                      </div>
+                      <div>
+                        <p class="text-[10px] uppercase font-semibold text-gray-400">Cliente</p>
+                        <p class="font-medium">{{ viewingProject.client }}</p>
+                      </div>
+                    </div>
+                  </div>
 
-            <!-- Links -->
-            <div v-if="viewingProject.videoUrl || viewingProject.projectUrl">
-              <h4 class="text-[#263238] mb-2">Links</h4>
-              <div class="flex gap-3">
-                <a
-                  v-if="viewingProject.videoUrl"
-                  :href="viewingProject.videoUrl"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="flex items-center gap-2 text-[#286AD8] hover:underline"
-                >
-                  <Video class="h-4 w-4" />
-                  Ver Vídeo
-                </a>
-                <a
-                  v-if="viewingProject.projectUrl"
-                  :href="viewingProject.projectUrl"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="flex items-center gap-2 text-[#286AD8] hover:underline"
-                >
-                  <ExternalLink class="h-4 w-4" />
-                  Ver Projeto
-                </a>
+                  <div v-if="viewingProject.tags.length > 0" class="flex flex-wrap gap-2">
+                    <Badge
+                      v-for="tag in viewingProject.tags"
+                      :key="tag"
+                      variant="secondary"
+                      class="bg-gray-100 hover:bg-gray-200 text-[#435574] transition-colors border-none"
+                    >
+                      {{ tag }}
+                    </Badge>
+                  </div>
+
+                  <div v-if="viewingProject.projectUrl || viewingProject.videoUrl" class="flex flex-col sm:flex-row gap-3 pt-6 border-t border-gray-100">
+                    <Button v-if="viewingProject.projectUrl" asChild class="flex-1">
+                      <a :href="viewingProject.projectUrl" target="_blank" class="flex items-center justify-center">
+                        <ExternalLink class="h-4 w-4 mr-2" />
+                        Acessar Projeto
+                      </a>
+                    </Button>
+                    <Button v-if="viewingProject.videoUrl" asChild variant="outline" class="flex-1">
+                      <a :href="viewingProject.videoUrl" target="_blank" class="flex items-center justify-center">
+                        <Youtube class="h-4 w-4 mr-2" />
+                        Ver Vídeo
+                      </a>
+                    </Button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
-
-          <DialogFooter>
-            <Button @click="showViewDialog = false" variant="outline">
-              Fechar
-            </Button>
-            <Button
-              @click="
-                showViewDialog = false;
-                handleEditProject(viewingProject);
-              "
-              variant="default"
-            >
-              <Edit class="h-4 w-4 mr-2" />
-              Editar Projeto
-            </Button>
-          </DialogFooter>
         </template>
       </DialogContent>
     </Dialog>

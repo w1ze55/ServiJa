@@ -74,7 +74,7 @@ const proposalStore = useProposalStore();
 const searchQuery = ref('');
 const categoryFilter = ref('Todas as categorias');
 const sortBy = ref('Mais recentes');
-const timeFilter = ref('Mês atual');
+const timeFilter = ref('Últimos 30 dias');
 const customDateFrom = ref('');
 const customDateTo = ref('');
 const currentTab = ref('all');
@@ -278,6 +278,11 @@ const filteredProposals = computed(() => {
           const sevenDaysAgo = new Date(startOfToday);
           sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
           return proposalDate >= sevenDaysAgo;
+        }
+        case 'Últimos 30 dias': {
+          const thirtyDaysAgo = new Date(startOfToday);
+          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+          return proposalDate >= thirtyDaysAgo;
         }
         case 'Mês atual':
           return proposalDate.getMonth() === now.getMonth() && proposalDate.getFullYear() === now.getFullYear();
@@ -510,12 +515,13 @@ watch(currentTab, () => {
 
         <Select :model-value="timeFilter" @update:model-value="(val: string) => { timeFilter = val; currentPage = 1; }">
           <SelectTrigger>
-            <SelectValue placeholder="Mês atual" />
+            <SelectValue placeholder="Últimos 30 dias" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="Hoje">Hoje</SelectItem>
             <SelectItem value="Ontem">Ontem</SelectItem>
             <SelectItem value="Últimos 7 dias">Últimos 7 dias</SelectItem>
+            <SelectItem value="Últimos 30 dias">Últimos 30 dias</SelectItem>
             <SelectItem value="Mês atual">Mês atual</SelectItem>
             <SelectItem value="Último mês">Último mês</SelectItem>
             <SelectItem value="Intervalo personalizado">Intervalo personalizado</SelectItem>
@@ -596,7 +602,11 @@ watch(currentTab, () => {
               v-for="proposal in currentProposals"
               :key="proposal.id"
               :class="`p-6 hover:shadow-md transition-all ${
-                !proposal.viewed ? 'border-l-4 border-l-[#286AD8] bg-blue-50/30' : ''
+                proposal.status === 'pending'
+                  ? 'border-l-4 border-l-blue-500 bg-blue-50/30'
+                  : !proposal.viewed
+                    ? 'border-l-4 border-l-[#286AD8]'
+                    : ''
               }`"
             >
               <div class="flex items-start gap-3">

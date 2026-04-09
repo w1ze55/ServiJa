@@ -119,4 +119,9 @@ export const freelancerService = {
   async removeService(serviceId: string): Promise<void> {
     await api.delete(`/freelancers/services/${serviceId}`);
   },
+
+  async refineBio(bio: string): Promise<string> {
+    const response = await api.post<{ refinedBio: string }>('/freelancer/ai/refine-bio', { bio });
+    return response.data.refinedBio;
+  },
 };
