@@ -14,7 +14,6 @@ import {
   LogOut,
   MessageSquare,
   Bell,
-  Clock,
   Briefcase,
 
   Images,
@@ -654,14 +653,7 @@ const handleNotificationStreamEvent = (event: Event) => {
                   <span>Notificações</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                  v-if="currentUser.type === 'contractor'"
-                  @click="props.onNavigate('contracts')"
-                >
-                  <Clock class="mr-2 h-4 w-4" />
-                  <span>Histórico de Contratações</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  v-else
+                  v-if="currentUser.type === 'provider'"
                   @click="props.onNavigate('freelancer-dashboard')"
                 >
                   <DollarSign class="mr-2 h-4 w-4" />

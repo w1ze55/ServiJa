@@ -41,7 +41,6 @@ export const clientRoutes: Record<string, string> = {
   'cliente-projects': '/cliente-projects',
   'cliente-delivery-approval': '/cliente-delivery-approval',
   'favorites': '/favorites',
-  'contracts': '/contracts',
   'rate-freelancer': '/rate-freelancer',
   'messages': '/messages',
   'notifications': '/notifications',

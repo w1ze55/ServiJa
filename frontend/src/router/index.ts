@@ -27,7 +27,6 @@ import ExplorePage from "@/pages/Explore/index.vue";
 import SearchPage from "@/pages/Search/index.vue";
 import MyRequestsPage from "@/pages/MyRequests/index.vue";
 import FavoritesPage from "@/pages/Favorites/index.vue";
-import ContractsPage from "@/pages/Contracts/index.vue";
 import FreelancerKYCPage from "@/pages/FreelancerKYC/index.vue";
 import ProviderProfilePage from "@/pages/ProviderProfile/index.vue";
 import ServiceDetailPage from "@/pages/ServiceDetail/index.vue";
@@ -253,14 +252,6 @@ const routes: RouteRecordRaw[] = [
     path: "/favorites",
     name: "favorites",
     component: FavoritesPage,
-    meta: { requiresAuth: true, userType: "contractor" },
-  },
-
-  // Contracts (Cliente)
-  {
-    path: "/contracts",
-    name: "contracts",
-    component: ContractsPage,
     meta: { requiresAuth: true, userType: "contractor" },
   },
 
