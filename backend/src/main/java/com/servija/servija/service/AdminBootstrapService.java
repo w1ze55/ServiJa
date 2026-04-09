@@ -4,13 +4,13 @@ import com.servija.servija.model.User;
 import com.servija.servija.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.core.annotation.Order;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 @Component
@@ -41,38 +41,51 @@ public class AdminBootstrapService implements ApplicationRunner {
     private String phone;
 
     @Override
-    @Transactional
     public void run(ApplicationArguments args) {
         if (!enabled) {
             return;
         }
 
-        if (!StringUtils.hasText(email)
+        String normalizedEmail = email == null ? "" : email.trim();
+        String normalizedCpf = cpf == null ? "" : cpf.trim();
+        String normalizedName = name == null ? "" : name.trim();
+        String normalizedPhone = phone == null ? "" : phone.trim();
+
+        if (!StringUtils.hasText(normalizedEmail)
                 || !StringUtils.hasText(password)
-                || !StringUtils.hasText(name)
-                || !StringUtils.hasText(cpf)
-                || !StringUtils.hasText(phone)) {
+                || !StringUtils.hasText(normalizedName)
+                || !StringUtils.hasText(normalizedCpf)
+                || !StringUtils.hasText(normalizedPhone)) {
             log.warn("Bootstrap de admin habilitado, mas configuracao incompleta. Nenhum admin foi criado.");
             return;
         }
 
-        if (userRepository.existsByEmail(email.trim())) {
-            log.info("Bootstrap de admin ignorado. Usuario {} ja existe.", email.trim());
+        if (userRepository.existsByEmail(normalizedEmail)) {
+            log.info("Bootstrap de admin ignorado. Usuario {} ja existe.", normalizedEmail);
+            return;
+        }
+
+        if (userRepository.existsByCpf(normalizedCpf)) {
+            log.warn("Bootstrap de admin ignorado. CPF {} ja esta cadastrado em outro usuario.", normalizedCpf);
             return;
         }
 
         User admin = User.builder()
-                .name(name.trim())
-                .email(email.trim())
-                .cpf(cpf.trim())
-                .phone(phone.trim())
+                .name(normalizedName)
+                .email(normalizedEmail)
+                .cpf(normalizedCpf)
+                .phone(normalizedPhone)
                 .password(passwordEncoder.encode(password))
                 .userType(User.UserType.ADMIN)
                 .emailVerified(true)
                 .active(true)
                 .build();
 
-        userRepository.save(admin);
-        log.info("Usuario admin bootstrap criado: {}", admin.getEmail());
+        try {
+            userRepository.saveAndFlush(admin);
+            log.info("Usuario admin bootstrap criado: {}", admin.getEmail());
+        } catch (DataIntegrityViolationException ex) {
+            log.error("Falha ao criar admin bootstrap {}. O startup seguira sem esse usuario.", admin.getEmail(), ex);
+        }
     }
 }
