@@ -98,6 +98,12 @@ const categories = computed(() =>
 const selectedSubcategories = computed(() =>
   categoryCatalogStore.getSubcategoriesByCategoryId(data.value.categoryId || null)
 );
+const selectedCategoryLabel = computed(
+  () => categories.value.find((category) => category.value === String(data.value.categoryId))?.label || ''
+);
+const selectedSubcategoryLabel = computed(
+  () => selectedSubcategories.value.find((subcategory) => subcategory.id === data.value.subcategoryId)?.name || ''
+);
 
 const availableSkills = [
   'Instalação',
@@ -474,7 +480,10 @@ const handleServiceAreaKeyPress = (e: KeyboardEvent) => {
                 @update:model-value="(val: string) => data.categoryId = val ? Number(val) : null"
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecione uma categoria" />
+                  <SelectValue
+                    :label="selectedCategoryLabel || undefined"
+                    placeholder="Selecione uma categoria"
+                  />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem v-for="cat in categories" :key="cat.value" :value="cat.value">
@@ -496,7 +505,10 @@ const handleServiceAreaKeyPress = (e: KeyboardEvent) => {
               :disabled="!data.categoryId || selectedSubcategories.length === 0"
             >
               <SelectTrigger>
-                <SelectValue :placeholder="selectedSubcategories.length > 0 ? 'Selecione uma subcategoria' : 'Escolha uma categoria primeiro'" />
+                <SelectValue
+                  :label="selectedSubcategoryLabel || undefined"
+                  :placeholder="selectedSubcategories.length > 0 ? 'Selecione uma subcategoria' : 'Escolha uma categoria primeiro'"
+                />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem

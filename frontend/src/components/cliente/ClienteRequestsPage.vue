@@ -112,6 +112,12 @@ const catalogCategories = computed(() => categoryCatalogStore.activePublicCatego
 const selectedSubcategories = computed(() =>
   categoryCatalogStore.getSubcategoriesByCategoryId(newRequest.value.categoryId)
 );
+const selectedCategoryLabel = computed(
+  () => catalogCategories.value.find((category) => category.id === newRequest.value.categoryId)?.name || ''
+);
+const selectedSubcategoryLabel = computed(
+  () => selectedSubcategories.value.find((subcategory) => subcategory.id === newRequest.value.subcategoryId)?.name || ''
+);
 
 // Mapeamento de valores de ordenação para português
 const sortOptions = {
@@ -926,7 +932,10 @@ watch(currentTab, () => {
               @update:model-value="(val: string) => newRequest.categoryId = val ? Number(val) : null"
             >
               <SelectTrigger>
-                <SelectValue placeholder="Selecione a categoria" />
+                <SelectValue
+                  :label="selectedCategoryLabel || undefined"
+                  placeholder="Selecione a categoria"
+                />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem v-for="category in catalogCategories" :key="category.id" :value="String(category.id)">
@@ -947,7 +956,10 @@ watch(currentTab, () => {
               :disabled="!newRequest.categoryId || selectedSubcategories.length === 0"
             >
               <SelectTrigger>
-                <SelectValue :placeholder="selectedSubcategories.length > 0 ? 'Selecione a subcategoria' : 'Escolha uma categoria primeiro'" />
+                <SelectValue
+                  :label="selectedSubcategoryLabel || undefined"
+                  :placeholder="selectedSubcategories.length > 0 ? 'Selecione a subcategoria' : 'Escolha uma categoria primeiro'"
+                />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem

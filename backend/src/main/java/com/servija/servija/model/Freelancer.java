@@ -71,6 +71,15 @@ public class Freelancer extends User {
     @JoinColumn(name = "subcategory_id")
     private ServiceSubcategory serviceSubcategory;
 
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+            name = "freelancer_subcategories",
+            joinColumns = @JoinColumn(name = "freelancer_id"),
+            inverseJoinColumns = @JoinColumn(name = "subcategory_id"))
+    @OrderBy("sortOrder ASC, name ASC")
+    @lombok.Builder.Default
+    private List<ServiceSubcategory> serviceSubcategories = new ArrayList<>();
+
     @Column(columnDefinition = "TEXT")
     private String cities;
 

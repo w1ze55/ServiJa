@@ -77,6 +77,12 @@ const categories = computed(() => categoryCatalogStore.activePublicCategories);
 const selectedSubcategories = computed(() =>
   categoryCatalogStore.getSubcategoriesByCategoryId(formData.value.categoryId || null)
 );
+const selectedCategoryLabel = computed(
+  () => categories.value.find((category) => category.id === formData.value.categoryId)?.name || ''
+);
+const selectedSubcategoryLabel = computed(
+  () => selectedSubcategories.value.find((subcategory) => subcategory.id === formData.value.subcategoryId)?.name || ''
+);
 
 watch(() => props.service, (newService) => {
   if (newService) {
@@ -425,7 +431,10 @@ const handleRemoveImage = async (index: number) => {
             @update:model-value="(value) => handleInputChange('categoryId', value ? Number(value) : null)"
           >
             <SelectTrigger :class="errors.category ? 'border-red-500' : ''">
-              <SelectValue placeholder="Selecione uma categoria" />
+              <SelectValue
+                :label="selectedCategoryLabel || undefined"
+                placeholder="Selecione uma categoria"
+              />
             </SelectTrigger>
             <SelectContent>
               <SelectItem v-for="cat in categories" :key="cat.id" :value="String(cat.id)">
@@ -447,7 +456,10 @@ const handleRemoveImage = async (index: number) => {
             :disabled="!formData.categoryId || selectedSubcategories.length === 0"
           >
             <SelectTrigger :class="errors.subcategory ? 'border-red-500' : ''">
-              <SelectValue :placeholder="selectedSubcategories.length > 0 ? 'Selecione uma subcategoria' : 'Escolha uma categoria primeiro'" />
+              <SelectValue
+                :label="selectedSubcategoryLabel || undefined"
+                :placeholder="selectedSubcategories.length > 0 ? 'Selecione uma subcategoria' : 'Escolha uma categoria primeiro'"
+              />
             </SelectTrigger>
             <SelectContent>
               <SelectItem v-for="subcategory in selectedSubcategories" :key="subcategory.id" :value="String(subcategory.id)">

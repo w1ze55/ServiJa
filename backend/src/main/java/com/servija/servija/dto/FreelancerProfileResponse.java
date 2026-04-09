@@ -22,9 +22,11 @@ public class FreelancerProfileResponse {
     private String categoryLabel;
     private String category;
     private Long subcategoryId;
+    private List<Long> subcategoryIds;
     private String subcategorySlug;
     private String subcategoryLabel;
     private String subcategory;
+    private List<String> subcategoryLabels;
     private String bio;
     private String profilePhoto;
     private String serviceType;

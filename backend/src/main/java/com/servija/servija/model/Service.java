@@ -59,7 +59,8 @@ public class Service {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "work_model", nullable = false, length = 20)
-    private WorkModel workModel;
+    @Builder.Default
+    private WorkModel workModel = WorkModel.REMOTO;
 
     @Column(columnDefinition = "TEXT")
     private String tags;

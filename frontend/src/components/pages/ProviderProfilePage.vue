@@ -71,6 +71,8 @@ interface FreelancerData {
   email: string;
   profession: string;
   category: string;
+  subcategory?: string;
+  subcategoryLabels?: string[];
   bio: string;
   profilePhoto: string;
   serviceType: string;
@@ -1275,6 +1277,23 @@ onMounted(() => {
                 <div v-if="freelancer.serviceType" class="flex items-center justify-between border-t pt-3">
                   <span class="text-sm text-[#435574]">Tipo:</span>
                   <span class="text-sm font-medium text-[#263238]">{{ freelancer.serviceType }}</span>
+                </div>
+
+                <div
+                  v-if="freelancer.subcategory || freelancer.subcategoryLabels?.length"
+                  class="border-t pt-3"
+                >
+                  <p class="text-sm text-[#435574] mb-2">Subcategorias:</p>
+                  <div class="flex flex-wrap gap-1">
+                    <Badge
+                      v-for="subcategory in (freelancer.subcategoryLabels?.length ? freelancer.subcategoryLabels : [freelancer.subcategory])"
+                      :key="subcategory"
+                      variant="outline"
+                      class="text-[10px] bg-white text-gray-600"
+                    >
+                      {{ subcategory }}
+                    </Badge>
+                  </div>
                 </div>
 
                 <div v-if="hasOnsiteServices && freelancer.serviceCities?.length" class="border-t pt-3">

@@ -139,6 +139,12 @@ const isUploading = ref(false);
 const selectedSubcategories = computed(() =>
   categoryCatalogStore.getSubcategoriesByCategoryId(projectForm.value.categoryId)
 );
+const selectedCategoryLabel = computed(
+  () => catalogCategories.value.find((category) => category.id === projectForm.value.categoryId)?.name || ''
+);
+const selectedSubcategoryLabel = computed(
+  () => selectedSubcategories.value.find((subcategory) => subcategory.id === projectForm.value.subcategoryId)?.name || ''
+);
 
 watch(
   () => projectForm.value.categoryId,
@@ -764,7 +770,10 @@ const handleTagKeyPress = (e: KeyboardEvent) => {
                 @update:model-value="(val: string) => projectForm.categoryId = val ? Number(val) : null"
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecione a categoria" />
+                  <SelectValue
+                    :label="selectedCategoryLabel || undefined"
+                    placeholder="Selecione a categoria"
+                  />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem
@@ -800,7 +809,10 @@ const handleTagKeyPress = (e: KeyboardEvent) => {
               :disabled="!projectForm.categoryId || selectedSubcategories.length === 0"
             >
               <SelectTrigger>
-                <SelectValue :placeholder="selectedSubcategories.length > 0 ? 'Selecione a subcategoria' : 'Escolha uma categoria primeiro'" />
+                <SelectValue
+                  :label="selectedSubcategoryLabel || undefined"
+                  :placeholder="selectedSubcategories.length > 0 ? 'Selecione a subcategoria' : 'Escolha uma categoria primeiro'"
+                />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem

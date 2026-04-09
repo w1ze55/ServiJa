@@ -22,6 +22,8 @@ import Button from '../ui/button.vue'
 import Input from '../ui/input.vue'
 import Label from '../ui/label.vue'
 import Card from '../ui/card.vue'
+import Badge from '../ui/badge.vue'
+import Checkbox from '../ui/checkbox.vue'
 import Textarea from '../ui/textarea.vue'
 import Select from '../ui/select.vue'
 import SelectContent from '../ui/select-content.vue'
@@ -63,8 +65,10 @@ interface ProfessionalLink {
 interface ProfessionalProfile {
   categoryId?: number | null
   subcategoryId?: number | null
+  subcategoryIds: number[]
   category: string
   subcategory: string
+  subcategoryLabels: string[]
   serviceType: string
   bio: string
   serviceCities: ServiceCity[]
@@ -130,8 +134,10 @@ const isRefiningBio = ref(false)
 const profileData = ref<ProfessionalProfile>({
   categoryId: null,
   subcategoryId: null,
+  subcategoryIds: [],
   category: '',
   subcategory: '',
+  subcategoryLabels: [],
   serviceType: '',
   bio: '',
   serviceCities: [],
@@ -142,6 +148,92 @@ const editedData = ref<ProfessionalProfile>({ ...profileData.value })
 const selectedSubcategories = computed(() =>
   categoryCatalogStore.getSubcategoriesByCategoryId(editedData.value.categoryId || null)
 )
+const selectedCategoryLabel = computed(
+  () => categories.value.find((category) => category.id === editedData.value.categoryId)?.name || ''
+)
+const selectedSubcategoryLabels = computed(() =>
+  selectedSubcategories.value
+    .filter((subcategory) => editedData.value.subcategoryIds.includes(subcategory.id))
+    .map((subcategory) => subcategory.name)
+)
+const profileSubcategoryLabels = computed(() =>
+  profileData.value.subcategoryLabels.length > 0
+    ? profileData.value.subcategoryLabels
+    : (profileData.value.subcategory ? [profileData.value.subcategory] : [])
+)
+
+const mapSubcategoryIds = (data: any) => {
+  if (Array.isArray(data?.subcategoryIds) && data.subcategoryIds.length > 0) {
+    return data.subcategoryIds
+      .map((id: number | string) => Number(id))
+      .filter((id: number) => !Number.isNaN(id))
+  }
+
+  if (data?.subcategoryId != null) {
+    const primaryId = Number(data.subcategoryId)
+    return Number.isNaN(primaryId) ? [] : [primaryId]
+  }
+
+  return []
+}
+
+const mapSubcategoryLabels = (data: any) => {
+  if (Array.isArray(data?.subcategoryLabels) && data.subcategoryLabels.length > 0) {
+    return data.subcategoryLabels.filter(
+      (label: string | null | undefined): label is string => Boolean(label)
+    )
+  }
+
+  const primaryLabel = data?.subcategoryLabel || data?.subcategory || ''
+  return primaryLabel ? [primaryLabel] : []
+}
+
+const buildProfessionalProfile = (data: any): ProfessionalProfile => {
+  const subcategoryIds = mapSubcategoryIds(data)
+  const subcategoryLabels = mapSubcategoryLabels(data)
+  const mappedCities: ServiceCity[] = (data?.serviceCities || []).map((c: any) => ({
+    id: c.id?.toString() || Date.now().toString(),
+    city: c.city,
+    state: c.state,
+  }))
+  const mappedLinks: ProfessionalLink[] = (data?.professionalLinks || []).map((l: any) => ({
+    id: l.id?.toString() || Date.now().toString(),
+    type: l.type || 'website',
+    url: l.url,
+    label: l.label || '',
+  }))
+
+  return {
+    categoryId: data?.categoryId ?? null,
+    subcategoryId: subcategoryIds[0] ?? null,
+    subcategoryIds,
+    category: data?.categoryLabel || data?.category || data?.serviceType || '',
+    subcategory: subcategoryLabels[0] || '',
+    subcategoryLabels,
+    serviceType: data?.categoryLabel || data?.category || data?.serviceType || '',
+    bio: data?.bio || '',
+    serviceCities: mappedCities,
+    professionalLinks: mappedLinks,
+  }
+}
+
+const syncEditedSubcategories = (nextIds: number[]) => {
+  const normalizedIds = Array.from(new Set(nextIds))
+  const selected = selectedSubcategories.value.filter((subcategory) => normalizedIds.includes(subcategory.id))
+
+  editedData.value.subcategoryIds = selected.map((subcategory) => subcategory.id)
+  editedData.value.subcategoryLabels = selected.map((subcategory) => subcategory.name)
+  editedData.value.subcategoryId = selected[0]?.id ?? null
+  editedData.value.subcategory = selected[0]?.name || ''
+}
+
+const toggleSubcategory = (subcategoryId: number, checked: boolean) => {
+  const nextIds = checked
+    ? [...editedData.value.subcategoryIds, subcategoryId]
+    : editedData.value.subcategoryIds.filter((id) => id !== subcategoryId)
+
+  syncEditedSubcategories(nextIds)
+}
 
 // City Dialog
 const showCityDialog = ref(false)
@@ -171,9 +263,9 @@ const linkErrors = ref({
 const isSavingLink = ref(false)
 const linkToDelete = ref<ProfessionalLink | null>(null)
 
-onMounted(() => {
-  categoryCatalogStore.loadPublicCategories()
-  loadProfileData()
+onMounted(async () => {
+  await categoryCatalogStore.loadPublicCategories()
+  await loadProfileData()
 })
 
 const loadProfileData = async () => {
@@ -181,6 +273,8 @@ const loadProfileData = async () => {
   try {
     const response = await api.get('/freelancer/profile')
     const data = response.data
+    const subcategoryIds = mapSubcategoryIds(data)
+    const subcategoryLabels = mapSubcategoryLabels(data)
     
     // Mapear serviceCities do backend (ids são numéricos)
     const mappedCities: ServiceCity[] = (data.serviceCities || []).map((c: any) => ({
@@ -199,9 +293,11 @@ const loadProfileData = async () => {
 
     profileData.value = {
       categoryId: data.categoryId ?? null,
-      subcategoryId: data.subcategoryId ?? null,
+      subcategoryId: subcategoryIds[0] ?? null,
+      subcategoryIds,
       category: data.categoryLabel || data.category || data.serviceType || '',
-      subcategory: data.subcategoryLabel || data.subcategory || '',
+      subcategory: subcategoryLabels[0] || '',
+      subcategoryLabels,
       serviceType: data.categoryLabel || data.category || data.serviceType || '',
       bio: data.bio || '',
       serviceCities: mappedCities,
@@ -213,11 +309,15 @@ const loadProfileData = async () => {
     const userString = localStorage.getItem('user')
     if (userString) {
       const user = JSON.parse(userString)
+      const subcategoryIds = mapSubcategoryIds(user)
+      const subcategoryLabels = mapSubcategoryLabels(user)
       profileData.value = {
         categoryId: user.categoryId ?? null,
-        subcategoryId: user.subcategoryId ?? null,
+        subcategoryId: subcategoryIds[0] ?? null,
+        subcategoryIds,
         category: user.category || user.serviceType || '',
-        subcategory: user.subcategory || '',
+        subcategory: subcategoryLabels[0] || '',
+        subcategoryLabels,
         serviceType: user.category || user.serviceType || '',
         bio: user.bio || '',
         serviceCities: [],
@@ -243,31 +343,27 @@ const handleSaveServiceSettings = async () => {
     */
   }
 
-  if (selectedSubcategories.value.length > 0 && !editedData.value.subcategoryId) {
+  if (selectedSubcategories.value.length > 0 && editedData.value.subcategoryIds.length === 0) {
     toast.error('Subcategoria e obrigatoria')
     return
   }
 
   const selectedCategory = categories.value.find((category) => category.id === editedData.value.categoryId)
-  const selectedSubcategory = selectedSubcategories.value.find(
-    (subcategory) => subcategory.id === editedData.value.subcategoryId
-  )
+  syncEditedSubcategories(editedData.value.subcategoryIds)
 
   isSaving.value = true
   try {
-    await api.put('/freelancer/profile', {
+    const response = await api.put('/freelancer/profile', {
       serviceType: selectedCategory?.name || editedData.value.serviceType,
       categoryId: editedData.value.categoryId,
       subcategoryId: editedData.value.subcategoryId,
+      subcategoryIds: editedData.value.subcategoryIds,
       category: selectedCategory?.name || editedData.value.category,
-      subcategory: selectedSubcategory?.name || editedData.value.subcategory,
+      subcategory: selectedSubcategoryLabels.value[0] || editedData.value.subcategory,
     })
 
-    profileData.value.categoryId = editedData.value.categoryId
-    profileData.value.subcategoryId = editedData.value.subcategoryId
-    profileData.value.category = selectedCategory?.name || editedData.value.category
-    profileData.value.subcategory = selectedSubcategory?.name || editedData.value.subcategory
-    profileData.value.serviceType = selectedCategory?.name || editedData.value.serviceType
+    profileData.value = buildProfessionalProfile(response.data)
+    editedData.value = JSON.parse(JSON.stringify(profileData.value))
     isEditingServiceSettings.value = false
     toast.success('Configurações de trabalho atualizadas!')
   } catch (error: any) {
@@ -279,11 +375,7 @@ const handleSaveServiceSettings = async () => {
 }
 
 const handleCancelServiceSettings = () => {
-  editedData.value.categoryId = profileData.value.categoryId
-  editedData.value.subcategoryId = profileData.value.subcategoryId
-  editedData.value.category = profileData.value.category
-  editedData.value.subcategory = profileData.value.subcategory
-  editedData.value.serviceType = profileData.value.serviceType
+  editedData.value = JSON.parse(JSON.stringify(profileData.value))
   isEditingServiceSettings.value = false
 }
 
@@ -293,25 +385,7 @@ watch(
     const selectedCategory = categories.value.find((category) => category.id === categoryId)
     editedData.value.category = selectedCategory?.name || ''
     editedData.value.serviceType = selectedCategory?.name || ''
-
-    const subcategoryStillValid = selectedSubcategories.value.some(
-      (subcategory) => subcategory.id === editedData.value.subcategoryId
-    )
-
-    if (!subcategoryStillValid) {
-      editedData.value.subcategoryId = null
-      editedData.value.subcategory = ''
-    }
-  }
-)
-
-watch(
-  () => editedData.value.subcategoryId,
-  (subcategoryId) => {
-    const selectedSubcategory = selectedSubcategories.value.find(
-      (subcategory) => subcategory.id === subcategoryId
-    )
-    editedData.value.subcategory = selectedSubcategory?.name || ''
+    syncEditedSubcategories(editedData.value.subcategoryIds)
   }
 )
 
@@ -696,7 +770,10 @@ const getLinkLabel = (link: ProfessionalLink) => {
               @update:model-value="(val: string) => editedData.categoryId = val ? Number(val) : null"
             >
               <SelectTrigger>
-                <SelectValue placeholder="Selecione o tipo de serviço" />
+                <SelectValue
+                  :label="selectedCategoryLabel || undefined"
+                  placeholder="Selecione o tipo de serviço"
+                />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem v-for="category in categories" :key="category.id" :value="String(category.id)">
@@ -708,27 +785,44 @@ const getLinkLabel = (link: ProfessionalLink) => {
 
           <div class="space-y-2">
             <Label for="subcategory">
-              Subcategoria
+              Subcategorias
               <span v-if="selectedSubcategories.length > 0" class="text-red-500">*</span>
             </Label>
-            <Select
-              :model-value="editedData.subcategoryId ? String(editedData.subcategoryId) : ''"
-              @update:model-value="(val: string) => editedData.subcategoryId = val ? Number(val) : null"
-              :disabled="!editedData.categoryId || selectedSubcategories.length === 0"
+            <div
+              v-if="selectedSubcategories.length > 0"
+              class="space-y-3 rounded-lg border border-slate-200 p-3"
             >
-              <SelectTrigger>
-                <SelectValue :placeholder="selectedSubcategories.length > 0 ? 'Selecione a subcategoria' : 'Escolha uma categoria primeiro'" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem
+              <div v-if="editedData.subcategoryLabels.length > 0" class="flex flex-wrap gap-2">
+                <Badge
+                  v-for="label in editedData.subcategoryLabels"
+                  :key="label"
+                  variant="secondary"
+                  class="bg-blue-50 text-[#286AD8]"
+                >
+                  {{ label }}
+                </Badge>
+              </div>
+
+              <div class="space-y-2">
+                <label
                   v-for="subcategory in selectedSubcategories"
                   :key="subcategory.id"
-                  :value="String(subcategory.id)"
+                  class="flex cursor-pointer items-center gap-3 rounded-md border border-slate-200 px-3 py-2 transition-colors hover:border-[#286AD8]/40"
                 >
-                  {{ subcategory.name }}
-                </SelectItem>
-              </SelectContent>
-            </Select>
+                  <Checkbox
+                    :checked="editedData.subcategoryIds.includes(subcategory.id)"
+                    @update:checked="(checked) => toggleSubcategory(subcategory.id, !!checked)"
+                  />
+                  <span class="text-sm text-[#263238]">{{ subcategory.name }}</span>
+                </label>
+              </div>
+            </div>
+            <div
+              v-else
+              class="rounded-lg border border-dashed border-slate-200 px-3 py-3 text-sm text-[#435574]"
+            >
+              Esta categoria não possui subcategorias cadastradas.
+            </div>
           </div>
 
           <div class="flex gap-2 pt-4">
@@ -747,12 +841,26 @@ const getLinkLabel = (link: ProfessionalLink) => {
           </div>
         </div>
 
-        <div v-else>
+        <div v-else class="space-y-4">
           <div>
             <p class="text-sm text-[#435574] mb-1">Tipo de Serviço</p>
             <div class="flex items-center gap-2">
               <Wrench class="h-4 w-4 text-[#286AD8]" />
               <span class="text-[#263238]">{{ profileData.serviceType || 'Não definido' }}</span>
+            </div>
+          </div>
+
+          <div v-if="profileSubcategoryLabels.length > 0">
+            <p class="text-sm text-[#435574] mb-2">Subcategorias</p>
+            <div class="flex flex-wrap gap-2">
+              <Badge
+                v-for="subcategory in profileSubcategoryLabels"
+                :key="subcategory"
+                variant="secondary"
+                class="bg-blue-50 text-[#286AD8]"
+              >
+                {{ subcategory }}
+              </Badge>
             </div>
           </div>
         </div>

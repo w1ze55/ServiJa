@@ -351,12 +351,11 @@ public class CategoryCatalogService {
                 continue;
             }
             CategorySelection selection = resolveSelection(null, null, request.getCategory(), request.getSubcategory(), false, false, true, false);
-            request.setServiceCategory(selection.getCategory());
-            request.setServiceSubcategory(selection.getSubcategory());
+            serviceRequestRepository.backfillCatalogAssignment(
+                    request.getId(),
+                    selection.getCategoryId(),
+                    selection.getSubcategoryId());
             updatedRequests++;
-        }
-        if (updatedRequests > 0) {
-            serviceRequestRepository.saveAll(requests);
         }
 
         if (updatedServices + updatedFreelancers + updatedProjects + updatedRequests > 0) {

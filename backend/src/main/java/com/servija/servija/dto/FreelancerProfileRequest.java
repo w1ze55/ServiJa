@@ -27,6 +27,8 @@ public class FreelancerProfileRequest {
 
     private Long subcategoryId;
 
+    private List<Long> subcategoryIds;
+
     @Size(max = 160, message = "Subcategoria deve ter no maximo 160 caracteres")
     private String subcategory;
     
