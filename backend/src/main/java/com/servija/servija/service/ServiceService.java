@@ -19,6 +19,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -38,6 +39,7 @@ public class ServiceService {
     private final ServiceRequestRepository serviceRequestRepository;
     private final ReviewRepository reviewRepository;
     private final ObjectMapper objectMapper;
+    private final CategoryCatalogService categoryCatalogService;
     private static final BigDecimal AVERAGE_PRICE_RANGE_SPREAD = new BigDecimal("0.20");
 
     /**
@@ -85,11 +87,14 @@ public class ServiceService {
     @Transactional
     public ServiceResponse createService(ServiceRequest request) {
         Freelancer freelancer = getCurrentFreelancer();
+        CategoryCatalogService.CategorySelection categorySelection = resolveRequiredSelection(request);
 
         Service service = Service.builder()
                 .freelancer(freelancer)
                 .title(request.getTitle())
-                .category(request.getCategory())
+                .category(categorySelection.getCategoryLabel())
+                .serviceCategory(categorySelection.getCategory())
+                .serviceSubcategory(categorySelection.getSubcategory())
                 .description(request.getDescription())
                 .price(request.getPrice())
                 .priceType(parseEnum(Service.PriceType.class, request.getPriceType(), Service.PriceType.FIXED))
@@ -173,6 +178,13 @@ public class ServiceService {
         }
         if (request.getIsActive() != null) {
             service.setIsActive(request.getIsActive());
+        }
+
+        if (hasCategorySelection(request)) {
+            CategoryCatalogService.CategorySelection categorySelection = resolveRequiredSelection(request);
+            service.setCategory(categorySelection.getCategoryLabel());
+            service.setServiceCategory(categorySelection.getCategory());
+            service.setServiceSubcategory(categorySelection.getSubcategory());
         }
 
         service = serviceRepository.save(service);
@@ -286,12 +298,47 @@ public class ServiceService {
         return toPublicResponses(services);
     }
 
+    @Transactional(readOnly = true)
+    public List<ServiceResponse> getActiveServices(String categorySlug, String subcategorySlug, String query) {
+        List<Service> services;
+
+        if (StringUtils.hasText(subcategorySlug)) {
+            services = serviceRepository.findByServiceSubcategory_SlugAndIsActiveOrderByCreatedAtDesc(subcategorySlug,
+                    true);
+        } else if (StringUtils.hasText(categorySlug)) {
+            services = serviceRepository.findByServiceCategory_SlugAndIsActiveOrderByCreatedAtDesc(categorySlug, true);
+        } else if (StringUtils.hasText(query)) {
+            services = serviceRepository.searchServices(query);
+        } else {
+            services = serviceRepository.findByIsActiveOrderByCreatedAtDesc(true);
+        }
+
+        if (StringUtils.hasText(query) && (StringUtils.hasText(categorySlug) || StringUtils.hasText(subcategorySlug))) {
+            String normalizedQuery = query.toLowerCase();
+            services = services.stream()
+                    .filter(service -> (service.getTitle() != null
+                            && service.getTitle().toLowerCase().contains(normalizedQuery))
+                            || (service.getDescription() != null
+                                    && service.getDescription().toLowerCase().contains(normalizedQuery)))
+                    .toList();
+        }
+
+        return toPublicResponses(services);
+    }
+
     /**
      * Buscar serviços públicos por categoria
      */
     @Transactional(readOnly = true)
     public List<ServiceResponse> getServicesByCategory(String category) {
-        List<Service> services = serviceRepository.findByCategoryAndIsActiveOrderByCreatedAtDesc(category, true);
+        List<Service> services = serviceRepository.findByServiceCategory_SlugAndIsActiveOrderByCreatedAtDesc(category,
+                true);
+        if (services.isEmpty()) {
+            services = serviceRepository.findByServiceSubcategory_SlugAndIsActiveOrderByCreatedAtDesc(category, true);
+        }
+        if (services.isEmpty()) {
+            services = serviceRepository.findByCategoryAndIsActiveOrderByCreatedAtDesc(category, true);
+        }
         return toPublicResponses(services);
     }
 
@@ -329,7 +376,18 @@ public class ServiceService {
                 .freelancerId(service.getFreelancer().getId())
                 .freelancerName(service.getFreelancer().getName())
                 .title(service.getTitle())
+                .categoryId(service.getServiceCategory() != null ? service.getServiceCategory().getId() : null)
+                .categorySlug(service.getServiceCategory() != null ? service.getServiceCategory().getSlug() : null)
+                .categoryLabel(service.getServiceCategory() != null ? service.getServiceCategory().getName()
+                        : service.getCategory())
                 .category(service.getCategory())
+                .subcategoryId(service.getServiceSubcategory() != null ? service.getServiceSubcategory().getId() : null)
+                .subcategorySlug(
+                        service.getServiceSubcategory() != null ? service.getServiceSubcategory().getSlug() : null)
+                .subcategoryLabel(
+                        service.getServiceSubcategory() != null ? service.getServiceSubcategory().getName() : null)
+                .subcategory(
+                        service.getServiceSubcategory() != null ? service.getServiceSubcategory().getName() : null)
                 .description(service.getDescription())
                 .price(service.getPrice())
                 .priceType(service.getPriceType().name())
@@ -343,6 +401,25 @@ public class ServiceService {
                 .createdAt(service.getCreatedAt())
                 .updatedAt(service.getUpdatedAt())
                 .build();
+    }
+
+    private boolean hasCategorySelection(ServiceRequest request) {
+        return request.getCategoryId() != null
+                || request.getSubcategoryId() != null
+                || StringUtils.hasText(request.getCategory())
+                || StringUtils.hasText(request.getSubcategory());
+    }
+
+    private CategoryCatalogService.CategorySelection resolveRequiredSelection(ServiceRequest request) {
+        return categoryCatalogService.resolveSelection(
+                request.getCategoryId(),
+                request.getSubcategoryId(),
+                request.getCategory(),
+                request.getSubcategory(),
+                true,
+                true,
+                false,
+                false);
     }
 
     private ServiceResponse toPublicResponse(Service service) {

@@ -1,0 +1,69 @@
+<script setup lang="ts">
+import { computed } from 'vue';
+import { useRouter } from 'vue-router';
+import { FolderTree, LogOut, Shield } from 'lucide-vue-next';
+import Button from '@/components/ui/button.vue';
+import { useUserStore } from '@/stores/userStore';
+
+const router = useRouter();
+const userStore = useUserStore();
+
+const currentUser = computed(() => userStore.user);
+
+const logout = () => {
+  userStore.clearUser();
+  router.push('/login');
+};
+</script>
+
+<template>
+  <div class="min-h-screen bg-slate-50">
+    <aside class="fixed inset-y-0 left-0 hidden w-72 border-r border-slate-200 bg-[#10243d] text-white lg:flex lg:flex-col">
+      <div class="border-b border-white/10 px-6 py-6">
+        <div class="flex items-center gap-3">
+          <div class="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10">
+            <Shield class="h-5 w-5" />
+          </div>
+          <div>
+            <p class="text-xs uppercase tracking-[0.24em] text-slate-300">Admin</p>
+            <h1 class="text-lg font-semibold">Servi Ja</h1>
+          </div>
+        </div>
+      </div>
+
+      <nav class="flex-1 px-4 py-6">
+        <button
+          class="flex w-full items-center gap-3 rounded-xl bg-white/10 px-4 py-3 text-left text-sm font-medium"
+          @click="router.push('/admin/categories')"
+        >
+          <FolderTree class="h-4 w-4" />
+          Catalogo de categorias
+        </button>
+      </nav>
+
+      <div class="border-t border-white/10 px-6 py-4 text-sm text-slate-300">
+        <p class="font-medium text-white">{{ currentUser?.name }}</p>
+        <p>{{ currentUser?.email }}</p>
+      </div>
+    </aside>
+
+    <div class="lg:pl-72">
+      <header class="sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur">
+        <div class="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6">
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Administracao</p>
+            <h2 class="text-lg font-semibold text-slate-900">Categorias e Subcategorias</h2>
+          </div>
+          <Button variant="outline" @click="logout">
+            <LogOut class="mr-2 h-4 w-4" />
+            Sair
+          </Button>
+        </div>
+      </header>
+
+      <main class="mx-auto max-w-7xl px-4 py-6 sm:px-6">
+        <slot />
+      </main>
+    </div>
+  </div>
+</template>

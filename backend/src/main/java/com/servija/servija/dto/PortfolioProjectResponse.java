@@ -16,7 +16,14 @@ public class PortfolioProjectResponse {
     private Long id;
     private String title;
     private String description;
+    private Long categoryId;
+    private String categorySlug;
+    private String categoryLabel;
     private String category;
+    private Long subcategoryId;
+    private String subcategorySlug;
+    private String subcategoryLabel;
+    private String subcategory;
     private List<String> tags;
     private String videoUrl;
     private String projectUrl;

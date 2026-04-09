@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import {
   User,
   Briefcase,
@@ -30,8 +30,8 @@ import Avatar from '../ui/avatar.vue';
 import AvatarImage from '../ui/avatar-image.vue';
 import AvatarFallback from '../ui/avatar-fallback.vue';
 import { toast } from '../../utils/toast';
-import { CATEGORIES } from '@/constants/categories';
 import { formatCPF, formatPhone } from '@/utils/masks';
+import { useCategoryCatalogStore } from '@/stores/categoryCatalogStore';
 
 interface OnboardingData {
   name: string;
@@ -40,7 +40,10 @@ interface OnboardingData {
   cpf: string;
   profilePhoto?: string;
   profession: string;
+  categoryId?: number | null;
+  subcategoryId?: number | null;
   category: string;
+  subcategory: string;
   bio: string;
   skills: string[];
   portfolioItems: Array<{
@@ -76,7 +79,25 @@ const steps = [
   { id: 5, title: 'Verificação', icon: CheckCircle },
 ];
 
-const categories = CATEGORIES;
+const categoryCatalogStore = useCategoryCatalogStore();
+const legacyCategories = [
+  { value: 'eletricista', label: 'Eletricista' },
+  { value: 'encanador', label: 'Encanador' },
+  { value: 'pintor', label: 'Pintor' },
+  { value: 'designer', label: 'Designer' },
+  { value: 'desenvolvedor', label: 'Desenvolvedor' },
+];
+const categories = computed(() =>
+  categoryCatalogStore.activePublicCategories.length > 0
+    ? categoryCatalogStore.activePublicCategories.map((category) => ({
+        value: String(category.id),
+        label: category.name,
+      }))
+    : legacyCategories
+);
+const selectedSubcategories = computed(() =>
+  categoryCatalogStore.getSubcategoriesByCategoryId(data.value.categoryId || null)
+);
 
 const availableSkills = [
   'Instalação',
@@ -99,7 +120,10 @@ const data = ref<OnboardingData>({
   phone: '',
   cpf: '',
   profession: '',
+  categoryId: null,
+  subcategoryId: null,
   category: '',
+  subcategory: '',
   bio: '',
   skills: [],
   portfolioItems: [],
@@ -118,6 +142,39 @@ const newPortfolioItem = ref({
 });
 
 const progress = computed(() => (currentStep.value / steps.length) * 100);
+
+onMounted(() => {
+  categoryCatalogStore.loadPublicCategories();
+});
+
+watch(
+  () => data.value.categoryId,
+  (categoryId) => {
+    const selectedCategory = categoryCatalogStore.activePublicCategories.find(
+      (category) => category.id === categoryId
+    );
+    data.value.category = selectedCategory?.name || '';
+
+    const subcategoryStillValid = selectedSubcategories.value.some(
+      (subcategory) => subcategory.id === data.value.subcategoryId
+    );
+
+    if (!subcategoryStillValid) {
+      data.value.subcategoryId = null;
+      data.value.subcategory = '';
+    }
+  }
+);
+
+watch(
+  () => data.value.subcategoryId,
+  (subcategoryId) => {
+    const selectedSubcategory = selectedSubcategories.value.find(
+      (subcategory) => subcategory.id === subcategoryId
+    );
+    data.value.subcategory = selectedSubcategory?.name || '';
+  }
+);
 
 
 const handleAddSkill = (skill: string) => {
@@ -179,8 +236,12 @@ const validateStep = (step: number): boolean => {
       return true;
 
     case 2:
-      if (!data.value.profession || !data.value.category || !data.value.bio) {
+      if (!data.value.profession || !data.value.categoryId || !data.value.bio) {
         toast.error('Preencha todos os campos obrigatórios');
+        return false;
+      }
+      if (selectedSubcategories.value.length > 0 && !data.value.subcategoryId) {
+        toast.error('Selecione uma subcategoria');
         return false;
       }
       if (data.value.skills.length === 0) {
@@ -409,8 +470,8 @@ const handleServiceAreaKeyPress = (e: KeyboardEvent) => {
             <div class="space-y-2">
               <Label for="category">Categoria *</Label>
               <Select
-                :model-value="data.category"
-                @update:model-value="(val: string) => data.category = val"
+                :model-value="data.categoryId ? String(data.categoryId) : ''"
+                @update:model-value="(val: string) => data.categoryId = val ? Number(val) : null"
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione uma categoria" />
@@ -422,6 +483,31 @@ const handleServiceAreaKeyPress = (e: KeyboardEvent) => {
                 </SelectContent>
               </Select>
             </div>
+          </div>
+
+          <div class="space-y-2">
+            <Label for="subcategory">
+              Subcategoria
+              <span v-if="selectedSubcategories.length > 0" class="text-red-500">*</span>
+            </Label>
+            <Select
+              :model-value="data.subcategoryId ? String(data.subcategoryId) : ''"
+              @update:model-value="(val: string) => data.subcategoryId = val ? Number(val) : null"
+              :disabled="!data.categoryId || selectedSubcategories.length === 0"
+            >
+              <SelectTrigger>
+                <SelectValue :placeholder="selectedSubcategories.length > 0 ? 'Selecione uma subcategoria' : 'Escolha uma categoria primeiro'" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem
+                  v-for="subcategory in selectedSubcategories"
+                  :key="subcategory.id"
+                  :value="String(subcategory.id)"
+                >
+                  {{ subcategory.name }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <div class="space-y-2">
@@ -722,4 +808,3 @@ const handleServiceAreaKeyPress = (e: KeyboardEvent) => {
     </div>
   </div>
 </template>
-

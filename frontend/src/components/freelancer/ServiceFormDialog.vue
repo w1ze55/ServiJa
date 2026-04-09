@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { X, Upload, Plus, Loader2 } from 'lucide-vue-next';
 import Dialog from '../ui/dialog.vue';
 import DialogContent from '../ui/dialog-content.vue';
@@ -17,12 +17,15 @@ import SelectValue from '../ui/select-value.vue';
 import Badge from '../ui/badge.vue';
 import { toast } from '../../utils/toast';
 import { uploadImages, deleteImage } from '../../api/uploadService';
-import { CATEGORIES } from '@/constants/categories';
+import { useCategoryCatalogStore } from '@/stores/categoryCatalogStore';
 
 export interface ServiceFormData {
   id?: string;
+  categoryId?: number | null;
+  subcategoryId?: number | null;
   title: string;
   category: string;
+  subcategory?: string;
   description: string;
   price: number;
   priceType: 'fixo' | 'hora' | 'dia';
@@ -41,6 +44,7 @@ interface Props {
 }
 
 const props = defineProps<Props>();
+const categoryCatalogStore = useCategoryCatalogStore();
 
 const WORK_MODELS = [
   { value: 'presencial', label: 'Presencial' },
@@ -50,8 +54,11 @@ const WORK_MODELS = [
 
 const formData = ref<ServiceFormData>({
   id: props.service?.id,
+  categoryId: props.service?.categoryId ?? null,
+  subcategoryId: props.service?.subcategoryId ?? null,
   title: props.service?.title || '',
   category: props.service?.category || '',
+  subcategory: props.service?.subcategory || '',
   description: props.service?.description || '',
   price: props.service?.price || 0,
   priceType: props.service?.priceType || 'fixo',
@@ -66,14 +73,20 @@ const tagInput = ref('');
 const errors = ref<Record<string, string>>({});
 const isUploading = ref(false);
 
-const categories = CATEGORIES;
+const categories = computed(() => categoryCatalogStore.activePublicCategories);
+const selectedSubcategories = computed(() =>
+  categoryCatalogStore.getSubcategoriesByCategoryId(formData.value.categoryId || null)
+);
 
 watch(() => props.service, (newService) => {
   if (newService) {
     formData.value = {
       id: newService.id,
+      categoryId: newService.categoryId ?? null,
+      subcategoryId: newService.subcategoryId ?? null,
       title: newService.title || '',
       category: newService.category || '',
+      subcategory: newService.subcategory || '',
       description: newService.description || '',
       price: newService.price || 0,
       priceType: newService.priceType || 'fixo',
@@ -87,6 +100,10 @@ watch(() => props.service, (newService) => {
   }
 }, { immediate: true });
 
+onMounted(() => {
+  categoryCatalogStore.loadPublicCategories();
+});
+
 watch(() => props.open, (isOpen) => {
   if (!isOpen) {
     handleClose();
@@ -98,6 +115,37 @@ watch(() => formData.value.category, () => {
   if (errors.value.category) {
     const newErrors = { ...errors.value };
     delete newErrors.category;
+    errors.value = newErrors;
+  }
+});
+
+watch(() => formData.value.categoryId, (categoryId) => {
+  const selectedCategory = categories.value.find((category) => category.id === categoryId);
+  formData.value.category = selectedCategory?.name || '';
+
+  const subcategoryStillValid = selectedSubcategories.value.some(
+    (subcategory) => subcategory.id === formData.value.subcategoryId
+  );
+
+  if (!subcategoryStillValid) {
+    formData.value.subcategoryId = null;
+    formData.value.subcategory = '';
+  }
+
+  if (errors.value.category) {
+    const newErrors = { ...errors.value };
+    delete newErrors.category;
+    errors.value = newErrors;
+  }
+});
+
+watch(() => formData.value.subcategoryId, (subcategoryId) => {
+  const selectedSubcategory = selectedSubcategories.value.find((subcategory) => subcategory.id === subcategoryId);
+  formData.value.subcategory = selectedSubcategory?.name || '';
+
+  if (errors.value.subcategory) {
+    const newErrors = { ...errors.value };
+    delete newErrors.subcategory;
     errors.value = newErrors;
   }
 });
@@ -205,8 +253,12 @@ const validateForm = () => {
     newErrors.title = 'Título deve ter no máximo 50 caracteres';
   }
 
-  if (!formData.value.category) {
+  if (!formData.value.categoryId) {
     newErrors.category = 'Categoria é obrigatória';
+  }
+
+  if (selectedSubcategories.value.length > 0 && !formData.value.subcategoryId) {
+    newErrors.subcategory = 'Subcategoria Ã© obrigatÃ³ria';
   }
 
   if (!formData.value.description.trim()) {
@@ -241,15 +293,27 @@ const handleSubmit = (e: Event) => {
     return;
   }
 
-  props.onSubmit(formData.value);
+  const selectedCategory = categories.value.find((category) => category.id === formData.value.categoryId);
+  const selectedSubcategory = selectedSubcategories.value.find(
+    (subcategory) => subcategory.id === formData.value.subcategoryId
+  );
+
+  props.onSubmit({
+    ...formData.value,
+    category: selectedCategory?.name || formData.value.category,
+    subcategory: selectedSubcategory?.name || formData.value.subcategory,
+  });
   handleClose();
 };
 
 const handleClose = () => {
   formData.value = {
     id: undefined,
+    categoryId: null,
+    subcategoryId: null,
     title: '',
     category: '',
+    subcategory: '',
     description: '',
     price: 0,
     priceType: 'fixo',
@@ -357,18 +421,41 @@ const handleRemoveImage = async (index: number) => {
             Categoria <span class="text-red-500">*</span>
           </Label>
           <Select
-            v-model="formData.category"
+            :model-value="formData.categoryId ? String(formData.categoryId) : ''"
+            @update:model-value="(value) => handleInputChange('categoryId', value ? Number(value) : null)"
           >
             <SelectTrigger :class="errors.category ? 'border-red-500' : ''">
               <SelectValue placeholder="Selecione uma categoria" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem v-for="cat in categories" :key="cat.value" :value="cat.value">
-                {{ cat.label }}
+              <SelectItem v-for="cat in categories" :key="cat.id" :value="String(cat.id)">
+                {{ cat.name }}
               </SelectItem>
             </SelectContent>
           </Select>
           <p v-if="errors.category" class="text-sm text-red-500">{{ errors.category }}</p>
+        </div>
+
+        <div class="space-y-2">
+          <Label for="subcategory">
+            Subcategoria
+            <span v-if="selectedSubcategories.length > 0" class="text-red-500">*</span>
+          </Label>
+          <Select
+            :model-value="formData.subcategoryId ? String(formData.subcategoryId) : ''"
+            @update:model-value="(value) => handleInputChange('subcategoryId', value ? Number(value) : null)"
+            :disabled="!formData.categoryId || selectedSubcategories.length === 0"
+          >
+            <SelectTrigger :class="errors.subcategory ? 'border-red-500' : ''">
+              <SelectValue :placeholder="selectedSubcategories.length > 0 ? 'Selecione uma subcategoria' : 'Escolha uma categoria primeiro'" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem v-for="subcategory in selectedSubcategories" :key="subcategory.id" :value="String(subcategory.id)">
+                {{ subcategory.name }}
+              </SelectItem>
+            </SelectContent>
+          </Select>
+          <p v-if="errors.subcategory" class="text-sm text-red-500">{{ errors.subcategory }}</p>
         </div>
 
         <!-- Descrição -->

@@ -25,7 +25,14 @@ public class ServiceRequestResponse {
     private String freelancerAvatar;
     private String freelancerLocation;
     private String serviceName;
+    private Long categoryId;
+    private String categorySlug;
+    private String categoryLabel;
     private String category;
+    private Long subcategoryId;
+    private String subcategorySlug;
+    private String subcategoryLabel;
+    private String subcategory;
     private String description;
     private BigDecimal budget;
     private String deadline;

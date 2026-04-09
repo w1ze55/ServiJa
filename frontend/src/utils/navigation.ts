@@ -48,23 +48,30 @@ export const clientRoutes: Record<string, string> = {
   'settings': '/settings',
 };
 
+export const adminRoutes: Record<string, string> = {
+  'home': '/admin/categories',
+  'admin-categories': '/admin/categories',
+};
+
 // Função para obter a rota baseada no tipo de usuário
-export function getRoute(page: string, userType?: 'provider' | 'contractor'): string {
+export function getRoute(page: string, userType?: 'provider' | 'contractor' | 'admin'): string {
   if (userType === 'provider') {
     return freelancerRoutes[page] || `/${page}`;
   } else if (userType === 'contractor') {
     return clientRoutes[page] || `/${page}`;
+  } else if (userType === 'admin') {
+    return adminRoutes[page] || `/${page}`;
   }
 
   // Fallback: tenta encontrar em qualquer um dos mapas
-  return freelancerRoutes[page] || clientRoutes[page] || `/${page}`;
+  return adminRoutes[page] || freelancerRoutes[page] || clientRoutes[page] || `/${page}`;
 }
 
 // Composable para navegação
 export function useNavigation() {
   const router = useRouter();
 
-  const navigate = (page: string, userType?: 'provider' | 'contractor', params?: Record<string, any>) => {
+  const navigate = (page: string, userType?: 'provider' | 'contractor' | 'admin', params?: Record<string, any>) => {
     const route = getRoute(page, userType);
 
     if (params) {

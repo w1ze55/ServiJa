@@ -40,6 +40,10 @@ public class AuthService {
     @Transactional
     public AuthResponse register(RegisterRequest request) {
         // Verificar se email já existe
+        if (request.getUserType() == User.UserType.ADMIN) {
+            throw new IllegalArgumentException("Cadastro publico de admin nao e permitido");
+        }
+
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new DuplicateResourceException("E-mail já cadastrado");
         }

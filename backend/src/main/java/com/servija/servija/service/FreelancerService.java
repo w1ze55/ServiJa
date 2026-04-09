@@ -21,6 +21,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import com.servija.servija.dto.ServiceCityResponse;
 import com.servija.servija.dto.ProfessionalLinkResponse;
@@ -44,6 +45,7 @@ public class FreelancerService {
     private final ServiceRequestRepository serviceRequestRepository;
     private final ReviewRepository reviewRepository;
     private final ObjectMapper objectMapper;
+    private final CategoryCatalogService categoryCatalogService;
 
     @Transactional(readOnly = true)
     public FreelancerProfileResponse getProfile() {
@@ -77,9 +79,6 @@ public class FreelancerService {
         if (request.getProfession() != null) {
             freelancer.setProfessionalTitle(request.getProfession());
         }
-        if (request.getCategory() != null) {
-            freelancer.setCategory(request.getCategory());
-        }
         if (request.getBio() != null) {
             freelancer.setBio(request.getBio());
         }
@@ -88,7 +87,23 @@ public class FreelancerService {
         }
 
         // Atualizar configurações de serviço
-        if (request.getServiceType() != null) {
+        if (hasCategorySelection(request)) {
+            CategoryCatalogService.CategorySelection categorySelection = categoryCatalogService.resolveSelection(
+                    request.getCategoryId(),
+                    request.getSubcategoryId(),
+                    request.getCategory(),
+                    request.getSubcategory(),
+                    true,
+                    true,
+                    false,
+                    false);
+            freelancer.setCategory(categorySelection.getCategoryLabel());
+            freelancer.setServiceCategory(categorySelection.getCategory());
+            freelancer.setServiceSubcategory(categorySelection.getSubcategory());
+            freelancer.setServiceType(StringUtils.hasText(request.getServiceType())
+                    ? request.getServiceType()
+                    : categorySelection.getSubcategoryLabel());
+        } else if (request.getServiceType() != null) {
             freelancer.setServiceType(request.getServiceType());
         }
         if (request.getCities() != null) {
@@ -235,7 +250,23 @@ public class FreelancerService {
                 .name(freelancer.getName())
                 .email(freelancer.getEmail())
                 .profession(freelancer.getProfessionalTitle())
+                .categoryId(freelancer.getServiceCategory() != null ? freelancer.getServiceCategory().getId() : null)
+                .categorySlug(
+                        freelancer.getServiceCategory() != null ? freelancer.getServiceCategory().getSlug() : null)
+                .categoryLabel(
+                        freelancer.getServiceCategory() != null ? freelancer.getServiceCategory().getName()
+                                : freelancer.getCategory())
                 .category(freelancer.getCategory())
+                .subcategoryId(
+                        freelancer.getServiceSubcategory() != null ? freelancer.getServiceSubcategory().getId() : null)
+                .subcategorySlug(freelancer.getServiceSubcategory() != null
+                        ? freelancer.getServiceSubcategory().getSlug()
+                        : null)
+                .subcategoryLabel(freelancer.getServiceSubcategory() != null
+                        ? freelancer.getServiceSubcategory().getName()
+                        : null)
+                .subcategory(
+                        freelancer.getServiceSubcategory() != null ? freelancer.getServiceSubcategory().getName() : null)
                 .bio(freelancer.getBio())
                 .profilePhoto(freelancer.getAvatarUrl())
                 .serviceType(freelancer.getServiceType())
@@ -269,7 +300,9 @@ public class FreelancerService {
         List<Freelancer> freelancers;
 
         if (category != null && !category.isEmpty()) {
-            freelancers = freelancerRepository.findByCategoryWithLocation(category);
+            freelancers = freelancerRepository.findAllWithLocation().stream()
+                    .filter(freelancer -> matchesCategoryFilter(freelancer, category))
+                    .collect(Collectors.toList());
         } else {
             freelancers = freelancerRepository.findAllWithLocation();
         }
@@ -336,5 +369,29 @@ public class FreelancerService {
                 .available(freelancer.getAvailable())
                 .category(freelancer.getCategory())
                 .build();
+    }
+
+    private boolean hasCategorySelection(FreelancerProfileRequest request) {
+        return request.getCategoryId() != null
+                || request.getSubcategoryId() != null
+                || StringUtils.hasText(request.getCategory())
+                || StringUtils.hasText(request.getSubcategory());
+    }
+
+    private boolean matchesCategoryFilter(Freelancer freelancer, String filter) {
+        if (!StringUtils.hasText(filter)) {
+            return true;
+        }
+
+        String normalizedFilter = filter.trim().toLowerCase();
+        return (freelancer.getServiceCategory() != null
+                && (freelancer.getServiceCategory().getSlug().equalsIgnoreCase(filter)
+                        || freelancer.getServiceCategory().getName().equalsIgnoreCase(filter)))
+                || (freelancer.getServiceSubcategory() != null
+                        && (freelancer.getServiceSubcategory().getSlug().equalsIgnoreCase(filter)
+                                || freelancer.getServiceSubcategory().getName().equalsIgnoreCase(filter)))
+                || (freelancer.getCategory() != null && freelancer.getCategory().toLowerCase().equals(normalizedFilter))
+                || (freelancer.getServiceType() != null
+                        && freelancer.getServiceType().toLowerCase().equals(normalizedFilter));
     }
 }

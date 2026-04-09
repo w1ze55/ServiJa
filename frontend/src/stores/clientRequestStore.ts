@@ -47,7 +47,10 @@ export interface ServiceRequest {
     freelancerAvatar?: string;
     freelancerLocation?: string;
     service: string;
+    categoryId?: number | null;
+    subcategoryId?: number | null;
     category: string;
+    subcategory?: string;
     description: string;
     budget?: number | null;
     deadline: string;
@@ -72,7 +75,10 @@ export interface ServiceRequest {
 export interface CreateServiceRequestInput {
     freelancerId?: string;
     service: string;
+    categoryId?: number | null;
+    subcategoryId?: number | null;
     category: string;
+    subcategory?: string;
     description: string;
     deadline: string;
     workModel: WorkModelValue;
@@ -174,6 +180,10 @@ export const useClientRequestStore = defineStore('clientRequest', () => {
         ...req,
         id: String(req.id),
         service: req.serviceName,
+        categoryId: req.categoryId ?? null,
+        subcategoryId: req.subcategoryId ?? null,
+        category: req.categoryLabel || req.category || '',
+        subcategory: req.subcategoryLabel || req.subcategory || '',
         budget: req.budget ?? existingRequest?.budget ?? null,
         workModel: normalizeWorkModel(req.workModel),
         status: mapApiStatusToLocal(req.status),
@@ -259,7 +269,10 @@ export const useClientRequestStore = defineStore('clientRequest', () => {
         try {
             const requestData = {
                 serviceName: input.service,
+                categoryId: input.categoryId,
+                subcategoryId: input.subcategoryId,
                 category: input.category,
+                subcategory: input.subcategory,
                 description: input.description,
                 deadline: input.deadline,
                 workModel: input.workModel,

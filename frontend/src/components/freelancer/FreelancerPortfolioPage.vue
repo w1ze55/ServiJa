@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import {
   Plus,
   Edit,
@@ -48,6 +48,7 @@ import SelectValue from '../ui/select-value.vue';
 import { toast } from '../../utils/toast';
 import api from '@/api/config/axios';
 import { uploadImages } from '@/api/uploadService';
+import { useCategoryCatalogStore } from '@/stores/categoryCatalogStore';
 
 interface PortfolioImage {
   id: string;
@@ -59,7 +60,10 @@ interface PortfolioProject {
   id: string;
   title: string;
   description: string;
+  categoryId?: number | null;
+  subcategoryId?: number | null;
   category: string;
+  subcategory?: string;
   tags: string[];
   images: PortfolioImage[];
   videoUrl?: string;
@@ -75,7 +79,7 @@ interface Props {
 
 const props = defineProps<Props>();
 
-const CATEGORIES = [
+const LEGACY_CATEGORIES = [
   'Todos',
   'Instalação Elétrica',
   'Automação',
@@ -85,6 +89,13 @@ const CATEGORIES = [
   'Iluminação',
   'Outros',
 ];
+const categoryCatalogStore = useCategoryCatalogStore();
+const categories = computed(() =>
+  categoryCatalogStore.activePublicCategories.length > 0
+    ? categoryCatalogStore.activePublicCategories.map((category) => category.name)
+    : LEGACY_CATEGORIES
+);
+const catalogCategories = computed(() => categoryCatalogStore.activePublicCategories);
 
 const viewMode = ref<'grid' | 'list'>('grid');
 const selectedCategory = ref('Todos');
@@ -101,7 +112,10 @@ const selectedImageIndex = ref(0);
 const projectForm = ref({
   title: '',
   description: '',
+  categoryId: null as number | null,
+  subcategoryId: null as number | null,
   category: '',
+  subcategory: '',
   tags: [] as string[],
   images: [] as File[],
   imageUrls: [] as string[],
@@ -115,9 +129,40 @@ const projectForm = ref({
 const tagInput = ref('');
 const isLoading = ref(false);
 const isUploading = ref(false);
+const selectedSubcategories = computed(() =>
+  categoryCatalogStore.getSubcategoriesByCategoryId(projectForm.value.categoryId)
+);
+
+watch(
+  () => projectForm.value.categoryId,
+  (categoryId) => {
+    const selectedCategory = catalogCategories.value.find((category) => category.id === categoryId);
+    projectForm.value.category = selectedCategory?.name || '';
+
+    const subcategoryStillValid = selectedSubcategories.value.some(
+      (subcategory) => subcategory.id === projectForm.value.subcategoryId
+    );
+
+    if (!subcategoryStillValid) {
+      projectForm.value.subcategoryId = null;
+      projectForm.value.subcategory = '';
+    }
+  }
+);
+
+watch(
+  () => projectForm.value.subcategoryId,
+  (subcategoryId) => {
+    const selectedSubcategory = selectedSubcategories.value.find(
+      (subcategory) => subcategory.id === subcategoryId
+    );
+    projectForm.value.subcategory = selectedSubcategory?.name || '';
+  }
+);
 
 // Carregar projetos do backend
 onMounted(async () => {
+  await categoryCatalogStore.loadPublicCategories();
   await loadProjects();
 });
 
@@ -129,7 +174,10 @@ const loadProjects = async () => {
       id: project.id.toString(),
       title: project.title,
       description: project.description,
-      category: project.category,
+      categoryId: project.categoryId ?? null,
+      subcategoryId: project.subcategoryId ?? null,
+      category: project.categoryLabel || project.category,
+      subcategory: project.subcategoryLabel || project.subcategory || '',
       tags: project.tags || [],
       images: project.images?.map((img: any) => ({
         id: img.id.toString(),
@@ -236,8 +284,13 @@ const handleRemoveImage = (index: number) => {
 };
 
 const handleSaveProject = async () => {
-  if (!projectForm.value.title || !projectForm.value.description || !projectForm.value.category) {
+  if (!projectForm.value.title || !projectForm.value.description || !projectForm.value.categoryId) {
     toast.error('Preencha todos os campos obrigatórios');
+    return;
+  }
+
+  if (selectedSubcategories.value.length > 0 && !projectForm.value.subcategoryId) {
+    toast.error('Selecione uma subcategoria');
     return;
   }
 
@@ -252,7 +305,10 @@ const handleSaveProject = async () => {
     const payload = {
       title: projectForm.value.title,
       description: projectForm.value.description,
+      categoryId: projectForm.value.categoryId,
+      subcategoryId: projectForm.value.subcategoryId,
       category: projectForm.value.category,
+      subcategory: projectForm.value.subcategory,
       tags: projectForm.value.tags,
       videoUrl: projectForm.value.videoUrl || null,
       projectUrl: projectForm.value.projectUrl || null,
@@ -295,7 +351,10 @@ const resetForm = () => {
   projectForm.value = {
     title: '',
     description: '',
+    categoryId: null,
+    subcategoryId: null,
     category: '',
+    subcategory: '',
     tags: [],
     images: [],
     imageUrls: [],
@@ -313,7 +372,10 @@ const handleEditProject = (project: PortfolioProject) => {
   projectForm.value = {
     title: project.title,
     description: project.description,
+    categoryId: project.categoryId ?? null,
+    subcategoryId: project.subcategoryId ?? null,
     category: project.category,
+    subcategory: project.subcategory || '',
     tags: project.tags,
     images: [],
     imageUrls: project.images.map((img) => img.url),
@@ -435,7 +497,7 @@ const handleTagKeyPress = (e: KeyboardEvent) => {
               <SelectValue placeholder="Categoria" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem v-for="cat in CATEGORIES" :key="cat" :value="cat">
+              <SelectItem v-for="cat in categories" :key="cat" :value="cat">
                 {{ cat }}
               </SelectItem>
             </SelectContent>
@@ -674,19 +736,19 @@ const handleTagKeyPress = (e: KeyboardEvent) => {
             <div class="space-y-2">
               <Label for="category">Categoria *</Label>
               <Select
-                :model-value="projectForm.category"
-                @update:model-value="(val: string) => projectForm.category = val"
+                :model-value="projectForm.categoryId ? String(projectForm.categoryId) : ''"
+                @update:model-value="(val: string) => projectForm.categoryId = val ? Number(val) : null"
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione a categoria" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem
-                    v-for="cat in CATEGORIES.filter((c) => c !== 'Todos')"
-                    :key="cat"
-                    :value="cat"
+                    v-for="category in catalogCategories"
+                    :key="category.id"
+                    :value="String(category.id)"
                   >
-                    {{ cat }}
+                    {{ category.name }}
                   </SelectItem>
                 </SelectContent>
               </Select>
@@ -701,6 +763,31 @@ const handleTagKeyPress = (e: KeyboardEvent) => {
                 @update:model-value="(val) => projectForm.completedDate = val as string"
               />
             </div>
+          </div>
+
+          <div class="space-y-2">
+            <Label for="subcategory">
+              Subcategoria
+              <span v-if="selectedSubcategories.length > 0" class="text-red-500">*</span>
+            </Label>
+            <Select
+              :model-value="projectForm.subcategoryId ? String(projectForm.subcategoryId) : ''"
+              @update:model-value="(val: string) => projectForm.subcategoryId = val ? Number(val) : null"
+              :disabled="!projectForm.categoryId || selectedSubcategories.length === 0"
+            >
+              <SelectTrigger>
+                <SelectValue :placeholder="selectedSubcategories.length > 0 ? 'Selecione a subcategoria' : 'Escolha uma categoria primeiro'" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem
+                  v-for="subcategory in selectedSubcategories"
+                  :key="subcategory.id"
+                  :value="String(subcategory.id)"
+                >
+                  {{ subcategory.name }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <!-- Client -->
@@ -979,4 +1066,3 @@ const handleTagKeyPress = (e: KeyboardEvent) => {
     </template>
   </div>
 </template>
-

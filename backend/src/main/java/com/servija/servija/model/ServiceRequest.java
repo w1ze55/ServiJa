@@ -56,6 +56,17 @@ public class ServiceRequest {
     @Column(nullable = false, length = 100)
     private String category;
 
+    @Column(length = 160)
+    private String subcategory;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "category_id")
+    private ServiceCategory serviceCategory;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "subcategory_id")
+    private ServiceSubcategory serviceSubcategory;
+
     @Column(nullable = false, columnDefinition = "TEXT")
     private String description;
 

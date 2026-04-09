@@ -88,7 +88,8 @@ public class User implements UserDetails {
 
     public enum UserType {
         CONTRACTOR,
-        FREELANCER
+        FREELANCER,
+        ADMIN
     }
 
     @Override

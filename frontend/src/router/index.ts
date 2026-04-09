@@ -39,6 +39,7 @@ import ClienteProjectsPage from "@/pages/ClienteProjects/index.vue";
 import ClienteDeliveryApprovalPage from "@/pages/ClienteDeliveryApproval/index.vue";
 import ClienteProjectDetailPage from "@/pages/ClienteProjectDetail/index.vue";
 import RateFreelancerPage from "@/pages/RateFreelancer/index.vue";
+import AdminCategoriesPage from "@/pages/AdminCategories/index.vue";
 
 const routes: RouteRecordRaw[] = [
   // ============ ROTAS PÚBLICAS ============
@@ -89,6 +90,12 @@ const routes: RouteRecordRaw[] = [
     name: "cliente-dashboard",
     component: ClienteDashboard,
     meta: { requiresAuth: true, userType: "contractor" },
+  },
+  {
+    path: "/admin/categories",
+    name: "admin-categories",
+    component: AdminCategoriesPage,
+    meta: { requiresAuth: true, userType: "admin" },
   },
 
   // ============ PROFILE SETTINGS ESPECÍFICOS ============
@@ -325,6 +332,7 @@ const router = createRouter({
 router.beforeEach((to, from, next) => {
   const userString = localStorage.getItem("user");
   const user = userString ? JSON.parse(userString) : null;
+  const requiredUserType = to.meta.userType;
 
   // Se a rota requer autenticação e o usuário não está logado
   if (to.meta.requiresAuth && !user) {
@@ -332,6 +340,14 @@ router.beforeEach((to, from, next) => {
   }
   // Se o usuário está logado e tenta acessar login
   else if (to.name === "login" && user) {
+    next("/dashboard");
+  }
+  else if (
+    user &&
+    requiredUserType &&
+    requiredUserType !== "both" &&
+    user.type !== requiredUserType
+  ) {
     next("/dashboard");
   }
   // Caso contrário, prosseguir

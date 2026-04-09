@@ -32,7 +32,7 @@ import FreelancerCard from '../freelancer/FreelancerCard.vue';
 import api from '@/api/config/axios';
 import { toast } from '@/utils/toast';
 import { useFavoritesStore } from '@/stores/favorites';
-import { CATEGORIES } from '@/constants/categories';
+import { useCategoryCatalogStore } from '@/stores/categoryCatalogStore';
 import { getServicePriceDisplay, getServicePriceSortValue, type ServicePriceRangeData } from '@/utils/servicePricing';
 import { formatServiceRatingDisplay, hasServiceRating, type ServiceReviewSummary } from '@/utils/serviceReviews';
 
@@ -42,6 +42,9 @@ interface ServiceItem extends ServicePriceRangeData, ServiceReviewSummary {
   freelancerName: string;
   title: string;
   category: string;
+  categorySlug?: string | null;
+  subcategory?: string | null;
+  subcategorySlug?: string | null;
   description: string;
   deliveryTime: number;
   deliveryUnit: string;
@@ -73,17 +76,39 @@ const isLoading = ref(false);
 const error = ref('');
 const searchQuery = ref('');
 const selectedCategory = ref('all');
+const selectedSubcategory = ref('all');
 const sortBy = ref('recent');
 const searchMode = ref<'services' | 'professionals'>('services');
 const viewMode = ref<'grid' | 'list'>('grid');
 const freelancerProfiles = ref<Record<number, FreelancerProfileData>>({});
 
 const favoritesStore = useFavoritesStore();
+const categoryCatalogStore = useCategoryCatalogStore();
 
-const categories = [
+const categories = computed(() => [
   { value: 'all', label: 'Todas as categorias' },
-  ...CATEGORIES
-];
+  ...categoryCatalogStore.activePublicCategories.map((category) => ({
+    value: category.slug,
+    label: category.name,
+  })),
+]);
+const subcategories = computed(() => {
+  if (selectedCategory.value === 'all') {
+    return [{ value: 'all', label: 'Todas as subcategorias' }];
+  }
+
+  const category = categoryCatalogStore.activePublicCategories.find(
+    (item) => item.slug === selectedCategory.value
+  );
+
+  return [
+    { value: 'all', label: 'Todas as subcategorias' },
+    ...(category?.subcategories || []).map((subcategory) => ({
+      value: subcategory.slug,
+      label: subcategory.name,
+    })),
+  ];
+});
 
 const sortOptions = [
   { value: 'recent', label: 'Mais recentes' },
@@ -96,14 +121,13 @@ const loadServices = async () => {
   isLoading.value = true;
   error.value = '';
   try {
-    let url = '/services/public/all';
-    if (selectedCategory.value !== 'all') {
-      url = `/services/public/category/${encodeURIComponent(selectedCategory.value)}`;
-    }
-    if (searchQuery.value.trim()) {
-      url = `/services/public/search?q=${encodeURIComponent(searchQuery.value.trim())}`;
-    }
-    const response = await api.get(url);
+    const response = await api.get('/services/public/all', {
+      params: {
+        categorySlug: selectedCategory.value !== 'all' ? selectedCategory.value : undefined,
+        subcategorySlug: selectedSubcategory.value !== 'all' ? selectedSubcategory.value : undefined,
+        q: searchQuery.value.trim() || undefined,
+      },
+    });
     services.value = response.data || [];
     
     // Also load favorites if not initialized
@@ -155,6 +179,15 @@ const handleSearchInput = () => {
 };
 
 watch(selectedCategory, () => {
+  if (!subcategories.value.some((subcategory) => subcategory.value === selectedSubcategory.value)) {
+    selectedSubcategory.value = 'all';
+  }
+  if (!searchQuery.value.trim()) {
+    loadServices();
+  }
+});
+
+watch(selectedSubcategory, () => {
   if (!searchQuery.value.trim()) {
     loadServices();
   }
@@ -162,10 +195,6 @@ watch(selectedCategory, () => {
 
 const filteredServices = computed(() => {
   let result = [...services.value];
-
-  if (selectedCategory.value !== 'all' && searchQuery.value.trim()) {
-    result = result.filter(s => s.category === selectedCategory.value);
-  }
 
   switch (sortBy.value) {
     case 'price-asc':
@@ -245,6 +274,7 @@ const handleViewService = (params: { providerId: number; serviceId: number }) =>
 const clearFilters = () => {
   searchQuery.value = '';
   selectedCategory.value = 'all';
+  selectedSubcategory.value = 'all';
   sortBy.value = 'recent';
   loadServices();
 };
@@ -260,6 +290,7 @@ const getInitials = (name: string) => {
 };
 
 onMounted(() => {
+  categoryCatalogStore.loadPublicCategories();
   loadServices();
 });
 
@@ -330,6 +361,19 @@ watch(
             <SelectContent>
               <SelectItem v-for="cat in categories" :key="cat.value" :value="cat.value">
                 {{ cat.label }}
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div class="w-full md:w-56">
+          <Select :model-value="selectedSubcategory" @update:model-value="(val) => selectedSubcategory = val as string">
+            <SelectTrigger>
+              <SelectValue :label="subcategories.find(c => c.value === selectedSubcategory)?.label" placeholder="Subcategoria" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem v-for="subcategory in subcategories" :key="subcategory.value" :value="subcategory.value">
+                {{ subcategory.label }}
               </SelectItem>
             </SelectContent>
           </Select>

@@ -1,0 +1,482 @@
+{
+  "categories": [
+    {
+      "name": "Reformas e Construcao",
+      "sortOrder": 10,
+      "subcategories": [
+        { "name": "Pedreiro", "sortOrder": 10 },
+        { "name": "Pintor", "sortOrder": 20 },
+        { "name": "Gesseiro", "sortOrder": 30 },
+        { "name": "Azulejista", "sortOrder": 40 },
+        { "name": "Drywall", "sortOrder": 50 },
+        { "name": "Instalacao de Piso", "sortOrder": 60 },
+        { "name": "Revestimentos", "sortOrder": 70 },
+        { "name": "Telhadista", "sortOrder": 80 },
+        { "name": "Serralheria", "sortOrder": 90 },
+        { "name": "Vidracaria", "sortOrder": 100 },
+        { "name": "Impermeabilizacao", "sortOrder": 110 },
+        { "name": "Demolicao", "sortOrder": 120 },
+        { "name": "Mestre de Obras", "sortOrder": 130 },
+        { "name": "Pequenas Reformas", "sortOrder": 140 },
+        { "name": "Reforma Completa", "sortOrder": 150 }
+      ]
+    },
+    {
+      "name": "Instalacao e Manutencao Residencial",
+      "sortOrder": 20,
+      "subcategories": [
+        { "name": "Eletricista", "sortOrder": 10 },
+        { "name": "Encanador", "sortOrder": 20 },
+        { "name": "Montador de Moveis", "sortOrder": 30 },
+        { "name": "Marcenaria", "sortOrder": 40 },
+        { "name": "Chaveiro", "sortOrder": 50 },
+        { "name": "Instalacao de Ar-Condicionado", "sortOrder": 60 },
+        { "name": "Manutencao de Ar-Condicionado", "sortOrder": 70 },
+        { "name": "Refrigeracao", "sortOrder": 80 },
+        { "name": "Instalacao de Chuveiro", "sortOrder": 90 },
+        { "name": "Instalacao de Ventilador", "sortOrder": 100 },
+        { "name": "Instalacao de Iluminacao", "sortOrder": 110 },
+        { "name": "Instalacao de TV e Suporte", "sortOrder": 120 },
+        { "name": "Instalacao de Persianas e Cortinas", "sortOrder": 130 },
+        { "name": "Antenista", "sortOrder": 140 },
+        { "name": "Conserto de Eletrodomesticos", "sortOrder": 150 }
+      ]
+    },
+    {
+      "name": "Limpeza e Servicos Domesticos",
+      "sortOrder": 30,
+      "subcategories": [
+        { "name": "Diarista", "sortOrder": 10 },
+        { "name": "Faxina Pesada", "sortOrder": 20 },
+        { "name": "Limpeza Pos-Obra", "sortOrder": 30 },
+        { "name": "Limpeza de Estofados", "sortOrder": 40 },
+        { "name": "Limpeza de Colchao", "sortOrder": 50 },
+        { "name": "Limpeza de Tapetes", "sortOrder": 60 },
+        { "name": "Limpeza de Vidros", "sortOrder": 70 },
+        { "name": "Passadeira", "sortOrder": 80 },
+        { "name": "Lavagem de Roupas", "sortOrder": 90 },
+        { "name": "Organizacao Residencial", "sortOrder": 100 },
+        { "name": "Personal Organizer", "sortOrder": 110 },
+        { "name": "Cozinheira Domestica", "sortOrder": 120 },
+        { "name": "Governanca Residencial", "sortOrder": 130 }
+      ]
+    },
+    {
+      "name": "Mudancas e Fretes",
+      "sortOrder": 40,
+      "subcategories": [
+        { "name": "Frete Pequeno", "sortOrder": 10 },
+        { "name": "Frete Local", "sortOrder": 20 },
+        { "name": "Mudanca Residencial", "sortOrder": 30 },
+        { "name": "Mudanca Comercial", "sortOrder": 40 },
+        { "name": "Carreto", "sortOrder": 50 },
+        { "name": "Montagem e Desmontagem para Mudanca", "sortOrder": 60 },
+        { "name": "Embalagem", "sortOrder": 70 },
+        { "name": "Icamento", "sortOrder": 80 },
+        { "name": "Transporte de Moveis", "sortOrder": 90 },
+        { "name": "Transporte de Eletrodomesticos", "sortOrder": 100 }
+      ]
+    },
+    {
+      "name": "Jardinagem e Areas Externas",
+      "sortOrder": 50,
+      "subcategories": [
+        { "name": "Jardinagem", "sortOrder": 10 },
+        { "name": "Corte de Grama", "sortOrder": 20 },
+        { "name": "Paisagismo", "sortOrder": 30 },
+        { "name": "Poda de Arvores", "sortOrder": 40 },
+        { "name": "Limpeza de Terreno", "sortOrder": 50 },
+        { "name": "Irrigacao", "sortOrder": 60 },
+        { "name": "Manutencao de Jardim", "sortOrder": 70 },
+        { "name": "Piscineiro", "sortOrder": 80 },
+        { "name": "Limpeza de Piscina", "sortOrder": 90 }
+      ]
+    },
+    {
+      "name": "Seguranca Residencial e Empresarial",
+      "sortOrder": 60,
+      "subcategories": [
+        { "name": "Instalacao de Cameras", "sortOrder": 10 },
+        { "name": "Cerca Eletrica", "sortOrder": 20 },
+        { "name": "Alarmes", "sortOrder": 30 },
+        { "name": "Controle de Acesso", "sortOrder": 40 },
+        { "name": "Porteiro ou Vigia", "sortOrder": 50 },
+        { "name": "Consultoria em Seguranca", "sortOrder": 60 }
+      ]
+    },
+    {
+      "name": "Automotivo",
+      "sortOrder": 70,
+      "subcategories": [
+        { "name": "Mecanica Automotiva", "sortOrder": 10 },
+        { "name": "Eletrica Automotiva", "sortOrder": 20 },
+        { "name": "Funilaria", "sortOrder": 30 },
+        { "name": "Pintura Automotiva", "sortOrder": 40 },
+        { "name": "Lava Rapido", "sortOrder": 50 },
+        { "name": "Polimento e Estetica Automotiva", "sortOrder": 60 },
+        { "name": "Martelinho de Ouro", "sortOrder": 70 },
+        { "name": "Guincho", "sortOrder": 80 },
+        { "name": "Inspecao Veicular", "sortOrder": 90 },
+        { "name": "Instalacao de Som e Acessorios", "sortOrder": 100 }
+      ]
+    },
+    {
+      "name": "Tecnologia e Informatica",
+      "sortOrder": 80,
+      "subcategories": [
+        { "name": "Suporte Tecnico", "sortOrder": 10 },
+        { "name": "Formatacao de Computador", "sortOrder": 20 },
+        { "name": "Montagem de PC", "sortOrder": 30 },
+        { "name": "Instalacao de Software", "sortOrder": 40 },
+        { "name": "Remocao de Virus", "sortOrder": 50 },
+        { "name": "Redes e Wi-Fi", "sortOrder": 60 },
+        { "name": "Cabeamento", "sortOrder": 70 },
+        { "name": "Manutencao de Impressora", "sortOrder": 80 },
+        { "name": "Configuracao de Celular", "sortOrder": 90 },
+        { "name": "Recuperacao de Dados", "sortOrder": 100 }
+      ]
+    },
+    {
+      "name": "Desenvolvimento e TI",
+      "sortOrder": 90,
+      "subcategories": [
+        { "name": "Desenvolvimento Web", "sortOrder": 10 },
+        { "name": "Criacao de Sites", "sortOrder": 20 },
+        { "name": "E-commerce", "sortOrder": 30 },
+        { "name": "Landing Pages", "sortOrder": 40 },
+        { "name": "Desenvolvimento Mobile", "sortOrder": 50 },
+        { "name": "Desenvolvimento de Sistemas", "sortOrder": 60 },
+        { "name": "Automacoes", "sortOrder": 70 },
+        { "name": "Integracoes API", "sortOrder": 80 },
+        { "name": "Banco de Dados", "sortOrder": 90 },
+        { "name": "DevOps", "sortOrder": 100 },
+        { "name": "QA e Testes", "sortOrder": 110 },
+        { "name": "UX e UI", "sortOrder": 120 },
+        { "name": "No-code e Low-code", "sortOrder": 130 },
+        { "name": "Chatbots", "sortOrder": 140 },
+        { "name": "IA Aplicada", "sortOrder": 150 }
+      ]
+    },
+    {
+      "name": "Design e Criativo",
+      "sortOrder": 100,
+      "subcategories": [
+        { "name": "Design Grafico", "sortOrder": 10 },
+        { "name": "Identidade Visual", "sortOrder": 20 },
+        { "name": "Criacao de Logo", "sortOrder": 30 },
+        { "name": "Social Media Design", "sortOrder": 40 },
+        { "name": "Apresentacoes", "sortOrder": 50 },
+        { "name": "Ilustracao", "sortOrder": 60 },
+        { "name": "Design Editorial", "sortOrder": 70 },
+        { "name": "Embalagens", "sortOrder": 80 },
+        { "name": "Motion Design", "sortOrder": 90 },
+        { "name": "Modelagem 3D", "sortOrder": 100 }
+      ]
+    },
+    {
+      "name": "Marketing e Vendas",
+      "sortOrder": 110,
+      "subcategories": [
+        { "name": "Marketing Digital", "sortOrder": 10 },
+        { "name": "Gestao de Trafego", "sortOrder": 20 },
+        { "name": "Social Media", "sortOrder": 30 },
+        { "name": "Copywriting", "sortOrder": 40 },
+        { "name": "SEO", "sortOrder": 50 },
+        { "name": "E-mail Marketing", "sortOrder": 60 },
+        { "name": "Branding", "sortOrder": 70 },
+        { "name": "Gestao Comercial", "sortOrder": 80 },
+        { "name": "Prospeccao", "sortOrder": 90 },
+        { "name": "SDR e Closer", "sortOrder": 100 },
+        { "name": "Marketplace Management", "sortOrder": 110 }
+      ]
+    },
+    {
+      "name": "Audiovisual e Conteudo",
+      "sortOrder": 120,
+      "subcategories": [
+        { "name": "Fotografia", "sortOrder": 10 },
+        { "name": "Filmagem", "sortOrder": 20 },
+        { "name": "Edicao de Video", "sortOrder": 30 },
+        { "name": "Captacao com Drone", "sortOrder": 40 },
+        { "name": "Fotografia de Eventos", "sortOrder": 50 },
+        { "name": "Fotografia de Produto", "sortOrder": 60 },
+        { "name": "Podcast", "sortOrder": 70 },
+        { "name": "Locucao", "sortOrder": 80 },
+        { "name": "Producao Musical", "sortOrder": 90 },
+        { "name": "Streaming", "sortOrder": 100 }
+      ]
+    },
+    {
+      "name": "Escrita Traducao e Idiomas",
+      "sortOrder": 130,
+      "subcategories": [
+        { "name": "Redacao", "sortOrder": 10 },
+        { "name": "Revisao de Texto", "sortOrder": 20 },
+        { "name": "Traducao", "sortOrder": 30 },
+        { "name": "Transcricao", "sortOrder": 40 },
+        { "name": "Legendagem", "sortOrder": 50 },
+        { "name": "Ghostwriting", "sortOrder": 60 },
+        { "name": "Curriculos", "sortOrder": 70 },
+        { "name": "Escrita Academica", "sortOrder": 80 },
+        { "name": "Producao de Conteudo", "sortOrder": 90 }
+      ]
+    },
+    {
+      "name": "Administrativo e Suporte Profissional",
+      "sortOrder": 140,
+      "subcategories": [
+        { "name": "Assistente Virtual", "sortOrder": 10 },
+        { "name": "Atendimento ao Cliente", "sortOrder": 20 },
+        { "name": "Suporte via Chat", "sortOrder": 30 },
+        { "name": "Backoffice", "sortOrder": 40 },
+        { "name": "Digitacao", "sortOrder": 50 },
+        { "name": "Emissao de Documentos", "sortOrder": 60 },
+        { "name": "Pesquisa", "sortOrder": 70 },
+        { "name": "Agendamento", "sortOrder": 80 },
+        { "name": "Secretariado Remoto", "sortOrder": 90 }
+      ]
+    },
+    {
+      "name": "Juridico e Documentacao",
+      "sortOrder": 150,
+      "subcategories": [
+        { "name": "Advocacia Civel", "sortOrder": 10 },
+        { "name": "Advocacia Trabalhista", "sortOrder": 20 },
+        { "name": "Advocacia Previdenciaria", "sortOrder": 30 },
+        { "name": "Advocacia Empresarial", "sortOrder": 40 },
+        { "name": "Contratos", "sortOrder": 50 },
+        { "name": "Consultoria Juridica", "sortOrder": 60 },
+        { "name": "Regularizacao Documental", "sortOrder": 70 },
+        { "name": "LGPD", "sortOrder": 80 },
+        { "name": "Mediacao", "sortOrder": 90 }
+      ]
+    },
+    {
+      "name": "Financas e Contabilidade",
+      "sortOrder": 160,
+      "subcategories": [
+        { "name": "Contabilidade", "sortOrder": 10 },
+        { "name": "BPO Financeiro", "sortOrder": 20 },
+        { "name": "Emissao de Notas", "sortOrder": 30 },
+        { "name": "Imposto de Renda", "sortOrder": 40 },
+        { "name": "MEI e Abertura de Empresa", "sortOrder": 50 },
+        { "name": "Folha de Pagamento", "sortOrder": 60 },
+        { "name": "Planejamento Financeiro", "sortOrder": 70 },
+        { "name": "Consultoria Tributaria", "sortOrder": 80 }
+      ]
+    },
+    {
+      "name": "Arquitetura Engenharia e Interiores",
+      "sortOrder": 170,
+      "subcategories": [
+        { "name": "Arquitetura", "sortOrder": 10 },
+        { "name": "Design de Interiores", "sortOrder": 20 },
+        { "name": "Projetos 3D", "sortOrder": 30 },
+        { "name": "Engenharia Civil", "sortOrder": 40 },
+        { "name": "Engenharia Eletrica", "sortOrder": 50 },
+        { "name": "Laudos Tecnicos", "sortOrder": 60 },
+        { "name": "Regularizacao de Imoveis", "sortOrder": 70 },
+        { "name": "Topografia", "sortOrder": 80 },
+        { "name": "Decoracao", "sortOrder": 90 }
+      ]
+    },
+    {
+      "name": "Aulas e Educacao",
+      "sortOrder": 180,
+      "subcategories": [
+        { "name": "Reforco Escolar", "sortOrder": 10 },
+        { "name": "Aulas de Idiomas", "sortOrder": 20 },
+        { "name": "Aulas de Musica", "sortOrder": 30 },
+        { "name": "Aulas de Informatica", "sortOrder": 40 },
+        { "name": "Preparatorio para Concurso", "sortOrder": 50 },
+        { "name": "Preparatorio ENEM", "sortOrder": 60 },
+        { "name": "Tutoria Universitaria", "sortOrder": 70 },
+        { "name": "Aulas Particulares", "sortOrder": 80 },
+        { "name": "Treinamentos Corporativos", "sortOrder": 90 }
+      ]
+    },
+    {
+      "name": "Consultoria e Mentoria",
+      "sortOrder": 190,
+      "subcategories": [
+        { "name": "Mentoria de Carreira", "sortOrder": 10 },
+        { "name": "Consultoria de Negocios", "sortOrder": 20 },
+        { "name": "Consultoria de Marketing", "sortOrder": 30 },
+        { "name": "Consultoria Financeira", "sortOrder": 40 },
+        { "name": "Consultoria de Processos", "sortOrder": 50 },
+        { "name": "RH e Recrutamento", "sortOrder": 60 },
+        { "name": "Planejamento Estrategico", "sortOrder": 70 }
+      ]
+    },
+    {
+      "name": "Saude e Bem-estar",
+      "sortOrder": 200,
+      "subcategories": [
+        { "name": "Psicologia", "sortOrder": 10 },
+        { "name": "Nutricao", "sortOrder": 20 },
+        { "name": "Fisioterapia", "sortOrder": 30 },
+        { "name": "Terapias Integrativas", "sortOrder": 40 },
+        { "name": "Massagem", "sortOrder": 50 },
+        { "name": "Personal Trainer", "sortOrder": 60 },
+        { "name": "Yoga", "sortOrder": 70 },
+        { "name": "Pilates", "sortOrder": 80 },
+        { "name": "Fonoaudiologia", "sortOrder": 90 },
+        { "name": "Terapia Ocupacional", "sortOrder": 100 }
+      ]
+    },
+    {
+      "name": "Beleza e Estetica",
+      "sortOrder": 210,
+      "subcategories": [
+        { "name": "Cabeleireiro", "sortOrder": 10 },
+        { "name": "Barbeiro", "sortOrder": 20 },
+        { "name": "Maquiagem", "sortOrder": 30 },
+        { "name": "Manicure e Pedicure", "sortOrder": 40 },
+        { "name": "Design de Sobrancelhas", "sortOrder": 50 },
+        { "name": "Alongamento de Unhas", "sortOrder": 60 },
+        { "name": "Estetica Facial", "sortOrder": 70 },
+        { "name": "Estetica Corporal", "sortOrder": 80 },
+        { "name": "Depilacao", "sortOrder": 90 },
+        { "name": "Bronzeamento", "sortOrder": 100 }
+      ]
+    },
+    {
+      "name": "Cuidados Pessoais e Assistencia",
+      "sortOrder": 220,
+      "subcategories": [
+        { "name": "Cuidador de Idosos", "sortOrder": 10 },
+        { "name": "Baba", "sortOrder": 20 },
+        { "name": "Cuidador Infantil", "sortOrder": 30 },
+        { "name": "Acompanhante Hospitalar", "sortOrder": 40 },
+        { "name": "Cuidados Especiais", "sortOrder": 50 },
+        { "name": "Apoio Domiciliar", "sortOrder": 60 },
+        { "name": "Enfermagem Domiciliar", "sortOrder": 70 }
+      ]
+    },
+    {
+      "name": "Eventos e Festas",
+      "sortOrder": 230,
+      "subcategories": [
+        { "name": "Cerimonialista", "sortOrder": 10 },
+        { "name": "Decoracao de Festas", "sortOrder": 20 },
+        { "name": "Buffet", "sortOrder": 30 },
+        { "name": "Garcom", "sortOrder": 40 },
+        { "name": "Barman", "sortOrder": 50 },
+        { "name": "DJ", "sortOrder": 60 },
+        { "name": "Musica ao Vivo", "sortOrder": 70 },
+        { "name": "Fotografia de Eventos", "sortOrder": 80 },
+        { "name": "Recreacao Infantil", "sortOrder": 90 },
+        { "name": "Locacao de Equipamentos", "sortOrder": 100 }
+      ]
+    },
+    {
+      "name": "Gastronomia e Alimentacao",
+      "sortOrder": 240,
+      "subcategories": [
+        { "name": "Chef Particular", "sortOrder": 10 },
+        { "name": "Marmitas", "sortOrder": 20 },
+        { "name": "Buffet", "sortOrder": 30 },
+        { "name": "Confeitaria", "sortOrder": 40 },
+        { "name": "Bolos Personalizados", "sortOrder": 50 },
+        { "name": "Churrasqueiro", "sortOrder": 60 },
+        { "name": "Coffee Break", "sortOrder": 70 },
+        { "name": "Cozinha para Eventos", "sortOrder": 80 },
+        { "name": "Personal Chef", "sortOrder": 90 }
+      ]
+    },
+    {
+      "name": "Moda e Costura",
+      "sortOrder": 250,
+      "subcategories": [
+        { "name": "Costureira", "sortOrder": 10 },
+        { "name": "Ajustes de Roupa", "sortOrder": 20 },
+        { "name": "Modelista", "sortOrder": 30 },
+        { "name": "Bordado", "sortOrder": 40 },
+        { "name": "Croche", "sortOrder": 50 },
+        { "name": "Confeccao Sob Medida", "sortOrder": 60 },
+        { "name": "Personal Stylist", "sortOrder": 70 }
+      ]
+    },
+    {
+      "name": "Pets",
+      "sortOrder": 260,
+      "subcategories": [
+        { "name": "Banho e Tosa", "sortOrder": 10 },
+        { "name": "Adestramento", "sortOrder": 20 },
+        { "name": "Pet Sitter", "sortOrder": 30 },
+        { "name": "Passeador de Caes", "sortOrder": 40 },
+        { "name": "Hospedagem Pet", "sortOrder": 50 },
+        { "name": "Transporte Pet", "sortOrder": 60 },
+        { "name": "Cuidador Pet", "sortOrder": 70 },
+        { "name": "Fotografia Pet", "sortOrder": 80 }
+      ]
+    },
+    {
+      "name": "Servicos Empresariais",
+      "sortOrder": 270,
+      "subcategories": [
+        { "name": "Recrutamento e Selecao", "sortOrder": 10 },
+        { "name": "Departamento Pessoal", "sortOrder": 20 },
+        { "name": "Consultoria Comercial", "sortOrder": 30 },
+        { "name": "Treinamento de Equipe", "sortOrder": 40 },
+        { "name": "Processos e Operacao", "sortOrder": 50 },
+        { "name": "Facilities", "sortOrder": 60 },
+        { "name": "Secretariado Executivo", "sortOrder": 70 },
+        { "name": "Pesquisa de Mercado", "sortOrder": 80 }
+      ]
+    },
+    {
+      "name": "Servicos Industriais e Tecnicos",
+      "sortOrder": 280,
+      "subcategories": [
+        { "name": "Soldagem", "sortOrder": 10 },
+        { "name": "Usinagem", "sortOrder": 20 },
+        { "name": "Automacao Industrial", "sortOrder": 30 },
+        { "name": "Manutencao Industrial", "sortOrder": 40 },
+        { "name": "CLP e Paineis Eletricos", "sortOrder": 50 },
+        { "name": "Instrumentacao", "sortOrder": 60 },
+        { "name": "Refrigeracao Industrial", "sortOrder": 70 },
+        { "name": "Caldeiraria", "sortOrder": 80 }
+      ]
+    },
+    {
+      "name": "Turismo e Viagens",
+      "sortOrder": 290,
+      "subcategories": [
+        { "name": "Guia Turistico", "sortOrder": 10 },
+        { "name": "Roteiros Personalizados", "sortOrder": 20 },
+        { "name": "Concierge", "sortOrder": 30 },
+        { "name": "Tradutor para Viagem", "sortOrder": 40 },
+        { "name": "Motorista Particular", "sortOrder": 50 }
+      ]
+    },
+    {
+      "name": "Servicos Religiosos e Cerimoniais",
+      "sortOrder": 300,
+      "subcategories": [
+        { "name": "Celebrante", "sortOrder": 10 },
+        { "name": "Musica para Cerimonia", "sortOrder": 20 },
+        { "name": "Decoracao Religiosa", "sortOrder": 30 },
+        { "name": "Organizacao Cerimonial", "sortOrder": 40 }
+      ]
+    },
+    {
+      "name": "Personalizados e Sob Demanda",
+      "sortOrder": 310,
+      "subcategories": [
+        { "name": "Presentes Personalizados", "sortOrder": 10 },
+        { "name": "Artesanato", "sortOrder": 20 },
+        { "name": "Servicos Sob Encomenda", "sortOrder": 30 },
+        { "name": "Producao Manual", "sortOrder": 40 },
+        { "name": "Solucoes Especiais", "sortOrder": 50 }
+      ]
+    },
+    {
+      "name": "Outros",
+      "sortOrder": 999,
+      "subcategories": [
+        { "name": "Geral", "sortOrder": 10 }
+      ]
+    }
+  ]
+}

@@ -56,6 +56,7 @@ public class ServiceRequestService {
     private final WebSocketService webSocketService;
     private final NotificationService notificationService;
     private final FreelancerWalletService walletService;
+    private final CategoryCatalogService categoryCatalogService;
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private static final BigDecimal MIN_NEGOTIATED_AMOUNT = new BigDecimal("20.00");
@@ -152,12 +153,31 @@ public class ServiceRequestService {
             }
         }
 
+        CategoryCatalogService.CategorySelection categorySelection = selectedService != null
+                ? resolveSelectionFromService(selectedService)
+                : categoryCatalogService.resolveSelection(
+                        dto.getCategoryId(),
+                        dto.getSubcategoryId(),
+                        dto.getCategory(),
+                        dto.getSubcategory(),
+                        true,
+                        true,
+                        false,
+                        false);
+
+        String requestServiceName = StringUtils.hasText(dto.getServiceName())
+                ? dto.getServiceName().trim()
+                : selectedService != null ? selectedService.getTitle() : null;
+
         ServiceRequest request = ServiceRequest.builder()
                 .contractor(contractor)
                 .freelancer(freelancer)
                 .service(selectedService)
-                .serviceName(dto.getServiceName())
-                .category(dto.getCategory())
+                .serviceName(requestServiceName)
+                .category(categorySelection.getCategoryLabel())
+                .subcategory(categorySelection.getSubcategoryLabel())
+                .serviceCategory(categorySelection.getCategory())
+                .serviceSubcategory(categorySelection.getSubcategory())
                 .description(normalizedDescription)
                 .deadline(dto.getDeadline())
                 .workModel(requestWorkModel)
@@ -176,7 +196,7 @@ public class ServiceRequestService {
                     saved.getId(),
                     freelancer.getEmail(),
                     contractor.getName(),
-                    dto.getServiceName());
+                    requestServiceName);
             notificationService.notifyNewServiceRequest(saved, contractor);
         }
 
@@ -221,6 +241,9 @@ public class ServiceRequestService {
                                 service_id,
                                 service_name,
                                 category,
+                                subcategory,
+                                category_id,
+                                subcategory_id,
                                 description,
                                 budget,
                                 deadline,
@@ -233,7 +256,7 @@ public class ServiceRequestService {
                                 legacy_low_value_allowed,
                                 created_at,
                                 updated_at
-                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                             """,
                     Statement.RETURN_GENERATED_KEYS);
 
@@ -250,21 +273,32 @@ public class ServiceRequestService {
             }
             statement.setString(4, request.getServiceName());
             statement.setString(5, request.getCategory());
-            statement.setString(6, request.getDescription());
-            statement.setBigDecimal(7, LEGACY_BUDGET_PLACEHOLDER);
-            statement.setString(8, request.getDeadline());
-            statement.setString(9, request.getWorkModel().name());
-            statement.setString(10,
-                    request.getStatus() != null ? request.getStatus().name() : ServiceRequest.Status.PENDING.name());
-            statement.setBoolean(11, Boolean.TRUE.equals(request.getChatEnabled()));
-            statement.setString(12, request.getAddress());
-            if (request.getDesiredDate() != null) {
-                statement.setDate(13, Date.valueOf(request.getDesiredDate()));
+            statement.setString(6, request.getSubcategory());
+            if (request.getServiceCategory() != null) {
+                statement.setLong(7, request.getServiceCategory().getId());
             } else {
-                statement.setNull(13, java.sql.Types.DATE);
+                statement.setNull(7, java.sql.Types.BIGINT);
             }
-            statement.setString(14, request.getAttachments());
-            statement.setBoolean(15, Boolean.TRUE.equals(request.getLegacyLowValueAllowed()));
+            if (request.getServiceSubcategory() != null) {
+                statement.setLong(8, request.getServiceSubcategory().getId());
+            } else {
+                statement.setNull(8, java.sql.Types.BIGINT);
+            }
+            statement.setString(9, request.getDescription());
+            statement.setBigDecimal(10, LEGACY_BUDGET_PLACEHOLDER);
+            statement.setString(11, request.getDeadline());
+            statement.setString(12, request.getWorkModel().name());
+            statement.setString(13,
+                    request.getStatus() != null ? request.getStatus().name() : ServiceRequest.Status.PENDING.name());
+            statement.setBoolean(14, Boolean.TRUE.equals(request.getChatEnabled()));
+            statement.setString(15, request.getAddress());
+            if (request.getDesiredDate() != null) {
+                statement.setDate(16, Date.valueOf(request.getDesiredDate()));
+            } else {
+                statement.setNull(16, java.sql.Types.DATE);
+            }
+            statement.setString(17, request.getAttachments());
+            statement.setBoolean(18, Boolean.TRUE.equals(request.getLegacyLowValueAllowed()));
             return statement;
         }, keyHolder);
 
@@ -868,6 +902,19 @@ public class ServiceRequestService {
         }
     }
 
+    private CategoryCatalogService.CategorySelection resolveSelectionFromService(
+            com.servija.servija.model.Service service) {
+        return categoryCatalogService.resolveSelection(
+                service.getServiceCategory() != null ? service.getServiceCategory().getId() : null,
+                service.getServiceSubcategory() != null ? service.getServiceSubcategory().getId() : null,
+                service.getCategory(),
+                null,
+                true,
+                false,
+                true,
+                false);
+    }
+
     private ServiceRequestResponse toResponse(ServiceRequest request) {
         return ServiceRequestResponse.builder()
                 .id(request.getId())
@@ -878,7 +925,19 @@ public class ServiceRequestService {
                 .freelancerName(request.getFreelancer() != null ? request.getFreelancer().getName() : null)
                 .freelancerAvatar(request.getFreelancer() != null ? request.getFreelancer().getAvatarUrl() : null)
                 .serviceName(request.getServiceName())
+                .categoryId(request.getServiceCategory() != null ? request.getServiceCategory().getId() : null)
+                .categorySlug(request.getServiceCategory() != null ? request.getServiceCategory().getSlug() : null)
+                .categoryLabel(request.getServiceCategory() != null ? request.getServiceCategory().getName()
+                        : request.getCategory())
                 .category(request.getCategory())
+                .subcategoryId(
+                        request.getServiceSubcategory() != null ? request.getServiceSubcategory().getId() : null)
+                .subcategorySlug(
+                        request.getServiceSubcategory() != null ? request.getServiceSubcategory().getSlug() : null)
+                .subcategoryLabel(
+                        request.getServiceSubcategory() != null ? request.getServiceSubcategory().getName()
+                                : request.getSubcategory())
+                .subcategory(request.getSubcategory())
                 .description(normalizeRequestDescription(request.getDescription()))
                 .deadline(request.getDeadline())
                 .workModel(request.getWorkModel() != null ? request.getWorkModel().name() : null)

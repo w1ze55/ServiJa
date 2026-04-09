@@ -22,6 +22,13 @@ public class FreelancerProfileRequest {
     
     @Size(max = 50, message = "Categoria deve ter no máximo 50 caracteres")
     private String category;
+
+    private Long categoryId;
+
+    private Long subcategoryId;
+
+    @Size(max = 160, message = "Subcategoria deve ter no maximo 160 caracteres")
+    private String subcategory;
     
     @Size(max = 1000, message = "Bio deve ter no máximo 1000 caracteres")
     private String bio;

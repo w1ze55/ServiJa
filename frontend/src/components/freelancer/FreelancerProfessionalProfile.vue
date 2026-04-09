@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import {
   MapPin,
   Link as LinkIcon,
@@ -37,6 +37,7 @@ import AlertDialogHeader from '../ui/alert-dialog-header.vue'
 import AlertDialogTitle from '../ui/alert-dialog-title.vue'
 import api from '@/api/config/axios'
 import { toast } from '@/utils/toast'
+import { useCategoryCatalogStore } from '@/stores/categoryCatalogStore'
 
 interface Props {
   onNavigate: (page: string, params?: any) => void;
@@ -58,6 +59,10 @@ interface ProfessionalLink {
 }
 
 interface ProfessionalProfile {
+  categoryId?: number | null
+  subcategoryId?: number | null
+  category: string
+  subcategory: string
   serviceType: string
   bio: string
   serviceCities: ServiceCity[]
@@ -65,7 +70,7 @@ interface ProfessionalProfile {
 }
 
 
-const SERVICE_TYPES = [
+const LEGACY_SERVICE_TYPES = [
   'Eletricista',
   'Encanador',
   'Pintor',
@@ -83,6 +88,19 @@ const SERVICE_TYPES = [
   'Mecânico',
   'Outro',
 ]
+const categoryCatalogStore = useCategoryCatalogStore()
+const categories = computed(() =>
+  categoryCatalogStore.activePublicCategories.length > 0
+    ? categoryCatalogStore.activePublicCategories
+    : LEGACY_SERVICE_TYPES.map((name, index) => ({
+        id: index + 1,
+        slug: name.toLowerCase().replace(/\s+/g, '-'),
+        name,
+        sortOrder: index,
+        active: true,
+        subcategories: [],
+      }))
+)
 
 const LINK_TYPES = [
   { value: 'website', label: 'Website', icon: Globe },
@@ -107,6 +125,10 @@ const isSaving = ref(false)
 
 // Profile data
 const profileData = ref<ProfessionalProfile>({
+  categoryId: null,
+  subcategoryId: null,
+  category: '',
+  subcategory: '',
   serviceType: '',
   bio: '',
   serviceCities: [],
@@ -114,6 +136,9 @@ const profileData = ref<ProfessionalProfile>({
 })
 
 const editedData = ref<ProfessionalProfile>({ ...profileData.value })
+const selectedSubcategories = computed(() =>
+  categoryCatalogStore.getSubcategoriesByCategoryId(editedData.value.categoryId || null)
+)
 
 // City Dialog
 const showCityDialog = ref(false)
@@ -144,6 +169,7 @@ const isSavingLink = ref(false)
 const linkToDelete = ref<ProfessionalLink | null>(null)
 
 onMounted(() => {
+  categoryCatalogStore.loadPublicCategories()
   loadProfileData()
 })
 
@@ -169,7 +195,11 @@ const loadProfileData = async () => {
     }))
 
     profileData.value = {
-      serviceType: data.serviceType || data.category || '',
+      categoryId: data.categoryId ?? null,
+      subcategoryId: data.subcategoryId ?? null,
+      category: data.categoryLabel || data.category || data.serviceType || '',
+      subcategory: data.subcategoryLabel || data.subcategory || '',
+      serviceType: data.categoryLabel || data.category || data.serviceType || '',
       bio: data.bio || '',
       serviceCities: mappedCities,
       professionalLinks: mappedLinks,
@@ -181,7 +211,11 @@ const loadProfileData = async () => {
     if (userString) {
       const user = JSON.parse(userString)
       profileData.value = {
-        serviceType: user.serviceType || user.category || '',
+        categoryId: user.categoryId ?? null,
+        subcategoryId: user.subcategoryId ?? null,
+        category: user.category || user.serviceType || '',
+        subcategory: user.subcategory || '',
+        serviceType: user.category || user.serviceType || '',
         bio: user.bio || '',
         serviceCities: [],
         professionalLinks: [],
@@ -195,19 +229,42 @@ const loadProfileData = async () => {
 
 // Service settings
 const handleSaveServiceSettings = async () => {
-  if (!editedData.value.serviceType) {
+  if (!editedData.value.categoryId) {
+    toast.error('Categoria e obrigatoria')
+    return
+    /*
     toast.error('Tipo de serviço é obrigatório')
     return
   }
 
+    */
+  }
+
+  if (selectedSubcategories.value.length > 0 && !editedData.value.subcategoryId) {
+    toast.error('Subcategoria e obrigatoria')
+    return
+  }
+
+  const selectedCategory = categories.value.find((category) => category.id === editedData.value.categoryId)
+  const selectedSubcategory = selectedSubcategories.value.find(
+    (subcategory) => subcategory.id === editedData.value.subcategoryId
+  )
+
   isSaving.value = true
   try {
     await api.put('/freelancer/profile', {
-      serviceType: editedData.value.serviceType,
-      category: editedData.value.serviceType,
+      serviceType: selectedCategory?.name || editedData.value.serviceType,
+      categoryId: editedData.value.categoryId,
+      subcategoryId: editedData.value.subcategoryId,
+      category: selectedCategory?.name || editedData.value.category,
+      subcategory: selectedSubcategory?.name || editedData.value.subcategory,
     })
 
-    profileData.value.serviceType = editedData.value.serviceType
+    profileData.value.categoryId = editedData.value.categoryId
+    profileData.value.subcategoryId = editedData.value.subcategoryId
+    profileData.value.category = selectedCategory?.name || editedData.value.category
+    profileData.value.subcategory = selectedSubcategory?.name || editedData.value.subcategory
+    profileData.value.serviceType = selectedCategory?.name || editedData.value.serviceType
     isEditingServiceSettings.value = false
     toast.success('Configurações de trabalho atualizadas!')
   } catch (error: any) {
@@ -219,9 +276,41 @@ const handleSaveServiceSettings = async () => {
 }
 
 const handleCancelServiceSettings = () => {
+  editedData.value.categoryId = profileData.value.categoryId
+  editedData.value.subcategoryId = profileData.value.subcategoryId
+  editedData.value.category = profileData.value.category
+  editedData.value.subcategory = profileData.value.subcategory
   editedData.value.serviceType = profileData.value.serviceType
   isEditingServiceSettings.value = false
 }
+
+watch(
+  () => editedData.value.categoryId,
+  (categoryId) => {
+    const selectedCategory = categories.value.find((category) => category.id === categoryId)
+    editedData.value.category = selectedCategory?.name || ''
+    editedData.value.serviceType = selectedCategory?.name || ''
+
+    const subcategoryStillValid = selectedSubcategories.value.some(
+      (subcategory) => subcategory.id === editedData.value.subcategoryId
+    )
+
+    if (!subcategoryStillValid) {
+      editedData.value.subcategoryId = null
+      editedData.value.subcategory = ''
+    }
+  }
+)
+
+watch(
+  () => editedData.value.subcategoryId,
+  (subcategoryId) => {
+    const selectedSubcategory = selectedSubcategories.value.find(
+      (subcategory) => subcategory.id === subcategoryId
+    )
+    editedData.value.subcategory = selectedSubcategory?.name || ''
+  }
+)
 
 // Biography
 const handleSaveBio = async () => {
@@ -589,15 +678,40 @@ const getLinkLabel = (link: ProfessionalLink) => {
           <div class="space-y-2">
             <Label for="serviceType">Tipo de Serviço *</Label>
             <Select
-              :model-value="editedData.serviceType"
-              @update:model-value="(val: string) => editedData.serviceType = val"
+              :model-value="editedData.categoryId ? String(editedData.categoryId) : ''"
+              @update:model-value="(val: string) => editedData.categoryId = val ? Number(val) : null"
             >
               <SelectTrigger>
                 <SelectValue placeholder="Selecione o tipo de serviço" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem v-for="type in SERVICE_TYPES" :key="type" :value="type">
-                  {{ type }}
+                <SelectItem v-for="category in categories" :key="category.id" :value="String(category.id)">
+                  {{ category.name }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div class="space-y-2">
+            <Label for="subcategory">
+              Subcategoria
+              <span v-if="selectedSubcategories.length > 0" class="text-red-500">*</span>
+            </Label>
+            <Select
+              :model-value="editedData.subcategoryId ? String(editedData.subcategoryId) : ''"
+              @update:model-value="(val: string) => editedData.subcategoryId = val ? Number(val) : null"
+              :disabled="!editedData.categoryId || selectedSubcategories.length === 0"
+            >
+              <SelectTrigger>
+                <SelectValue :placeholder="selectedSubcategories.length > 0 ? 'Selecione a subcategoria' : 'Escolha uma categoria primeiro'" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem
+                  v-for="subcategory in selectedSubcategories"
+                  :key="subcategory.id"
+                  :value="String(subcategory.id)"
+                >
+                  {{ subcategory.name }}
                 </SelectItem>
               </SelectContent>
             </Select>
