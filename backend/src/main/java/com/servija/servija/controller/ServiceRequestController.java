@@ -93,6 +93,18 @@ public class ServiceRequestController {
         return ResponseEntity.ok(serviceRequestService.respondToRequest(id, dto, email));
     }
 
+    @PatchMapping("/{id}/milestones/{milestoneId}")
+    @Operation(summary = "Atualizar status de marco", description = "Atualiza o status de um marco cadastrado na proposta do freelancer")
+    @SecurityRequirement(name = "bearerAuth")
+    public ResponseEntity<ServiceRequestResponse> updateMilestoneStatus(
+            @PathVariable Long id,
+            @PathVariable String milestoneId,
+            @RequestBody Map<String, String> body,
+            Authentication authentication) {
+        String status = body != null ? body.get("status") : null;
+        return ResponseEntity.ok(serviceRequestService.updateMilestoneStatus(id, milestoneId, status, authentication.getName()));
+    }
+
     @PatchMapping("/{id}/counter-proposal")
     @Operation(summary = "Enviar contra proposta", description = "Cliente envia uma contra proposta com novo valor e prazo")
     @SecurityRequirement(name = "bearerAuth")

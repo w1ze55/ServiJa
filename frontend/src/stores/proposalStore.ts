@@ -61,8 +61,6 @@ export interface Milestone {
   id: string;
   title: string;
   description: string;
-  deadline: string;
-  value: number;
   status: 'pending' | 'in_progress' | 'completed';
 }
 
@@ -156,6 +154,27 @@ export const useProposalStore = defineStore('proposal', () => {
       description: attachment.description?.trim() || undefined,
     }));
 
+  const mapMilestones = (
+    milestones: Array<{
+      id?: string | number | null;
+      title?: string | null;
+      description?: string | null;
+      status?: string | null;
+    }> | undefined,
+    requestId: string | number
+  ): Milestone[] | undefined => {
+    const normalized = (milestones || [])
+      .filter((milestone) => typeof milestone?.title === 'string' && milestone.title.trim())
+      .map((milestone, index) => ({
+        id: String(milestone.id ?? `milestone-${requestId}-${index}`),
+        title: milestone.title!.trim(),
+        description: typeof milestone.description === 'string' ? milestone.description.trim() : '',
+        status: milestone.status === 'completed' || milestone.status === 'in_progress' ? milestone.status : 'pending',
+      }));
+
+    return normalized.length > 0 ? normalized : undefined;
+  };
+
   const stats = computed<ProposalStats>(() => ({
     pending: proposals.value.filter((p) => p.status === 'pending').length,
     negotiating: proposals.value.filter((p) => p.status === 'negotiating' || p.status === 'accepted').length,
@@ -206,7 +225,7 @@ export const useProposalStore = defineStore('proposal', () => {
               scope: req.responseScope,
               notes: req.responseNotes,
               sentAt: req.respondedAt,
-              milestones: req.milestones,
+              milestones: mapMilestones(req.milestones, req.id),
               attachments: mapAttachments(req.responseAttachments, 'ratt', req.id)
             } : undefined,
             counterValue: req.counterValue,
@@ -274,6 +293,7 @@ export const useProposalStore = defineStore('proposal', () => {
     if (proposal) {
       proposal.freelancerResponse = {
         ...response,
+        milestones: response.milestones ? [...response.milestones] : undefined,
         sentAt: new Date().toISOString(),
       };
       proposal.status = 'negotiating';
@@ -401,13 +421,12 @@ export const useProposalStore = defineStore('proposal', () => {
       const proposal = proposals.value.find((p) => p.id === proposalId);
       if (!proposal?.freelancerResponse?.milestones) return false;
 
+      const response = await api.patch(`/service-requests/${proposalId}/milestones/${milestoneId}`, { status });
+      const updatedMilestones = mapMilestones(response.data?.milestones, proposalId);
+      proposal.freelancerResponse.milestones = updatedMilestones || [];
+
       const milestone = proposal.freelancerResponse.milestones.find((m) => m.id === milestoneId);
       if (!milestone) return false;
-
-      milestone.status = status;
-
-      // TODO: Chamar API
-      // await api.patch(`/proposals/${proposalId}/milestones/${milestoneId}`, { status });
 
       const statusLabels: Record<string, string> = {
         pending: 'Pendente',

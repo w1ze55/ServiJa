@@ -9,17 +9,15 @@ import {
   Calendar,
   CheckCircle,
   MessageSquare,
-  DollarSign,
   AlertCircle,
   Loader2,
-  Briefcase,
-  Trash2,
 } from 'lucide-vue-next';
 import AttachmentUploadField from '../shared/AttachmentUploadField.vue';
 import FileAttachment from '../shared/FileAttachment.vue';
 import Button from '../ui/button.vue';
 import Card from '../ui/card.vue';
 import Badge from '../ui/badge.vue';
+import Checkbox from '../ui/checkbox.vue';
 import Progress from '../ui/progress.vue';
 import Avatar from '../ui/avatar.vue';
 import AvatarFallback from '../ui/avatar-fallback.vue';
@@ -152,6 +150,24 @@ const selectedProject = computed(() =>
   activeProjects.value.find((p) => p.id === selectedProjectId.value) || null
 );
 
+const getMilestoneProgress = (project: Proposal | null) => {
+  if (!project) return 0;
+
+  const milestones = project.freelancerResponse?.milestones;
+  if (milestones && milestones.length > 0) {
+    const completed = milestones.filter((milestone) => milestone.status === 'completed').length;
+    return Math.round((completed / milestones.length) * 100);
+  }
+
+  return 50;
+};
+
+const selectedProjectMilestones = computed(() => selectedProject.value?.freelancerResponse?.milestones ?? []);
+
+const selectedProjectCompletedMilestones = computed(
+  () => selectedProjectMilestones.value.filter((milestone) => milestone.status === 'completed').length
+);
+
 const pendingAdjustmentForSelectedProject = computed(() => {
   if (!selectedProject.value) return null;
   return adjustmentStore.adjustments.find(a => 
@@ -166,16 +182,7 @@ watch(selectedProjectId, async (newId) => {
   }
 });
 
-const projectProgress = computed(() => {
-  const project = selectedProject.value;
-  if (!project) return 0;
-  const milestones = project.freelancerResponse?.milestones;
-  if (milestones && milestones.length > 0) {
-    const completed = milestones.filter((m) => m.status === 'completed').length;
-    return Math.round((completed / milestones.length) * 100);
-  }
-  return 50;
-});
+const projectProgress = computed(() => getMilestoneProgress(selectedProject.value));
 
 const remainingDays = computed(() => {
   const project = selectedProject.value;
@@ -189,38 +196,6 @@ const remainingDays = computed(() => {
   today.setHours(0, 0, 0, 0);
   const diffMs = deadlineDate.getTime() - today.getTime();
   return Math.round(diffMs / (1000 * 60 * 60 * 24));
-});
-
-const paymentProgress = computed(() => {
-  const project = selectedProject.value;
-  if (!project) return 0;
-  const milestones = project.freelancerResponse?.milestones;
-  if (milestones && milestones.length > 0) {
-    const completedValue = milestones
-      .filter((m) => m.status === 'completed')
-      .reduce((sum, m) => sum + m.value, 0);
-    const totalValue = milestones.reduce((sum, m) => sum + m.value, 0);
-    return totalValue > 0 ? Math.round((completedValue / totalValue) * 100) : 0;
-  }
-  return 0;
-});
-
-const paidAmount = computed(() => {
-  const project = selectedProject.value;
-  if (!project) return 0;
-  const milestones = project.freelancerResponse?.milestones;
-  if (milestones && milestones.length > 0) {
-    return milestones
-      .filter((m) => m.status === 'completed')
-      .reduce((sum, m) => sum + m.value, 0);
-  }
-  return 0;
-});
-
-const totalAmount = computed(() => {
-  const project = selectedProject.value;
-  if (!project) return 0;
-  return project.freelancerResponse?.value ?? project.budget ?? 0;
 });
 
 // Select project
@@ -320,8 +295,8 @@ const handleMilestoneComplete = async (milestone: Milestone) => {
     newStatus
   );
   if (success) {
-    const label = newStatus === 'completed' ? 'concluído' : 'reaberto';
-    toast.success(`Marco "${milestone.title}" ${label}!`);
+    const label = newStatus === 'completed' ? 'marcado como concluído' : 'desmarcado';
+    toast.success(`Marco "${milestone.title}" ${label}.`);
   } else {
     toast.error('Erro ao atualizar marco.');
   }
@@ -528,24 +503,11 @@ const getMilestoneStatusConfig = (status: Milestone['status']) => {
             <div class="flex items-center justify-between text-xs">
               <span class="text-[#435574]">Progresso</span>
               <span class="text-[#263238] font-medium">
-                {{ project.freelancerResponse?.milestones?.length
-                  ? Math.round(
-                      (project.freelancerResponse.milestones.filter((m) => m.status === 'completed').length /
-                        project.freelancerResponse.milestones.length) *
-                        100
-                    )
-                  : 50
-                }}%
+                {{ getMilestoneProgress(project) }}%
               </span>
             </div>
             <Progress
-              :value="
-                project.freelancerResponse?.milestones?.length
-                  ? (project.freelancerResponse.milestones.filter((m) => m.status === 'completed').length /
-                      project.freelancerResponse.milestones.length) *
-                    100
-                  : 50
-              "
+              :value="getMilestoneProgress(project)"
               class="h-1.5"
             />
           </div>
@@ -601,6 +563,57 @@ const getMilestoneStatusConfig = (status: Milestone['status']) => {
                   </div>
                   <Progress :value="projectProgress" class="h-2" />
                 </div>
+
+                <div
+                  v-if="selectedProjectMilestones.length > 0"
+                  class="rounded-xl border border-slate-200 bg-slate-50 p-4"
+                >
+                  <div class="flex items-start justify-between gap-4 mb-4">
+                    <div>
+                      <h3 class="text-sm font-semibold text-[#263238]">Checklist do Projeto</h3>
+                      <p class="text-sm text-[#435574]">
+                        {{ selectedProjectCompletedMilestones }} de {{ selectedProjectMilestones.length }}
+                        {{ selectedProjectMilestones.length === 1 ? 'marco concluído' : 'marcos concluídos' }}
+                      </p>
+                    </div>
+                    <Badge class="bg-white text-[#263238] border border-slate-200 hover:bg-white">
+                      {{ projectProgress }}%
+                    </Badge>
+                  </div>
+
+                  <div class="space-y-3">
+                    <label
+                      v-for="milestone in selectedProjectMilestones"
+                      :key="milestone.id"
+                      class="flex items-start gap-3 rounded-lg border border-slate-200 bg-white px-3 py-3"
+                    >
+                      <Checkbox
+                        class="mt-0.5"
+                        :checked="milestone.status === 'completed'"
+                        @update:checked="() => handleMilestoneComplete(milestone)"
+                      />
+
+                      <div class="min-w-0 flex-1">
+                        <div class="flex items-center gap-2 flex-wrap">
+                          <p
+                            :class="[
+                              'text-sm font-medium',
+                              milestone.status === 'completed' ? 'text-slate-500 line-through' : 'text-[#263238]',
+                            ]"
+                          >
+                            {{ milestone.title }}
+                          </p>
+                          <Badge :class="getMilestoneStatusConfig(milestone.status).class" class="text-xs">
+                            {{ getMilestoneStatusConfig(milestone.status).label }}
+                          </Badge>
+                        </div>
+                        <p v-if="milestone.description" class="text-sm text-[#435574] mt-1">
+                          {{ milestone.description }}
+                        </p>
+                      </div>
+                    </label>
+                  </div>
+                </div>
               </div>
 
               <div class="flex gap-8 mb-6">
@@ -650,70 +663,6 @@ const getMilestoneStatusConfig = (status: Milestone['status']) => {
                   <CheckCircle class="h-4 w-4 mr-2" />
                   Finalizar Ajustes
                 </Button>
-              </div>
-            </Card>
-
-            <!-- Milestones Section -->
-            <Card
-              v-if="selectedProject.freelancerResponse?.milestones && selectedProject.freelancerResponse.milestones.length > 0"
-              class="p-6"
-            >
-              <h3 class="text-lg font-semibold text-[#263238] mb-4">Marcos de Entrega</h3>
-              <div class="space-y-3">
-                <div
-                  v-for="milestone in selectedProject.freelancerResponse.milestones"
-                  :key="milestone.id"
-                  :class="[
-                    'p-4 rounded-lg border transition-colors',
-                    milestone.status === 'completed'
-                      ? 'bg-green-50 border-green-200'
-                      : milestone.status === 'in_progress'
-                      ? 'bg-blue-50 border-blue-200'
-                      : 'bg-gray-50 border-gray-200',
-                  ]"
-                >
-                  <div class="flex items-start justify-between">
-                    <div class="flex-1">
-                      <div class="flex items-center gap-2 mb-1">
-                        <h4 class="font-medium text-[#263238]">{{ milestone.title }}</h4>
-                        <Badge :class="getMilestoneStatusConfig(milestone.status).class" class="text-xs">
-                          {{ getMilestoneStatusConfig(milestone.status).label }}
-                        </Badge>
-                      </div>
-                      <p class="text-sm text-[#435574] mb-2">{{ milestone.description }}</p>
-                      <div class="flex items-center gap-4 text-xs text-[#435574]">
-                        <span class="flex items-center gap-1">
-                          <Calendar class="h-3 w-3" />
-                          Prazo: {{ milestone.deadline }}
-                        </span>
-                        <span class="flex items-center gap-1">
-                          <DollarSign class="h-3 w-3" />
-                          {{ formatCurrency(milestone.value) }}
-                        </span>
-                      </div>
-                    </div>
-                    <Button
-                      v-if="milestone.status !== 'completed'"
-                      @click.stop="handleMilestoneComplete(milestone)"
-                      size="sm"
-                      variant="default"
-                      class="ml-3"
-                    >
-                      <Check class="h-3 w-3 mr-1" />
-                      Concluir Marco
-                    </Button>
-                    <Button
-                      v-else
-                      @click.stop="handleMilestoneComplete(milestone)"
-                      size="sm"
-                      variant="outline"
-                      class="text-green-700 border-green-300 hover:bg-green-50 ml-3"
-                    >
-                      <CheckCircle class="h-3 w-3 mr-1" />
-                      Concluído
-                    </Button>
-                  </div>
-                </div>
               </div>
             </Card>
 

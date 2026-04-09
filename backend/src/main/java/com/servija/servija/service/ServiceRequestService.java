@@ -6,6 +6,7 @@ import com.servija.servija.dto.CounterProposalDTO;
 import com.servija.servija.dto.FreelancerAttachmentDTO;
 import com.servija.servija.dto.FreelancerAttachmentsRequest;
 import com.servija.servija.dto.FreelancerResponseDTO;
+import com.servija.servija.dto.ResponseMilestoneDTO;
 import com.servija.servija.dto.ServiceRequestDTO;
 import com.servija.servija.dto.ServiceRequestResponse;
 import com.servija.servija.exception.ResourceNotFoundException;
@@ -37,6 +38,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.regex.Pattern;
 
 @Service
@@ -62,6 +64,7 @@ public class ServiceRequestService {
     private static final BigDecimal MIN_NEGOTIATED_AMOUNT = new BigDecimal("20.00");
     private static final BigDecimal MAX_NEGOTIATED_AMOUNT = new BigDecimal("1000000.00");
     private static final BigDecimal LEGACY_BUDGET_PLACEHOLDER = MIN_NEGOTIATED_AMOUNT;
+    private static final List<String> VALID_MILESTONE_STATUSES = List.of("pending", "in_progress", "completed");
 
     @Transactional
     public ServiceRequestResponse create(String contractorEmail, ServiceRequestDTO dto) {
@@ -437,7 +440,11 @@ public class ServiceRequestService {
             } catch (Exception e) {
                 throw new RuntimeException("Error serializing attachments", e);
             }
+        } else {
+            request.setResponseAttachments(null);
         }
+
+        request.setResponseMilestones(serializeResponseMilestones(dto.getMilestones()));
 
         ServiceRequest saved = serviceRequestRepository.save(request);
         String details = String.format("Valor: R$ %.2f | Prazo: %d dias", dto.getValue(), dto.getExecutionDays());
@@ -451,6 +458,48 @@ public class ServiceRequestService {
                 String.format("R$ %.2f", dto.getValue()));
         notificationService.notifyNewProposal(saved, freelancer);
 
+        return toResponse(saved);
+    }
+
+    @Transactional
+    public ServiceRequestResponse updateMilestoneStatus(Long id, String milestoneId, String status, String freelancerEmail) {
+        if (!StringUtils.hasText(status)) {
+            throw new IllegalArgumentException("Informe o status do marco");
+        }
+
+        ServiceRequest request = serviceRequestRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Solicitacao nao encontrada"));
+
+        User freelancer = userRepository.findByEmail(freelancerEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("Freelancer nao encontrado"));
+
+        if (request.getFreelancer() == null || !request.getFreelancer().getId().equals(freelancer.getId())) {
+            throw new IllegalStateException("Apenas o freelancer responsavel pode atualizar marcos");
+        }
+
+        List<ResponseMilestoneDTO> milestones = parseResponseMilestones(request.getResponseMilestones());
+        if (milestones.isEmpty()) {
+            throw new ResourceNotFoundException("Nao ha marcos cadastrados para esta solicitacao");
+        }
+
+        String normalizedMilestoneId = milestoneId != null ? milestoneId.trim() : "";
+        String normalizedStatus = normalizeMilestoneStatus(status);
+        boolean updated = false;
+
+        for (ResponseMilestoneDTO milestone : milestones) {
+            if (normalizedMilestoneId.equals(milestone.getId())) {
+                milestone.setStatus(normalizedStatus);
+                updated = true;
+                break;
+            }
+        }
+
+        if (!updated) {
+            throw new ResourceNotFoundException("Marco nao encontrado");
+        }
+
+        request.setResponseMilestones(serializeResponseMilestones(milestones));
+        ServiceRequest saved = serviceRequestRepository.save(request);
         return toResponse(saved);
     }
 
@@ -893,6 +942,91 @@ public class ServiceRequestService {
         return url != null && url.contains(".s3.") && url.contains("amazonaws.com");
     }
 
+    private String serializeResponseMilestones(List<ResponseMilestoneDTO> milestones) {
+        List<ResponseMilestoneDTO> normalizedMilestones = normalizeResponseMilestones(milestones);
+        if (normalizedMilestones.isEmpty()) {
+            return null;
+        }
+
+        try {
+            return objectMapper.writeValueAsString(normalizedMilestones);
+        } catch (Exception e) {
+            log.error("Erro ao serializar response milestones", e);
+            throw new RuntimeException("Erro ao salvar marcos da proposta");
+        }
+    }
+
+    private List<ResponseMilestoneDTO> parseResponseMilestones(String json) {
+        if (!StringUtils.hasText(json)) {
+            return new ArrayList<>();
+        }
+
+        try {
+            JsonNode root = objectMapper.readTree(json);
+            if (!root.isArray()) {
+                return new ArrayList<>();
+            }
+
+            List<ResponseMilestoneDTO> milestones = new ArrayList<>();
+            for (JsonNode node : root) {
+                if (!node.isObject()) {
+                    continue;
+                }
+
+                String title = node.path("title").asText(null);
+                if (!StringUtils.hasText(title)) {
+                    continue;
+                }
+
+                milestones.add(ResponseMilestoneDTO.builder()
+                        .id(StringUtils.hasText(node.path("id").asText(null))
+                                ? node.path("id").asText().trim()
+                                : UUID.randomUUID().toString())
+                        .title(title.trim())
+                        .description(StringUtils.hasText(node.path("description").asText(null))
+                                ? node.path("description").asText().trim()
+                                : null)
+                        .status(normalizeMilestoneStatus(node.path("status").asText(null)))
+                        .build());
+            }
+            return milestones;
+        } catch (Exception e) {
+            log.warn("Erro ao deserializar response milestones: {}", e.getMessage());
+            return new ArrayList<>();
+        }
+    }
+
+    private List<ResponseMilestoneDTO> normalizeResponseMilestones(List<ResponseMilestoneDTO> milestones) {
+        List<ResponseMilestoneDTO> normalized = new ArrayList<>();
+        if (milestones == null) {
+            return normalized;
+        }
+
+        for (ResponseMilestoneDTO milestone : milestones) {
+            if (milestone == null || !StringUtils.hasText(milestone.getTitle())) {
+                continue;
+            }
+
+            normalized.add(ResponseMilestoneDTO.builder()
+                    .id(StringUtils.hasText(milestone.getId()) ? milestone.getId().trim() : UUID.randomUUID().toString())
+                    .title(milestone.getTitle().trim())
+                    .description(StringUtils.hasText(milestone.getDescription()) ? milestone.getDescription().trim() : null)
+                    .status(normalizeMilestoneStatus(milestone.getStatus()))
+                    .build());
+        }
+
+        return normalized;
+    }
+
+    private String normalizeMilestoneStatus(String status) {
+        if (!StringUtils.hasText(status)) {
+            return "pending";
+        }
+
+        String normalized = status.trim().toLowerCase();
+        return VALID_MILESTONE_STATUSES.contains(normalized) ? normalized : "pending";
+    }
+
     private ServiceRequest.WorkModel resolveRequestWorkModel(
             ServiceRequestDTO dto,
             com.servija.servija.model.Service service) {
@@ -967,6 +1101,7 @@ public class ServiceRequestService {
                 .freelancerAttachments(parseAttachmentUrls(request.getFreelancerAttachments()))
                 .freelancerAttachmentDetails(parseFreelancerAttachmentDetails(request.getFreelancerAttachments()))
                 .responseAttachments(parseAttachmentUrls(request.getResponseAttachments()))
+                .milestones(parseResponseMilestones(request.getResponseMilestones()))
                 .createdAt(request.getCreatedAt())
                 .updatedAt(request.getUpdatedAt())
                 .build();

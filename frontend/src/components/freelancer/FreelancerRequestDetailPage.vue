@@ -4,7 +4,6 @@ import {
   ArrowLeft,
   Calendar,
   MapPin,
-  DollarSign,
   Clock,
   FileText,
   Download,
@@ -90,6 +89,7 @@ const isLoading = ref(false);
 const proposal = ref<Proposal | null>(null);
 
 const MAX_EXECUTION_DAYS = 365;
+const PLATFORM_FEE_PERCENTAGE = 0.05;
 
 const proposalForm = ref({
   value: '',
@@ -103,8 +103,6 @@ const milestones = ref<Array<Omit<Milestone, 'status'> & { status?: Milestone['s
 const milestoneForm = ref({
   title: '',
   description: '',
-  deadline: '',
-  value: '',
 });
 const showAddMilestone = ref(false);
 
@@ -315,6 +313,15 @@ const parseCurrencyValue = (value: string): number => {
   return parseFloat(numbers) || 0;
 };
 
+const roundCurrency = (value: number) => Math.round(value * 100) / 100;
+
+const proposalGrossValue = computed(() => parseCurrencyValue(proposalForm.value.value));
+const proposalPlatformFee = computed(() => roundCurrency(proposalGrossValue.value * PLATFORM_FEE_PERCENTAGE));
+const proposalNetValue = computed(() =>
+  roundCurrency(Math.max(0, proposalGrossValue.value - proposalPlatformFee.value))
+);
+const shouldShowProposalNetValue = computed(() => proposalGrossValue.value > 0);
+
 const handleExecutionDaysInput = (value: string) => {
   const clean = value.replace(/\D/g, '');
   const digitsOnly = clean.slice(0, 3);
@@ -393,37 +400,24 @@ const validateProposal = () => {
     errors.push(`Prazo de execução não pode ser maior que ${MAX_EXECUTION_DAYS} dias`);
   }
 
-  if (milestones.value.length > 0) {
-    const milestonesTotal = milestones.value.reduce((sum, m) => {
-      const mValue = parseCurrencyValue(String(m.value));
-      return sum + (isNaN(mValue) ? 0 : mValue);
-    }, 0);
-
-    if (Math.abs(milestonesTotal - value) > 0.01) {
-      errors.push('A soma dos valores dos marcos deve ser igual ao valor total da proposta');
-    }
-  }
-
   return errors;
 };
 
 const handleAddMilestone = () => {
-  if (!milestoneForm.value.title || !milestoneForm.value.deadline || !milestoneForm.value.value) {
-    toast.error('Preencha todos os campos obrigatórios do marco');
+  if (!milestoneForm.value.title.trim()) {
+    toast.error('Informe o título do marco');
     return;
   }
 
   const newMilestone = {
     id: Date.now().toString(),
-    title: milestoneForm.value.title,
-    description: milestoneForm.value.description,
-    deadline: milestoneForm.value.deadline,
-    value: parseCurrencyValue(milestoneForm.value.value),
+    title: milestoneForm.value.title.trim(),
+    description: milestoneForm.value.description.trim(),
     status: 'pending' as const,
   };
 
   milestones.value = [...milestones.value, newMilestone];
-  milestoneForm.value = { title: '', description: '', deadline: '', value: '' };
+  milestoneForm.value = { title: '', description: '' };
   showAddMilestone.value = false;
   toast.success('Marco adicionado com sucesso');
 };
@@ -711,15 +705,7 @@ const getStatusBadge = (currentProposal: Proposal) => {
               variant="default"
             >
               <Send class="h-4 w-4 mr-2" />
-              {{ proposal.freelancerResponse ? 'Atualizar Proposta' : 'Enviar Proposta' }}
-            </Button>
-            <Button
-              v-if="proposal.status === 'in_progress'"
-              @click="showCompleteDialog = true"
-              variant="success"
-            >
-              <CheckCircle class="h-4 w-4 mr-2" />
-              Marcar como Entregue
+              {{ proposal.freelancerResponse ? 'Atualizar Orçamento' : 'Enviar Orçamento' }}
             </Button>
           </div>
         </div>
@@ -938,16 +924,6 @@ const getStatusBadge = (currentProposal: Proposal) => {
                       <p v-if="milestone.description" class="text-sm text-[#435574] mb-2">
                         {{ milestone.description }}
                       </p>
-                      <div class="flex items-center gap-4 text-sm text-[#435574]">
-                        <span class="flex items-center gap-1">
-                          <Calendar class="h-4 w-4" />
-                          {{ new Date(milestone.deadline).toLocaleDateString('pt-BR') }}
-                        </span>
-                        <span class="flex items-center gap-1">
-                          <DollarSign class="h-4 w-4" />
-                          {{ formatCurrency(milestone.value) }}
-                        </span>
-                      </div>
                     </div>
                     <div v-if="proposal.status === 'accepted' || proposal.status === 'in_progress'" class="flex gap-2">
                       <Button
@@ -1144,9 +1120,9 @@ const getStatusBadge = (currentProposal: Proposal) => {
     <Dialog :open="showSendProposalDialog" @update:open="(val) => showSendProposalDialog = val">
       <DialogContent class="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{{ proposal?.freelancerResponse ? 'Atualizar Proposta' : 'Enviar Proposta' }}</DialogTitle>
+          <DialogTitle>{{ proposal?.freelancerResponse ? 'Atualizar Orçamento' : 'Enviar Orçamento' }}</DialogTitle>
           <DialogDescription>
-            Preencha os detalhes da sua proposta para este serviço
+            Preencha os detalhes do seu orçamento para este serviço
           </DialogDescription>
         </DialogHeader>
 
@@ -1161,6 +1137,17 @@ const getStatusBadge = (currentProposal: Proposal) => {
                 @update:model-value="(val) => proposalForm.value = handleCurrencyInput(val as string)"
                 placeholder="R$ 0,00"
               />
+              <div
+                v-if="shouldShowProposalNetValue"
+                class="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm"
+              >
+                <p class="text-gray-600 mb-1">
+                  Valor a receber: {{ formatCurrency(proposalNetValue) }}
+                </p>
+                <p class="text-gray-600">
+                  Já considerando 5% da plataforma ({{ formatCurrency(proposalPlatformFee) }}).
+                </p>
+              </div>
             </div>
 
             <div class="space-y-2">
@@ -1226,18 +1213,6 @@ const getStatusBadge = (currentProposal: Proposal) => {
                   placeholder="Descrição do marco"
                   :rows="2"
                 />
-                <div class="grid grid-cols-2 gap-3">
-                  <Input
-                    type="date"
-                    :model-value="milestoneForm.deadline"
-                    @update:model-value="(val) => milestoneForm.deadline = val as string"
-                  />
-                  <Input
-                    :model-value="milestoneForm.value"
-                    @update:model-value="(val) => milestoneForm.value = handleCurrencyInput(val as string)"
-                    placeholder="Valor do marco"
-                  />
-                </div>
                 <div class="flex gap-2">
                   <Button @click="handleAddMilestone" size="sm" class="flex-1">
                     Adicionar
@@ -1270,16 +1245,6 @@ const getStatusBadge = (currentProposal: Proposal) => {
                     <p v-if="milestone.description" class="text-sm text-[#435574] mb-2">
                       {{ milestone.description }}
                     </p>
-                    <div class="flex items-center gap-4 text-sm text-[#435574]">
-                      <span class="flex items-center gap-1">
-                        <Calendar class="h-4 w-4" />
-                        {{ new Date(milestone.deadline).toLocaleDateString('pt-BR') }}
-                      </span>
-                      <span class="flex items-center gap-1">
-                        <DollarSign class="h-4 w-4" />
-                        {{ formatCurrency(milestone.value) }}
-                      </span>
-                    </div>
                   </div>
                   <Button
                     @click="handleRemoveMilestone(milestone.id)"
@@ -1348,6 +1313,12 @@ const getStatusBadge = (currentProposal: Proposal) => {
             Você está prestes a enviar uma proposta de
             <strong>{{ proposalForm.value }}</strong> com prazo de
             <strong>{{ proposalForm.executionDays }} dias</strong>.
+            <template v-if="shouldShowProposalNetValue">
+              <br />
+              <br />
+              Valor a receber após a taxa da plataforma (5%):
+              <strong>{{ formatCurrency(proposalNetValue) }}</strong>.
+            </template>
             <template v-if="milestones.length > 0">
               <br />
               <br />

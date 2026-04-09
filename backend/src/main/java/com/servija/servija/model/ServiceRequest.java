@@ -102,6 +102,9 @@ public class ServiceRequest {
     @Column(name = "response_attachments", columnDefinition = "TEXT")
     private String responseAttachments;
 
+    @Column(name = "response_milestones", columnDefinition = "LONGTEXT")
+    private String responseMilestones;
+
     @DecimalMin(value = "5.00", message = "O valor minimo e R$ 5,00")
     @DecimalMax(value = "1000000.00", message = "O valor maximo e R$ 1.000.000,00")
     @Column(name = "response_value", precision = 10, scale = 2)

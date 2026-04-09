@@ -44,6 +44,7 @@ public class ServiceRequestResponse {
     private List<String> freelancerAttachments;
     private List<FreelancerAttachmentDTO> freelancerAttachmentDetails;
     private List<String> responseAttachments;
+    private List<ResponseMilestoneDTO> milestones;
 
     private BigDecimal responseValue;
     private Integer responseDays;
