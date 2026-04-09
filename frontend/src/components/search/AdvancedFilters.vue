@@ -308,7 +308,8 @@ const distanceValue = computed({
         <Button
           @click="handleApply"
           :disabled="!hasChanges"
-          class="w-full bg-[#286AD8] hover:bg-[#435574] transition-colors"
+          variant="default"
+          class="w-full"
           size="lg"
         >
           Aplicar Filtros
@@ -316,7 +317,7 @@ const distanceValue = computed({
         <Button
           @click="handleClear"
           variant="outline"
-          class="w-full border-[#286AD8] text-[#286AD8] hover:bg-blue-50"
+          class="w-full text-primary border-primary hover:bg-blue-50"
           size="lg"
         >
           Limpar Filtros

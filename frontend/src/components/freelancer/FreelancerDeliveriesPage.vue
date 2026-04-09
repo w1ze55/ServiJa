@@ -220,7 +220,7 @@ const paidAmount = computed(() => {
 const totalAmount = computed(() => {
   const project = selectedProject.value;
   if (!project) return 0;
-  return project.freelancerResponse?.value || project.budget;
+  return project.freelancerResponse?.value ?? project.budget ?? 0;
 });
 
 // Select project
@@ -229,8 +229,8 @@ const selectProject = async (id: string) => {
 };
 
 // Format currency
-const formatCurrency = (value: number) =>
-  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+const formatCurrency = (value?: number | null) =>
+  value == null ? 'A combinar' : new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 
 // Client initials
 const getInitials = (name: string) =>
@@ -484,7 +484,7 @@ const getMilestoneStatusConfig = (status: Milestone['status']) => {
       </div>
       <h2 class="text-xl font-semibold text-[#263238] mb-2">Nenhum projeto em andamento</h2>
       <p class="text-[#435574] mb-6">Quando um cliente aceitar sua proposta, o projeto aparecerá aqui.</p>
-      <Button @click="props.onNavigate('freelancer-proposals')" class="bg-[#286AD8] hover:bg-[#435574]">
+      <Button @click="props.onNavigate('freelancer-proposals')" variant="default">
         <FileText class="h-4 w-4 mr-2" />
         Ver Solicitações
       </Button>
@@ -624,7 +624,7 @@ const getMilestoneStatusConfig = (status: Milestone['status']) => {
 
               <!-- Action Buttons -->
               <div class="flex flex-wrap gap-3">
-                <Button @click="openUploadDialog" variant="outline" class="border-[#286AD8] text-[#286AD8] hover:bg-blue-50">
+                <Button @click="openUploadDialog" variant="outline">
                   <Upload class="h-4 w-4 mr-2" />
                   Enviar Arquivos
                 </Button>
@@ -636,7 +636,7 @@ const getMilestoneStatusConfig = (status: Milestone['status']) => {
                 <Button
                   v-if="selectedProject.status !== 'delivered' && !pendingAdjustmentForSelectedProject"
                   @click="showCompleteDialog = true"
-                  class="bg-[#286AD8] hover:bg-[#435574]"
+                  variant="default"
                 >
                   <Check class="h-4 w-4 mr-2" />
                   Concluir Entrega
@@ -645,7 +645,7 @@ const getMilestoneStatusConfig = (status: Milestone['status']) => {
                 <Button
                   v-if="pendingAdjustmentForSelectedProject"
                   @click="showCompleteAdjustmentDialog = true"
-                  class="bg-yellow-600 hover:bg-yellow-700 text-white"
+                  variant="warning"
                 >
                   <CheckCircle class="h-4 w-4 mr-2" />
                   Finalizar Ajustes
@@ -696,7 +696,8 @@ const getMilestoneStatusConfig = (status: Milestone['status']) => {
                       v-if="milestone.status !== 'completed'"
                       @click.stop="handleMilestoneComplete(milestone)"
                       size="sm"
-                      class="bg-[#286AD8] hover:bg-[#435574] ml-3"
+                      variant="default"
+                      class="ml-3"
                     >
                       <Check class="h-3 w-3 mr-1" />
                       Concluir Marco
@@ -854,7 +855,6 @@ const getMilestoneStatusConfig = (status: Milestone['status']) => {
           <AlertDialogAction
             @click="handleCompleteDelivery"
             :disabled="isCompleting"
-            class="bg-[#286AD8] hover:bg-[#435574]"
           >
             <Loader2 v-if="isCompleting" class="h-4 w-4 mr-2 animate-spin" />
             <Check v-else class="h-4 w-4 mr-2" />
@@ -887,7 +887,7 @@ const getMilestoneStatusConfig = (status: Milestone['status']) => {
           <AlertDialogAction
             @click="handleCompleteAdjustment"
             :disabled="isCompletingAdjustment"
-            class="bg-yellow-600 hover:bg-yellow-700 text-white"
+            class="bg-warning text-warning-foreground hover:bg-warning/90"
           >
             <Loader2 v-if="isCompletingAdjustment" class="h-4 w-4 mr-2 animate-spin" />
             <CheckCircle v-else class="h-4 w-4 mr-2" />
@@ -935,7 +935,7 @@ const getMilestoneStatusConfig = (status: Milestone['status']) => {
           <Button
             @click="handleUploadFiles"
             :disabled="isUploading || uploadFiles.length === 0"
-            class="bg-[#286AD8] hover:bg-[#435574]"
+            variant="default"
           >
             <Loader2 v-if="isUploading" class="h-4 w-4 mr-2 animate-spin" />
             <Upload v-else class="h-4 w-4 mr-2" />

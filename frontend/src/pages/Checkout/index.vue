@@ -36,6 +36,13 @@ onMounted(async () => {
       return;
     }
 
+    const negotiatedPrice = data.responseValue ?? data.counterValue;
+    if (!negotiatedPrice) {
+      error.value = 'O freelancer ainda nao enviou um valor para esta solicitacao';
+      isLoading.value = false;
+      return;
+    }
+
     // Montar dados da proposta para o checkout
     proposalData.value = {
       freelancerId: data.freelancerId,
@@ -44,7 +51,7 @@ onMounted(async () => {
       freelancerRating: 4.8,
       service: data.serviceName,
       description: data.description,
-      price: parseFloat(data.responseValue || data.counterValue || data.budget),
+      price: Number(negotiatedPrice),
       deliveryTime: `${data.responseDays || data.counterDays || 7} dias`,
     };
 
@@ -101,7 +108,7 @@ const handleConfirmPayment = async (paymentMethod: string, paymentData: any) => 
         </div>
         <h2 class="text-2xl font-bold text-[#263238] mb-2">Ops!</h2>
         <p class="text-[#435574] mb-6">{{ error }}</p>
-        <Button @click="handleBack" class="bg-[#286AD8] hover:bg-[#435574]">
+        <Button @click="handleBack" variant="default">
           Voltar para Minhas Solicitações
         </Button>
       </div>

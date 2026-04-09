@@ -30,21 +30,6 @@
   padding: 0;
 }
 
-.signup-personal-data-back-button {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  color: rgb(75, 85, 99);
-  background: none;
-  border: none;
-  cursor: pointer;
-  margin-bottom: 1.5rem;
-  transition: color 0.2s;
-}
-
-.signup-personal-data-back-button:hover {
-  color: rgb(17, 24, 39);
-}
 
 .signup-personal-data-header {
   margin-bottom: 2rem;
@@ -203,11 +188,5 @@
 .signup-personal-data-terms-link:hover {
   text-decoration: underline;
 }
-
-.signup-personal-data-submit-button {
-  width: 100%;
-}
-
-
 
 

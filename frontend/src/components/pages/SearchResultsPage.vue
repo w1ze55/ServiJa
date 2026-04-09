@@ -300,13 +300,13 @@ const activeFiltersCount = computed(() => {
           <Button
             @click="showFilters = true"
             variant="outline"
-            class="border-[#286AD8] text-[#286AD8] hover:bg-blue-50"
+            class="text-primary border-primary hover:bg-blue-50"
           >
             <SlidersHorizontal class="h-4 w-4 mr-2" />
             Filtros
             <span
               v-if="activeFiltersCount > 0"
-              class="ml-2 bg-[#286AD8] text-white rounded-full w-5 h-5 flex items-center justify-center text-xs"
+              class="ml-2 bg-primary text-white rounded-full w-5 h-5 flex items-center justify-center text-xs"
             >
               {{ activeFiltersCount }}
             </span>
@@ -346,7 +346,7 @@ const activeFiltersCount = computed(() => {
           currentPage = 1;
         "
         variant="outline"
-        class="border-[#286AD8] text-[#286AD8]"
+        class="text-primary border-primary"
       >
         Limpar filtros
       </Button>
@@ -380,7 +380,6 @@ const activeFiltersCount = computed(() => {
           :key="page"
           @click="currentPage = page"
           :variant="currentPage === page ? 'default' : 'outline'"
-          :class="currentPage === page ? 'bg-[#286AD8]' : ''"
         >
           {{ page }}
         </Button>

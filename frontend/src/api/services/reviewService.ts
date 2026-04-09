@@ -32,6 +32,26 @@ export interface PendingReview {
   completedAt: string;
 }
 
+export interface AiCommentRequest {
+  rating: number;
+  tags: string[];
+  serviceName?: string;
+  freelancerName?: string;
+  existingComment?: string | null;
+}
+
+export interface AiCommentResponse {
+  suggestion: string;
+}
+
+export interface AiSummaryResponse {
+  available: boolean;
+  strengths: string[];
+  attentionPoints: string[];
+  overall: string;
+  generatedAt?: string;
+}
+
 const reviewService = {
   async createReview(serviceRequestId: string | number, data: ReviewData): Promise<ReviewResponse> {
     const response = await api.post<ReviewResponse>(`/reviews/${serviceRequestId}`, data);
@@ -63,6 +83,16 @@ const reviewService = {
       }
       throw error;
     }
+  },
+
+  async suggestComment(data: AiCommentRequest): Promise<AiCommentResponse> {
+    const response = await api.post<AiCommentResponse>('/reviews/ai/suggest-comment', data);
+    return response.data;
+  },
+
+  async getAiSummary(freelancerId: string | number): Promise<AiSummaryResponse> {
+    const response = await api.get<AiSummaryResponse>(`/reviews/ai/summary/${freelancerId}`);
+    return response.data;
   },
 };
 

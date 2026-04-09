@@ -15,21 +15,6 @@
   position: relative;
 }
 
-.auth-card-back-button {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  color: #435574;
-  margin-bottom: 1rem;
-  transition: color 0.2s;
-  background: none;
-  border: none;
-  cursor: pointer;
-}
-
-.auth-card-back-button:hover {
-  color: #263238;
-}
 
 .auth-card-main {
   position: relative;
@@ -153,31 +138,8 @@
   text-decoration: underline;
 }
 
-.auth-card-submit-button {
-  width: 100%;
-  background-color: #286AD8;
-  transition: background-color 0.2s;
-}
-
-.auth-card-submit-button:hover {
-  background-color: #435574;
-}
-
 .auth-card-switch-text {
   color: #435574;
-}
-
-.auth-card-switch-button {
-  color: #286AD8;
-  background: none;
-  border: none;
-  cursor: pointer;
-  transition: color 0.2s;
-}
-
-.auth-card-switch-button:hover {
-  color: #435574;
-  text-decoration: underline;
 }
 
 .auth-card-progress-header {
@@ -292,10 +254,9 @@
 }
 
 .auth-card-overlay-button {
-  background-color: transparent;
   border: 2px solid white;
   color: white;
-  transition: all 0.2s;
+  background-color: transparent;
 }
 
 .auth-card-overlay-button:hover {

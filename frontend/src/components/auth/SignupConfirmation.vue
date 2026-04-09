@@ -1,15 +1,16 @@
 <template>
   <div :class="props.inline ? '' : 'min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4'">
     <div :class="props.inline ? '' : 'w-full max-w-4xl bg-white rounded-lg shadow-xl p-8'">
-      <button
+      <Button
         v-if="!props.inline"
+        variant="ghost"
         @click="onBack"
-        class="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6"
+        class="mb-6"
         :disabled="isLoading"
       >
         <ArrowLeft class="h-4 w-4" />
         Voltar
-      </button>
+      </Button>
 
       <div v-if="!props.inline" class="mb-8">
         <div class="flex items-center justify-between mb-2">

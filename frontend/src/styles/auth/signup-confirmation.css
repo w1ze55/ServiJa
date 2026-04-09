@@ -30,21 +30,6 @@
   padding: 0;
 }
 
-.signup-confirmation-back-button {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  color: rgb(75, 85, 99);
-  background: none;
-  border: none;
-  cursor: pointer;
-  margin-bottom: 1.5rem;
-  transition: color 0.2s;
-}
-
-.signup-confirmation-back-button:hover {
-  color: rgb(17, 24, 39);
-}
 
 .signup-confirmation-header {
   margin-bottom: 2rem;
@@ -213,11 +198,5 @@
 .signup-confirmation-terms-link:hover {
   text-decoration: underline;
 }
-
-.signup-confirmation-submit-button {
-  width: 100%;
-}
-
-
 
 

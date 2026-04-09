@@ -51,13 +51,14 @@ const accountTypes: Array<{
 <template>
   <div class="signup-account-type-container">
     <div class="signup-account-type-card">
-      <button
+      <Button
+        variant="ghost"
         @click="props.onBack"
-        class="signup-account-type-back-button"
+        class="mb-6"
       >
         <ArrowLeft class="h-4 w-4" />
         Voltar
-      </button>
+      </Button>
 
       <div class="signup-account-type-header">
         <div class="signup-account-type-progress-header">
@@ -120,20 +121,22 @@ const accountTypes: Array<{
       <Button
         @click="selectedType && props.onNext(selectedType)"
         :disabled="!selectedType"
-        class="signup-account-type-submit-button"
+        class="w-full"
         size="lg"
       >
         Continuar
       </Button>
 
       <div v-if="props.onBackToLanding" class="signup-account-type-back-wrapper">
-        <button
+        <Button
+          variant="ghost"
+          size="sm"
           @click="props.onBackToLanding"
-          class="signup-account-type-back-link"
+          class="mx-auto"
         >
           <ArrowLeft class="h-4 w-4" />
           Voltar para a página inicial
-        </button>
+        </Button>
       </div>
     </div>
   </div>

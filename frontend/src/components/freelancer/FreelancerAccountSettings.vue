@@ -188,7 +188,7 @@ const strengthData = computed(() => getPasswordStrengthLabel(strength.value));
           <Button
             @click="showPasswordDialog = true"
             variant="outline"
-            class="border-[#286AD8] text-[#286AD8] hover:bg-blue-50"
+            class="text-primary border-primary"
           >
             <Key class="h-4 w-4 mr-2" />
             Alterar Senha
@@ -231,7 +231,6 @@ const strengthData = computed(() => getPasswordStrengthLabel(strength.value));
           <Button
             v-else
             @click="showTwoFactorDialog = true"
-            class="bg-[#286AD8] hover:bg-[#435574]"
           >
             <Shield class="h-4 w-4 mr-2" />
             Ativar 2FA
@@ -392,7 +391,7 @@ const strengthData = computed(() => getPasswordStrengthLabel(strength.value));
           <Button @click="showPasswordDialog = false" variant="outline">
             Cancelar
           </Button>
-          <Button @click="handleChangePassword" class="bg-[#286AD8] hover:bg-[#435574]">
+          <Button @click="handleChangePassword">
             Alterar Senha
           </Button>
         </DialogFooter>
@@ -447,7 +446,7 @@ const strengthData = computed(() => getPasswordStrengthLabel(strength.value));
           <Button @click="showTwoFactorDialog = false" variant="outline">
             Cancelar
           </Button>
-          <Button @click="handleEnable2FA" class="bg-[#286AD8] hover:bg-[#435574]">
+          <Button @click="handleEnable2FA">
             Ativar 2FA
           </Button>
         </DialogFooter>
@@ -480,7 +479,7 @@ const strengthData = computed(() => getPasswordStrengthLabel(strength.value));
           <AlertDialogCancel>Cancelar</AlertDialogCancel>
           <AlertDialogAction
             @click="handleConfirmDelete"
-            class="bg-red-600 hover:bg-red-700"
+            class="bg-destructive hover:bg-destructive/90"
           >
             Continuar
           </AlertDialogAction>
@@ -538,7 +537,7 @@ const strengthData = computed(() => getPasswordStrengthLabel(strength.value));
           <AlertDialogCancel>Cancelar</AlertDialogCancel>
           <AlertDialogAction
             @click="handleFinalDeleteAccount"
-            class="bg-red-600 hover:bg-red-700"
+            class="bg-destructive hover:bg-destructive/90"
           >
             Excluir Definitivamente
           </AlertDialogAction>

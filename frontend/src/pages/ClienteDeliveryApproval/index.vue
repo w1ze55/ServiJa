@@ -236,7 +236,7 @@ onUnmounted(() => {
         <p class="mb-4 text-[#435574]">
           A solicitacao que voce esta procurando nao existe ou foi removida.
         </p>
-        <Button @click="router.push('/cliente-projects')" class="bg-[#286AD8] hover:bg-[#435574]">
+        <Button variant="default" @click="router.push('/cliente-projects')">
           Voltar para Meus Projetos
         </Button>
       </div>

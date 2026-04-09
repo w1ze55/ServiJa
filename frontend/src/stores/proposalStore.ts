@@ -13,7 +13,7 @@ export interface Proposal {
   service: string;
   category: string;
   description: string;
-  budget: number;
+  budget?: number | null;
   deadline: string;
   workModel?: WorkModelValue | null;
   status: 'pending' | 'negotiating' | 'accepted' | 'in_progress' | 'delivered' | 'rejected' | 'completed' | 'archived';
@@ -166,7 +166,7 @@ export const useProposalStore = defineStore('proposal', () => {
         service: req.serviceName,
         category: req.category,
         description: req.description,
-        budget: Number(req.budget),
+        budget: req.budget ?? null,
         deadline: req.deadline,
         workModel: normalizeWorkModel(req.workModel),
         status: mapApiStatusToLocal(req.status),

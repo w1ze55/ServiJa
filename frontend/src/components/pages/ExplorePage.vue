@@ -14,6 +14,7 @@ import {
   ChevronRight,
   DollarSign,
   Clock,
+  Star,
 } from 'lucide-vue-next';
 import Button from '../ui/button.vue';
 import Card from '../ui/card.vue';
@@ -32,16 +33,16 @@ import api from '@/api/config/axios';
 import { toast } from '@/utils/toast';
 import { useFavoritesStore } from '@/stores/favorites';
 import { CATEGORIES } from '@/constants/categories';
+import { getServicePriceDisplay, getServicePriceSortValue, type ServicePriceRangeData } from '@/utils/servicePricing';
+import { formatServiceRatingDisplay, hasServiceRating, type ServiceReviewSummary } from '@/utils/serviceReviews';
 
-interface ServiceItem {
+interface ServiceItem extends ServicePriceRangeData, ServiceReviewSummary {
   id: number;
   freelancerId: number;
   freelancerName: string;
   title: string;
   category: string;
   description: string;
-  price: number;
-  priceType: string;
   deliveryTime: number;
   deliveryUnit: string;
   workModel?: string | null;
@@ -51,6 +52,14 @@ interface ServiceItem {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+interface FreelancerProfileData {
+  id: number;
+  location?: string | null;
+  rating?: number | null;
+  totalReviews?: number | null;
+  available?: boolean | null;
 }
 
 interface Props {
@@ -67,6 +76,7 @@ const selectedCategory = ref('all');
 const sortBy = ref('recent');
 const searchMode = ref<'services' | 'professionals'>('services');
 const viewMode = ref<'grid' | 'list'>('grid');
+const freelancerProfiles = ref<Record<number, FreelancerProfileData>>({});
 
 const favoritesStore = useFavoritesStore();
 
@@ -109,6 +119,29 @@ const loadServices = async () => {
   }
 };
 
+const loadFreelancerProfiles = async (freelancerIds: number[]) => {
+  if (freelancerIds.length === 0) {
+    freelancerProfiles.value = {};
+    return;
+  }
+
+  try {
+    const profiles = await Promise.all(
+      freelancerIds.map(async (freelancerId) => {
+        const response = await api.get(`/freelancer/${freelancerId}/profile`);
+        return response.data as FreelancerProfileData;
+      })
+    );
+
+    freelancerProfiles.value = profiles.reduce<Record<number, FreelancerProfileData>>((acc, profile) => {
+      acc[profile.id] = profile;
+      return acc;
+    }, {});
+  } catch (err) {
+    console.error('Erro ao carregar perfis de freelancers:', err);
+  }
+};
+
 const handleSearch = () => {
   loadServices();
 };
@@ -136,10 +169,10 @@ const filteredServices = computed(() => {
 
   switch (sortBy.value) {
     case 'price-asc':
-      result.sort((a, b) => a.price - b.price);
+      result.sort((a, b) => getServicePriceSortValue(a) - getServicePriceSortValue(b));
       break;
     case 'price-desc':
-      result.sort((a, b) => b.price - a.price);
+      result.sort((a, b) => getServicePriceSortValue(b) - getServicePriceSortValue(a));
       break;
     case 'name-asc':
       result.sort((a, b) => a.title.localeCompare(b.title));
@@ -170,17 +203,22 @@ const freelancerGroups = computed(() => {
 });
 
 const freelancerResults = computed(() =>
-  freelancerGroups.value.map((group) => ({
-    id: group.freelancerId,
-    name: group.freelancerName,
-    avatar: group.freelancerProfilePhoto,
-    category: Array.from(new Set(group.services.map((s) => s.category))).join(', '),
-    categories: Array.from(new Set(group.services.map((s) => s.category))),
-    servicesCount: group.services.length,
-    rating: 5.0,
-    reviewCount: 0,
-    isAvailable: true,
-  }))
+  freelancerGroups.value.map((group) => {
+    const profile = freelancerProfiles.value[group.freelancerId];
+
+    return {
+      id: group.freelancerId,
+      name: group.freelancerName,
+      avatar: group.freelancerProfilePhoto,
+      location: profile?.location || undefined,
+      category: Array.from(new Set(group.services.map((s) => s.category))).join(', '),
+      categories: Array.from(new Set(group.services.map((s) => s.category))),
+      servicesCount: group.services.length,
+      rating: profile?.rating ?? 5.0,
+      reviewCount: profile?.totalReviews ?? 0,
+      isAvailable: profile?.available ?? true,
+    };
+  })
 );
 
 const totalFreelancers = computed(() => freelancerResults.value.length);
@@ -201,7 +239,7 @@ const handleViewProfile = (providerId: string | number) => {
 };
 
 const handleViewService = (params: { providerId: number; serviceId: number }) => {
-  props.onNavigate('provider-profile', params);
+  props.onNavigate('service-detail', params);
 };
 
 const clearFilters = () => {
@@ -224,6 +262,14 @@ const getInitials = (name: string) => {
 onMounted(() => {
   loadServices();
 });
+
+watch(
+  freelancerGroups,
+  (groups) => {
+    loadFreelancerProfiles(groups.map((group) => group.freelancerId));
+  },
+  { immediate: true }
+);
 </script>
 
 <template>
@@ -310,7 +356,6 @@ onMounted(() => {
             :variant="viewMode === 'grid' ? 'default' : 'outline'"
             size="icon"
             @click="viewMode = 'grid'"
-            :class="viewMode === 'grid' ? 'bg-[#286AD8]' : ''"
           >
             <Grid3x3 class="h-4 w-4" />
           </Button>
@@ -318,7 +363,6 @@ onMounted(() => {
             :variant="viewMode === 'list' ? 'default' : 'outline'"
             size="icon"
             @click="viewMode = 'list'"
-            :class="viewMode === 'list' ? 'bg-[#286AD8]' : ''"
           >
             <List class="h-4 w-4" />
           </Button>
@@ -359,7 +403,7 @@ onMounted(() => {
       <AlertCircle class="h-12 w-12 text-red-400 mx-auto mb-4" />
       <h3 class="text-lg font-semibold text-[#263238] mb-2">Ops, algo deu errado</h3>
       <p class="text-[#435574] mb-4">{{ error }}</p>
-      <Button @click="loadServices" class="bg-[#286AD8]">
+      <Button @click="loadServices">
         <RefreshCw class="h-4 w-4 mr-2" /> Tentar novamente
       </Button>
     </div>
@@ -377,7 +421,7 @@ onMounted(() => {
         </div>
         <h3 class="text-[#263238] mb-2">Nenhum profissional encontrado</h3>
         <p class="text-[#435574] mb-6">Tente ajustar seus filtros ou fazer uma nova busca</p>
-        <Button @click="clearFilters" variant="outline" class="border-[#286AD8] text-[#286AD8]">
+        <Button @click="clearFilters" variant="outline" class="text-primary border-primary">
           Limpar filtros
         </Button>
       </div>
@@ -479,7 +523,7 @@ onMounted(() => {
         </div>
         <h3 class="text-[#263238] mb-2">Nenhum serviço encontrado</h3>
         <p class="text-[#435574] mb-6">Tente ajustar seus filtros ou fazer uma nova busca</p>
-        <Button @click="clearFilters" variant="outline" class="border-[#286AD8] text-[#286AD8]">
+        <Button @click="clearFilters" variant="outline" class="text-primary border-primary">
           Limpar filtros
         </Button>
       </div>
@@ -561,12 +605,15 @@ onMounted(() => {
 
               <p class="text-sm text-[#435574] mb-3 line-clamp-2">{{ service.description }}</p>
 
+              <div class="flex items-center gap-1.5 text-xs text-[#435574] mb-3">
+                <Star :class="`h-3.5 w-3.5 ${hasServiceRating(service) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`" />
+                <span>{{ formatServiceRatingDisplay(service) }}</span>
+              </div>
+
               <div class="flex items-center gap-4">
                 <div class="flex items-center gap-1 text-[#286AD8]">
                   <DollarSign class="h-4 w-4" />
-                  <span class="font-bold text-sm">
-                    {{ new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(service.price) }}{{ service.priceType === 'HOURLY' ? '/hora' : service.priceType === 'DAILY' ? '/dia' : '' }}
-                  </span>
+                  <span class="font-bold text-sm">{{ getServicePriceDisplay(service) }}</span>
                 </div>
                 <div class="flex items-center gap-1 text-[#435574]">
                   <Clock class="h-3.5 w-3.5" />

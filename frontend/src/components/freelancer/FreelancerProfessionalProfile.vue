@@ -16,6 +16,7 @@ import {
   Instagram,
   Github,
   ExternalLink,
+  Sparkles,
 } from 'lucide-vue-next'
 import Button from '../ui/button.vue'
 import Input from '../ui/input.vue'
@@ -37,6 +38,7 @@ import AlertDialogHeader from '../ui/alert-dialog-header.vue'
 import AlertDialogTitle from '../ui/alert-dialog-title.vue'
 import api from '@/api/config/axios'
 import { toast } from '@/utils/toast'
+import { freelancerService } from '@/api/services/freelancerService'
 
 interface Props {
   onNavigate: (page: string, params?: any) => void;
@@ -104,6 +106,7 @@ const isEditingServiceSettings = ref(false)
 const isEditingBio = ref(false)
 const isEditingLinks = ref(false)
 const isSaving = ref(false)
+const isRefiningBio = ref(false)
 
 // Profile data
 const profileData = ref<ProfessionalProfile>({
@@ -251,6 +254,17 @@ const handleSaveBio = async () => {
 const handleCancelBio = () => {
   editedData.value.bio = profileData.value.bio
   isEditingBio.value = false
+}
+
+const handleRefineBio = async () => {
+  isRefiningBio.value = true
+  try {
+    editedData.value.bio = await freelancerService.refineBio(editedData.value.bio)
+  } catch {
+    toast.error('Não foi possível refinar a biografia. Tente novamente.')
+  } finally {
+    isRefiningBio.value = false
+  }
 }
 
 // Service Cities
@@ -606,7 +620,7 @@ const getLinkLabel = (link: ProfessionalLink) => {
           <div class="flex gap-2 pt-4">
             <Button 
               @click="handleSaveServiceSettings" 
-              class="bg-[#286AD8] hover:bg-[#435574]"
+              variant="default"
               :disabled="isSaving"
             >
               <Check class="h-4 w-4 mr-2" />
@@ -684,7 +698,35 @@ const getLinkLabel = (link: ProfessionalLink) => {
 
         <div v-if="isEditingBio" class="space-y-4">
           <div class="space-y-2">
-            <Label for="bio">Conte sobre você e sua experiência profissional</Label>
+            <div class="flex items-center justify-between">
+              <Label for="bio">Conte sobre você e sua experiência profissional</Label>
+              <span
+                :class="editedData.bio.trim().length < 100 ? 'cursor-not-allowed' : ''"
+                :title="editedData.bio.trim().length < 100
+                  ? `Digite pelo menos 100 caracteres para refinar (${editedData.bio.trim().length}/100)`
+                  : ''"
+              >
+                <Button
+                  @click="handleRefineBio"
+                  :disabled="isRefiningBio || editedData.bio.trim().length < 100"
+                  variant="outline"
+                  size="sm"
+                  type="button"
+                  :class="editedData.bio.trim().length >= 100
+                    ? 'text-[#286AD8] border-[#286AD8] hover:bg-blue-50 hover:text-[#286AD8]'
+                    : 'text-gray-400 border-gray-300 opacity-50'"
+                >
+                  <span v-if="isRefiningBio" class="flex items-center gap-1.5">
+                    <span class="animate-spin h-3.5 w-3.5 border-2 border-[#286AD8] border-t-transparent rounded-full" />
+                    Refinando...
+                  </span>
+                  <span v-else class="flex items-center gap-1.5">
+                    <Sparkles class="h-3.5 w-3.5" />
+                    Refinar com IA
+                  </span>
+                </Button>
+              </span>
+            </div>
             <Textarea
               id="bio"
               v-model="editedData.bio"
@@ -697,7 +739,7 @@ const getLinkLabel = (link: ProfessionalLink) => {
           <div class="flex gap-2 pt-4">
             <Button 
               @click="handleSaveBio" 
-              class="bg-[#286AD8] hover:bg-[#435574]"
+              variant="default"
               :disabled="isSaving"
             >
               <Check class="h-4 w-4 mr-2" />
@@ -871,7 +913,6 @@ const getLinkLabel = (link: ProfessionalLink) => {
           <AlertDialogCancel @click="closeCityDialog">Cancelar</AlertDialogCancel>
           <AlertDialogAction 
             @click="handleSaveCity" 
-            class="bg-[#286AD8] hover:bg-[#435574]"
             :disabled="isSavingCity || isLoadingCEP"
           >
             {{ isSavingCity ? 'Salvando...' : (editingCity ? 'Salvar Alterações' : 'Adicionar') }}
@@ -891,7 +932,7 @@ const getLinkLabel = (link: ProfessionalLink) => {
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel @click="cityToDelete = null">Cancelar</AlertDialogCancel>
-          <AlertDialogAction @click="handleDeleteCity" class="bg-red-600 hover:bg-red-700">
+          <AlertDialogAction @click="handleDeleteCity" class="bg-destructive hover:bg-destructive/90">
             Sim, Remover
           </AlertDialogAction>
         </AlertDialogFooter>
@@ -962,7 +1003,6 @@ const getLinkLabel = (link: ProfessionalLink) => {
           <AlertDialogCancel @click="closeLinkDialog">Cancelar</AlertDialogCancel>
           <AlertDialogAction 
             @click="handleSaveLink" 
-            class="bg-[#286AD8] hover:bg-[#435574]"
             :disabled="isSavingLink"
           >
             {{ isSavingLink ? 'Salvando...' : (editingLink ? 'Salvar Alterações' : 'Adicionar') }}
@@ -982,7 +1022,7 @@ const getLinkLabel = (link: ProfessionalLink) => {
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel @click="linkToDelete = null">Cancelar</AlertDialogCancel>
-          <AlertDialogAction @click="handleDeleteLink" class="bg-red-600 hover:bg-red-700">
+          <AlertDialogAction @click="handleDeleteLink" class="bg-destructive hover:bg-destructive/90">
             Sim, Remover
           </AlertDialogAction>
         </AlertDialogFooter>

@@ -97,8 +97,8 @@ const cardData = ref({
   cvv: '',
 });
 
-const platformFee = computed(() => props.proposal.price * 0.1);
-const totalAmount = computed(() => props.proposal.price + platformFee.value);
+const platformFee = computed(() => 0); // Cliente não paga taxa - desconto é do freelancer
+const totalAmount = computed(() => props.proposal.price);
 
 const formatCardNumber = (value: string) => {
   const cleaned = value.replace(/\s/g, '');
@@ -663,14 +663,14 @@ const onLeave = (el: Element, done: () => void) => {
               <div class="flex gap-3">
                 <Button
                   @click="router.push(`/payment-success?paymentId=${currentPaymentId}`)"
-                  class="bg-[#286AD8] hover:bg-[#1e5bb8] text-white"
+                  variant="default"
                 >
                   Ver Detalhes do Pagamento
                 </Button>
                 <Button
                   @click="props.onBack"
                   variant="outline"
-                  class="border-[#286AD8] text-[#286AD8] hover:bg-blue-50"
+                  class="text-primary border-primary hover:bg-blue-50"
                 >
                   Voltar
                 </Button>
@@ -737,7 +737,8 @@ const onLeave = (el: Element, done: () => void) => {
                         <Button
                           @click="reloadPixQrCode"
                           :disabled="isLoadingPix"
-                          class="w-full mt-3 bg-[#286AD8] hover:bg-[#1e5bb8] text-white"
+                          variant="default"
+                          class="w-full mt-3"
                         >
                           <Loader2 v-if="isLoadingPix" class="h-4 w-4 mr-2 animate-spin" />
                           <QrCode v-else class="h-4 w-4 mr-2" />
@@ -777,7 +778,8 @@ const onLeave = (el: Element, done: () => void) => {
                         <Button
                           @click="generatePixQrCode"
                           :disabled="!pixCpf || pixCpf.replace(/\D/g, '').length !== 11 || isLoadingPix"
-                          class="w-full mt-3 bg-[#286AD8] hover:bg-[#1e5bb8] text-white"
+                          variant="default"
+                          class="w-full mt-3"
                         >
                           <Loader2 v-if="isLoadingPix" class="h-4 w-4 mr-2 animate-spin" />
                           <QrCode v-else class="h-4 w-4 mr-2" />
@@ -865,7 +867,8 @@ const onLeave = (el: Element, done: () => void) => {
                           </div>
                           <Button
                             @click="() => { paymentError = null; reloadPixQrCode(); }"
-                            class="mt-3 bg-red-600 hover:bg-red-700 text-white"
+                            variant="destructive"
+                            class="mt-3"
                             size="sm"
                           >
                             Tentar Novamente
@@ -890,7 +893,8 @@ const onLeave = (el: Element, done: () => void) => {
                           <Button
                             @click="simulatePaymentConfirmation"
                             :disabled="isSimulatingPayment"
-                            class="w-full bg-yellow-500 hover:bg-yellow-600 text-yellow-900"
+                            variant="warning"
+                            class="w-full"
                             size="sm"
                           >
                             <Loader2 v-if="isSimulatingPayment" class="h-4 w-4 mr-2 animate-spin" />
@@ -981,7 +985,8 @@ const onLeave = (el: Element, done: () => void) => {
                             <Button
                               @click="handleConfirmPayment"
                               :disabled="isProcessing"
-                              class="w-full bg-[#286AD8] hover:bg-[#435574] transition-colors"
+                              variant="default"
+                              class="w-full"
                               size="lg"
                             >
                               <span v-if="isProcessing" class="flex items-center gap-2">
@@ -1058,10 +1063,6 @@ const onLeave = (el: Element, done: () => void) => {
             <div class="flex justify-between text-[#435574]">
               <span>Valor do serviço</span>
               <span>R$ {{ proposal.price.toFixed(2) }}</span>
-            </div>
-            <div class="flex justify-between text-[#435574]">
-              <span>Taxa da plataforma (10%)</span>
-              <span>R$ {{ platformFee.toFixed(2) }}</span>
             </div>
           </div>
 

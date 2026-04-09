@@ -74,7 +74,7 @@ const proposalStore = useProposalStore();
 const searchQuery = ref('');
 const categoryFilter = ref('Todas as categorias');
 const sortBy = ref('Mais recentes');
-const timeFilter = ref('Mês atual');
+const timeFilter = ref('Últimos 30 dias');
 const customDateFrom = ref('');
 const customDateTo = ref('');
 const currentTab = ref('all');
@@ -279,6 +279,11 @@ const filteredProposals = computed(() => {
           sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
           return proposalDate >= sevenDaysAgo;
         }
+        case 'Últimos 30 dias': {
+          const thirtyDaysAgo = new Date(startOfToday);
+          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+          return proposalDate >= thirtyDaysAgo;
+        }
         case 'Mês atual':
           return proposalDate.getMonth() === now.getMonth() && proposalDate.getFullYear() === now.getFullYear();
         case 'Último mês': {
@@ -305,9 +310,9 @@ const filteredProposals = computed(() => {
   if (sortBy.value === 'Mais recentes') {
     filtered.sort((a, b) => new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime());
   } else if (sortBy.value === 'Maior orçamento') {
-    filtered.sort((a, b) => b.budget - a.budget);
+    filtered.sort((a, b) => (b.freelancerResponse?.value ?? b.budget ?? 0) - (a.freelancerResponse?.value ?? a.budget ?? 0));
   } else if (sortBy.value === 'Menor orçamento') {
-    filtered.sort((a, b) => a.budget - b.budget);
+    filtered.sort((a, b) => (a.freelancerResponse?.value ?? a.budget ?? 0) - (b.freelancerResponse?.value ?? b.budget ?? 0));
   }
 
   return filtered;
@@ -319,7 +324,8 @@ const currentProposals = computed(() =>
   filteredProposals.value.slice(startIndex.value, startIndex.value + itemsPerPage)
 );
 
-const formatCurrency = (value: number) => {
+const formatCurrency = (value?: number | null) => {
+  if (value == null) return 'A combinar';
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
     currency: 'BRL',
@@ -509,12 +515,13 @@ watch(currentTab, () => {
 
         <Select :model-value="timeFilter" @update:model-value="(val: string) => { timeFilter = val; currentPage = 1; }">
           <SelectTrigger>
-            <SelectValue placeholder="Mês atual" />
+            <SelectValue placeholder="Últimos 30 dias" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="Hoje">Hoje</SelectItem>
             <SelectItem value="Ontem">Ontem</SelectItem>
             <SelectItem value="Últimos 7 dias">Últimos 7 dias</SelectItem>
+            <SelectItem value="Últimos 30 dias">Últimos 30 dias</SelectItem>
             <SelectItem value="Mês atual">Mês atual</SelectItem>
             <SelectItem value="Último mês">Último mês</SelectItem>
             <SelectItem value="Intervalo personalizado">Intervalo personalizado</SelectItem>
@@ -595,7 +602,11 @@ watch(currentTab, () => {
               v-for="proposal in currentProposals"
               :key="proposal.id"
               :class="`p-6 hover:shadow-md transition-all ${
-                !proposal.viewed ? 'border-l-4 border-l-[#286AD8] bg-blue-50/30' : ''
+                proposal.status === 'pending'
+                  ? 'border-l-4 border-l-blue-500 bg-blue-50/30'
+                  : !proposal.viewed
+                    ? 'border-l-4 border-l-[#286AD8]'
+                    : ''
               }`"
             >
               <div class="flex items-start gap-3">
@@ -611,7 +622,7 @@ watch(currentTab, () => {
                     <div class="flex-1 min-w-0 cursor-pointer" @click="handleViewDetails(proposal)">
                       <div class="flex flex-wrap items-center gap-2 mb-1">
                         <h3 class="font-semibold text-[#263238] hover:text-[#286AD8] truncate">{{ proposal.service }}</h3>
-                        <Badge v-if="!proposal.viewed" class="bg-[#286AD8] hover:bg-[#286AD8] text-xs flex-shrink-0">
+                        <Badge v-if="!proposal.viewed" class="bg-primary hover:bg-primary text-xs flex-shrink-0">
                           Novo
                         </Badge>
                       </div>
@@ -785,7 +796,6 @@ watch(currentTab, () => {
                 @click="currentPage = pageNum"
                 :variant="currentPage === pageNum ? 'default' : 'outline'"
                 size="sm"
-                :class="currentPage === pageNum ? 'bg-[#286AD8] hover:bg-[#435574]' : ''"
               >
                 {{ pageNum }}
               </Button>
@@ -828,7 +838,7 @@ watch(currentTab, () => {
           <Button @click="showRejectDialog = false" variant="outline">
             Cancelar
           </Button>
-          <Button @click="handleRejectProposal" class="bg-red-600 hover:bg-red-700">
+          <Button @click="handleRejectProposal" variant="destructive">
             Confirmar Recusa
           </Button>
         </DialogFooter>
@@ -847,7 +857,7 @@ watch(currentTab, () => {
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel @click="showArchiveDialog = false">Cancelar</AlertDialogCancel>
-          <AlertDialogAction @click="handleArchiveProposal" class="bg-[#286AD8] hover:bg-[#435574]">
+          <AlertDialogAction @click="handleArchiveProposal">
             Arquivar
           </AlertDialogAction>
         </AlertDialogFooter>

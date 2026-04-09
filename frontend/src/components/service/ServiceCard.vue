@@ -1,17 +1,17 @@
 <script setup lang="ts">
-import { Briefcase, Heart, DollarSign, Clock } from 'lucide-vue-next';
+import { Briefcase, Heart, DollarSign, Clock, Star } from 'lucide-vue-next';
 import Card from '../ui/card.vue';
 import Badge from '../ui/badge.vue';
+import { getServicePriceDisplay, type ServicePriceRangeData } from '@/utils/servicePricing';
+import { formatServiceRatingDisplay, hasServiceRating, type ServiceReviewSummary } from '@/utils/serviceReviews';
 
-interface ServiceItem {
+interface ServiceItem extends ServicePriceRangeData, ServiceReviewSummary {
   id: number;
   freelancerId: number;
   freelancerName: string;
   title: string;
   category: string;
   description: string;
-  price: number;
-  priceType: string;
   deliveryTime: number;
   deliveryUnit: string;
   workModel?: string | null;
@@ -27,12 +27,6 @@ interface Props {
 }
 
 const props = defineProps<Props>();
-
-const formatPrice = (price: number, priceType: string) => {
-  const formatted = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(price);
-  const suffix = priceType === 'HOURLY' ? '/hora' : priceType === 'DAILY' ? '/dia' : '';
-  return `${formatted}${suffix}`;
-};
 
 const formatDelivery = (time: number, unit: string) => {
   const unitLabel = unit === 'HOURS' ? 'hora(s)' : unit === 'DAYS' ? 'dia(s)' : 'semana(s)';
@@ -105,19 +99,25 @@ const handleFavoriteClick = (e: MouseEvent) => {
       </Badge>
 
       <!-- Freelancer -->
-      <div class="flex items-center gap-2 mb-3">
-        <div class="w-6 h-6 rounded-full bg-[#286AD8]/10 overflow-hidden flex items-center justify-center text-[10px] font-semibold text-[#286AD8]">
-          <img
-            v-if="service.freelancerProfilePhoto"
-            :src="service.freelancerProfilePhoto"
-            :alt="service.freelancerName"
-            class="w-full h-full object-cover"
-          />
-          <template v-else>
-            {{ getInitials(service.freelancerName) }}
-          </template>
+      <div class="flex items-center justify-between gap-3 mb-3">
+        <div class="flex items-center gap-2 min-w-0">
+          <div class="w-6 h-6 rounded-full bg-[#286AD8]/10 overflow-hidden flex items-center justify-center text-[10px] font-semibold text-[#286AD8]">
+            <img
+              v-if="service.freelancerProfilePhoto"
+              :src="service.freelancerProfilePhoto"
+              :alt="service.freelancerName"
+              class="w-full h-full object-cover"
+            />
+            <template v-else>
+              {{ getInitials(service.freelancerName) }}
+            </template>
+          </div>
+          <span class="text-sm text-[#435574] truncate">{{ service.freelancerName }}</span>
         </div>
-        <span class="text-sm text-[#435574]">{{ service.freelancerName }}</span>
+        <div class="flex items-center justify-end gap-1.5 text-xs text-[#435574] flex-shrink-0">
+          <Star :class="`h-3.5 w-3.5 ${hasServiceRating(service) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`" />
+          <span>{{ formatServiceRatingDisplay(service) }}</span>
+        </div>
       </div>
 
       <p class="text-sm text-[#435574] mb-3 line-clamp-2">{{ service.description }}</p>
@@ -126,7 +126,7 @@ const handleFavoriteClick = (e: MouseEvent) => {
       <div class="flex items-center justify-between pt-3 border-t border-gray-100">
         <div class="flex items-center gap-1 text-[#286AD8]">
           <DollarSign class="h-4 w-4" />
-          <span class="font-bold text-sm">{{ formatPrice(service.price, service.priceType) }}</span>
+          <span class="font-bold text-sm">{{ getServicePriceDisplay(service) }}</span>
         </div>
         <div class="flex items-center gap-1 text-[#435574]">
           <Clock class="h-3.5 w-3.5" />

@@ -69,13 +69,13 @@ const stats = computed(() => {
     (r) => r.status === 'in_progress' || r.status === 'delivered'
   );
 
+  const getProjectAmount = (request: ServiceRequest) => request.freelancerResponse?.value ?? request.budget ?? 0;
+
   return {
     inProgress: activeProjects.filter((r) => r.status === 'in_progress').length,
     needAction: activeProjects.filter((r) => r.status === 'delivered').length,
     completed: store.requests.filter((r) => r.status === 'completed').length,
-    totalInvested: activeProjects.reduce((sum, r) =>
-      sum + (r.freelancerResponse?.value || r.budget), 0
-    ),
+    totalInvested: activeProjects.reduce((sum, r) => sum + getProjectAmount(r), 0),
   };
 });
 
@@ -137,7 +137,8 @@ const filteredProjects = computed(() => {
   return filtered;
 });
 
-const formatCurrency = (value: number) => {
+const formatCurrency = (value?: number | null) => {
+  if (value == null) return 'A combinar';
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
     currency: 'BRL',

@@ -46,6 +46,17 @@ const handleNavigate = (page: string, params?: Record<string, any>) => {
     return;
   }
 
+  if (page === 'service-detail' && params?.providerId && params?.serviceId) {
+    router.push({
+      name: 'service-detail',
+      params: {
+        providerId: params.providerId,
+        serviceId: params.serviceId,
+      }
+    });
+    return;
+  }
+
   const route = getRoute(page, currentUser.value.type);
   if (params) {
     router.push({ path: route, query: params });

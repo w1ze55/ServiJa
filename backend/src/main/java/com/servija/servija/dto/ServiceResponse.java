@@ -20,7 +20,13 @@ public class ServiceResponse {
     private String title;
     private String category;
     private String description;
+    private BigDecimal serviceRating;
+    private Integer serviceReviewCount;
     private BigDecimal price;
+    private Long completedServicesCount;
+    private BigDecimal averageCompletedPrice;
+    private BigDecimal averagePriceMin;
+    private BigDecimal averagePriceMax;
     private String priceType;
     private Integer deliveryTime;
     private String deliveryUnit;

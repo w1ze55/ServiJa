@@ -9,7 +9,9 @@ import com.servija.servija.model.Freelancer;
 import com.servija.servija.model.Service;
 import com.servija.servija.model.User;
 import com.servija.servija.repository.FreelancerRepository;
+import com.servija.servija.repository.ReviewRepository;
 import com.servija.servija.repository.ServiceRepository;
+import com.servija.servija.repository.ServiceRequestRepository;
 import com.servija.servija.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,6 +20,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -31,7 +35,10 @@ public class ServiceService {
     private final FreelancerRepository freelancerRepository;
     private final UserRepository userRepository;
     private final FileStorageService fileStorageService;
+    private final ServiceRequestRepository serviceRequestRepository;
+    private final ReviewRepository reviewRepository;
     private final ObjectMapper objectMapper;
+    private static final BigDecimal AVERAGE_PRICE_RANGE_SPREAD = new BigDecimal("0.20");
 
     /**
      * Obter o usuário autenticado atual
@@ -255,7 +262,19 @@ public class ServiceService {
     public List<ServiceResponse> getPublicServicesByFreelancer(Long freelancerId) {
         List<Service> services = serviceRepository.findByFreelancerIdAndIsActiveOrderByCreatedAtDesc(freelancerId,
                 true);
-        return services.stream().map(this::toResponse).collect(Collectors.toList());
+        return toPublicResponses(services);
+    }
+
+    @Transactional(readOnly = true)
+    public ServiceResponse getPublicServiceByIdWithPricing(Long id) {
+        Service service = serviceRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Serviço não encontrado"));
+
+        if (!service.getIsActive()) {
+            throw new RuntimeException("Serviço não está ativo");
+        }
+
+        return toPublicResponse(service);
     }
 
     /**
@@ -264,7 +283,7 @@ public class ServiceService {
     @Transactional(readOnly = true)
     public List<ServiceResponse> getAllActiveServices() {
         List<Service> services = serviceRepository.findByIsActiveOrderByCreatedAtDesc(true);
-        return services.stream().map(this::toResponse).collect(Collectors.toList());
+        return toPublicResponses(services);
     }
 
     /**
@@ -273,7 +292,7 @@ public class ServiceService {
     @Transactional(readOnly = true)
     public List<ServiceResponse> getServicesByCategory(String category) {
         List<Service> services = serviceRepository.findByCategoryAndIsActiveOrderByCreatedAtDesc(category, true);
-        return services.stream().map(this::toResponse).collect(Collectors.toList());
+        return toPublicResponses(services);
     }
 
     /**
@@ -282,7 +301,7 @@ public class ServiceService {
     @Transactional(readOnly = true)
     public List<ServiceResponse> searchPublicServices(String query) {
         List<Service> services = serviceRepository.searchServices(query);
-        return services.stream().map(this::toResponse).collect(Collectors.toList());
+        return toPublicResponses(services);
     }
 
     /**
@@ -324,6 +343,62 @@ public class ServiceService {
                 .createdAt(service.getCreatedAt())
                 .updatedAt(service.getUpdatedAt())
                 .build();
+    }
+
+    private ServiceResponse toPublicResponse(Service service) {
+        ServiceResponse response = toResponse(service);
+        populateServiceReviewSummary(service.getId(), response);
+
+        long completedServicesCount = serviceRequestRepository.countByService_IdAndStatusAndResponseValueIsNotNull(
+                service.getId(),
+                com.servija.servija.model.ServiceRequest.Status.COMPLETED);
+
+        response.setCompletedServicesCount(completedServicesCount);
+        if (completedServicesCount == 0) {
+            return response;
+        }
+
+        BigDecimal averageCompletedPrice = serviceRequestRepository.findAverageCompletedResponseValueByServiceId(
+                service.getId(),
+                com.servija.servija.model.ServiceRequest.Status.COMPLETED.name());
+
+        if (averageCompletedPrice == null) {
+            return response;
+        }
+
+        BigDecimal normalizedAverage = averageCompletedPrice.setScale(2, RoundingMode.HALF_UP);
+        response.setAverageCompletedPrice(normalizedAverage);
+        response.setAveragePriceMin(calculateAveragePriceBound(normalizedAverage, true));
+        response.setAveragePriceMax(calculateAveragePriceBound(normalizedAverage, false));
+        return response;
+    }
+
+    private List<ServiceResponse> toPublicResponses(List<Service> services) {
+        return services.stream().map(this::toPublicResponse).collect(Collectors.toList());
+    }
+
+    private void populateServiceReviewSummary(Long serviceId, ServiceResponse response) {
+        long serviceReviewCount = reviewRepository.countByServiceId(serviceId);
+        response.setServiceReviewCount(Math.toIntExact(serviceReviewCount));
+
+        if (serviceReviewCount == 0) {
+            return;
+        }
+
+        Double averageRating = reviewRepository.findAverageRatingByServiceId(serviceId);
+        if (averageRating == null) {
+            return;
+        }
+
+        response.setServiceRating(BigDecimal.valueOf(averageRating).setScale(1, RoundingMode.HALF_UP));
+    }
+
+    private BigDecimal calculateAveragePriceBound(BigDecimal averagePrice, boolean lowerBound) {
+        BigDecimal halfSpread = AVERAGE_PRICE_RANGE_SPREAD.divide(new BigDecimal("2"), 4, RoundingMode.HALF_UP);
+        BigDecimal multiplier = lowerBound
+                ? BigDecimal.ONE.subtract(halfSpread)
+                : BigDecimal.ONE.add(halfSpread);
+        return averagePrice.multiply(multiplier).setScale(2, RoundingMode.HALF_UP);
     }
 
     private String toJson(List<String> list) {

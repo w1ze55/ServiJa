@@ -2,7 +2,6 @@
 import { ref, onMounted, onUnmounted } from 'vue';
 import { Search, Star, MessageSquare, Shield, TrendingUp, Users, CheckCircle, Sparkles, ListChecks, ShieldCheck } from 'lucide-vue-next';
 import Button from './ui/button.vue';
-import Card from './ui/card.vue';
 import logo from '@/assets/favicon-32x32.png';
 
 interface Props {
@@ -14,16 +13,38 @@ defineProps<Props>();
 
 const isScrolled = ref(false);
 
+const DESKTOP_BREAKPOINT = 836;
+const COLLAPSE_SCROLL_Y = 80;
+const EXPAND_SCROLL_Y = 32;
+
 function handleScroll() {
-  if (window.innerWidth < 836) {
+  if (window.innerWidth < DESKTOP_BREAKPOINT) {
     isScrolled.value = false;
     return;
   }
-  isScrolled.value = window.scrollY > 80;
+
+  const currentScrollY = window.scrollY;
+
+  if (!isScrolled.value && currentScrollY >= COLLAPSE_SCROLL_Y) {
+    isScrolled.value = true;
+    return;
+  }
+
+  if (isScrolled.value && currentScrollY <= EXPAND_SCROLL_Y) {
+    isScrolled.value = false;
+  }
 }
 
-onMounted(() => window.addEventListener('scroll', handleScroll, { passive: true }));
-onUnmounted(() => window.removeEventListener('scroll', handleScroll));
+onMounted(() => {
+  handleScroll();
+  window.addEventListener('scroll', handleScroll, { passive: true });
+  window.addEventListener('resize', handleScroll, { passive: true });
+});
+
+onUnmounted(() => {
+  window.removeEventListener('scroll', handleScroll);
+  window.removeEventListener('resize', handleScroll);
+});
 </script>
 
 <template>

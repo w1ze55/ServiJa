@@ -229,7 +229,7 @@ const handleToggleFavorite = (id: string | number) => {
           @click="props.onNavigate('search-results')"
           variant="outline"
           size="lg"
-          class="border-[#286AD8] text-[#286AD8] hover:bg-blue-50"
+          class="text-primary border-primary hover:bg-blue-50"
         >
           Ver todos os profissionais
           <ChevronRight class="ml-1 h-4 w-4" />

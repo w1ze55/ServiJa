@@ -147,7 +147,8 @@ watch(() => props.requestId, async (newId, oldId) => {
   }
 });
 
-const formatCurrency = (value: number) => {
+const formatCurrency = (value?: number | null) => {
+  if (value == null) return 'A combinar';
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
     currency: 'BRL',
@@ -273,10 +274,10 @@ const getStatusColor = (status: string) => {
   const colors: Record<string, { bg: string; text: string }> = {
     pending: { bg: 'bg-blue-100', text: 'text-blue-700' },
     sent: { bg: 'bg-blue-100', text: 'text-blue-700' },
-    negotiating: { bg: 'bg-amber-100', text: 'text-amber-700' },
+    negotiating: { bg: 'bg-blue-100', text: 'text-blue-700' },
     accepted: { bg: 'bg-green-100', text: 'text-green-700' },
     in_progress: { bg: 'bg-purple-100', text: 'text-purple-700' },
-    delivered: { bg: 'bg-amber-100', text: 'text-amber-700' },
+    delivered: { bg: 'bg-blue-100', text: 'text-blue-700' },
     completed: { bg: 'bg-teal-100', text: 'text-teal-700' },
     rejected: { bg: 'bg-red-100', text: 'text-red-700' },
     cancelled: { bg: 'bg-gray-100', text: 'text-gray-700' },
@@ -347,7 +348,7 @@ const getStatusColor = (status: string) => {
             request.status === 'accepted' &&
             !request.auditLog?.some((log) => log.operationKey === 'PAYMENT_CONFIRMED')
           " 
-          class="mt-4 p-4 rounded-lg border-2 border-green-300 bg-gradient-to-r from-green-50 to-yellow-50 flex items-start gap-3"
+          class="mt-4 p-4 rounded-lg border-2 border-green-300 bg-gradient-to-r from-green-50 to-blue-50 flex items-start gap-3"
         >
           <div class="flex-shrink-0 w-10 h-10 bg-green-600 rounded-full flex items-center justify-center">
             <CreditCard class="h-5 w-5 text-white" />
@@ -359,7 +360,7 @@ const getStatusColor = (status: string) => {
             </p>
             <Button
               @click="handleGoToCheckout"
-              class="bg-green-600 hover:bg-green-700"
+              variant="success"
               size="sm"
             >
               <CreditCard class="h-4 w-4 mr-2" />
@@ -406,7 +407,7 @@ const getStatusColor = (status: string) => {
             Mensagens
             <Badge
               v-if="request.messages && request.messages.length > 0"
-              class="ml-1 bg-[#286AD8] text-white text-xs"
+              class="ml-1 bg-primary text-white text-xs"
             >
               {{ request.messages.length }}
             </Badge>
@@ -456,9 +457,9 @@ const getStatusColor = (status: string) => {
           </Card>
 
           <!-- Freelancer Response -->
-          <Card v-if="request.freelancerResponse" class="p-6 border-amber-200 bg-amber-50/30">
+          <Card v-if="request.freelancerResponse" class="p-6 border-blue-200 bg-blue-50/30">
             <div class="flex items-center gap-2 mb-4">
-              <Send class="h-5 w-5 text-amber-600" />
+              <Send class="h-5 w-5 text-blue-600" />
               <h3 class="font-semibold text-[#263238]">Resposta do Profissional</h3>
             </div>
 
@@ -511,11 +512,11 @@ const getStatusColor = (status: string) => {
               </div>
 
               <!-- Rejection Alert -->
-              <div v-if="wasCounterProposalRejected" class="p-4 bg-amber-50 border border-amber-100 rounded-lg flex items-start gap-3">
-                <AlertCircle class="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+              <div v-if="wasCounterProposalRejected" class="p-4 bg-blue-50 border border-blue-100 rounded-lg flex items-start gap-3">
+                <AlertCircle class="h-5 w-5 text-blue-600 shrink-0 mt-0.5" />
                 <div>
-                  <p class="text-sm font-medium text-amber-900">Contra proposta recusada</p>
-                  <p class="text-xs text-amber-700 mt-1">
+                  <p class="text-sm font-medium text-blue-900">Contra proposta recusada</p>
+                  <p class="text-xs text-blue-700 mt-1">
                     O profissional preferiu manter a proposta original. Você pode aceitá-la ou recusar.
                   </p>
                 </div>
@@ -524,7 +525,8 @@ const getStatusColor = (status: string) => {
               <div class="flex items-center gap-3 flex-wrap">
                 <Button
                   @click="handleAcceptResponse"
-                  class="bg-green-600 hover:bg-green-700 flex-1 min-w-[150px]"
+                  variant="success"
+                  class="flex-1 min-w-[150px]"
                 >
                   <CheckCircle class="h-4 w-4 mr-2" />
                   Aceitar Proposta
@@ -541,7 +543,7 @@ const getStatusColor = (status: string) => {
                   v-if="!request.counterValue && !wasCounterProposalRejected"
                   @click="handleOpenCounterProposalDialog"
                   variant="outline"
-                  class="text-[#286AD8] border-[#286AD8] hover:bg-blue-50 flex-1 min-w-[150px]"
+                  class="text-primary border-primary flex-1 min-w-[150px]"
                 >
                   <FileEdit class="h-4 w-4 mr-2" />
                   Contra Proposta
@@ -620,6 +622,7 @@ const getStatusColor = (status: string) => {
           :messages="request.messages || []"
           current-user-role="client"
           :is-locked="request.status !== 'in_progress' && request.status !== 'delivered'"
+          :service-status="request.status"
           :is-sending="isSendingMessage"
           @send-message="handleSendMessage"
         />
@@ -703,7 +706,7 @@ const getStatusColor = (status: string) => {
               :size="attachment.size"
               :description="attachment.description"
               sender-info="Enviado pelo profissional"
-              variant="amber"
+              variant="blue"
             />
           </div>
         </div>
@@ -733,7 +736,7 @@ const getStatusColor = (status: string) => {
         </div>
         <DialogFooter>
           <Button @click="showCancelDialog = false" variant="outline">Manter</Button>
-          <Button @click="handleCancelRequest" class="bg-red-600 hover:bg-red-700">
+          <Button @click="handleCancelRequest" variant="destructive">
             Confirmar Cancelamento
           </Button>
         </DialogFooter>
@@ -763,7 +766,7 @@ const getStatusColor = (status: string) => {
         </div>
         <DialogFooter>
           <Button @click="showRejectDialog = false" variant="outline">Cancelar</Button>
-          <Button @click="handleRejectResponse" class="bg-red-600 hover:bg-red-700">
+          <Button @click="handleRejectResponse" variant="destructive">
             Confirmar Recusa
           </Button>
         </DialogFooter>
@@ -813,7 +816,7 @@ const getStatusColor = (status: string) => {
           <Button @click="showCounterProposalDialog = false" variant="outline">Cancelar</Button>
           <Button 
             @click="handleSendCounterProposal" 
-            class="bg-[#286AD8] hover:bg-[#435574]"
+            variant="default"
             :disabled="isSubmittingCounter"
           >
             {{ isSubmittingCounter ? 'Enviando...' : 'Enviar Contra Proposta' }}
@@ -877,7 +880,8 @@ const getStatusColor = (status: string) => {
           <div class="space-y-3 pt-4">
             <Button
               @click="handleGoToCheckout"
-              class="w-full bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white py-6 text-lg"
+              variant="success"
+              class="w-full py-6 text-lg"
               size="lg"
             >
               <CreditCard class="h-6 w-6 mr-2" />

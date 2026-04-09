@@ -17,6 +17,8 @@ public class WithdrawalResponse {
     private Long id;
     private BigDecimal amount;
     private String status;
+    private String withdrawalMethod;
+    private Long bankAccountId;
     private String pixKey;
     private String pixKeyType;
     private String transactionId;

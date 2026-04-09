@@ -5,8 +5,6 @@ import {
   ArrowLeft,
   Star,
   MapPin,
-  Clock,
-  DollarSign,
   CheckCircle,
   Send,
   Heart,
@@ -35,7 +33,8 @@ import Label from '@/components/ui/label.vue';
 import api from '@/api/config/axios';
 import { toast } from '@/utils/toast';
 import { useFavoritesStore } from '@/stores/favorites';
-import { normalizeWorkModel } from '@/utils/workModel';
+import { formatBaseServicePrice, getServicePriceDisplay, hasAveragePriceRange as hasAveragePriceRangeData, type ServicePriceRangeData } from '@/utils/servicePricing';
+import { getWorkModelLabel, normalizeWorkModel } from '@/utils/workModel';
 import ImageGallery from '@/components/shared/ImageGallery.vue';
 import ReviewList from '@/components/shared/ReviewList.vue';
 import type { ReviewItem } from '@/components/shared/ReviewList.vue';
@@ -43,15 +42,13 @@ import WorkModelBadge from '@/components/shared/WorkModelBadge.vue';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-interface ServiceItem {
+interface ServiceItem extends ServicePriceRangeData {
   id: number;
   freelancerId: number;
   freelancerName: string;
   title: string;
   category: string;
   description: string;
-  price: number;
-  priceType: string;
   deliveryTime: number;
   deliveryUnit: string;
   workModel?: string | null;
@@ -141,27 +138,11 @@ function createEmptyAddressErrors(): QuoteAddressErrors {
   return { zipCode: '', street: '', number: '', neighborhood: '', city: '', state: '' };
 }
 
-const formatPrice = (price: number, priceType: string) => {
-  const f = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(price);
-  const suffix = priceType === 'HOURLY' ? '/hora' : priceType === 'DAILY' ? '/dia' : '';
-  return `${f}${suffix}`;
-};
-
-const formatDelivery = (time: number, unit: string) => {
-  const unitLabel = unit === 'HOURS' ? 'hora(s)' : unit === 'DAYS' ? 'dia(s)' : 'semana(s)';
-  return `${time} ${unitLabel}`;
-};
-
 const getInitials = (name: string) =>
   name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2);
 
 const formatDate = (dateStr: string) =>
   new Date(dateStr).toLocaleDateString('pt-BR', { day: 'numeric', month: 'short', year: 'numeric' });
-
-const formatPriceDisplay = (value: number): string => {
-  if (!value) return '';
-  return new Intl.NumberFormat('pt-BR', { style: 'decimal', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
-};
 
 const getDetailedApproximation = (totalDays: number) => {
   const d = Math.min(totalDays, 365);
@@ -192,6 +173,23 @@ const getDeadlineApproximation = (days: string) => {
 const isFavorite = computed(() => favoritesStore.isFavoriteService(props.serviceId));
 const workModel = computed(() => service.value ? normalizeWorkModel(service.value.workModel) : null);
 const serviceRequiresAddress = computed(() => workModel.value === 'PRESENCIAL' || workModel.value === 'HIBRIDO');
+const serviceWorkModelLabel = computed(() => getWorkModelLabel(service.value?.workModel));
+const serviceExperienceLabel = computed(() => {
+  const completedServicesCount = service.value?.completedServicesCount ?? 0;
+
+  if (completedServicesCount <= 0) {
+    return 'Primeiras entregas';
+  }
+
+  return `${completedServicesCount} ${completedServicesCount === 1 ? 'entrega concluída' : 'entregas concluídas'}`;
+});
+const hasAveragePriceRange = computed(() => hasAveragePriceRangeData(service.value));
+const servicePriceLabel = computed(() => hasAveragePriceRange.value ? 'Valor médio do serviço' : 'Valor aproximado');
+const servicePriceDisplay = computed(() => {
+  if (!service.value) return '';
+  if (!hasAveragePriceRange.value) return formatBaseServicePrice(service.value.price, service.value.priceType);
+  return getServicePriceDisplay(service.value);
+});
 const averageRating = computed(() => {
   if (!reviews.value.length) return null;
   return reviews.value.reduce((sum, r) => sum + r.rating, 0) / reviews.value.length;
@@ -257,6 +255,11 @@ const loadReviews = async () => {
 // ─── Navigation ───────────────────────────────────────────────────────────────
 
 const goBack = () => {
+  if (window.history.state?.back) {
+    router.back();
+    return;
+  }
+
   router.push({ name: 'provider-profile', params: { providerId: props.providerId } });
 };
 
@@ -283,8 +286,6 @@ const handleRequestService = () => {
 
 const resetQuoteForm = () => {
   quoteMessage.value = '';
-  quoteBudget.value = '';
-  formattedQuoteBudget.value = '';
   quoteDeadline.value = '';
   quoteDeadlineDate.value = '';
   quoteDeadlineType.value = 'estimated';
@@ -294,38 +295,15 @@ const resetQuoteForm = () => {
   isLoadingCEP.value = false;
 };
 
-const handleQuoteBudgetInput = (val: string) => {
-  let digits = val.replace(/\D/g, '');
-  if (!digits) { formattedQuoteBudget.value = ''; quoteBudget.value = ''; return; }
-  if (digits.length > 9) digits = digits.slice(0, 9);
-  let numValue = parseInt(digits) / 100;
-  if (numValue > 1000000) { numValue = 1000000; digits = '100000000'; }
-  formattedQuoteBudget.value = formatPriceDisplay(numValue);
-  quoteBudget.value = numValue.toString();
-};
-
 const blockNonNumericKeys = (event: KeyboardEvent) => {
   const allowed = ['Backspace','Delete','Tab','Escape','Enter','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End'];
   if (allowed.includes(event.key) || event.ctrlKey || event.metaKey) return;
   if (!/^[0-9]$/.test(event.key)) event.preventDefault();
 };
 
-const blockBudgetExceedingMax = (event: KeyboardEvent) => {
-  const allowed = ['Backspace','Delete','Tab','Escape','Enter','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End'];
-  if (allowed.includes(event.key) || event.ctrlKey || event.metaKey) return;
-  if (!/^[0-9]$/.test(event.key)) { event.preventDefault(); return; }
-  const currentDigits = formattedQuoteBudget.value.replace(/\D/g, '');
-  if (currentDigits.length >= 9 || Number(quoteBudget.value) >= 1000000) event.preventDefault();
-};
-
-const handleBudgetPaste = (event: ClipboardEvent) => {
-  const digits = (event.clipboardData?.getData('text') || '').replace(/\D/g, '');
-  if (!digits) return;
-  let numValue = parseInt(digits) / 100;
-  if (numValue > 1000000) numValue = 1000000;
-  formattedQuoteBudget.value = formatPriceDisplay(numValue);
-  quoteBudget.value = numValue.toString();
-};
+const handleQuoteBudgetInput = (val: string) => {};
+const blockBudgetExceedingMax = () => {};
+const handleBudgetPaste = () => {};
 
 const handleDeadlineInput = (val: string) => {
   let digits = val.replace(/\D/g, '');
@@ -422,7 +400,6 @@ const formatFileSize = (bytes: number) => {
 
 const handleSendQuote = async () => {
   if (!quoteMessage.value.trim()) { toast.error('Por favor, descreva o serviço que você precisa'); return; }
-  if (!quoteBudget.value || Number(quoteBudget.value) < 5) { toast.error('Informe um orçamento de no mínimo R$ 5,00'); return; }
   if (!quoteDeadline.value && quoteDeadlineType.value === 'estimated') { toast.error('Informe a quantidade de dias'); return; }
   if (!quoteDeadlineDate.value && quoteDeadlineType.value === 'decided') { toast.error('Selecione uma data'); return; }
   if (quoteDeadlineType.value === 'decided' && quoteDeadlineDate.value) {
@@ -437,6 +414,7 @@ const handleSendQuote = async () => {
   }
 
   const deadline = quoteDeadlineType.value === 'decided' ? quoteDeadlineDate.value : `${quoteDeadline.value} dias`;
+  const desiredDate = quoteDeadlineType.value === 'decided' ? quoteDeadlineDate.value : undefined;
   isSendingQuote.value = true;
   try {
     let attachmentUrls: string[] = [];
@@ -448,8 +426,8 @@ const handleSendQuote = async () => {
       serviceName: service.value ? `${service.value.title} - Solicitação` : 'Solicitação',
       category: service.value?.category || '',
       description: quoteMessage.value,
-      budget: Number(quoteBudget.value),
       deadline,
+      desiredDate,
       workModel: workModel.value?.toUpperCase(),
       address: serviceRequiresAddress.value ? buildQuoteAddress() : null,
       serviceId: props.serviceId,
@@ -491,7 +469,7 @@ onMounted(() => {
       <AlertCircle class="h-12 w-12 text-red-400" />
       <h3 class="text-lg font-semibold text-[#263238]">Ops, algo deu errado</h3>
       <p class="text-[#435574]">{{ error }}</p>
-      <Button @click="loadData" class="bg-[#286AD8]">Tentar novamente</Button>
+      <Button @click="loadData">Tentar novamente</Button>
     </div>
 
     <!-- ── Content ────────────────────────────────────────────── -->
@@ -505,7 +483,7 @@ onMounted(() => {
           class="text-[#435574] hover:text-[#286AD8]"
         >
           <ArrowLeft class="h-4 w-4 mr-2" />
-          Voltar ao perfil
+          Voltar 
         </Button>
         <div class="flex items-center gap-2">
           <Button
@@ -537,7 +515,6 @@ onMounted(() => {
                 <Badge class="bg-blue-50 text-[#286AD8] border-none font-semibold uppercase tracking-wide text-[10px]">
                   {{ service.category }}
                 </Badge>
-                <WorkModelBadge v-if="workModel" :work-model="workModel" />
               </div>
               <h1 class="text-2xl sm:text-3xl font-bold text-[#263238] leading-tight">{{ service.title }}</h1>
             </div>
@@ -546,21 +523,21 @@ onMounted(() => {
             <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
               <div class="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm flex items-center gap-3">
                 <div class="p-2.5 bg-blue-50 rounded-xl text-[#286AD8]">
-                  <DollarSign class="h-5 w-5" />
+                  <CheckCircle class="h-5 w-5" />
                 </div>
                 <div>
-                  <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Investimento</p>
-                  <p class="text-lg font-black text-[#263238]">{{ formatPrice(service.price, service.priceType) }}</p>
+                  <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Experiência neste serviço</p>
+                  <p class="text-base font-bold leading-tight text-[#263238]">{{ serviceExperienceLabel }}</p>
                 </div>
               </div>
 
               <div class="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm flex items-center gap-3">
                 <div class="p-2.5 bg-green-50 rounded-xl text-green-600">
-                  <Clock class="h-5 w-5" />
+                  <Briefcase class="h-5 w-5" />
                 </div>
                 <div>
-                  <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Prazo</p>
-                  <p class="text-base font-bold text-[#263238]">{{ formatDelivery(service.deliveryTime, service.deliveryUnit) }}</p>
+                  <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Modalidade</p>
+                  <p class="text-base font-bold text-[#263238]">{{ serviceWorkModelLabel }}</p>
                 </div>
               </div>
 
@@ -626,13 +603,16 @@ onMounted(() => {
 
               <!-- Price CTA card -->
               <Card class="p-6 border-2 border-[#286AD8]/20">
-                <div class="mb-5">
-                  <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Valor aproximado</p>
-                  <p class="text-3xl font-black text-[#263238]">{{ formatPrice(service.price, service.priceType) }}</p>
+                <div class="mb-1">
+                  <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">{{ servicePriceLabel }}</p>
+                  <p class="text-3xl font-black leading-tight text-[#263238]">{{ servicePriceDisplay }}</p>
+                  <p v-if="hasAveragePriceRange" class="mt-2 text-xs text-[#435574]">
+                    Faixa calculada com base nos serviços concluídos.
+                  </p>
                 </div>
                 <Button
                   @click="handleRequestService"
-                  class="w-full bg-[#286AD8] hover:bg-[#435574] h-13 text-base font-bold shadow-lg shadow-[#286AD8]/20 transition-all active:scale-95 rounded-xl mb-3"
+                  class="w-full h-13 text-base font-bold shadow-lg shadow-primary/20 transition-all active:scale-95 rounded-xl mb-3"
                 >
                   <Send class="h-5 w-5 mr-2" />
                   Solicitar este serviço
@@ -681,7 +661,7 @@ onMounted(() => {
                   <Badge v-else variant="secondary">Indisponível</Badge>
                 </div>
 
-                <Button variant="outline" class="w-full text-[#286AD8] border-[#286AD8]/30 hover:bg-blue-50" @click="goBack">
+                <Button variant="outline" class="w-full text-primary border-primary/30" @click="goBack">
                   Ver perfil completo
                 </Button>
               </Card>
@@ -715,7 +695,7 @@ onMounted(() => {
             </DialogHeader>
 
             <!-- Budget -->
-            <div>
+            <div v-if="false">
               <Label class="text-[#435574] mb-2 block text-sm">
                 Orçamento estimado <span class="text-red-500">*</span>
               </Label>
@@ -731,19 +711,18 @@ onMounted(() => {
                   @paste.prevent="handleBudgetPaste"
                   class="pl-10"
                   :class="{
-                    'border-red-500 focus-visible:ring-red-500': quoteBudget && Number(quoteBudget) < 5,
+                    'border-red-500 focus-visible:ring-red-500': quoteBudget && Number(quoteBudget) < 20,
                     'border-amber-500 focus-visible:ring-amber-500': Number(quoteBudget) >= 1000000
                   }"
                 />
               </div>
-              <p v-if="quoteBudget && Number(quoteBudget) < 5" class="text-[11px] text-red-500 font-medium mt-1">
-                O orçamento mínimo é R$ 5,00
+              <p v-if="quoteBudget && Number(quoteBudget) < 20" class="text-[11px] text-red-500 font-medium mt-1">
+                O orçamento mínimo é R$ 20,00
               </p>
               <p v-else-if="Number(quoteBudget) >= 1000000" class="text-[11px] text-amber-600 font-medium mt-1">
                 Valor máximo atingido: R$ 1.000.000,00
               </p>
             </div>
-
             <!-- Deadline -->
             <div class="space-y-3">
               <Label class="text-[#435574] mb-2 block text-sm">
@@ -797,7 +776,7 @@ onMounted(() => {
                 Descrição do serviço <span class="text-red-500">*</span>
               </Label>
               <Textarea
-                placeholder="Ex: Preciso instalar 3 ventiladores de teto na sala e quartos..."
+                placeholder="Insira detalhes sobre o serviço que você precisa, características, objetivos, preferências e qualquer informação relevante para que o profissional possa entender melhor sua demanda."
                 :rows="5"
                 v-model="quoteMessage"
                 class="resize-none"
@@ -935,7 +914,7 @@ onMounted(() => {
             </div>
 
             <!-- Submit -->
-            <Button @click="handleSendQuote" class="w-full bg-[#286AD8]" :disabled="isSendingQuote">
+            <Button @click="handleSendQuote" class="w-full" :disabled="isSendingQuote">
               <Loader2 v-if="isSendingQuote" class="h-4 w-4 mr-2 animate-spin" />
               <Send v-else class="h-4 w-4 mr-2" />
               {{ isSendingQuote ? 'Enviando...' : 'Enviar Solicitação' }}

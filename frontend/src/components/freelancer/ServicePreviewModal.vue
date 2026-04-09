@@ -329,7 +329,7 @@ const selectedImage = ref(0);
           <!-- Ações -->
           <div class="flex gap-3">
             <Button 
-              class="flex-1 bg-[#286AD8] hover:bg-[#435574] text-white"
+              class="flex-1"
               size="lg"
             >
               <MessageCircle class="h-5 w-5 mr-2" />
@@ -337,7 +337,7 @@ const selectedImage = ref(0);
             </Button>
             <Button 
               variant="outline"
-              class="border-[#286AD8] text-[#286AD8] hover:bg-blue-50"
+              class="text-primary border-primary"
               size="lg"
             >
               Enviar Mensagem
