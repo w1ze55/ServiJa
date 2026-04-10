@@ -226,6 +226,7 @@ public class NotificationService {
         ServiceRequest serviceRequest = payment.getServiceRequest();
         Map<String, Object> paymentMetadata = metadataForPayment(serviceRequest, payment.getId(), ROUTE_CLIENT_PROJECT_DETAIL);
         Map<String, Object> projectMetadataForContractor = metadataForPayment(serviceRequest, payment.getId(), ROUTE_CLIENT_PROJECT_DETAIL);
+        Map<String, Object> paymentMetadataForFreelancer = metadataForPayment(serviceRequest, payment.getId(), ROUTE_FREELANCER_PROPOSAL_DETAIL);
         Map<String, Object> projectMetadataForFreelancer = metadataForPayment(serviceRequest, payment.getId(), ROUTE_FREELANCER_PROPOSAL_DETAIL);
 
         createUniqueNotification(
@@ -236,6 +237,16 @@ public class NotificationService {
                 "Pagamento aprovado",
                 "Seu pagamento foi aprovado e o projeto já pode começar.",
                 paymentMetadata
+        );
+
+        createUniqueNotification(
+                payment.getFreelancer(),
+                payment.getContractor(),
+                NotificationType.PAYMENT_RECEIVED,
+                NotificationCategory.PAYMENTS,
+                "Pagamento recebido",
+                "O pagamento do projeto foi confirmado e voce ja pode iniciar o trabalho.",
+                paymentMetadataForFreelancer
         );
 
         createUniqueNotification(

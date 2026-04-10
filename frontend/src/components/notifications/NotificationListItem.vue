@@ -9,6 +9,7 @@ import {
   formatNotificationTimestamp,
   getNotificationDescription,
   getNotificationCategoryLabel,
+  getNotificationTone,
 } from '@/utils/notifications';
 
 interface Props {
@@ -32,28 +33,58 @@ const emit = defineEmits<{
   delete: [notification: NotificationItem];
 }>();
 
-const isRejectedNotification = computed(() => props.notification.type === 'REQUEST_REJECTED');
+const tone = computed(() => getNotificationTone(props.notification));
+
+const toneItemClasses: Record<string, { unread: string; read: string; action: string; indicator: string; link: string }> = {
+  green: {
+    unread: 'border-emerald-200 bg-emerald-50/70 hover:border-emerald-300 hover:shadow-sm',
+    read: 'border-emerald-100 bg-white hover:border-emerald-200 hover:bg-emerald-50/40 hover:shadow-sm',
+    action: 'h-8 w-8 text-slate-500 hover:bg-emerald-100 hover:text-emerald-700',
+    indicator: 'ml-auto h-2.5 w-2.5 rounded-full bg-emerald-500',
+    link: 'text-emerald-700 hover:text-emerald-800',
+  },
+  purple: {
+    unread: 'border-violet-200 bg-violet-50/70 hover:border-violet-300 hover:shadow-sm',
+    read: 'border-violet-100 bg-white hover:border-violet-200 hover:bg-violet-50/40 hover:shadow-sm',
+    action: 'h-8 w-8 text-slate-500 hover:bg-violet-100 hover:text-violet-700',
+    indicator: 'ml-auto h-2.5 w-2.5 rounded-full bg-violet-500',
+    link: 'text-violet-700 hover:text-violet-800',
+  },
+  red: {
+    unread: 'border-red-200 bg-red-50/70 hover:border-red-300 hover:shadow-sm',
+    read: 'border-red-100 bg-white hover:border-red-200 hover:bg-red-50/40 hover:shadow-sm',
+    action: 'h-8 w-8 text-slate-500 hover:bg-red-100 hover:text-red-700',
+    indicator: 'ml-auto h-2.5 w-2.5 rounded-full bg-red-500',
+    link: 'text-red-700 hover:text-red-800',
+  },
+  blue: {
+    unread: 'border-sky-200 bg-sky-50/70 hover:border-sky-300 hover:shadow-sm',
+    read: 'border-sky-100 bg-white hover:border-sky-200 hover:bg-sky-50/40 hover:shadow-sm',
+    action: 'h-8 w-8 text-slate-500 hover:bg-sky-100 hover:text-sky-700',
+    indicator: 'ml-auto h-2.5 w-2.5 rounded-full bg-sky-500',
+    link: 'text-sky-700 hover:text-sky-800',
+  },
+  orange: {
+    unread: 'border-orange-200 bg-orange-50/70 hover:border-orange-300 hover:shadow-sm',
+    read: 'border-orange-100 bg-white hover:border-orange-200 hover:bg-orange-50/40 hover:shadow-sm',
+    action: 'h-8 w-8 text-slate-500 hover:bg-orange-100 hover:text-orange-700',
+    indicator: 'ml-auto h-2.5 w-2.5 rounded-full bg-orange-500',
+    link: 'text-orange-700 hover:text-orange-800',
+  },
+};
 
 const itemClasses = computed(() => [
   'group rounded-xl border transition-all',
   props.compact ? 'p-3' : 'p-4',
   props.notification.isRead
-    ? 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm'
-    : isRejectedNotification.value
-      ? 'border-red-200 bg-red-50/70 hover:border-red-300 hover:shadow-sm'
-      : 'border-blue-200 bg-blue-50/70 hover:border-blue-300 hover:shadow-sm',
+    ? toneItemClasses[tone.value].read
+    : toneItemClasses[tone.value].unread,
   props.pending ? 'opacity-70 pointer-events-none' : '',
 ]);
 
-const markReadButtonClasses = computed(() =>
-  isRejectedNotification.value
-    ? 'h-8 w-8 text-slate-500 hover:bg-red-100 hover:text-red-700'
-    : 'h-8 w-8 text-slate-500 hover:bg-blue-100 hover:text-blue-700'
-);
-
-const unreadIndicatorClasses = computed(() =>
-  isRejectedNotification.value ? 'ml-auto h-2.5 w-2.5 rounded-full bg-red-500' : 'ml-auto h-2.5 w-2.5 rounded-full bg-[#286AD8]'
-);
+const markReadButtonClasses = computed(() => toneItemClasses[tone.value].action);
+const unreadIndicatorClasses = computed(() => toneItemClasses[tone.value].indicator);
+const detailsLinkClasses = computed(() => toneItemClasses[tone.value].link);
 
 const timestamp = computed(() =>
   formatNotificationTimestamp(props.notification.createdAt, props.nowTimestamp)
@@ -122,7 +153,7 @@ const description = computed(() => getNotificationDescription(props.notification
           <Button
             variant="link"
             size="sm"
-            class="h-auto p-0 text-[#286AD8] hover:text-[#1f4ea7]"
+            :class="['h-auto p-0', detailsLinkClasses]"
             @click.stop="emit('open', notification)"
           >
             Ver detalhes
@@ -169,7 +200,7 @@ const description = computed(() => getNotificationDescription(props.notification
             <Button
               variant="link"
               size="sm"
-              class="mt-1 h-auto p-0 text-[#286AD8] hover:text-[#1f4ea7]"
+              :class="['mt-1 h-auto p-0', detailsLinkClasses]"
               @click.stop="emit('open', notification)"
             >
               Ver detalhes

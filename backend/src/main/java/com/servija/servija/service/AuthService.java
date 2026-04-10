@@ -28,6 +28,11 @@ import java.time.LocalDateTime;
 @RequiredArgsConstructor
 public class AuthService {
 
+    private static final int MAX_VERIFICATION_ATTEMPTS = 5;
+    private static final int LOCKOUT_MINUTES = 30;
+    private static final int VERIFICATION_CODE_EXPIRY_MINUTES = 10;
+    private static final int RESET_PASSWORD_CODE_EXPIRY_MINUTES = 30;
+
     private final UserRepository userRepository;
     private final ContractorRepository contractorRepository;
     private final FreelancerRepository freelancerRepository;
@@ -39,44 +44,34 @@ public class AuthService {
 
     @Transactional
     public AuthResponse register(RegisterRequest request) {
-        // Verificar se email já existe
         if (request.getUserType() == User.UserType.ADMIN) {
             throw new IllegalArgumentException("Cadastro publico de admin nao e permitido");
         }
 
         if (userRepository.existsByEmail(request.getEmail())) {
-            throw new DuplicateResourceException("E-mail já cadastrado");
+            throw new DuplicateResourceException("E-mail ja cadastrado");
         }
 
-        // Verificar se CPF já existe
         if (userRepository.existsByCpf(request.getCpf())) {
-            throw new DuplicateResourceException("CPF já cadastrado");
+            throw new DuplicateResourceException("CPF ja cadastrado");
         }
 
-        // Criar usuário baseado no tipo
-        User user;
-        if (request.getUserType() == User.UserType.CONTRACTOR) {
-            user = createContractor(request);
-        } else {
-            user = createFreelancer(request);
-        }
+        User user = request.getUserType() == User.UserType.CONTRACTOR
+                ? createContractor(request)
+                : createFreelancer(request);
 
-        // Gerar código de verificação
         String verificationCode = generateVerificationCode();
         user.setVerificationCode(verificationCode);
-        user.setVerificationCodeExpiry(LocalDateTime.now().plusMinutes(10));
+        user.setVerificationCodeExpiry(LocalDateTime.now().plusMinutes(VERIFICATION_CODE_EXPIRY_MINUTES));
 
-        // Salvar usuário
-        if (user instanceof Contractor) {
-            user = contractorRepository.save((Contractor) user);
+        if (user instanceof Contractor contractor) {
+            user = contractorRepository.save(contractor);
         } else {
             user = freelancerRepository.save((Freelancer) user);
         }
 
-        // Enviar email de verificação
         emailService.sendVerificationEmail(user.getEmail(), user.getName(), verificationCode);
 
-        // Gerar token JWT
         UserDetails userDetails = userDetailsService.loadUserByUsername(user.getEmail());
         String token = jwtService.generateToken(userDetails);
 
@@ -84,41 +79,31 @@ public class AuthService {
     }
 
     public AuthResponse login(LoginRequest request) {
-        // Autenticar
         authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(
-                        request.getEmail(),
-                        request.getPassword()));
+                new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword()));
 
-        // Buscar usuário
         User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Usuario nao encontrado"));
 
-        // Verificar se está ativo
         if (!user.getActive()) {
             throw new InvalidCredentialsException("Conta desativada");
         }
 
-        // Gerar token
         UserDetails userDetails = userDetailsService.loadUserByUsername(user.getEmail());
         String token = jwtService.generateToken(userDetails);
 
         return buildAuthResponse(user, token);
     }
 
-    private static final int MAX_VERIFICATION_ATTEMPTS = 5;
-    private static final int LOCKOUT_MINUTES = 30;
-
     @Transactional(noRollbackFor = { IllegalArgumentException.class, TooManyAttemptsException.class })
     public AuthResponse verifyEmail(String email, String code) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Usuario nao encontrado"));
 
-        if (user.getEmailVerified()) {
-            throw new IllegalStateException("E-mail já verificado");
+        if (Boolean.TRUE.equals(user.getEmailVerified())) {
+            throw new IllegalStateException("E-mail ja verificado");
         }
 
-        // Verificar se está em lockout
         if (user.getVerificationLockUntil() != null && user.getVerificationLockUntil().isAfter(LocalDateTime.now())) {
             throw new TooManyAttemptsException(
                     "Muitas tentativas. Aguarde para tentar novamente.",
@@ -126,15 +111,13 @@ public class AuthService {
                     user.getVerificationLockUntil());
         }
 
-        // Se o lockout expirou, resetar tentativas
         if (user.getVerificationLockUntil() != null && user.getVerificationLockUntil().isBefore(LocalDateTime.now())) {
             user.setVerificationAttempts(0);
             user.setVerificationLockUntil(null);
         }
 
-        // Verificar código
         if (user.getVerificationCode() == null || !user.getVerificationCode().equals(code)) {
-            int attempts = user.getVerificationAttempts() + 1;
+            int attempts = safeAttempts(user.getVerificationAttempts()) + 1;
             user.setVerificationAttempts(attempts);
 
             if (attempts >= MAX_VERIFICATION_ATTEMPTS) {
@@ -152,11 +135,10 @@ public class AuthService {
                     remaining + " tentativa" + (remaining != 1 ? "s" : "") + " restante" + (remaining != 1 ? "s" : ""));
         }
 
-        if (user.getVerificationCodeExpiry().isBefore(LocalDateTime.now())) {
-            throw new IllegalArgumentException("Código de verificação expirado, solicite um novo");
+        if (user.getVerificationCodeExpiry() == null || user.getVerificationCodeExpiry().isBefore(LocalDateTime.now())) {
+            throw new IllegalArgumentException("Codigo de verificacao expirado, solicite um novo");
         }
 
-        // Sucesso: resetar tudo
         user.setEmailVerified(true);
         user.setVerificationCode(null);
         user.setVerificationCodeExpiry(null);
@@ -173,15 +155,15 @@ public class AuthService {
     @Transactional
     public void resendVerificationCode(String email) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Usuario nao encontrado"));
 
-        if (user.getEmailVerified()) {
-            throw new IllegalStateException("E-mail já verificado");
+        if (Boolean.TRUE.equals(user.getEmailVerified())) {
+            throw new IllegalStateException("E-mail ja verificado");
         }
 
         String verificationCode = generateVerificationCode();
         user.setVerificationCode(verificationCode);
-        user.setVerificationCodeExpiry(LocalDateTime.now().plusMinutes(10));
+        user.setVerificationCodeExpiry(LocalDateTime.now().plusMinutes(VERIFICATION_CODE_EXPIRY_MINUTES));
         user.setVerificationAttempts(0);
         user.setVerificationLockUntil(null);
         userRepository.save(user);
@@ -191,65 +173,118 @@ public class AuthService {
 
     @Transactional
     public void forgotPassword(String email) {
-        User user = userRepository.findByEmail(email)
-                .orElse(null);
+        User user = userRepository.findByEmail(email).orElse(null);
 
-        // Não revelamos se o email existe ou não por segurança
         if (user == null) {
             return;
         }
 
-        // Gerar código de reset de senha (6 dígitos)
         String resetCode = generateVerificationCode();
         user.setResetPasswordToken(resetCode);
-        user.setResetPasswordTokenExpiry(LocalDateTime.now().plusHours(1)); // Expira em 1 hora
+        user.setResetPasswordTokenExpiry(LocalDateTime.now().plusMinutes(RESET_PASSWORD_CODE_EXPIRY_MINUTES));
+        user.setResetPasswordAttempts(0);
+        user.setResetPasswordLockUntil(null);
         userRepository.save(user);
 
-        // Enviar email de reset de senha
         emailService.sendPasswordResetEmail(user.getEmail(), user.getName(), resetCode);
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = { IllegalArgumentException.class, TooManyAttemptsException.class })
+    public void verifyResetPasswordCode(String email, String code) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("Usuario nao encontrado"));
+
+        validateResetPasswordCode(user, code, true);
+        user.setResetPasswordAttempts(0);
+        user.setResetPasswordLockUntil(null);
+        userRepository.save(user);
+    }
+
+    @Transactional(noRollbackFor = { IllegalArgumentException.class, TooManyAttemptsException.class })
     public void resetPassword(String email, String code, String newPassword, String confirmPassword) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Usuario nao encontrado"));
 
-        // Verificar código
-        if (user.getResetPasswordToken() == null || !user.getResetPasswordToken().equals(code)) {
-            throw new IllegalArgumentException("Código de recuperação inválido");
-        }
+        validateResetPasswordCode(user, code, false);
 
-        // Verificar expiração
-        if (user.getResetPasswordTokenExpiry() == null ||
-                user.getResetPasswordTokenExpiry().isBefore(LocalDateTime.now())) {
-            throw new IllegalArgumentException("Código de recuperação expirado. Solicite um novo.");
-        }
-
-        // Verificar se as senhas coincidem
         if (!newPassword.equals(confirmPassword)) {
-            throw new IllegalArgumentException("As senhas não coincidem");
+            throw new IllegalArgumentException("As senhas nao coincidem");
         }
 
-        // Validar força da senha
         if (!isValidPassword(newPassword)) {
             throw new IllegalArgumentException(
-                    "A senha deve ter no mínimo 8 caracteres e conter pelo menos: " +
-                            "1 letra maiúscula, 1 letra minúscula, 1 número e 1 caractere especial");
+                    "A senha deve ter no minimo 8 caracteres e conter pelo menos: "
+                            + "1 letra maiuscula, 1 letra minuscula, 1 numero e 1 caractere especial");
         }
 
-        // Atualizar senha
         user.setPassword(passwordEncoder.encode(newPassword));
-        user.setResetPasswordToken(null);
-        user.setResetPasswordTokenExpiry(null);
+        clearResetPasswordChallenge(user);
+        saveUser(user);
+    }
 
-        // Salvar no repositório apropriado
-        if (user instanceof Contractor) {
-            contractorRepository.save((Contractor) user);
-        } else if (user instanceof Freelancer) {
-            freelancerRepository.save((Freelancer) user);
-        } else {
+    private void validateResetPasswordCode(User user, String code, boolean consumeAttemptsOnFailure) {
+        LocalDateTime now = LocalDateTime.now();
+
+        if (user.getResetPasswordLockUntil() != null && user.getResetPasswordLockUntil().isAfter(now)) {
+            throw new TooManyAttemptsException(
+                    "Muitas tentativas. Aguarde para tentar novamente.",
+                    0,
+                    user.getResetPasswordLockUntil());
+        }
+
+        if (user.getResetPasswordLockUntil() != null && user.getResetPasswordLockUntil().isBefore(now)) {
+            user.setResetPasswordAttempts(0);
+            user.setResetPasswordLockUntil(null);
             userRepository.save(user);
         }
+
+        if (user.getResetPasswordToken() == null || !user.getResetPasswordToken().equals(code)) {
+            if (!consumeAttemptsOnFailure) {
+                throw new IllegalArgumentException("Codigo de recuperacao invalido");
+            }
+
+            int attempts = safeAttempts(user.getResetPasswordAttempts()) + 1;
+            user.setResetPasswordAttempts(attempts);
+
+            if (attempts >= MAX_VERIFICATION_ATTEMPTS) {
+                user.setResetPasswordLockUntil(now.plusMinutes(LOCKOUT_MINUTES));
+                userRepository.save(user);
+                throw new TooManyAttemptsException(
+                        "Muitas tentativas. Aguarde para tentar novamente.",
+                        0,
+                        user.getResetPasswordLockUntil());
+            }
+
+            userRepository.save(user);
+            int remaining = MAX_VERIFICATION_ATTEMPTS - attempts;
+            throw new IllegalArgumentException(
+                    remaining + " tentativa" + (remaining != 1 ? "s" : "") + " restante" + (remaining != 1 ? "s" : ""));
+        }
+
+        if (user.getResetPasswordTokenExpiry() == null || user.getResetPasswordTokenExpiry().isBefore(now)) {
+            throw new IllegalArgumentException("Codigo de recuperacao expirado. Solicite um novo.");
+        }
+    }
+
+    private void clearResetPasswordChallenge(User user) {
+        user.setResetPasswordToken(null);
+        user.setResetPasswordTokenExpiry(null);
+        user.setResetPasswordAttempts(0);
+        user.setResetPasswordLockUntil(null);
+    }
+
+    private int safeAttempts(Integer attempts) {
+        return attempts == null ? 0 : attempts;
+    }
+
+    private User saveUser(User user) {
+        if (user instanceof Contractor contractor) {
+            return contractorRepository.save(contractor);
+        }
+        if (user instanceof Freelancer freelancer) {
+            return freelancerRepository.save(freelancer);
+        }
+        return userRepository.save(user);
     }
 
     private boolean isValidPassword(String password) {

@@ -9,9 +9,11 @@ import {
   MessageSquare,
   Paperclip,
   RefreshCcw,
+  Rocket,
   X,
 } from 'lucide-vue-next';
 import type { NotificationItem } from '@/types/notifications';
+import { getNotificationTone } from '@/utils/notifications';
 
 interface Props {
   notification: NotificationItem;
@@ -43,6 +45,7 @@ const iconComponent = computed(() => {
     case 'ADJUSTMENTS_REQUESTED':
       return RefreshCcw;
     case 'PROJECT_STARTED':
+      return Rocket;
     case 'PROJECT_COMPLETED':
     case 'DELIVERY_APPROVED':
       return CheckCheck;
@@ -52,28 +55,32 @@ const iconComponent = computed(() => {
 });
 
 const palette = computed(() => {
-  if (props.notification.type === 'REQUEST_REJECTED') {
-    return {
-      wrapper: 'bg-red-100',
-      icon: 'text-red-700',
-    };
-  }
-
-  switch (props.notification.category) {
-    case 'payments':
+  switch (getNotificationTone(props.notification)) {
+    case 'green':
       return {
         wrapper: 'bg-emerald-100',
         icon: 'text-emerald-700',
       };
-    case 'messages':
+    case 'purple':
+      return {
+        wrapper: 'bg-violet-100',
+        icon: 'text-violet-700',
+      };
+    case 'red':
+      return {
+        wrapper: 'bg-red-100',
+        icon: 'text-red-700',
+      };
+    case 'orange':
+      return {
+        wrapper: 'bg-orange-100',
+        icon: 'text-orange-700',
+      };
+    case 'blue':
+    default:
       return {
         wrapper: 'bg-sky-100',
         icon: 'text-sky-700',
-      };
-    default:
-      return {
-        wrapper: 'bg-blue-100',
-        icon: 'text-blue-700',
       };
   }
 });
