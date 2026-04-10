@@ -272,7 +272,7 @@ const menuItems = computed(() =>
         // Menu para Freelancers
         { id: "freelancer-dashboard", label: "Dashboard", icon: Home },
         { id: "freelancer-proposals", label: "Propostas", icon: FileText },
-        { id: "freelancer-deliveries", label: "Projetos", icon: Package },
+        { id: "freelancer-deliveries", label: "Minhas entregas", icon: Package },
         { id: "freelancer-wallet", label: "Carteira", icon: Wallet },
 
         { id: "messages", label: "Mensagens", icon: MessageSquare },

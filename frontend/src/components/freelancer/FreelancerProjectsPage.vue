@@ -126,7 +126,7 @@ const selectedCategoryLabel = computed(
 const getProjectStatusMeta = (project: Proposal) => {
   if (hasPendingAdjustment(project)) {
     return {
-      label: 'Requer Acao',
+      label: 'Requer ação',
       class: 'bg-amber-100 text-amber-700',
       step: 'Cliente solicitou ajustes na entrega',
     };
@@ -134,7 +134,7 @@ const getProjectStatusMeta = (project: Proposal) => {
 
   if (project.status === 'delivered') {
     return {
-      label: 'Aguardando aprovacao',
+      label: 'Aguardando aprovação',
       class: 'bg-emerald-100 text-emerald-700',
       step: 'Entrega enviada, aguardando retorno do cliente',
     };
@@ -151,7 +151,7 @@ const getProjectStatusMeta = (project: Proposal) => {
   return {
     label: 'Em andamento',
     class: 'bg-blue-100 text-blue-700',
-    step: 'Execucao em andamento',
+    step: 'Execução em andamento',
   };
 };
 
@@ -252,8 +252,8 @@ onUnmounted(() => {
   <div class="max-w-7xl mx-auto space-y-6 p-6">
     <div class="flex items-center justify-between gap-4 flex-wrap">
       <div class="flex-1">
-        <h1 class="text-2xl font-bold text-[#263238] mb-2">Projetos em Andamento</h1>
-        <p class="text-[#435574]">Acompanhe o progresso dos servicos aceitos e finalize suas entregas.</p>
+        <h1 class="text-2xl font-bold text-[#263238] mb-2">Minhas Entregas</h1>
+        <p class="text-[#435574]">Acompanhe o progresso dos serviços aceitos e finalize suas entregas.</p>
       </div>
 
       <Button variant="outline" @click="handleRefresh">
@@ -281,7 +281,7 @@ onUnmounted(() => {
             <AlertCircle class="h-6 w-6 text-amber-600" />
           </div>
           <div>
-            <p class="text-sm text-[#435574]">Requer acao</p>
+            <p class="text-sm text-[#435574]">Requer ação</p>
             <p class="text-2xl font-bold text-[#263238]">{{ stats.needAction }}</p>
           </div>
         </div>
@@ -293,7 +293,7 @@ onUnmounted(() => {
             <CheckCircle class="h-6 w-6 text-green-600" />
           </div>
           <div>
-            <p class="text-sm text-[#435574]">Concluidos</p>
+            <p class="text-sm text-[#435574]">Concluídos</p>
             <p class="text-2xl font-bold text-[#263238]">{{ stats.completed }}</p>
           </div>
         </div>
@@ -346,10 +346,10 @@ onUnmounted(() => {
           Ativos ({{ stats.inProgress }})
         </TabsTrigger>
         <TabsTrigger value="need_action">
-          Requer acao ({{ stats.needAction }})
+          Requer ação ({{ stats.needAction }})
         </TabsTrigger>
         <TabsTrigger value="completed">
-          Concluidos ({{ stats.completed }})
+          Concluídos ({{ stats.completed }})
         </TabsTrigger>
       </TabsList>
 
@@ -364,7 +364,7 @@ onUnmounted(() => {
           <p class="text-[#435574]">
             {{ searchQuery || categoryFilter !== 'all'
               ? 'Tente ajustar os filtros de busca.'
-              : 'Seus projetos ativos e concluidos aparecerao aqui.' }}
+              : 'Seus projetos ativos e Concluídos aparecerao aqui.' }}
           </p>
         </Card>
 
@@ -424,7 +424,7 @@ onUnmounted(() => {
               <div class="flex flex-wrap items-center gap-4 text-sm text-[#435574]">
                 <div class="flex items-center gap-1">
                   <Calendar class="h-4 w-4" />
-                  <span>Inicio: {{ formatDate(project.receivedAt) }}</span>
+                  <span>Início: {{ formatDate(project.receivedAt) }}</span>
                 </div>
                 <div class="flex items-center gap-1">
                   <Clock class="h-4 w-4" />

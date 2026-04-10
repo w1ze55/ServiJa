@@ -381,7 +381,7 @@ onUnmounted(() => {
             <Search class="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-[#435574]" />
             <Input
               v-model="searchQuery"
-              placeholder="Buscar por serviço ou freelancer..."
+              placeholder="Buscar por serviço ou profissional..."
               class="pl-10"
             />
           </div>

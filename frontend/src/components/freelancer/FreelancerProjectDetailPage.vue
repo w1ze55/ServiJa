@@ -519,7 +519,7 @@ const handleUploadFiles = async () => {
 
           <div class="flex items-center gap-8 px-6 border-l hidden md:flex">
             <div class="text-center">
-              <p class="text-xs text-[#435574] uppercase tracking-wider mb-1">Inicio</p>
+              <p class="text-xs text-[#435574] uppercase tracking-wider mb-1">Início</p>
               <p class="font-semibold text-[#263238]">{{ formatDate(project.receivedAt) }}</p>
             </div>
             <div class="text-center">
@@ -559,7 +559,7 @@ const handleUploadFiles = async () => {
             >
               <TabsTrigger value="details">Detalhes</TabsTrigger>
               <TabsTrigger value="messages">Mensagens</TabsTrigger>
-              <TabsTrigger value="history">Historico</TabsTrigger>
+              <TabsTrigger value="history">Histórico</TabsTrigger>
               <TabsTrigger value="files">Arquivos</TabsTrigger>
               <TabsTrigger v-if="hasMilestones" value="milestones">Marcos</TabsTrigger>
             </TabsList>
@@ -568,7 +568,7 @@ const handleUploadFiles = async () => {
               <Card class="p-6">
                 <h3 class="font-bold text-[#263238] mb-4 flex items-center gap-2">
                   <FileText class="h-5 w-5 text-blue-600" />
-                  Escopo e Descricao
+                  Escopo e Descrição
                 </h3>
                 <div class="prose prose-blue max-w-none text-[#435574]">
                   <p class="whitespace-pre-line">{{ project.description }}</p>
@@ -583,10 +583,10 @@ const handleUploadFiles = async () => {
               </Card>
 
               <Card class="p-6">
-                <h3 class="font-bold text-[#263238] mb-4">Informacoes de Localizacao</h3>
+                <h3 class="font-bold text-[#263238] mb-2">Informações de Localização</h3>
                 <div class="flex items-start gap-3 text-[#435574]">
                   <MapPin class="h-5 w-5 text-blue-500 shrink-0" />
-                  <p>{{ project.address || project.clientLocation || 'Local nao informado' }}</p>
+                  <p>{{ project.address || project.clientLocation || 'Local não informado' }}</p>
                 </div>
               </Card>
             </TabsContent>
@@ -780,7 +780,7 @@ const handleUploadFiles = async () => {
             <h3 class="font-bold text-[#263238] mb-4">Resumo Financeiro</h3>
             <div class="space-y-4">
               <div class="flex justify-between items-center text-sm">
-                <span class="text-[#435574]">Valor do servico</span>
+                <span class="text-[#435574]">Valor do serviço</span>
                 <span class="font-semibold">{{ formatCurrency(projectValue) }}</span>
               </div>
               <div class="flex justify-between items-center text-sm">
@@ -793,10 +793,10 @@ const handleUploadFiles = async () => {
               </div>
             </div>
 
-            <div class="mt-6 p-4 bg-gray-50 rounded-lg flex items-start gap-2">
+            <div class="p-4 bg-gray-50 rounded-lg flex items-start gap-2">
               <DollarSign class="h-4 w-4 text-green-500 mt-1 shrink-0" />
               <p class="text-[10px] text-[#435574]">
-                O valor sera liberado conforme a regra financeira do projeto apos a aprovacao final da entrega.
+                O valor será liberado para pagamento assim que o projeto for marcado como concluído e aprovado pelo cliente.
               </p>
             </div>
           </Card>
