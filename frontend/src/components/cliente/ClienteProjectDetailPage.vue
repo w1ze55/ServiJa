@@ -12,6 +12,7 @@ import {
   Send,
   FileText,
   Upload,
+  Loader2,
 } from 'lucide-vue-next';
 import Button from '../ui/button.vue';
 import Input from '../ui/input.vue';
@@ -49,9 +50,12 @@ const request = ref<ServiceRequest | null>(null);
 const freelancerRating = ref<number | null>(null);
 const freelancerTotalReviews = ref(0);
 const activeTab = ref('details');
+const activeFileTab = ref<'client' | 'freelancer'>('client');
 const newMessage = ref('');
 const isSendingMessage = ref(false);
 const showAdjustmentModal = ref(false);
+const isUploadingFiles = ref(false);
+const projectFileInput = ref<HTMLInputElement | null>(null);
 let wsConnection: ReturnType<typeof useServiceRequestWebSocket> | null = null;
 
 const clientAttachments = computed(() => request.value?.attachments || []);
@@ -59,9 +63,6 @@ const professionalAttachments = computed(() => [
   ...(request.value?.freelancerResponse?.attachments || []),
   ...(request.value?.freelancerAttachments || []),
 ]);
-const hasProjectAttachments = computed(() =>
-  clientAttachments.value.length > 0 || professionalAttachments.value.length > 0
-);
 const adjustmentAlreadyUsed = computed(() => adjustmentStore.adjustments.length > 0);
 
 const loadData = async (preserveCurrent = false) => {
@@ -228,6 +229,52 @@ const handleGoToChat = () => {
   activeTab.value = 'messages';
 };
 
+const resetProjectFileInput = () => {
+  if (projectFileInput.value) {
+    projectFileInput.value.value = '';
+  }
+};
+
+const openProjectFilePicker = () => {
+  if (isUploadingFiles.value) return;
+  projectFileInput.value?.click();
+};
+
+const handleProjectFileSelection = async (event: Event) => {
+  const target = event.target as HTMLInputElement;
+  const files = Array.from(target.files || []);
+  resetProjectFileInput();
+
+  if (!request.value || files.length === 0) return;
+
+  isUploadingFiles.value = true;
+
+  try {
+    const formData = new FormData();
+    files.forEach((file) => formData.append('files', file));
+
+    const uploadResponse = await api.post('/upload/images', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+
+    const urls = uploadResponse.data.urls || [];
+    if (!urls.length) {
+      throw new Error('Nenhum arquivo foi enviado');
+    }
+
+    await api.post(`/service-requests/${request.value.id}/contractor-attachments`, { urls });
+    await loadData(true);
+    activeTab.value = 'files';
+    toast.success(files.length === 1 ? 'Arquivo enviado com sucesso.' : 'Arquivos enviados com sucesso.');
+  } catch (error) {
+    console.error('Erro ao enviar arquivos do projeto:', error);
+    toast.error('Erro ao enviar arquivos. Tente novamente.');
+  } finally {
+    isUploadingFiles.value = false;
+    resetProjectFileInput();
+  }
+};
+
 const progress = computed(() => {
   if (!request.value) return 0;
   switch (request.value.status) {
@@ -318,7 +365,7 @@ const getStatusColor = (status: string) => {
     <div v-if="request" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <div class="lg:col-span-2 space-y-6">
         <Tabs v-model="activeTab">
-          <TabsList class="grid w-full grid-cols-4 bg-white border shadow-sm">
+          <TabsList class="tabs-list grid w-full grid-cols-4">
             <TabsTrigger value="details">
               Detalhes
             </TabsTrigger>
@@ -354,7 +401,7 @@ const getStatusColor = (status: string) => {
             <Card class="p-6">
               <h3 class="font-bold text-[#263238] mb-4">Informações de Localização</h3>
               <div class="flex items-start gap-3 text-[#435574]">
-                <MapPin class="h-5 w-5 text-red-500 shrink-0" />
+                <MapPin class="h-5 w-5 text-blue-500 shrink-0" />
                 <p>{{ request.address || 'Local não informado' }}</p>
               </div>
             </Card>
@@ -364,7 +411,6 @@ const getStatusColor = (status: string) => {
             <Card class="p-0 overflow-hidden flex flex-col min-h-[500px]">
               <div class="p-4 border-b bg-gray-50 flex items-center justify-between">
                 <h3 class="font-bold text-[#263238]">Conversa com {{ request.freelancerName }}</h3>
-                <Badge variant="outline" class="bg-white">Online</Badge>
               </div>
 
               <div class="flex-1 p-6 space-y-4 overflow-y-auto max-h-[400px]">
@@ -383,9 +429,9 @@ const getStatusColor = (status: string) => {
               </div>
 
               <div class="p-4 border-t bg-white">
-                <div class="flex gap-2">
-                  <Input v-model="newMessage" placeholder="Digite sua mensagem..." @keyup.enter="handleSendMessage" class="flex-1 rounded-full px-6" />
-                  <Button @click="handleSendMessage" :disabled="!newMessage.trim() || isSendingMessage" variant="default" class="rounded-full w-12 h-12 p-0 flex items-center justify-center">
+                <div class="flex items-center gap-2">
+                  <Input v-model="newMessage" placeholder="Digite sua mensagem..." @keyup.enter="handleSendMessage" class="h-12 flex-1 rounded-full px-6" />
+                  <Button @click="handleSendMessage" :disabled="!newMessage.trim() || isSendingMessage" variant="default" class="h-12 w-12 shrink-0 rounded-full p-0 flex items-center justify-center">
                     <Send class="h-5 w-5 text-white" />
                   </Button>
                 </div>
@@ -399,40 +445,93 @@ const getStatusColor = (status: string) => {
 
           <TabsContent value="files" class="mt-4">
             <Card class="p-6">
-              <div class="flex items-center justify-between mb-6">
-                <h3 class="font-bold text-[#263238]">Anexos do Projeto</h3>
-                <Button variant="outline" size="sm" class="text-primary border-primary">
-                  <Upload class="h-4 w-4 mr-2" />
-                  Enviar Arquivo
+              <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-[#263238]">Arquivos do Projeto</h3>
+                <Button
+                  variant="outline"
+                  :disabled="isUploadingFiles"
+                  @click="openProjectFilePicker"
+                >
+                  <Loader2 v-if="isUploadingFiles" class="h-4 w-4 mr-2 animate-spin" />
+                  <Upload v-else class="h-4 w-4 mr-2" />
+                  {{ isUploadingFiles ? 'Enviando...' : 'Enviar Arquivos' }}
                 </Button>
+                <input
+                  ref="projectFileInput"
+                  type="file"
+                  multiple
+                  class="hidden"
+                  :disabled="isUploadingFiles"
+                  @change="handleProjectFileSelection"
+                />
               </div>
 
-              <div v-if="!hasProjectAttachments" class="text-center py-12 border-2 border-dashed rounded-xl">
-                <FileText class="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                <p class="text-[#435574]">Nenhum arquivo enviado para este projeto.</p>
+              <div class="flex border-b border-gray-200 mb-4">
+                <button
+                  @click="activeFileTab = 'client'"
+                  :class="[
+                    'px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px',
+                    activeFileTab === 'client'
+                      ? 'border-[#286AD8] text-[#286AD8]'
+                      : 'border-transparent text-[#435574] hover:text-[#263238]'
+                  ]"
+                >
+                  Cliente
+                  <Badge v-if="clientAttachments.length > 0" variant="secondary" class="ml-2">
+                    {{ clientAttachments.length }}
+                  </Badge>
+                </button>
+                <button
+                  @click="activeFileTab = 'freelancer'"
+                  :class="[
+                    'px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px',
+                    activeFileTab === 'freelancer'
+                      ? 'border-[#286AD8] text-[#286AD8]'
+                      : 'border-transparent text-[#435574] hover:text-[#263238]'
+                  ]"
+                >
+                  Freelancer
+                  <Badge v-if="professionalAttachments.length > 0" variant="secondary" class="ml-2">
+                    {{ professionalAttachments.length }}
+                  </Badge>
+                </button>
               </div>
 
-              <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FileAttachment
-                  v-for="file in clientAttachments"
-                  :key="file.id"
-                  :name="file.name"
-                  :url="file.url"
-                  :size="file.size"
-                  sender-info="Enviado por você"
-                  variant="blue"
-                />
+              <div v-if="activeFileTab === 'client'">
+                <div v-if="clientAttachments.length === 0" class="text-center py-8">
+                  <FileText class="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                  <p class="text-[#435574]">Nenhum arquivo enviado pelo cliente</p>
+                </div>
+                <div v-else class="space-y-2">
+                  <FileAttachment
+                    v-for="attachment in clientAttachments"
+                    :key="attachment.id"
+                    :name="attachment.name"
+                    :url="attachment.url"
+                    :size="attachment.size"
+                    variant="blue"
+                    sender-info="Enviado pelo cliente"
+                  />
+                </div>
+              </div>
 
-                <FileAttachment
-                  v-for="file in professionalAttachments"
-                  :key="file.id"
-                  :name="file.name"
-                  :url="file.url"
-                  :size="file.size"
-                  :description="file.description"
-                  sender-info="Enviado pelo profissional"
-                  variant="amber"
-                />
+              <div v-if="activeFileTab === 'freelancer'">
+                <div v-if="professionalAttachments.length === 0" class="text-center py-8">
+                  <FileText class="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                  <p class="text-[#435574]">Nenhum arquivo enviado pelo freelancer</p>
+                </div>
+                <div v-else class="space-y-2">
+                  <FileAttachment
+                    v-for="attachment in professionalAttachments"
+                    :key="attachment.id"
+                    :name="attachment.name"
+                    :url="attachment.url"
+                    :size="attachment.size"
+                    :description="attachment.description"
+                    variant="amber"
+                    sender-info="Enviado pelo profissional"
+                  />
+                </div>
               </div>
             </Card>
           </TabsContent>
@@ -513,5 +612,12 @@ const getStatusColor = (status: string) => {
 <style scoped>
 .prose {
   line-height: 1.6;
+}
+
+@media (max-width: 768px) {
+  .tabs-list {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 0.25rem;
+  }
 }
 </style>

@@ -13,6 +13,7 @@ export const freelancerRoutes: Record<string, string> = {
   'freelancer-proposals': '/freelancer-proposals',
   'freelancer-proposal-detail': '/freelancer-proposal-detail',
   'freelancer-deliveries': '/freelancer-deliveries',
+  'freelancer-project-detail': '/freelancer-project-detail',
   'freelancer-wallet': '/freelancer-wallet',
 
   'freelancer-portfolio': '/freelancer-portfolio',

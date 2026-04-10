@@ -250,6 +250,12 @@ const resolveRouteByHint = (hint: string | undefined, metadata: NotificationMeta
         path: '/freelancer-proposal-detail',
         query: buildQuery('requestId', serviceRequestId),
       };
+    case 'freelancer-project-detail':
+    case 'freelancer-deliveries':
+      return {
+        path: serviceRequestId ? '/freelancer-project-detail' : '/freelancer-deliveries',
+        query: buildQuery('requestId', serviceRequestId),
+      };
     case 'messages':
       return {
         path: '/messages',
@@ -270,6 +276,17 @@ export const resolveNotificationRoute = (
   }
 
   if (userType === 'provider') {
+    const status = typeof notification.metadata.status === 'string'
+      ? notification.metadata.status.toUpperCase()
+      : '';
+
+    if (['IN_PROGRESS', 'DELIVERED', 'COMPLETED'].includes(status)) {
+      return {
+        path: '/freelancer-project-detail',
+        query: buildQuery('requestId', notification.metadata.serviceRequestId),
+      };
+    }
+
     return {
       path: '/freelancer-proposal-detail',
       query: buildQuery('requestId', notification.metadata.serviceRequestId),

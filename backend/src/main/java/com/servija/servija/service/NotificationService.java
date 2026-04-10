@@ -36,6 +36,7 @@ public class NotificationService {
     private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() {};
 
     private static final String ROUTE_FREELANCER_PROPOSAL_DETAIL = "freelancer-proposal-detail";
+    private static final String ROUTE_FREELANCER_PROJECT_DETAIL = "freelancer-project-detail";
     private static final String ROUTE_CLIENT_REQUEST_DETAIL = "cliente-request-detail";
     private static final String ROUTE_CLIENT_PROJECT_DETAIL = "cliente-project-detail";
     private static final String ROUTE_CLIENT_DELIVERY_APPROVAL = "cliente-delivery-approval";
@@ -226,8 +227,8 @@ public class NotificationService {
         ServiceRequest serviceRequest = payment.getServiceRequest();
         Map<String, Object> paymentMetadata = metadataForPayment(serviceRequest, payment.getId(), ROUTE_CLIENT_PROJECT_DETAIL);
         Map<String, Object> projectMetadataForContractor = metadataForPayment(serviceRequest, payment.getId(), ROUTE_CLIENT_PROJECT_DETAIL);
-        Map<String, Object> paymentMetadataForFreelancer = metadataForPayment(serviceRequest, payment.getId(), ROUTE_FREELANCER_PROPOSAL_DETAIL);
-        Map<String, Object> projectMetadataForFreelancer = metadataForPayment(serviceRequest, payment.getId(), ROUTE_FREELANCER_PROPOSAL_DETAIL);
+        Map<String, Object> paymentMetadataForFreelancer = metadataForPayment(serviceRequest, payment.getId(), ROUTE_FREELANCER_PROJECT_DETAIL);
+        Map<String, Object> projectMetadataForFreelancer = metadataForPayment(serviceRequest, payment.getId(), ROUTE_FREELANCER_PROJECT_DETAIL);
 
         createUniqueNotification(
                 payment.getContractor(),
@@ -288,7 +289,7 @@ public class NotificationService {
 
     @Transactional
     public void notifyDeliveryApproved(ServiceRequest serviceRequest, User contractor) {
-        Map<String, Object> metadata = metadataForServiceRequest(serviceRequest, ROUTE_FREELANCER_PROPOSAL_DETAIL);
+        Map<String, Object> metadata = metadataForServiceRequest(serviceRequest, ROUTE_FREELANCER_PROJECT_DETAIL);
         metadata.put("status", ServiceRequest.Status.COMPLETED.name());
 
         createUniqueNotification(
@@ -311,7 +312,7 @@ public class NotificationService {
                 NotificationCategory.PROJECTS,
                 "Ajustes solicitados",
                 contractor.getName() + " solicitou ajustes na entrega.",
-                metadataForServiceRequest(serviceRequest, ROUTE_FREELANCER_PROPOSAL_DETAIL)
+                metadataForServiceRequest(serviceRequest, ROUTE_FREELANCER_PROJECT_DETAIL)
         );
     }
 
@@ -335,11 +336,22 @@ public class NotificationService {
 
     @Transactional
     public void notifyAttachmentAdded(ServiceRequest serviceRequest, User actor, int attachmentCount) {
-        Map<String, Object> metadata = metadataForServiceRequest(serviceRequest, resolveContractorRouteHint(serviceRequest));
+        boolean sentByContractor = serviceRequest.getContractor() != null
+                && actor.getId().equals(serviceRequest.getContractor().getId());
+        User recipient = sentByContractor ? serviceRequest.getFreelancer() : serviceRequest.getContractor();
+        if (recipient == null || recipient.getId().equals(actor.getId())) {
+            return;
+        }
+
+        String routeHint = sentByContractor
+                ? resolveFreelancerRouteHint(serviceRequest)
+                : resolveContractorRouteHint(serviceRequest);
+
+        Map<String, Object> metadata = metadataForServiceRequest(serviceRequest, routeHint);
         metadata.put("attachmentCount", attachmentCount);
 
         createNotification(
-                serviceRequest.getContractor(),
+                recipient,
                 actor,
                 NotificationType.ATTACHMENT_ADDED,
                 NotificationCategory.PROJECTS,
@@ -502,5 +514,15 @@ public class NotificationService {
         }
 
         return ROUTE_CLIENT_REQUEST_DETAIL;
+    }
+
+    private String resolveFreelancerRouteHint(ServiceRequest serviceRequest) {
+        if (serviceRequest.getStatus() == ServiceRequest.Status.IN_PROGRESS
+                || serviceRequest.getStatus() == ServiceRequest.Status.DELIVERED
+                || serviceRequest.getStatus() == ServiceRequest.Status.COMPLETED) {
+            return ROUTE_FREELANCER_PROJECT_DETAIL;
+        }
+
+        return ROUTE_FREELANCER_PROPOSAL_DETAIL;
     }
 }

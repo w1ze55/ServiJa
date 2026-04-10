@@ -6,6 +6,7 @@ import com.servija.servija.dto.CounterProposalDTO;
 import com.servija.servija.dto.FreelancerAttachmentDTO;
 import com.servija.servija.dto.FreelancerAttachmentsRequest;
 import com.servija.servija.dto.FreelancerResponseDTO;
+import com.servija.servija.dto.ProjectAttachmentsRequest;
 import com.servija.servija.dto.ResponseMilestoneDTO;
 import com.servija.servija.dto.ServiceRequestDTO;
 import com.servija.servija.dto.ServiceRequestResponse;
@@ -808,6 +809,39 @@ public class ServiceRequestService {
         return toResponse(saved);
     }
 
+    @Transactional
+    public ServiceRequestResponse addContractorAttachments(Long id, ProjectAttachmentsRequest body, String contractorEmail) {
+        ServiceRequest request = serviceRequestRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("SolicitaÃ§Ã£o nÃ£o encontrada"));
+
+        User contractor = userRepository.findByEmail(contractorEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("UsuÃ¡rio nÃ£o encontrado"));
+
+        if (request.getContractor() == null || !request.getContractor().getId().equals(contractor.getId())) {
+            throw new IllegalStateException("Apenas o cliente da solicitaÃ§Ã£o pode enviar arquivos");
+        }
+
+        List<String> attachmentsToAdd = resolveProjectAttachmentUrls(body);
+        if (attachmentsToAdd.isEmpty()) {
+            throw new IllegalArgumentException("Informe pelo menos um arquivo");
+        }
+
+        List<String> existing = parseAttachmentUrls(request.getAttachments());
+        existing.addAll(attachmentsToAdd);
+
+        try {
+            request.setAttachments(objectMapper.writeValueAsString(existing));
+        } catch (Exception e) {
+            log.error("Erro ao serializar attachments do cliente", e);
+            throw new RuntimeException("Erro ao salvar arquivos");
+        }
+
+        ServiceRequest saved = serviceRequestRepository.save(request);
+        notificationService.notifyAttachmentAdded(saved, contractor, attachmentsToAdd.size());
+        log.info("Contractor attachments adicionados Ã  solicitaÃ§Ã£o {}: {} arquivos", id, attachmentsToAdd.size());
+        return toResponse(saved);
+    }
+
     private List<String> parseAttachmentUrls(String json) {
         if (!StringUtils.hasText(json)) {
             return new ArrayList<>();
@@ -903,6 +937,21 @@ public class ServiceRequestService {
                     continue;
                 }
                 resolved.add(buildFreelancerAttachment(url, null, null));
+            }
+        }
+
+        return resolved;
+    }
+
+    private List<String> resolveProjectAttachmentUrls(ProjectAttachmentsRequest body) {
+        List<String> resolved = new ArrayList<>();
+        if (body == null || body.getUrls() == null || body.getUrls().isEmpty()) {
+            return resolved;
+        }
+
+        for (String url : body.getUrls()) {
+            if (StringUtils.hasText(url)) {
+                resolved.add(url.trim());
             }
         }
 

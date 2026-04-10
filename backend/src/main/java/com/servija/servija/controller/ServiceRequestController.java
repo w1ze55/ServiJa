@@ -3,6 +3,7 @@ package com.servija.servija.controller;
 import com.servija.servija.dto.CounterProposalDTO;
 import com.servija.servija.dto.FreelancerAttachmentsRequest;
 import com.servija.servija.dto.FreelancerResponseDTO;
+import com.servija.servija.dto.ProjectAttachmentsRequest;
 import com.servija.servija.dto.ServiceRequestDTO;
 import com.servija.servija.dto.ServiceRequestHistoryResponse;
 import com.servija.servija.dto.ServiceRequestResponse;
@@ -146,6 +147,20 @@ public class ServiceRequestController {
             return ResponseEntity.badRequest().build();
         }
         return ResponseEntity.ok(serviceRequestService.addFreelancerAttachments(id, body, authentication.getName()));
+    }
+
+    @PostMapping("/{id}/contractor-attachments")
+    @Operation(summary = "Adicionar arquivos do cliente", description = "Contratante envia URLs de arquivos para vincular ao projeto")
+    @SecurityRequirement(name = "bearerAuth")
+    public ResponseEntity<ServiceRequestResponse> addContractorAttachments(
+            @PathVariable Long id,
+            @RequestBody ProjectAttachmentsRequest body,
+            Authentication authentication) {
+        boolean hasUrls = body != null && body.getUrls() != null && !body.getUrls().isEmpty();
+        if (!hasUrls) {
+            return ResponseEntity.badRequest().build();
+        }
+        return ResponseEntity.ok(serviceRequestService.addContractorAttachments(id, body, authentication.getName()));
     }
 
     @GetMapping("/{id}/history")
