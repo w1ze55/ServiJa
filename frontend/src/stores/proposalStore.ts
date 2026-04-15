@@ -23,6 +23,7 @@ export interface Proposal {
   workModel?: WorkModelValue | null;
   status: 'pending' | 'negotiating' | 'accepted' | 'in_progress' | 'delivered' | 'rejected' | 'completed' | 'archived';
   receivedAt: string;
+  updatedAt?: string;
   attachments?: ProposalAttachment[];
   freelancerAttachments?: ProposalAttachment[];
   viewed: boolean;
@@ -215,6 +216,7 @@ export const useProposalStore = defineStore('proposal', () => {
             workModel: normalizeWorkModel(req.workModel),
             status: mapApiStatusToLocal(req.status),
             receivedAt: req.createdAt,
+            updatedAt: req.updatedAt || req.createdAt,
             attachments: mapAttachments(req.attachments, 'att', req.id),
             viewed: true,
             address: req.address,
