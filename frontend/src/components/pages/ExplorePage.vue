@@ -129,8 +129,7 @@ const loadServices = async () => {
       },
     });
     services.value = response.data || [];
-    
-    // Also load favorites if not initialized
+
     if (!favoritesStore.initialized) {
       favoritesStore.fetchFavorites();
     }
