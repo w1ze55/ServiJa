@@ -1521,7 +1521,7 @@ onMounted(() => {
           </div>
 
           <div class="rounded-lg border border-blue-100 bg-blue-50/60 p-3 text-sm text-[#435574]">
-            O valor nao e informado nesta etapa. Descreva o escopo e o freelancer enviara o orcamento depois.
+            O valor não é informado nesta etapa. Descreva o escopo e o freelancer enviará o orçamento depois.
           </div>
 
           <div class="space-y-3">

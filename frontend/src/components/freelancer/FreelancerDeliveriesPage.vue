@@ -797,7 +797,7 @@ const getMilestoneStatusConfig = (status: Milestone["status"]) => {
                     ]"
                   >
                     <template v-if="remainingDays < 0"
-                      >{{ Math.abs(remainingDays) }} dias atrasado</template
+                      >{{ Math.abs(remainingDays) }} dias de atraso</template
                     >
                     <template v-else-if="remainingDays === 0"
                       >Vence hoje</template

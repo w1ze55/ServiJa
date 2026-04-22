@@ -78,7 +78,7 @@ const saveCategory = async () => {
     await loadCategories(true);
   } catch (error) {
     console.error(error);
-    toast.error('Nao foi possivel salvar a categoria');
+    toast.error('Não foi possível salvar a categoria');
   }
 };
 
@@ -94,7 +94,7 @@ const toggleCategory = async (category: AdminCategoryItem) => {
     await loadCategories(true);
   } catch (error) {
     console.error(error);
-    toast.error('Nao foi possivel atualizar a categoria');
+    toast.error('Não foi possível atualizar a categoria');
   }
 };
 
@@ -123,7 +123,7 @@ const saveSubcategory = async () => {
     await loadCategories(true);
   } catch (error) {
     console.error(error);
-    toast.error('Nao foi possivel salvar a subcategoria');
+    toast.error('Não foi possível salvar a subcategoria');
   }
 };
 
@@ -139,7 +139,7 @@ const toggleSubcategory = async (subcategory: { id: number; active: boolean }) =
     await loadCategories(true);
   } catch (error) {
     console.error(error);
-    toast.error('Nao foi possivel atualizar a subcategoria');
+    toast.error('Não foi possível atualizar a subcategoria');
   }
 };
 
@@ -252,7 +252,7 @@ onMounted(() => {
         <div class="space-y-4 py-2">
           <div class="space-y-2">
             <Label for="category-name">Nome</Label>
-            <Input id="category-name" v-model="categoryForm.name" placeholder="Ex: Tecnologia e Informatica" />
+            <Input id="category-name" v-model="categoryForm.name" placeholder="Ex: Tecnologia e Informática" />
           </div>
           <div class="space-y-2">
             <Label for="category-sort">Ordem</Label>

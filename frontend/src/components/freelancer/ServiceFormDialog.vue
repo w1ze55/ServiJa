@@ -264,7 +264,7 @@ const validateForm = () => {
   }
 
   if (selectedSubcategories.value.length > 0 && !formData.value.subcategoryId) {
-    newErrors.subcategory = 'Subcategoria Ã© obrigatÃ³ria';
+    newErrors.subcategory = 'Subcategoria é obrigatória';
   }
 
   if (!formData.value.description.trim()) {

@@ -215,13 +215,13 @@ const handleRequestAdjustments = async (reason: string) => {
   const success = await adjustmentStore.requestAdjustment(parseInt(props.requestId), reason);
 
   if (success) {
-    toast.success('Solicitacao de ajustes enviada ao freelancer.');
+    toast.success('Solicitação de ajustes enviada ao freelancer.');
     await loadAdjustments();
     await loadData(true);
     return true;
   }
 
-  toast.error('Erro ao enviar solicitacao. Tente novamente.');
+  toast.error('Erro ao enviar solicitação. Tente novamente.');
   return false;
 };
 

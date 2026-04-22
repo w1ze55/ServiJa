@@ -142,9 +142,9 @@ const getProjectStatusMeta = (project: Proposal) => {
 
   if (project.status === 'completed') {
     return {
-      label: 'Concluido',
+      label: 'Concluído',
       class: 'bg-teal-100 text-teal-700',
-      step: 'Projeto concluido com sucesso',
+      step: 'Projeto concluído com sucesso',
     };
   }
 

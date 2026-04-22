@@ -274,13 +274,13 @@ function validatePassword(): boolean {
   } else if (password.value.length > 256) {
     newErrors.password = "Senha deve ter no maximo 256 caracteres";
   } else if (!isPasswordValid.value) {
-    newErrors.password = "Senha nao atende aos requisitos";
+    newErrors.password = "Senha não atende aos requisitos";
   }
 
   if (!confirmPassword.value) {
     newErrors.confirmPassword = "Confirmacao de senha e obrigatoria";
   } else if (password.value !== confirmPassword.value) {
-    newErrors.confirmPassword = "As senhas nao coincidem";
+    newErrors.confirmPassword = "As senhas não coincidem";
   }
 
   errors.value = {
@@ -359,13 +359,13 @@ async function handleSubmit(event: Event) {
         <h2 class="text-gray-900 mb-2">Senha redefinida!</h2>
         <p class="text-gray-600 mb-4">Sua senha foi alterada com sucesso.</p>
         <p class="text-sm text-gray-500 mb-6">
-          Voce sera redirecionado para o login em instantes...
+          Você será redirecionado para o login em instantes...
         </p>
 
         <Alert class="mb-6 bg-blue-50 border-blue-200 text-left">
           <AlertCircle class="h-4 w-4 text-blue-600" />
           <AlertDescription class="text-gray-700">
-            Por seguranca, voce precisara fazer login com sua nova senha.
+            Por segurança, você precisará fazer login com sua nova senha.
           </AlertDescription>
         </Alert>
 
