@@ -343,7 +343,7 @@ onUnmounted(() => {
     <Tabs v-model="currentTab">
       <TabsList class="grid w-full grid-cols-3">
         <TabsTrigger value="active">
-          Ativos ({{ stats.inProgress }})
+          Em andamento ({{ stats.inProgress }})
         </TabsTrigger>
         <TabsTrigger value="need_action">
           Requer ação ({{ stats.needAction }})

@@ -785,7 +785,7 @@ const handleUploadFiles = async () => {
               </div>
               <div class="flex justify-between items-center text-sm">
                 <span class="text-[#435574]">Taxa da plataforma (5%)</span>
-                <span class="font-semibold text-amber-600">{{ formatCurrency(platformFee) }}</span>
+                <span class="font-semibold text-gray-600">{{ formatCurrency(platformFee) }}</span>
               </div>
               <div class="pt-4 border-t flex justify-between items-center">
                 <span class="font-bold text-[#263238]">Valor a receber</span>
@@ -845,7 +845,7 @@ const handleUploadFiles = async () => {
               O cliente será notificado e poderá revisar a entrega. Certifique-se de que todos os arquivos
               e marcos estão finalizados antes de confirmar.
               <br /><br />
-              <span class="text-amber-600 font-medium">Esta ação não pode ser desfeita.</span>
+              <span class="text-amber-600 font-medium">Esta acao nao pode ser desfeita.</span>
             </template>
           </AlertDialogDescription>
         </AlertDialogHeader>
