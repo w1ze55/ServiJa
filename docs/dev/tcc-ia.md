@@ -10,7 +10,7 @@ Documentação técnica com base no código do repositório. O sistema emprega *
 
 | Camada | Responsabilidade |
 |--------|-------------------|
-| **Infra** | Chave e modelo configuráveis (`gemini.api.key`, `gemini.model`); variáveis de ambiente em `application.properties` e `docker-compose*.yml` (`GEMINI_API_KEY`, `GEMINI_MODEL`). |
+| **Infra** | Chave e modelo configuráveis (`gemini.api.key`, `gemini.model`); variáveis de ambiente declaradas em `application.properties` e nos arquivos `docker-compose` do projeto (`GEMINI_API_KEY`, `GEMINI_MODEL`). |
 | **Serviço de baixo nível** | `GeminiService` encapsula `Client.models.generateContent` e trata erros (incl. quota 429). |
 | **Regras de negócio / prompts** | `ReviewAiService` monta prompts em PT-BR, pós-processa texto ou JSON e persiste resumos em cache. |
 | **API HTTP** | `FreelancerAiController` (refino de bio) e `ReviewAiController` (sugestão de comentário e resumo agregado). |
@@ -42,7 +42,7 @@ Entidade JPA: `backend/src/main/java/com/servija/servija/model/ReviewSummary.jav
 ### 3.1. Dependência e configuração
 
 - **Maven:** `backend/pom.xml` — artefato `com.google.genai:google-genai` (versão 1.46.0 no trecho analisado).
-- **Propriedades:** `backend/src/main/resources/application.properties` — `gemini.api.key=${GEMINI_API_KEY}`, `gemini.model=${GEMINI_MODEL:gemini-2.5-flash}`; também há chaves `google.project.*` declaradas (uso além do `GeminiService` não foi rastreado nesta tarefa focada em IA generativa).
+- **Propriedades:** `backend/src/main/resources/application.properties` — `gemini.api.key=${GEMINI_API_KEY}`, `gemini.model=${GEMINI_MODEL:gemini-2.5-flash}`; `backend/src/main/resources/application-local.properties` reforça `gemini.model=gemini-2.5-flash` no perfil local; também há chaves `google.project.*` declaradas (uso além do `GeminiService` não foi rastreado nesta tarefa focada em IA generativa).
 
 ### 3.2. `GeminiService`
 
@@ -77,7 +77,7 @@ DTO agregado: `backend/src/main/java/com/servija/servija/dto/AiSummaryResponse.j
 
 Arquivo: `backend/src/main/java/com/servija/servija/config/SecurityConfig.java`.
 
-- `GET /api/reviews/ai/summary/**` está em **`permitAll`**, ou seja, **qualquer cliente** pode consultar o resumo de IA de um freelancer por ID **sem JWT**. Os demais endpoints de IA seguem a regra `anyRequest().authenticated()` (incluindo `POST /api/reviews/ai/suggest-comment` e `POST /api/freelancer/ai/refine-bio`).
+- O padrão `/api/reviews/ai/summary/**` está em **`permitAll`**, ou seja, **qualquer cliente** pode consultar o resumo de IA de um freelancer por ID **sem JWT**. Os demais endpoints de IA seguem a regra `anyRequest().authenticated()` (incluindo `POST /api/reviews/ai/suggest-comment` e `POST /api/freelancer/ai/refine-bio`).
 
 **Lacuna / implicação para documentação acadêmica:** vale descrever explicitamente essa escolha (exibição pública de síntese gerada por modelo) e o risco de **abuso de cota** ou **enumeração** de resumos, se relevante ao trabalho.
 
@@ -94,7 +94,7 @@ Arquivo: `backend/src/main/java/com/servija/servija/config/SecurityConfig.java`.
 - `frontend/src/api/services/freelancerService.ts` — `refineBio(bio)` → `POST /freelancer/ai/refine-bio`.
 - `frontend/src/api/services/reviewService.ts` — `suggestComment`, `getAiSummary(freelancerId)` com tipos `AiCommentRequest` / `AiCommentResponse` / `AiSummaryResponse`.
 
-Base URL: `VITE_API_URL` + `/api` (`frontend/src/api/config/axios.ts`).
+Base URL: o cliente Axios normaliza `VITE_API_URL`, remove um eventual sufixo `/api` e então define `baseURL` como `cleanBaseURL + /api` (`frontend/src/api/config/axios.ts`).
 
 ### 4.2. Componentes e fluxo do usuário
 
@@ -102,7 +102,7 @@ Base URL: `VITE_API_URL` + `/api` (`frontend/src/api/config/axios.ts`).
 |------------|-----------|
 | `frontend/src/components/freelancer/FreelancerProfessionalProfile.vue` | Ao refinar, substitui a bio editada pelo retorno de `freelancerService.refineBio`. |
 | `frontend/src/components/shared/RatingForm.vue` | Ação “sugerir comentário” chama `reviewService.suggestComment` com nota, tags, nome do serviço/freelancer e comentário atual; preenche o campo de texto com a sugestão. |
-| `frontend/src/components/freelancer/AiReviewSummary.vue` | No `onMounted`, chama `getAiSummary`; se `available`, exibe card “Análise por IA” com síntese, pontos fortes e pontos de atenção; falha silenciosa (card omitido). |
+| `frontend/src/components/freelancer/AiReviewSummary.vue` | No `onMounted`, chama `getAiSummary`; se houver resumo disponível com `overall`, exibe card “Análise por IA” com síntese e pontos fortes. O campo `attentionPoints` é retornado pela API, mas não é renderizado no componente atual; em falha, o card é omitido silenciosamente. |
 
 ---
 

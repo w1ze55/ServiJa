@@ -78,6 +78,7 @@ const paymentMethod = ref<string>('');
 const togglePaymentMethod = (method: string) => {
   paymentMethod.value = paymentMethod.value === method ? '' : method;
 };
+
 const isProcessing = ref(false);
 const isLoadingPix = ref(false);
 const showPixQrCode = ref(false);
@@ -90,6 +91,7 @@ const copyFeedbackVisible = ref(false);
 const copyFeedbackFading = ref(false);
 let copyFeedbackTimeout: ReturnType<typeof setTimeout> | null = null;
 let copyFeedbackFadeTimeout: ReturnType<typeof setTimeout> | null = null;
+
 const cardData = ref({
   number: '',
   name: '',
@@ -197,13 +199,11 @@ watch(paymentMethod, async (newMethod, oldMethod) => {
 });
 
 const generatePixQrCode = async () => {
-  // Validar CPF antes de gerar
   if (!validateCpf(pixCpf.value)) {
     alert('Por favor, digite um CPF válido (11 dígitos)');
     return;
   }
 
-  // Se já existe um pagamento, apenas recarregar o QR Code
   if (currentPaymentId.value) {
     isLoadingPix.value = true;
     try {
@@ -242,8 +242,6 @@ const generatePixQrCode = async () => {
 
   try {
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080';
-
-    // Criar um pagamento temporário para gerar o QR Code
     const response = await fetch(`${apiUrl}/api/payments`, {
       method: 'POST',
       headers: {
@@ -254,19 +252,17 @@ const generatePixQrCode = async () => {
         serviceRequestId: parseInt(props.requestId),
         paymentMethod: 'PIX',
         amount: totalAmount.value,
-        cpf: pixCpf.value.replace(/\D/g, ''), // Enviar CPF sem formatação
+        cpf: pixCpf.value.replace(/\D/g, ''),
       }),
     });
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       
-      // Se já existe um pagamento, buscar ele ao invés de criar um novo
       if (errorData.message && errorData.message.includes('Já existe um pagamento')) {
         console.log('Pagamento já existe, buscando QR Code...');
         await checkExistingPayment();
         if (currentPaymentId.value) {
-          // Tentar gerar novamente (agora vai usar o pagamento existente)
           await generatePixQrCode();
           return;
         }

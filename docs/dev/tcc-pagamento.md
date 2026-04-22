@@ -1,14 +1,28 @@
-# Pagamento no ServiJá
+# Pagamento no Servi Já
 
-Documentação técnica do fluxo de pagamento entre contratante (cliente) e freelancer, com base no código do repositório. **Nota:** o arquivo de referência indicado pela skill (`tcc-servija/references/TCC.md`) não foi encontrado neste clone; a estrutura segue banco → backend → frontend, com rastreabilidade por caminhos de arquivo.
+Documentação técnica do fluxo de pagamento entre contratante e freelancer, com base no código atual do repositório. O objetivo deste material é descrever a implementação real do módulo, destacando suas regras de negócio, integração externa, comportamento no frontend e limitações observadas.
 
 ---
 
 ## 1. Visão geral
 
-O pagamento associa-se a uma **solicitação de serviço** (`service_requests`) já **aceita** (`ACCEPTED`). O contratante autenticado é quem cria o pagamento; o valor cobrado do cliente corresponde ao **valor acordado** (`responseValue` ou `counterValue`). A plataforma retém **5%** como taxa (`platform_fee`); o freelancer credita na carteira o valor líquido (`amount` = 95% do acordado). Taxas do gateway Asaas são calculadas em `gateway_fee` como **custo interno** (não repassadas ao cliente no fluxo analisado).
+O pagamento do Servi Já está vinculado a uma **solicitação de serviço** já aceita (`service_requests` com status `ACCEPTED`). O contratante autenticado é quem inicia a cobrança, e o valor pago deve corresponder exatamente ao valor negociado na solicitação (`responseValue` ou `counterValue`).
 
-Integração financeira: **Asaas** (API REST v3), com webhooks em `/api/webhooks/asaas`. Métodos tratados no serviço principal: **PIX** (cobrança real no Asaas), **cartão de crédito** (fluxo **simulado** no backend, aprovação instantânea) e **wallet** (simulado, status `PROCESSING`).
+O backend calcula três valores principais:
+
+- `totalAmount`: valor total pago pelo cliente.
+- `platformFee`: taxa da plataforma, fixada em 5% do valor acordado.
+- `amount`: valor líquido destinado ao freelancer, já descontada a taxa da plataforma.
+
+Além disso, o sistema registra `gatewayFee`, que representa o custo operacional do gateway Asaas. Essa taxa é tratada como custo interno da plataforma e não é adicionada ao preço exibido ao contratante no fluxo analisado.
+
+Os métodos contemplados pelo serviço principal são:
+
+- `pix`: cobrança real via Asaas.
+- `credit-card`: fluxo atualmente simulado no backend, com confirmação imediata.
+- `wallet`: fluxo previsto no serviço de pagamento, mas sem exposição visual na tela atual de checkout.
+
+Importante: a funcionalidade de **carteira** já existe no sistema atual, com frontend e backend próprios. O que ainda não está implementado na interface analisada é a seleção do método `wallet` como forma de pagamento do contratante durante o checkout.
 
 ---
 
@@ -16,107 +30,300 @@ Integração financeira: **Asaas** (API REST v3), com webhooks em `/api/webhooks
 
 ### 2.1. Tabela `payments`
 
-Criação inicial em `backend/src/main/resources/db/migration/V20__create_payments_table.sql`:
+A criação inicial da tabela está em `backend/src/main/resources/db/migration/V20__create_payments_table.sql`.
 
-| Conceito | Colunas / observação |
-|----------|----------------------|
-| Identificação | `id`, `service_request_id`, `contractor_id`, `freelancer_id` (FKs com `ON DELETE CASCADE`) |
-| Valores | `amount` (líquido freelancer), `platform_fee`, `total_amount` (total pago pelo cliente) |
-| Método e status | `payment_method`, `status` (string no SQL; entidade JPA usa enum) |
-| Rastreamento | `transaction_id`, `pix_qr_code`, `pix_copy_paste`, `card_last_digits`, `refund_reason`, `completed_at`, timestamps |
+Principais colunas:
 
-Evoluções relevantes:
+| Grupo | Colunas |
+|------|---------|
+| Identificação | `id`, `service_request_id`, `contractor_id`, `freelancer_id` |
+| Valores | `amount`, `platform_fee`, `total_amount`, `gateway_fee` |
+| Método e status | `payment_method`, `status` |
+| Integração | `asaas_payment_id`, `asaas_customer_id`, `transaction_id` |
+| PIX | `pix_qr_code`, `pix_copy_paste`, `pix_transaction_id`, `pix_end_to_end_id`, `pix_transaction_status` |
+| Cartão e reembolso | `card_last_digits`, `refund_reason` |
+| Datas | `completed_at`, `created_at`, `updated_at` |
 
-- **V21** (`V21__add_asaas_fields_to_payments.sql`): `asaas_payment_id`, `asaas_customer_id` e índices.
-- **V23** (`V23__add_gateway_fee_to_payments.sql`): `gateway_fee`.
-- **V26** (`V26__add_payment_history_and_chat_enabled.sql`): tabela `payment_status_history`; índice `asaas_payment_id`; coluna `service_requests.chat_enabled` (chat liberado quando há pagamento concluído).
-- **V27** (`V27__add_pix_transaction_fields_to_payments.sql`): `pix_transaction_id`, `pix_end_to_end_id`, `pix_transaction_status` (rastreio de transação PIX no Asaas).
+Relacionamentos principais:
+
+- `service_request_id` referencia a solicitação que originou o pagamento.
+- `contractor_id` referencia o usuário contratante.
+- `freelancer_id` referencia o usuário prestador.
+
+No SQL de criação, essas chaves estrangeiras usam `ON DELETE CASCADE`, o que faz com que pagamentos vinculados sejam removidos quando o registro-pai for excluído.
+
+Migrações relevantes:
+
+- `V21__add_asaas_fields_to_payments.sql`: adiciona integração com Asaas.
+- `V23__add_gateway_fee_to_payments.sql`: adiciona `gateway_fee`.
+- `V26__add_payment_history_and_chat_enabled.sql`: cria o histórico de status e adiciona `chat_enabled` em `service_requests`.
+- `V27__add_pix_transaction_fields_to_payments.sql`: adiciona campos específicos do PIX.
 
 ### 2.2. Tabela `payment_status_history`
 
-Modelo JPA: `backend/src/main/java/com/servija/servija/model/PaymentStatusHistory.java`. Campos: `payment_id`, `status`, `asaas_event`, `details`, `created_at`. Usada para auditoria de mudanças de status (criação, webhook, simulação de teste).
+Modelada em `backend/src/main/java/com/servija/servija/model/PaymentStatusHistory.java`, essa tabela registra a trilha de auditoria do pagamento.
 
-### 2.3. Enum de status (`Payment.PaymentStatus`)
+Campos principais:
 
-Definido em `backend/src/main/java/com/servija/servija/model/Payment.java`: `PENDING`, `PROCESSING`, `COMPLETED`, `FAILED`, `REFUNDED`, `CANCELLED`, `OVERDUE`, `CHARGEBACK`.
+- `payment_id`
+- `status`
+- `asaas_event`
+- `details`
+- `created_at`
+
+Seu papel é armazenar transições relevantes, como criação do pagamento, confirmação por webhook, atualização manual ou simulação de testes.
+
+### 2.3. Enum de status
+
+O enum `Payment.PaymentStatus`, definido em `backend/src/main/java/com/servija/servija/model/Payment.java`, contém os estados:
+
+- `PENDING`
+- `PROCESSING`
+- `COMPLETED`
+- `FAILED`
+- `REFUNDED`
+- `CANCELLED`
+- `OVERDUE`
+- `CHARGEBACK`
 
 ---
 
 ## 3. Backend
 
-### 3.1. API REST — `PaymentController`
+### 3.1. Controller principal: `PaymentController`
 
-Arquivo: `backend/src/main/java/com/servija/servija/controller/PaymentController.java`  
-Prefixo: `/api/payments` (protegido por JWT, exceto onde o framework aplicar regras globais).
+Arquivo: `backend/src/main/java/com/servija/servija/controller/PaymentController.java`
 
-| Método | Caminho | Função |
-|--------|---------|--------|
-| `POST` | `/` | Criar pagamento |
-| `GET` | `/{id}` | Detalhe do pagamento |
-| `GET` | `/my` | Lista do usuário (contratante ou freelancer) |
-| `GET` | `/{id}/status` | Consulta status no Asaas e sincroniza |
-| `PATCH` | `/{id}/status` | Atualização manual de status (corpo `{ "status": "..." }`) |
-| `GET` | `/{id}/pix-qrcode` | Dados do QR Code / payload PIX |
-| `GET` | `/service-request/{serviceRequestId}` | Pagamento mais recente da solicitação |
-| `GET` | `/{id}/history` | Histórico de status |
-| `GET` | `/{id}/receipt-url` | URLs de recibo no Asaas |
-| `POST` | `/{id}/simulate-confirmation` | **Teste:** simula confirmação PIX (marcado para remoção em produção) |
+O prefixo do controller é `/api/payments`. No contexto atual de segurança, as rotas ficam sob autenticação JWT por regra global de `SecurityConfig`, enquanto os webhooks públicos ficam sob `/api/webhooks/**`.
+
+Rotas principais:
+
+| Método | Caminho | Método do controller | Função |
+|------|---------|----------------------|--------|
+| `POST` | `/` | `createPayment` | Cria um novo pagamento |
+| `GET` | `/{id}` | `getPayment` | Busca detalhes de um pagamento |
+| `GET` | `/my` | `getMyPayments` | Lista pagamentos do usuário autenticado |
+| `GET` | `/{id}/status` | `checkPaymentStatus` | Consulta status no Asaas e sincroniza o pagamento |
+| `PATCH` | `/{id}/status` | `updatePaymentStatus` | Atualiza manualmente o status |
+| `GET` | `/{id}/pix-qrcode` | `getPixQrCode` | Retorna QR Code e payload PIX |
+| `GET` | `/service-request/{serviceRequestId}` | `getPaymentByServiceRequest` | Retorna um pagamento associado à solicitação |
+| `GET` | `/{id}/history` | `getPaymentHistory` | Retorna o histórico de status |
+| `GET` | `/{id}/receipt-url` | `getReceiptUrl` | Retorna URLs de recibo/fatura do Asaas |
+| `POST` | `/{id}/simulate-confirmation` | `simulatePaymentConfirmation` | Simula confirmação de pagamento para testes |
+
+Observação importante sobre `GET /service-request/{serviceRequestId}`:
+
+- Na implementação atual, `PaymentService.getPaymentByServiceRequestId` usa `PaymentRepository.findByServiceRequestId(...)` e retorna o primeiro item da lista.
+- Como a consulta não possui ordenação explícita, o código atual não garante formalmente que esse item seja o pagamento "mais recente".
 
 ### 3.2. DTOs
 
-- **Entrada:** `backend/src/main/java/com/servija/servija/dto/PaymentRequest.java` — `serviceRequestId`, `paymentMethod`, `amount`, `cpf` opcional, `cardData` (número, nome, validade, CVV) para cartão.
-- **Saída:** `backend/src/main/java/com/servija/servija/dto/PaymentResponse.java` — inclui `platformFee`, `gatewayFee`, `totalAmount`, `pixQrCode`, `pixCopyPaste`, `asaasPaymentId`, etc.
+#### Entrada: `PaymentRequest`
 
-### 3.3. Regras de negócio — `PaymentService`
+Arquivo: `backend/src/main/java/com/servija/servija/dto/PaymentRequest.java`
 
-Arquivo: `backend/src/main/java/com/servija/servija/service/PaymentService.java`.
+Campos principais:
 
-**Pré-condições em `createPayment`:**
+- `serviceRequestId`
+- `paymentMethod`
+- `amount`
+- `cpf`
+- `cardData`
 
-1. Usuário existe e é o **contratante** da solicitação.
-2. Status da solicitação = `ACCEPTED`.
-3. Não pode existir outro pagamento para a mesma solicitação (`existsByServiceRequest`).
-4. `amount` da requisição deve ser **igual** ao valor acordado (`validatePaymentAmount`).
-5. Valor mínimo R$ 20,00 salvo exceção `legacyLowValueAllowed` na solicitação (`validateMinimumPaymentAmount`).
-6. CPF/CNPJ do pagador obrigatório (perfil ou campo `cpf`).
+O objeto `cardData` encapsula:
 
-**Cálculo financeiro:**
+- número do cartão
+- nome do titular
+- validade
+- CVV
 
-- `totalAmount` = valor acordado (100% pago pelo cliente).
-- `platformFee` = 5% do acordado.
-- `amount` (carteira freelancer) = acordado − taxa da plataforma.
-- `gatewayFee` depende do método (constantes Asaas PIX/boleto/cartão).
+#### Saída: `PaymentResponse`
 
-**PIX:** `getOrCreateCustomer` + `AsaasService.createPayment` (`billingType` PIX) + `getPixQrCode`; preenche `asaas_payment_id`, QR em base64 prefixado com `data:image/png;base64,`, copia-e-cola; status do pagamento → `PROCESSING`.
+Arquivo: `backend/src/main/java/com/servija/servija/dto/PaymentResponse.java`
 
-**Cartão:** `processCreditCardPayment` valida dados, guarda últimos 4 dígitos, marca `COMPLETED` imediatamente, chama `FreelancerWalletService.addPendingBalance`, **sem** chamada ao Asaas para cobrança de cartão (log indica simulação).
+Campos relevantes:
 
-**Carteira (`wallet`):** apenas status `PROCESSING` e log (simulação).
+- `id`
+- `serviceRequestId`
+- `amount`
+- `platformFee`
+- `gatewayFee`
+- `totalAmount`
+- `paymentMethod`
+- `status`
+- `pixQrCode`
+- `pixCopyPaste`
+- `asaasPaymentId`
+- `completedAt`
 
-**Após `COMPLETED` no ato da criação (cartão):** solicitação → `IN_PROGRESS`, `chatEnabled = true`, histórico da solicitação (`PAYMENT_CONFIRMED`), WebSocket (`notifyServiceRequestStatusChange`, `notifyPixPaymentConfirmed` para cliente e freelancer — nome genérico mesmo para cartão), `notificationService.notifyProjectStarted`.
+### 3.3. Service principal: `PaymentService`
 
-**Consulta manual de status:** `checkAsaasPaymentStatus` consulta Asaas, mapeia status, em caso de `COMPLETED` atualiza `completedAt` e chama `addPendingBalance`. **Lacuna documental com base no código:** neste método **não** há atualização de `ServiceRequest` para `IN_PROGRESS`, nem habilitação de chat, nem notificações/WebSocket — diferente do fluxo de webhook e do cartão simulado. Quem depende só do `GET .../status` pode ficar com pagamento concluído e solicitação ainda `ACCEPTED` até outro mecanismo atuar.
+Arquivo: `backend/src/main/java/com/servija/servija/service/PaymentService.java`
 
-**Teste local:** `simulatePaymentConfirmation` reproduz efeitos próximos ao webhook (pagamento completo, carteira, solicitação, WebSocket, notificação).
+Métodos mais importantes do módulo:
 
-### 3.4. Integração Asaas — `AsaasService`
+- `createPayment`
+- `validatePaymentAmount`
+- `validateMinimumPaymentAmount`
+- `createPixPayment`
+- `processCreditCardPayment`
+- `getPaymentById`
+- `getPaymentByServiceRequestId`
+- `checkAsaasPaymentStatus`
+- `getPixQrCode`
+- `getPaymentHistory`
+- `getReceiptUrl`
+- `simulatePaymentConfirmation`
 
-Arquivo: `backend/src/main/java/com/servija/servija/service/AsaasService.java`. Configuração: `asaas.api.url`, `asaas.api.key`. Destaques: criação/atualização de cliente com **notificações desativadas** (custo de mensageria); `createPayment` POST `/v3/payments`; `getPixQrCode` GET `/v3/payments/{id}/pixQrCode`; `getPaymentStatus`; `getPaymentReceiptUrl` (extrai `transactionReceiptUrl` e `invoiceUrl`).
+#### Regras de negócio em `createPayment`
 
-### 3.5. Webhooks — `AsaasWebhookController` / `AsaasWebhookService`
+Antes de persistir o pagamento, o serviço valida:
 
-- `POST /api/webhooks/asaas` — eventos gerais; cabeçalho `asaas-access-token` comparado a `asaas.webhook.token`.
-- `POST /api/webhooks/asaas/pix-transaction` — transações PIX.
+1. O usuário autenticado existe.
+2. O usuário autenticado é o contratante da solicitação.
+3. A solicitação está com status `ACCEPTED`.
+4. Ainda não existe pagamento para a solicitação.
+5. O valor informado é exatamente igual ao valor acordado.
+6. O pagamento atende ao valor mínimo de R$ 20,00, salvo exceção de legado.
+7. Há CPF/CNPJ disponível para o pagador.
 
-Em `AsaasWebhookService`, confirmação de pagamento (ex.: `PAYMENT_RECEIVED` / confirmado) e fluxo **PIX_TRANSACTION_DONE** atualizam pagamento para `COMPLETED`, histórico, `addPendingBalance`, passam solicitação para `IN_PROGRESS`, `chatEnabled`, notificações e WebSocket — alinhado ao comportamento esperado após pagamento efetivo.
+#### Cálculo financeiro
 
-### 3.6. Carteira do freelancer
+- `totalAmount = valor acordado`
+- `platformFee = 5% do valor acordado`
+- `amount = valor acordado - platformFee`
+- `gatewayFee = taxa interna calculada conforme o método`
 
-`FreelancerWalletService.addPendingBalance` (`backend/src/main/java/com/servija/servija/service/FreelancerWalletService.java`): cria carteira se não existir e incrementa saldo **pendente** (liberação para disponível é responsabilidade de outros fluxos, p.ex. `releasePendingBalance` ligado a pagamento e prazos).
+#### Fluxo PIX
 
-### 3.7. Lacunas / divergências frontend × backend
+No pagamento via PIX, o backend:
 
-O arquivo `frontend/src/api/services/paymentService.ts` declara métodos `getReceipt`, `downloadReceiptPdf` e `requestRefund` apontando para rotas `/payments/...` que **não** aparecem no `PaymentController` pesquisado — tratam-se de **código cliente não espelhado** por esses endpoints no backend atual, salvo outro controller não mapeado nesta análise.
+1. Obtém ou cria o cliente no Asaas por `AsaasService.getOrCreateCustomer`.
+2. Cria a cobrança por `AsaasService.createPayment`.
+3. Busca o QR Code por `AsaasService.getPixQrCode`.
+4. Persiste o pagamento com status `PROCESSING`.
+5. Salva `asaas_payment_id`, `pix_qr_code` e `pix_copy_paste`.
+
+#### Fluxo cartão de crédito
+
+O método `processCreditCardPayment` valida os dados mínimos do cartão, armazena os últimos quatro dígitos e marca o pagamento como `COMPLETED` imediatamente.
+
+Após isso, o sistema:
+
+- adiciona saldo pendente na carteira do freelancer por `FreelancerWalletService.addPendingBalance`;
+- altera a solicitação para `IN_PROGRESS`;
+- habilita `chatEnabled`;
+- registra histórico da solicitação;
+- envia notificações e eventos WebSocket.
+
+Esse fluxo é atualmente tratado como **simulado**, sem cobrança real de cartão no Asaas.
+
+#### Fluxo `wallet`
+
+O `switch` interno do serviço já contempla `wallet` como método válido. No estado atual:
+
+- o pagamento entra em `PROCESSING`;
+- o fluxo permanece simulado;
+- não há integração operacional completa equivalente ao PIX;
+- a tela de checkout analisada não disponibiliza essa opção ao contratante.
+
+### 3.4. Consulta de status e limitações comportamentais
+
+O método `checkAsaasPaymentStatus` consulta o Asaas e sincroniza o status do pagamento local.
+
+Quando identifica conclusão:
+
+- atualiza `status` para `COMPLETED`;
+- preenche `completedAt`;
+- adiciona saldo pendente na carteira do freelancer.
+
+Porém, no trecho atual de `PaymentService`, esse método **não replica todo o fluxo de pós-confirmação** usado no cartão simulado e no webhook. Em particular, ele não garante:
+
+- atualização da `ServiceRequest` para `IN_PROGRESS`;
+- habilitação de `chatEnabled`;
+- disparo completo de notificações;
+- envio dos mesmos eventos WebSocket do fluxo principal.
+
+Na prática, isso significa que uma consulta manual via `GET /payments/{id}/status` pode concluir o pagamento, mas deixar a solicitação em estado anterior até que outro mecanismo execute as demais transições.
+
+### 3.5. Observação de segurança da implementação atual
+
+Embora as rotas de pagamento estejam em contexto autenticado, várias operações de leitura e consulta não fazem, no trecho atual analisado, uma validação explícita de ownership no service.
+
+Isso vale especialmente para:
+
+- `getPayment`
+- `checkPaymentStatus`
+- `getPixQrCode`
+- `getPaymentByServiceRequest`
+- `getPaymentHistory`
+- `getReceiptUrl`
+
+Esses métodos recuperam registros por ID e retornam dados, mas não verificam de forma explícita, nesse ponto da implementação, se o usuário autenticado é parte autorizada daquele pagamento. Para fins de TCC, isso deve ser registrado como limitação da versão atual do módulo.
+
+### 3.6. Integração com o Asaas
+
+Arquivo: `backend/src/main/java/com/servija/servija/service/AsaasService.java`
+
+Principais métodos utilizados:
+
+- `getOrCreateCustomer`
+- `createPayment`
+- `getPixQrCode`
+- `getPaymentStatus`
+- `getPaymentReceiptUrl`
+
+Características relevantes:
+
+- usa `asaas.api.url` e `asaas.api.key`;
+- cria clientes com notificações desativadas;
+- cria cobranças via `POST /v3/payments`;
+- consulta QR Code por `GET /v3/payments/{id}/pixQrCode`;
+- consulta status e links de recibo/fatura.
+
+### 3.7. Webhooks
+
+Arquivos:
+
+- `backend/src/main/java/com/servija/servija/controller/AsaasWebhookController.java`
+- `backend/src/main/java/com/servija/servija/service/AsaasWebhookService.java`
+
+Rotas:
+
+- `POST /api/webhooks/asaas`
+- `POST /api/webhooks/asaas/pix-transaction`
+
+Quando o Asaas confirma o pagamento, o serviço de webhook:
+
+- marca o pagamento como `COMPLETED`;
+- grava histórico em `payment_status_history`;
+- adiciona saldo pendente na carteira do freelancer;
+- altera a solicitação para `IN_PROGRESS`;
+- habilita o chat;
+- envia notificações e eventos WebSocket.
+
+Esse é o fluxo mais completo de confirmação efetiva do pagamento PIX.
+
+### 3.8. Carteira do freelancer
+
+Arquivo principal: `backend/src/main/java/com/servija/servija/service/FreelancerWalletService.java`
+
+Métodos mais importantes:
+
+- `addPendingBalance`
+- `releasePendingBalance`
+
+O método `addPendingBalance` cria a carteira do freelancer, se necessário, e incrementa o saldo pendente. O método `releasePendingBalance` trata a conversão do saldo pendente em saldo disponível em fluxos posteriores.
+
+### 3.9. Divergências entre frontend e backend
+
+O arquivo `frontend/src/api/services/paymentService.ts` declara métodos que não possuem endpoint correspondente no `PaymentController` analisado:
+
+- `getReceipt`
+- `downloadReceiptPdf`
+- `requestRefund`
+
+Esses métodos apontam para rotas que não aparecem no backend atual mapeado para pagamentos. Portanto, trata-se de divergência entre o cliente HTTP e a API disponível nesta versão do sistema.
 
 ---
 
@@ -124,38 +331,129 @@ O arquivo `frontend/src/api/services/paymentService.ts` declara métodos `getRec
 
 ### 4.1. Rotas
 
-`frontend/src/router/index.ts`: `/checkout` (`CheckoutPage` em `frontend/src/pages/Checkout/index.vue`), `/payment-success` (`PaymentSuccess`).
+As rotas principais do fluxo estão em `frontend/src/router/index.ts`:
 
-### 4.2. Checkout da página pai
+- `/checkout`
+- `/payment-success`
 
-`frontend/src/pages/Checkout/index.vue`:
+Os wrappers de página são:
 
-- Lê `requestId` da query; carrega `GET /api/service-requests/{id}` (axios com `baseURL` … `/api`).
-- Exige status `ACCEPTED` e preço negociado (`responseValue` ou `counterValue`).
-- **Cartão (e fluxo que chama `onConfirmPayment`):** delega a `paymentService.createPayment` e redireciona para `/payment-success?paymentId=...`.
+- `frontend/src/pages/Checkout/index.vue`
+- `frontend/src/pages/PaymentSuccess/index.vue`
 
-### 4.3. Componente de checkout
+### 4.2. Página de checkout: `frontend/src/pages/Checkout/index.vue`
 
-`frontend/src/components/payment/CheckoutPage.vue`:
+Essa página orquestra o processo de pagamento.
 
-- **PIX:** cria pagamento com `fetch` direto em `POST /api/payments` com `paymentMethod: 'PIX'`, `amount` e `cpf` (após validação de 11 dígitos); em seguida `GET /api/payments/{id}/pix-qrcode`. Trata erro “Já existe um pagamento” buscando pagamento existente e recarregando QR.
-- **Cartão:** chama `onConfirmPayment` do pai com `cardData` e valor.
-- **WebSocket:** `usePaymentWebSocket` (`frontend/src/composables/usePaymentWebSocket.ts`) — destino STOMP `/topic/payment/{email}`; eventos como `PIX_CONFIRMED` redirecionam para `/payment-success`.
-- **Simulação:** botão de teste chama `POST /api/payments/{id}/simulate-confirmation`.
+Métodos e responsabilidades principais:
 
-Comentário no componente: taxa de plataforma exibida como zero para o cliente (`platformFee = 0` no computed), coerente com o desconto ser do lado do freelancer no backend.
+- leitura de `requestId` pela query string;
+- carregamento da solicitação por `GET /api/service-requests/{id}`;
+- validação de status `ACCEPTED`;
+- chamada de `paymentService.createPayment(...)` no fluxo delegado pelo componente filho.
 
-### 4.4. Página de sucesso
+Há um detalhe importante:
 
-`frontend/src/pages/PaymentSuccess/index.vue`: carrega `paymentService.getPayment(paymentId)`; recibo via `getReceiptUrl`. O rótulo “Valor Total” usa `paymentData.amount` — no backend, `PaymentResponse.amount` é o **líquido do freelancer**, não o `totalAmount` pago pelo cliente; possível **ambiguidade de UI** em relação ao texto exibido.
+- o tipo aceito por `handleConfirmPayment` contempla `pix`, `credit-card` e `wallet`;
+- porém, a tela de checkout atual não renderiza uma opção visual para `wallet`.
 
-### 4.5. Cliente HTTP
+### 4.3. Componente principal do checkout: `CheckoutPage.vue`
 
-`frontend/src/api/config/axios.ts`: `baseURL` = `{VITE_API_URL}/api`. `paymentService.createPayment` usa `POST /payments`.
+Arquivo: `frontend/src/components/payment/CheckoutPage.vue`
+
+Principais métodos utilizados:
+
+- `togglePaymentMethod`
+- `generatePixQrCode`
+- `loadPixQrCode`
+- `checkExistingPayment`
+- `handleContinue`
+- `simulatePaymentConfirmation`
+
+#### Fluxo PIX no frontend
+
+O componente executa um fluxo próprio para PIX, usando `fetch` diretamente:
+
+1. `POST /api/payments` com `paymentMethod: 'PIX'`, valor e CPF.
+2. `GET /api/payments/{id}/pix-qrcode`.
+3. Exibição do QR Code e do código copia-e-cola.
+4. Abertura de escuta via WebSocket para confirmação.
+
+Se o backend retorna erro indicando que já existe pagamento, o componente busca o pagamento existente por solicitação e recarrega o QR Code.
+
+#### Fluxo cartão no frontend
+
+No cartão, o componente coleta os dados do formulário e delega para o callback `onConfirmPayment`, implementado na página pai. Esse callback usa `paymentService.createPayment(...)`.
+
+#### Métodos de pagamento exibidos na interface
+
+Na implementação visual atual, o componente renderiza apenas:
+
+- `PIX`
+- `credit-card`
+
+Apesar disso, o contrato tipado do frontend e o backend já contemplam `wallet` como possibilidade técnica.
+
+### 4.4. WebSocket de pagamento
+
+O componente usa `frontend/src/composables/usePaymentWebSocket.ts`.
+
+Eventos relevantes observados:
+
+- `PIX_CONFIRMED`
+- `PAYMENT_FAILED`
+- `PAYMENT_CANCELLED`
+- `PAYMENT_STATUS_CHANGED`
+
+Quando o pagamento é confirmado, o frontend redireciona o usuário para a tela de sucesso.
+
+### 4.5. Módulo de carteira existente no sistema
+
+A carteira não está restrita ao backend. Ela já possui implementação própria no frontend, por exemplo em:
+
+- `frontend/src/api/services/walletService.ts`
+- `frontend/src/pages/FreelancerWallet/index.vue`
+- `frontend/src/components/freelancer/FreelancerWalletPage.vue`
+
+No backend, a funcionalidade também está presente, incluindo controller e service específicos:
+
+- `backend/src/main/java/com/servija/servija/controller/FreelancerWalletController.java`
+- `backend/src/main/java/com/servija/servija/service/FreelancerWalletService.java`
+
+Portanto, a limitação atual não é a inexistência da carteira no sistema, mas sim a ausência de uma opção visual de pagamento por carteira no checkout do contratante.
+
+### 4.6. Página de sucesso
+
+Arquivo: `frontend/src/pages/PaymentSuccess/index.vue`
+
+Principais ações:
+
+- carrega o pagamento por `paymentService.getPayment(paymentId)`;
+- busca links de recibo por `paymentService.getReceiptUrl(paymentId)`.
+
+Observação relevante de consistência:
+
+- a interface exibe o rótulo "Valor Total";
+- entretanto, o valor mostrado é `paymentData.amount`;
+- no backend, `amount` representa o valor líquido do freelancer, não o total pago pelo cliente;
+- o valor total pago pelo contratante está em `totalAmount`.
+
+Para um texto acadêmico, isso deve ser registrado como ambiguidade de apresentação na interface atual.
+
+### 4.7. Cliente HTTP
+
+Arquivo: `frontend/src/api/config/axios.ts`
+
+O frontend usa `baseURL = {VITE_API_URL}/api`. No entanto, o fluxo PIX em `CheckoutPage.vue` usa `fetch` direto para `/api/payments`, enquanto o fluxo padrão encapsulado em serviço usa `frontend/src/api/services/paymentService.ts`.
+
+Isso mostra que o módulo de pagamento possui dois estilos de acesso HTTP convivendo no frontend:
+
+- serviço centralizado por Axios;
+- chamadas diretas por `fetch` dentro do componente.
 
 ---
 
-## 5. Fluxo resumido (mermaid)
+## 5. Fluxo resumido
 
 ```mermaid
 sequenceDiagram
@@ -163,21 +461,21 @@ sequenceDiagram
   participant API as Spring /api/payments
   participant A as Asaas API
   participant W as Webhook Asaas
-  participant DB as MySQL
+  participant DB as Banco de dados
 
   alt PIX
     C->>API: POST criar pagamento + CPF
-    API->>A: cliente + cobrança PIX + QR
-    API->>DB: payments PROCESSING
+    API->>A: cria cliente e cobrança PIX
+    API->>DB: persiste payment PROCESSING
     C->>API: GET pix-qrcode
-    A-->>W: pagamento confirmado
-    W->>DB: COMPLETED + histórico + carteira
-    W->>C: WebSocket PIX_CONFIRMED
-  else Cartão (simulado)
-    C->>API: POST + cardData
-    API->>DB: COMPLETED + carteira
-    API->>DB: solicitação IN_PROGRESS + chat
-    C->>C: redirect payment-success
+    A-->>W: confirmação de pagamento
+    W->>DB: COMPLETED + histórico + carteira + solicitação IN_PROGRESS
+    W-->>C: evento WebSocket de confirmação
+  else Cartão
+    C->>API: POST criar pagamento + cardData
+    API->>DB: COMPLETED + carteira + solicitação IN_PROGRESS
+    API-->>C: resposta imediata
+    C->>C: redireciona para payment-success
   end
 ```
 
@@ -185,4 +483,13 @@ sequenceDiagram
 
 ## 6. Conclusão
 
-O ServiJá modela pagamentos na tabela `payments`, com histórico em `payment_status_history` e integração **Asaas** para **PIX** e dados de cliente/cobrança/recibo. A **taxa da plataforma (5%)** e o **líquido do freelancer** estão explícitos em `PaymentService`. O **cartão** e a **carteira** são tratados como fluxos simplificados ou simulados no código atual. Para o TCC, vale destacar a **separação de caminhos**: confirmação via **webhook** (e cartão simulado) avança a solicitação e o chat; a **consulta pontual** `GET /payments/{id}/status` completa pagamento e carteira, mas **não** replica todas essas atualizações no trecho analisado de `PaymentService`.
+O módulo de pagamento do Servi Já possui uma modelagem consistente em `payments` e `payment_status_history`, integração efetiva com o Asaas para o fluxo PIX e integração com carteira do freelancer para apropriação financeira do valor líquido.
+
+Do ponto de vista arquitetural, o backend concentra a lógica principal em `PaymentService`, enquanto o frontend divide a experiência entre uma página orquestradora (`Checkout/index.vue`), um componente operacional (`CheckoutPage.vue`) e uma tela de retorno (`PaymentSuccess/index.vue`).
+
+Para fins de TCC, merecem destaque quatro aspectos da implementação atual:
+
+1. O sistema separa corretamente valor total do cliente, taxa da plataforma e valor líquido do freelancer.
+2. O webhook é o caminho mais completo e consistente para confirmação de pagamentos PIX.
+3. A carteira já existe como módulo do sistema, mas ainda não está exposta como opção visual no checkout analisado.
+4. Há limitações reais na versão atual, como ausência de validação explícita de ownership em algumas consultas, divergência entre métodos do frontend e endpoints do backend e ambiguidade de UI na exibição do valor total na tela de sucesso.

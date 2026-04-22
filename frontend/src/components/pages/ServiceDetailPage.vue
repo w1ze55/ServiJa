@@ -38,7 +38,6 @@ import { getWorkModelLabel, normalizeWorkModel } from '@/utils/workModel';
 import ImageGallery from '@/components/shared/ImageGallery.vue';
 import ReviewList from '@/components/shared/ReviewList.vue';
 import type { ReviewItem } from '@/components/shared/ReviewList.vue';
-import WorkModelBadge from '@/components/shared/WorkModelBadge.vue';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 

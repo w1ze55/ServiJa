@@ -63,12 +63,10 @@ onMounted(async () => {
       </CardHeader>
 
       <CardContent class="pt-0">
-        <!-- Síntese Geral -->
         <p class="text-sm text-[#435574] leading-relaxed">
           {{ summary.overall }}
         </p>
-
-        <!-- Pontos Fortes (opcionais, exibidos como tags) -->
+        
         <div v-if="summary.strengths && summary.strengths.length > 0" class="flex flex-wrap gap-2 mt-3">
           <span
             v-for="(point, idx) in summary.strengths"
