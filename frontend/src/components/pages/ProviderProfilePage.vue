@@ -24,6 +24,7 @@ import {
   Github,
   Linkedin,
   Instagram,
+  Images,
   Twitter,
   Facebook,
   Youtube,
@@ -33,6 +34,7 @@ import {
   MessageCircle,
   Paperclip,
   Trash2,
+  User,
 } from 'lucide-vue-next';
 import { uploadImages } from '@/api/uploadService';
 import Button from '../ui/button.vue';
@@ -1022,11 +1024,9 @@ onMounted(() => {
 
               <!-- Services Tab -->
               <TabsContent value="services">
-                <div class="mb-6">
-                  <h3 class="text-[#263238] mb-1">Serviços cadastrados</h3>
-                  <p class="text-[#435574]">
-                    Disponíveis para contratação ({{ services.length }} itens)
-                  </p>
+                <div class="flex items-center gap-3 mb-5">
+                  <Briefcase class="h-6 w-6 text-[#286AD8]" />                  
+                  <h2 class="text-lg font-bold text-[#263238]">Serviços cadastrados</h2>
                 </div>
 
                 <div v-if="services.length > 0">
@@ -1148,8 +1148,11 @@ onMounted(() => {
 
               <!-- About Tab -->
               <TabsContent value="about">
+                <div class="flex items-center gap-3 mb-5">
+                  <User class="h-6 w-6 text-[#286AD8]" />                  
+                  <h2 class="text-lg font-bold text-[#263238]">Sobre o profissional</h2>
+                </div>
                 <Card class="p-6">
-                  <h3 class="font-semibold text-[#263238] mb-4">Sobre o profissional</h3>
                   <p v-if="freelancer.bio" class="text-[#435574] mb-6 whitespace-pre-wrap">{{ freelancer.bio }}</p>
                   <p v-else class="text-[#435574] mb-6">Nenhuma descrição disponível.</p>
 
@@ -1185,11 +1188,9 @@ onMounted(() => {
 
               <!-- Portfolio Tab -->
               <TabsContent value="portfolio">
-                <div class="mb-6">
-                  <h3 class="text-[#263238] mb-1">Portfólio</h3>
-                  <p class="text-[#435574]">
-                    Galeria de trabalhos realizados ({{ portfolio.length }} itens)
-                  </p>
+                <div class="flex items-center gap-3 mb-5">
+                  <Images class="h-6 w-6 text-[#286AD8]" />
+                  <h2 class="text-lg font-bold text-[#263238]">Portfólio</h2>
                 </div>
 
                 <div v-if="portfolio.length > 0" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1254,8 +1255,9 @@ onMounted(() => {
                   </Card>
                 </div>
                 <Card v-else class="p-12 text-center">
-                  <Award class="h-12 w-12 text-[#435574]/30 mx-auto mb-4" />
-                  <p class="text-[#435574]">Nenhum item no portfólio ainda</p>
+                  <Award class="h-10 w-10 text-gray-200 mx-auto mb-3" />
+                  <p class="font-medium text-[#263238]">Ainda sem projetos</p>
+                  <p class="text-sm text-[#435574] mt-1">Este profissional ainda não tem projetos publicados.</p>
                 </Card>
               </TabsContent>
             </Tabs>

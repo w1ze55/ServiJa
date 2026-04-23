@@ -72,6 +72,8 @@ const formData = ref<ServiceFormData>({
 const tagInput = ref('');
 const errors = ref<Record<string, string>>({});
 const isUploading = ref(false);
+const isDragOver = ref(false);
+const dragCounter = ref(0);
 
 const categories = computed(() => categoryCatalogStore.activePublicCategories);
 const selectedSubcategories = computed(() =>
@@ -335,9 +337,98 @@ const handleClose = () => {
   props.onClose();
 };
 
+const uploadSelectedImages = async (files: File[]) => {
+  if (files.length === 0 || isUploading.value) {
+    return;
+  }
+
+  if (formData.value.images.length + files.length > 5) {
+    toast.error('MÃ¡ximo de 5 imagens permitido');
+    return;
+  }
+
+  const invalidFiles = files.filter((file) => !file.type.startsWith('image/'));
+  if (invalidFiles.length > 0) {
+    toast.error('Envie apenas arquivos de imagem');
+    return;
+  }
+
+  const oversizedFiles = files.filter((file) => file.size > 10 * 1024 * 1024);
+  if (oversizedFiles.length > 0) {
+    toast.error('Cada imagem deve ter no mÃ¡ximo 10MB');
+    return;
+  }
+
+  isUploading.value = true;
+  try {
+    const uploadedUrls = await uploadImages(files);
+    handleInputChange('images', [...formData.value.images, ...uploadedUrls]);
+    toast.success(`${files.length} imagem(ns) enviada(s) com sucesso`);
+  } catch (error) {
+    console.error('Erro ao fazer upload:', error);
+    toast.error('Erro ao enviar imagem(ns). Tente novamente.');
+  } finally {
+    isUploading.value = false;
+  }
+};
+
+const hasDraggedFiles = (e: DragEvent) => {
+  return Array.from(e.dataTransfer?.types || []).includes('Files');
+};
+
+const handleDragEnter = (e: DragEvent) => {
+  if (isUploading.value || !hasDraggedFiles(e)) {
+    return;
+  }
+
+  dragCounter.value += 1;
+  isDragOver.value = true;
+};
+
+const handleDragOver = (e: DragEvent) => {
+  if (isUploading.value || !hasDraggedFiles(e)) {
+    return;
+  }
+
+  isDragOver.value = true;
+};
+
+const handleDragLeave = () => {
+  if (isUploading.value) {
+    return;
+  }
+
+  dragCounter.value = Math.max(dragCounter.value - 1, 0);
+  if (dragCounter.value === 0) {
+    isDragOver.value = false;
+  }
+};
+
+const handleImageDrop = async (e: DragEvent) => {
+  dragCounter.value = 0;
+  isDragOver.value = false;
+
+  if (isUploading.value || !hasDraggedFiles(e)) {
+    return;
+  }
+
+  const files = Array.from(e.dataTransfer?.files || []);
+  await uploadSelectedImages(files);
+};
+
 const handleImageUpload = async (e: Event) => {
   const target = e.target as HTMLInputElement;
-  const files = target.files;
+  const files = target.files ? Array.from(target.files) : [];
+
+  try {
+    await uploadSelectedImages(files);
+  } finally {
+    // Limpar o input para permitir novo upload do mesmo arquivo
+    target.value = '';
+  }
+
+  return;
+  /*
   if (files && files.length > 0) {
     // Verificar limite de 5 imagens
     if (formData.value.images.length + files.length > 5) {
@@ -367,6 +458,7 @@ const handleImageUpload = async (e: Event) => {
       target.value = '';
     }
   }
+  */
 };
 
 const handleRemoveImage = async (index: number) => {
@@ -616,12 +708,16 @@ const handleRemoveImage = async (index: number) => {
           </Label>
           <div 
             class="border-2 border-dashed rounded-lg p-6 transition-colors"
-            :class="isUploading ? 'border-[#286AD8] bg-blue-50' : 'border-gray-300 hover:border-[#286AD8]'"
+            :class="isUploading || isDragOver ? 'border-[#286AD8] bg-blue-50' : 'border-gray-300 hover:border-[#286AD8]'"
+            @dragenter.prevent="handleDragEnter"
+            @dragover.prevent="handleDragOver"
+            @dragleave.prevent="handleDragLeave"
+            @drop.prevent="handleImageDrop"
           >
             <label
               v-if="!isUploading"
               for="images"
-              class="flex flex-col items-center justify-center cursor-pointer"
+              class="flex min-h-32 w-full flex-col items-center justify-center cursor-pointer"
             >
               <Upload class="h-10 w-10 text-gray-400 mb-2" />
               <p class="text-sm text-gray-600 text-center">
