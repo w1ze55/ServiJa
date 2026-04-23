@@ -28,9 +28,10 @@ export const freelancerRoutes: Record<string, string> = {
 
 // Mapa de rotas para clientes
 export const clientRoutes: Record<string, string> = {
-  'home': '/cliente-dashboard',
-  'cliente-dashboard': '/cliente-dashboard',
-  'contractor-dashboard': '/cliente-dashboard',
+  'home': '/cliente-home',
+  'cliente-home': '/cliente-home',
+  'cliente-dashboard': '/cliente-home',
+  'contractor-dashboard': '/cliente-home',
   'profile': '/cliente-profile-settings',
   'cliente-profile-settings': '/cliente-profile-settings',
   'my-account': '/cliente-profile-settings',

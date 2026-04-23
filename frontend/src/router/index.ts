@@ -6,7 +6,7 @@ import Login from "@/pages/Login/index.vue";
 import Perfil from "@/pages/Perfil/index.vue";
 import Dashboard from "@/pages/Dashboard/index.vue";
 import FreelancerDashboard from "@/pages/FreelancerDashboard/index.vue";
-import ClienteDashboard from "@/pages/ClienteDashboard/index.vue";
+import ClienteHomePage from "@/pages/ClienteDashboard/index.vue";
 import FreelancerProfileSettings from "@/pages/FreelancerProfileSettings/index.vue";
 import FreelancerProfessionalProfile from "@/pages/FreelancerProfessionalProfile/index.vue";
 import FreelancerPortfolio from "@/pages/FreelancerPortfolio/index.vue";
@@ -86,10 +86,14 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, userType: "provider" },
   },
   {
-    path: "/cliente-dashboard",
-    name: "cliente-dashboard",
-    component: ClienteDashboard,
+    path: "/cliente-home",
+    name: "cliente-home",
+    component: ClienteHomePage,
     meta: { requiresAuth: true, userType: "contractor" },
+  },
+  {
+    path: "/cliente-dashboard",
+    redirect: { name: "cliente-home" },
   },
   {
     path: "/admin/categories",

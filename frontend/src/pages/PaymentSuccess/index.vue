@@ -34,7 +34,7 @@ onMounted(async () => {
 });
 
 const handleBackToDashboard = () => {
-  router.push('/cliente-dashboard');
+  router.push('/cliente-home');
 };
 
 const handleDownloadReceipt = async () => {

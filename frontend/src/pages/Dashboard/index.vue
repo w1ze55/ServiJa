@@ -18,7 +18,7 @@ onMounted(() => {
   if (user.type === 'provider') {
     router.push('/freelancer-dashboard');
   } else if (user.type === 'contractor') {
-    router.push('/cliente-dashboard');
+    router.push('/cliente-home');
   } else if (user.type === 'admin') {
     router.push('/admin/categories');
   } else {

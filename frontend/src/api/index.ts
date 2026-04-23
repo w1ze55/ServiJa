@@ -1,5 +1,6 @@
 // Exporta todos os serviços da API
 export { authService } from './services/authService';
+export { clientHomeService } from './services/clientHomeService';
 export { freelancerService } from './services/freelancerService';
 export { clientService } from './services/clientService';
 export { dashboardService } from './services/dashboardService';
@@ -10,7 +11,7 @@ export { default as api } from './config/axios';
 
 // Exporta tipos
 export type { LoginCredentials, RegisterData, User } from './services/authService';
+export type { ClientHomeResponse } from './services/clientHomeService';
 export type { Freelancer, FreelancerProfile, Service, Review } from './services/freelancerService';
 export type { Client, Quote, Contract } from './services/clientService';
 export type { DashboardStats, RecentActivity } from './services/dashboardService';
-
