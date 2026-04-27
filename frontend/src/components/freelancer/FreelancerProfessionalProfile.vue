@@ -136,6 +136,9 @@ const normalizeLocationName = (value: string) =>
     .trim()
     .toLowerCase()
 
+const createTemporaryId = (prefix: string) =>
+  `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+
 const getPersistedServiceCityId = (id: string | undefined) =>
   id && /^\d+$/.test(id) ? Number(id) : undefined
 
@@ -208,12 +211,12 @@ const buildProfessionalProfile = (data: any): ProfessionalProfile => {
   const subcategoryIds = mapSubcategoryIds(data)
   const subcategoryLabels = mapSubcategoryLabels(data)
   const mappedCities: ServiceCity[] = (data?.serviceCities || []).map((c: any) => ({
-    id: c.id?.toString() || Date.now().toString(),
+    id: c.id?.toString() || createTemporaryId('city'),
     city: c.city,
     state: c.state,
   }))
   const mappedLinks: ProfessionalLink[] = (data?.professionalLinks || []).map((l: any) => ({
-    id: l.id?.toString() || Date.now().toString(),
+    id: l.id?.toString() || createTemporaryId('link'),
     type: l.type || 'website',
     url: l.url,
     label: l.label || '',
@@ -338,14 +341,14 @@ const loadProfileData = async () => {
     
     // Mapear serviceCities do backend (ids são numéricos)
     const mappedCities: ServiceCity[] = (data.serviceCities || []).map((c: any) => ({
-      id: c.id?.toString() || Date.now().toString(),
+      id: c.id?.toString() || createTemporaryId('city'),
       city: c.city,
       state: c.state,
     }))
 
     // Mapear professionalLinks do backend
     const mappedLinks: ProfessionalLink[] = (data.professionalLinks || []).map((l: any) => ({
-      id: l.id?.toString() || Date.now().toString(),
+      id: l.id?.toString() || createTemporaryId('link'),
       type: l.type || 'website',
       url: l.url,
       label: l.label || '',
@@ -825,10 +828,10 @@ const handleSaveCity = async () => {
             ? { ...city, city: newCity.value.city, state: newCity.value.state }
             : city
         )
-      : [
+        : [
           ...profileData.value.serviceCities,
           {
-            id: Date.now().toString(),
+            id: createTemporaryId('city'),
             city: newCity.value.city,
             state: newCity.value.state,
           },
@@ -937,13 +940,13 @@ const handleSaveLink = async () => {
           ? { ...l, type: newLink.value.type, url: newLink.value.url, label: newLink.value.label }
           : l
       )
-    } else {
-      profileData.value.professionalLinks.push({
-        id: Date.now().toString(),
-        type: newLink.value.type,
-        url: newLink.value.url,
-        label: newLink.value.label,
-      })
+      } else {
+        profileData.value.professionalLinks.push({
+          id: createTemporaryId('link'),
+          type: newLink.value.type,
+          url: newLink.value.url,
+          label: newLink.value.label,
+        })
     }
 
     // Enviar lista completa para o backend como entidades
