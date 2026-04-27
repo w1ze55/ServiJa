@@ -299,6 +299,25 @@ const handleRemoveImage = (index: number) => {
   projectForm.value = { ...projectForm.value, imageUrls: newUrls };
 };
 
+const normalizeExternalUrl = (value: string) => {
+  const trimmedValue = value.trim();
+
+  if (!trimmedValue) {
+    return '';
+  }
+
+  if (/^https?:\/\//i.test(trimmedValue)) {
+    return trimmedValue;
+  }
+
+  return `https://${trimmedValue}`;
+};
+
+const normalizeProjectLinks = () => {
+  projectForm.value.videoUrl = normalizeExternalUrl(projectForm.value.videoUrl);
+  projectForm.value.projectUrl = normalizeExternalUrl(projectForm.value.projectUrl);
+};
+
 const handleSaveProject = async () => {
   if (!projectForm.value.title || !projectForm.value.description || !projectForm.value.categoryId) {
     toast.error('Preencha todos os campos obrigatórios');
@@ -319,6 +338,8 @@ const handleSaveProject = async () => {
     toast.error('Adicione pelo menos uma imagem ao projeto');
     return;
   }
+
+  normalizeProjectLinks();
 
   isLoading.value = true;
 
@@ -920,6 +941,7 @@ const handleTagKeyPress = (e: KeyboardEvent) => {
                 id="videoUrl"
                 :model-value="projectForm.videoUrl"
                 @update:model-value="(val: string) => projectForm.videoUrl = val"
+                @blur="projectForm.videoUrl = normalizeExternalUrl(projectForm.videoUrl)"
                 placeholder="https://youtube.com/..."
               />
             </div>
@@ -930,6 +952,7 @@ const handleTagKeyPress = (e: KeyboardEvent) => {
                 id="projectUrl"
                 :model-value="projectForm.projectUrl"
                 @update:model-value="(val: string) => projectForm.projectUrl = val"
+                @blur="projectForm.projectUrl = normalizeExternalUrl(projectForm.projectUrl)"
                 placeholder="https://..."
               />
             </div>
