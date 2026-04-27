@@ -1030,7 +1030,7 @@ const getLinkLabel = (link: ProfessionalLink) => {
     <template v-else>
       <!-- Service Type -->
       <Card class="p-6">
-        <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center justify-between">
           <h3 class="text-lg font-semibold text-[#263238]">Configurações de Trabalho</h3>
           <Button v-if="!isEditingServiceSettings" @click="isEditingServiceSettings = true" variant="outline" size="sm">
             <Edit class="h-4 w-4 mr-2" />
@@ -1145,7 +1145,7 @@ const getLinkLabel = (link: ProfessionalLink) => {
 
       <!-- Service Cities -->
       <Card class="p-6">
-        <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center justify-between">
           <h3 class="text-lg font-semibold text-[#263238]">Cidades de Atendimento</h3>
           <Button @click="openAddCityDialog" variant="outline" size="sm">
             <Plus class="h-4 w-4 mr-2" />
@@ -1187,7 +1187,7 @@ const getLinkLabel = (link: ProfessionalLink) => {
 
       <!-- Biography -->
       <Card class="p-6">
-        <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center justify-between">
           <h3 class="text-lg font-semibold text-[#263238]">Biografia</h3>
           <Button v-if="!isEditingBio" @click="isEditingBio = true" variant="outline" size="sm">
             <Edit class="h-4 w-4 mr-2" />
@@ -1266,7 +1266,7 @@ const getLinkLabel = (link: ProfessionalLink) => {
 
       <!-- Professional Links -->
       <Card class="p-6">
-        <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center justify-between">
           <h3 class="text-lg font-semibold text-[#263238]">Links Profissionais</h3>
           <Button @click="openAddLinkDialog" variant="outline" size="sm">
             <Plus class="h-4 w-4 mr-2" />

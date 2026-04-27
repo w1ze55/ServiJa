@@ -34,6 +34,7 @@ import { toast } from '@/utils/toast'
 import { formatCPF, formatPhone } from '@/utils/masks'
 import { useUserStore } from '@/stores/userStore'
 import { uploadAvatar } from '@/api/uploadService'
+import { dispatchUserLocationUpdated } from '@/utils/userLocationCache'
 
 const userStore = useUserStore()
 
@@ -48,6 +49,17 @@ interface Address {
   state: string
   zipCode: string
   isDefault: boolean
+}
+
+const syncSidebarUserLocation = () => {
+  const userId = userStore.user?.id
+
+  if (!userId) {
+    return
+  }
+
+  const primaryAddress = addresses.value.find((address) => address.isDefault) || addresses.value[0] || null
+  dispatchUserLocationUpdated(userId, primaryAddress)
 }
 
 const isEditingPersonal = ref(false)
@@ -357,6 +369,7 @@ const handleSetDefaultAddress = async (addressId: string) => {
       ...addr,
       isDefault: addr.id === addressId,
     }))
+    syncSidebarUserLocation()
     toast.success('Endereço padrão atualizado')
   } catch (error: any) {
     const errorMessage = error.response?.data?.message || 'Erro ao definir endereço padrão'
@@ -380,6 +393,7 @@ const reloadAddresses = async () => {
       zipCode: addr.zipCode,
       isDefault: addr.isDefault,
     }))
+    syncSidebarUserLocation()
   } catch (error) {
     console.error('Erro ao recarregar endereços:', error)
   }
@@ -387,11 +401,12 @@ const reloadAddresses = async () => {
 
 const handleDeleteAddress = async () => {
   if (addressToDelete.value) {
-    try {
-      await api.delete(`/addresses/${addressToDelete.value.id}`)
-      addresses.value = addresses.value.filter((addr) => addr.id !== addressToDelete.value!.id)
-      addressToDelete.value = null
-      toast.success('Endereço removido')
+      try {
+        await api.delete(`/addresses/${addressToDelete.value.id}`)
+        addresses.value = addresses.value.filter((addr) => addr.id !== addressToDelete.value!.id)
+        syncSidebarUserLocation()
+        addressToDelete.value = null
+        toast.success('Endereço removido')
     } catch (error: any) {
       const errorMessage = error.response?.data?.message || 'Erro ao remover endereço'
       toast.error(errorMessage)
