@@ -44,8 +44,7 @@ public class PaymentService {
     private static final BigDecimal ASAAS_BOLETO_FEE = new BigDecimal("0.99"); // Taxa Asaas para Boleto (promocional)
     private static final BigDecimal ASAAS_CREDIT_CARD_FIXED_FEE = new BigDecimal("0.49"); // Taxa fixa cartão
     private static final BigDecimal ASAAS_CREDIT_CARD_PERCENTAGE = new BigDecimal("0.0199"); // 1,99% cartão
-                                                                                             // (promocional)
-    private static final BigDecimal MIN_NEGOTIATED_AMOUNT = new BigDecimal("20.00");
+    private static final BigDecimal MIN_NEGOTIATED_AMOUNT = new BigDecimal("20.00"); // Valor mínimo para pagamento
     private static final int RELEASE_DAYS = 7; // Dias para liberar saldo ao freelancer
 
     @Transactional
@@ -64,7 +63,6 @@ public class PaymentService {
             throw new IllegalStateException("A solicitação deve estar aceita para realizar o pagamento");
         }
 
-        // Verificar se já existe um pagamento para esta solicitação
         boolean paymentExists = paymentRepository.existsByServiceRequest(serviceRequest);
         if (paymentExists) {
             throw new IllegalStateException("Já existe um pagamento para esta solicitação");
@@ -74,16 +72,12 @@ public class PaymentService {
         validatePaymentAmount(request.getAmount(), agreedAmount);
         validateMinimumPaymentAmount(serviceRequest, agreedAmount);
 
-        // NOVA REGRA: Cliente paga 100% do valor acordado
         BigDecimal totalAmount = agreedAmount;
 
-        // Taxa da plataforma (5% do valor acordado) - descontada do freelancer
         BigDecimal platformFee = agreedAmount.multiply(PLATFORM_FEE_PERCENTAGE);
 
-        // Valor que o freelancer receberá (95% do valor acordado)
         BigDecimal freelancerAmount = agreedAmount.subtract(platformFee);
 
-        // Calcular taxa do gateway (custo interno da plataforma, não repassado)
         BigDecimal gatewayFee = BigDecimal.ZERO;
         switch (request.getPaymentMethod().toLowerCase()) {
             case "pix":
@@ -109,7 +103,6 @@ public class PaymentService {
                     "CPF/CNPJ do contratante não cadastrado. Por favor, informe o CPF para realizar o pagamento.");
         }
 
-        // Criar ou recuperar cliente no Asaas
         String asaasCustomerId = asaasService.getOrCreateCustomer(
                 contractor.getEmail(),
                 contractor.getName(),

@@ -5,7 +5,7 @@ interface UserClient {
     id: string
     name: string
     email: string
-    type: 'contractor' | 'provider'
+    type: 'contractor' | 'provider' | 'admin'
     avatar?: string
 }
 

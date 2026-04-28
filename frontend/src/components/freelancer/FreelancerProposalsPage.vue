@@ -68,11 +68,20 @@ interface Props {
   onNavigate: (page: string, params?: any) => void;
 }
 
+interface FilterOption {
+  value: string;
+  label: string;
+}
+
 const props = defineProps<Props>();
 const proposalStore = useProposalStore();
 
+const ALL_CATEGORIES_VALUE = 'all';
+const ALL_SUBCATEGORIES_VALUE = 'all';
+
 const searchQuery = ref('');
-const categoryFilter = ref('Todas as categorias');
+const categoryFilter = ref(ALL_CATEGORIES_VALUE);
+const subcategoryFilter = ref(ALL_SUBCATEGORIES_VALUE);
 const sortBy = ref('Mais recentes');
 const timeFilter = ref('Últimos 30 dias');
 const customDateFrom = ref('');
@@ -90,7 +99,6 @@ const rejectReason = ref('');
 let wsConnection: any = null;
 let paymentWsConnection: any = null;
 
-const categories = ['Eletricista', 'Encanador', 'Pintor', 'Pedreiro', 'Designer', 'Desenvolvedor'];
 
 // Mapeamento de valores de ordenação para português
 const sortOptions = {
@@ -102,6 +110,112 @@ const sortOptions = {
 const getSortLabel = (value: string) => {
   return sortOptions[value as keyof typeof sortOptions] || value;
 };
+
+const normalizeFilterText = (value: string) =>
+  value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase();
+
+const initialTimeFilterKey = normalizeFilterText(timeFilter.value);
+
+const getCategoryDisplayLabel = (proposal: Proposal) =>
+  proposal.categoryLabel?.trim() || proposal.category?.trim() || '';
+
+const getSubcategoryDisplayLabel = (proposal: Proposal) =>
+  proposal.subcategoryLabel?.trim() || proposal.subcategory?.trim() || '';
+
+const getCategoryFilterValue = (proposal: Proposal) => {
+  const label = getCategoryDisplayLabel(proposal);
+
+  if (!label) {
+    return '';
+  }
+
+  return proposal.categoryId != null
+    ? `category:${proposal.categoryId}`
+    : `category:${normalizeFilterText(label)}`;
+};
+
+const getSubcategoryFilterValue = (proposal: Proposal) => {
+  const label = getSubcategoryDisplayLabel(proposal);
+
+  if (!label) {
+    return '';
+  }
+
+  return proposal.subcategoryId != null
+    ? `subcategory:${proposal.subcategoryId}`
+    : `subcategory:${normalizeFilterText(label)}`;
+};
+
+const buildFilterOptions = (
+  proposals: Proposal[],
+  valueGetter: (proposal: Proposal) => string,
+  labelGetter: (proposal: Proposal) => string
+): FilterOption[] => {
+  const uniqueOptions = new Map<string, string>();
+
+  proposals.forEach((proposal) => {
+    const value = valueGetter(proposal);
+    const label = labelGetter(proposal);
+
+    if (!value || !label || uniqueOptions.has(value)) {
+      return;
+    }
+
+    uniqueOptions.set(value, label);
+  });
+
+  return Array.from(uniqueOptions.entries())
+    .map(([value, label]) => ({ value, label }))
+    .sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
+};
+
+const categoryOptions = computed(() =>
+  buildFilterOptions(proposalStore.proposals, getCategoryFilterValue, getCategoryDisplayLabel)
+);
+
+const proposalsForSelectedCategory = computed(() => {
+  if (categoryFilter.value === ALL_CATEGORIES_VALUE) {
+    return proposalStore.proposals;
+  }
+
+  return proposalStore.proposals.filter(
+    (proposal) => getCategoryFilterValue(proposal) === categoryFilter.value
+  );
+});
+
+const subcategoryOptions = computed(() =>
+  buildFilterOptions(
+    proposalsForSelectedCategory.value,
+    getSubcategoryFilterValue,
+    getSubcategoryDisplayLabel
+  )
+);
+
+const selectedCategoryLabel = computed(
+  () =>
+    categoryOptions.value.find((option) => option.value === categoryFilter.value)?.label ||
+    'Todas as categorias'
+);
+
+const selectedSubcategoryLabel = computed(
+  () =>
+    subcategoryOptions.value.find((option) => option.value === subcategoryFilter.value)?.label ||
+    'Todas as subcategorias'
+);
+
+const hasActiveFilters = computed(
+  () =>
+    !!searchQuery.value.trim() ||
+    categoryFilter.value !== ALL_CATEGORIES_VALUE ||
+    subcategoryFilter.value !== ALL_SUBCATEGORIES_VALUE ||
+    normalizeFilterText(timeFilter.value) !== initialTimeFilterKey ||
+    !!customDateFrom.value ||
+    !!customDateTo.value
+);
 
 // Obter mensagem de estado vazio baseada na tab atual
 const getEmptyMessage = () => {
@@ -252,7 +366,12 @@ const filteredProposals = computed(() => {
       proposal.clientName.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
       proposal.service.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
       proposal.description.toLowerCase().includes(searchQuery.value.toLowerCase());
-    const matchesCategory = categoryFilter.value === 'Todas as categorias' || proposal.category === categoryFilter.value;
+    const matchesCategory =
+      categoryFilter.value === ALL_CATEGORIES_VALUE ||
+      getCategoryFilterValue(proposal) === categoryFilter.value;
+    const matchesSubcategory =
+      subcategoryFilter.value === ALL_SUBCATEGORIES_VALUE ||
+      getSubcategoryFilterValue(proposal) === subcategoryFilter.value;
     const matchesTab =
       currentTab.value === 'all' ||
       (currentTab.value === 'pending' && proposal.status === 'pending') ||
@@ -304,7 +423,7 @@ const filteredProposals = computed(() => {
       }
     })();
 
-    return matchesSearch && matchesCategory && matchesTab && matchesTime;
+    return matchesSearch && matchesCategory && matchesSubcategory && matchesTab && matchesTime;
   });
 
   if (sortBy.value === 'Mais recentes') {
@@ -350,6 +469,27 @@ const getInitials = (name: string) => {
     .join('')
     .toUpperCase()
     .slice(0, 2);
+};
+
+const handleCategoryFilterChange = (value: string) => {
+  categoryFilter.value = value;
+  subcategoryFilter.value = ALL_SUBCATEGORIES_VALUE;
+  currentPage.value = 1;
+};
+
+const handleSubcategoryFilterChange = (value: string) => {
+  subcategoryFilter.value = value;
+  currentPage.value = 1;
+};
+
+const handleTimeFilterChange = (value: string) => {
+  timeFilter.value = value;
+  currentPage.value = 1;
+};
+
+const handleSortChange = (value: string) => {
+  sortBy.value = value;
+  currentPage.value = 1;
 };
 
 const handleSearchChange = (value: string) => {
@@ -412,6 +552,36 @@ const handleRefresh = () => {
 
 watch(currentTab, () => {
   currentPage.value = 1;
+});
+
+watch(categoryOptions, (options) => {
+  if (
+    categoryFilter.value !== ALL_CATEGORIES_VALUE &&
+    !options.some((option) => option.value === categoryFilter.value)
+  ) {
+    categoryFilter.value = ALL_CATEGORIES_VALUE;
+    subcategoryFilter.value = ALL_SUBCATEGORIES_VALUE;
+  }
+});
+
+watch(subcategoryOptions, (options) => {
+  if (
+    subcategoryFilter.value !== ALL_SUBCATEGORIES_VALUE &&
+    !options.some((option) => option.value === subcategoryFilter.value)
+  ) {
+    subcategoryFilter.value = ALL_SUBCATEGORIES_VALUE;
+  }
+});
+
+watch(totalPages, (pages) => {
+  if (pages === 0) {
+    currentPage.value = 1;
+    return;
+  }
+
+  if (currentPage.value > pages) {
+    currentPage.value = pages;
+  }
 });
 </script>
 
@@ -490,7 +660,7 @@ watch(currentTab, () => {
 
     <!-- Filters -->
     <Card class="p-4">
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
         <div class="relative col-span-2 md:col-span-1">
           <Search class="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-[#435574]" />
           <Input
@@ -501,19 +671,39 @@ watch(currentTab, () => {
           />
         </div>
 
-        <Select :model-value="categoryFilter" @update:model-value="(val: string) => categoryFilter = val">
+        <Select :model-value="categoryFilter" @update:model-value="handleCategoryFilterChange">
           <SelectTrigger>
-            <SelectValue placeholder="Todas as categorias" />
+            <SelectValue :label="selectedCategoryLabel" placeholder="Todas as categorias" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="Todas as categorias">Todas as categorias</SelectItem>
-            <SelectItem v-for="cat in categories" :key="cat" :value="cat">
-              {{ cat }}
+            <SelectItem :value="ALL_CATEGORIES_VALUE">Todas as categorias</SelectItem>
+            <SelectItem
+              v-for="category in categoryOptions"
+              :key="category.value"
+              :value="category.value"
+            >
+              {{ category.label }}
             </SelectItem>
           </SelectContent>
         </Select>
 
-        <Select :model-value="timeFilter" @update:model-value="(val: string) => { timeFilter = val; currentPage = 1; }">
+        <Select :model-value="subcategoryFilter" @update:model-value="handleSubcategoryFilterChange">
+          <SelectTrigger>
+            <SelectValue :label="selectedSubcategoryLabel" placeholder="Todas as subcategorias" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem :value="ALL_SUBCATEGORIES_VALUE">Todas as subcategorias</SelectItem>
+            <SelectItem
+              v-for="subcategory in subcategoryOptions"
+              :key="subcategory.value"
+              :value="subcategory.value"
+            >
+              {{ subcategory.label }}
+            </SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Select :model-value="timeFilter" @update:model-value="handleTimeFilterChange">
           <SelectTrigger>
             <SelectValue placeholder="Últimos 30 dias" />
           </SelectTrigger>
@@ -528,7 +718,7 @@ watch(currentTab, () => {
           </SelectContent>
         </Select>
 
-        <Select :model-value="sortBy" @update:model-value="(val: string) => sortBy = val">
+        <Select :model-value="sortBy" @update:model-value="handleSortChange">
           <SelectTrigger>
             <SelectValue placeholder="Mais recentes" />
           </SelectTrigger>
@@ -586,10 +776,10 @@ watch(currentTab, () => {
         <Card v-else-if="currentProposals.length === 0" class="p-12 text-center">
           <FileText class="h-12 w-12 text-gray-400 mx-auto mb-4" />
           <h3 class="text-lg font-semibold text-[#263238] mb-2">
-            {{ searchQuery || categoryFilter !== 'Todas as categorias' ? 'Nenhuma solicitação encontrada' : getEmptyMessage() }}
+            {{ hasActiveFilters ? 'Nenhuma solicitação encontrada' : getEmptyMessage() }}
           </h3>
           <p class="text-[#435574]">
-            {{ searchQuery || categoryFilter !== 'Todas as categorias'
+            {{ hasActiveFilters
               ? 'Tente ajustar os filtros de busca'
               : 'Você receberá notificações quando novos clientes enviarem solicitações' }}
           </p>

@@ -1,11 +1,13 @@
 import type {
   NotificationCategory,
   NotificationItem,
+  NotificationType,
   NotificationMetadata,
 } from '@/types/notifications';
 import { getApiDateTimestamp, parseApiDate } from '@/utils/apiDate';
 
 export type NotificationUserType = 'provider' | 'contractor';
+export type NotificationTone = 'green' | 'purple' | 'red' | 'blue' | 'orange';
 
 export interface NotificationRouteTarget {
   path: string;
@@ -22,8 +24,95 @@ const categoryLabels: Record<NotificationCategory, string> = {
 
 const withActor = (actorName: string | null | undefined, fallback: string) => actorName || fallback;
 
+const POSITIVE_TYPES: NotificationType[] = [
+  'PROPOSAL_ACCEPTED',
+  'PAYMENT_APPROVED',
+  'PAYMENT_RECEIVED',
+  'DELIVERY_APPROVED',
+];
+
+const NEGATIVE_TYPES: NotificationType[] = ['REQUEST_REJECTED'];
+
+const INFO_TYPES: NotificationType[] = ['MESSAGE_RECEIVED', 'ATTACHMENT_ADDED'];
+
+const PENDING_TYPES: NotificationType[] = [
+  'NEW_SERVICE_REQUEST',
+  'NEW_PROPOSAL',
+  'PAYMENT_REQUIRED',
+  'PROJECT_COMPLETED',
+  'ADJUSTMENTS_REQUESTED',
+];
+
+const POSITIVE_STATUS_KEYWORDS = ['ACCEPTED', 'APPROVED', 'COMPLETED'];
+const NEGATIVE_STATUS_KEYWORDS = ['REJECTED', 'REPROVED', 'FAILED', 'REFUSED', 'CANCELLED', 'OVERDUE', 'CHARGEBACK'];
+const PENDING_STATUS_KEYWORDS = ['PENDING', 'NEGOTIATING', 'SENT', 'DELIVERED', 'PROCESSING'];
+const STARTED_STATUS_KEYWORDS = ['IN_PROGRESS'];
+
 export const getNotificationCategoryLabel = (category: NotificationCategory) => {
   return categoryLabels[category];
+};
+
+const resolveToneByStatus = (status: unknown): NotificationTone | null => {
+  if (typeof status !== 'string' || !status.trim()) {
+    return null;
+  }
+
+  const normalizedStatus = status.trim().toUpperCase();
+
+  if (STARTED_STATUS_KEYWORDS.some((keyword) => normalizedStatus.includes(keyword))) {
+    return 'blue';
+  }
+
+  if (NEGATIVE_STATUS_KEYWORDS.some((keyword) => normalizedStatus.includes(keyword))) {
+    return 'red';
+  }
+
+  if (POSITIVE_STATUS_KEYWORDS.some((keyword) => normalizedStatus.includes(keyword))) {
+    return 'green';
+  }
+
+  if (PENDING_STATUS_KEYWORDS.some((keyword) => normalizedStatus.includes(keyword))) {
+    return 'orange';
+  }
+
+  return null;
+};
+
+export const getNotificationTone = (notification: NotificationItem): NotificationTone => {
+  if (notification.type === 'PROJECT_STARTED') {
+    return 'blue';
+  }
+
+  if (POSITIVE_TYPES.includes(notification.type)) {
+    return 'green';
+  }
+
+  if (NEGATIVE_TYPES.includes(notification.type)) {
+    return 'red';
+  }
+
+  if (INFO_TYPES.includes(notification.type)) {
+    return 'blue';
+  }
+
+  if (PENDING_TYPES.includes(notification.type)) {
+    return 'orange';
+  }
+
+  const statusTone = resolveToneByStatus(notification.metadata?.status);
+  if (statusTone) {
+    return statusTone;
+  }
+
+  switch (notification.category) {
+    case 'payments':
+      return 'green';
+    case 'messages':
+      return 'blue';
+    case 'projects':
+    default:
+      return 'orange';
+  }
 };
 
 export const getNotificationDescription = (notification: NotificationItem) => {
@@ -161,6 +250,12 @@ const resolveRouteByHint = (hint: string | undefined, metadata: NotificationMeta
         path: '/freelancer-proposal-detail',
         query: buildQuery('requestId', serviceRequestId),
       };
+    case 'freelancer-project-detail':
+    case 'freelancer-deliveries':
+      return {
+        path: serviceRequestId ? '/freelancer-project-detail' : '/freelancer-deliveries',
+        query: buildQuery('requestId', serviceRequestId),
+      };
     case 'messages':
       return {
         path: '/messages',
@@ -181,6 +276,17 @@ export const resolveNotificationRoute = (
   }
 
   if (userType === 'provider') {
+    const status = typeof notification.metadata.status === 'string'
+      ? notification.metadata.status.toUpperCase()
+      : '';
+
+    if (['IN_PROGRESS', 'DELIVERED', 'COMPLETED'].includes(status)) {
+      return {
+        path: '/freelancer-project-detail',
+        query: buildQuery('requestId', notification.metadata.serviceRequestId),
+      };
+    }
+
     return {
       path: '/freelancer-proposal-detail',
       query: buildQuery('requestId', notification.metadata.serviceRequestId),

@@ -1,5 +1,6 @@
 package com.servija.servija.dto;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -29,6 +30,9 @@ public class FreelancerResponseDTO {
     private String scope;
 
     private String notes;
+
+    @Valid
+    private List<ResponseMilestoneDTO> milestones;
 
     private List<String> attachments;
 }

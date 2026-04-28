@@ -104,12 +104,12 @@ const handleRequestAdjustments = async (reason: string) => {
   );
 
   if (success) {
-    toast.success('Solicitacao de ajustes enviada ao freelancer.');
+    toast.success('Solicitação de ajustes enviada ao freelancer.');
     await adjustmentStore.getAdjustmentsByServiceRequest(parseInt(requestId.value));
     return true;
   }
 
-  toast.error('Erro ao enviar solicitacao. Tente novamente.');
+  toast.error('Erro ao enviar solicitação. Tente novamente.');
   return false;
 };
 
@@ -145,7 +145,7 @@ const getUserEmail = () => {
 
 const handleServiceRequestNotification = (event: any) => {
   const notification = event.detail;
-  console.log('Notificacao recebida em aprovacao de entrega:', notification);
+  console.log('Notificação recebida em aprovação de entrega:', notification);
 
   if (notification.serviceRequestId === parseInt(requestId.value)) {
     switch (notification.type) {
@@ -193,7 +193,7 @@ onMounted(async () => {
   }
 
   if (!requestId.value) {
-    toast.error('ID da solicitacao nao fornecido');
+    toast.error('ID da solicitação não fornecido');
     router.push('/cliente-projects');
     return;
   }
@@ -201,7 +201,7 @@ onMounted(async () => {
   await adjustmentStore.getAdjustmentsByServiceRequest(parseInt(requestId.value));
 
   const userEmail = getUserEmail();
-  console.log('Tentando conectar WebSocket para aprovacao de entrega:', userEmail);
+  console.log('Tentando conectar WebSocket para aprovação de entrega:', userEmail);
 
   if (userEmail) {
     wsConnection = useServiceRequestWebSocket(userEmail);
@@ -209,7 +209,7 @@ onMounted(async () => {
 
     window.addEventListener('service-request-notification', handleServiceRequestNotification);
   } else {
-    console.error('Nao foi possivel extrair email do token');
+    console.error('Não foi possível extrair e-mail do token');
   }
 });
 
@@ -232,9 +232,9 @@ onUnmounted(() => {
   >
     <div v-if="!request && !store.isLoading" class="max-w-4xl mx-auto p-6">
       <div class="text-center py-12">
-        <h2 class="mb-2 text-xl font-semibold text-[#263238]">Solicitacao nao encontrada</h2>
+        <h2 class="mb-2 text-xl font-semibold text-[#263238]">Solicitação não encontrada</h2>
         <p class="mb-4 text-[#435574]">
-          A solicitacao que voce esta procurando nao existe ou foi removida.
+          A solicitação que você está procurando não existe ou foi removida.
         </p>
         <Button variant="default" @click="router.push('/cliente-projects')">
           Voltar para Meus Projetos

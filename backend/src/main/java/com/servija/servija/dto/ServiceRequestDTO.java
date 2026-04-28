@@ -1,7 +1,7 @@
 package com.servija.servija.dto;
 
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -20,8 +20,13 @@ public class ServiceRequestDTO {
     @NotBlank(message = "O nome do servico e obrigatorio")
     private String serviceName;
 
-    @NotBlank(message = "A categoria e obrigatoria")
+    private Long categoryId;
+
+    private Long subcategoryId;
+
     private String category;
+
+    private String subcategory;
 
     @NotBlank(message = "A descricao e obrigatoria")
     private String description;

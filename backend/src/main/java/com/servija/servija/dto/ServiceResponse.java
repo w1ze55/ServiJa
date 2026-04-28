@@ -18,7 +18,14 @@ public class ServiceResponse {
     private Long freelancerId;
     private String freelancerName;
     private String title;
+    private Long categoryId;
+    private String categorySlug;
+    private String categoryLabel;
     private String category;
+    private Long subcategoryId;
+    private String subcategorySlug;
+    private String subcategoryLabel;
+    private String subcategory;
     private String description;
     private BigDecimal serviceRating;
     private Integer serviceReviewCount;

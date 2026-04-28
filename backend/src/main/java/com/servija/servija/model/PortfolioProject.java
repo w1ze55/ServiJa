@@ -38,6 +38,14 @@ public class PortfolioProject {
     @Column(length = 100)
     private String category;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "category_id")
+    private ServiceCategory serviceCategory;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "subcategory_id")
+    private ServiceSubcategory serviceSubcategory;
+
     @Column(columnDefinition = "TEXT")
     private String tags; // Armazenado como JSON
 

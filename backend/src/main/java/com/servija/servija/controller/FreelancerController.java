@@ -109,17 +109,17 @@ public class FreelancerController {
             description = "Não autenticado"
         ),
         @ApiResponse(
+            responseCode = "503",
+            description = "Serviço externo de validação indisponível"
+        ),
+        @ApiResponse(
             responseCode = "500",
             description = "Erro interno do servidor"
         )
     })
     public ResponseEntity<FreelancerProfileResponse> updateProfile(@RequestBody FreelancerProfileRequest request) {
-        try {
-            FreelancerProfileResponse profile = freelancerService.updateProfile(request);
-            return ResponseEntity.ok(profile);
-        } catch (Exception e) {
-            return ResponseEntity.internalServerError().build();
-        }
+        FreelancerProfileResponse profile = freelancerService.updateProfile(request);
+        return ResponseEntity.ok(profile);
     }
 
     @GetMapping("/nearby")

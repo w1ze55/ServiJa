@@ -48,6 +48,7 @@ public class SecurityConfig {
                                 "/api/freelancer/nearby",
                                 "/api/freelancer/*/profile",
                                 "/api/portfolio/freelancer/**",
+                                "/api/categories/public/**",
                                 "/api/services/public/**",
                                 "/api/files/**",
                                 "/error",

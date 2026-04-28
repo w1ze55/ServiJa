@@ -12,6 +12,8 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ServiceCityRequest {
+
+    private Long id;
     
     @NotBlank(message = "Cidade é obrigatória")
     @Size(max = 100, message = "Cidade deve ter no máximo 100 caracteres")

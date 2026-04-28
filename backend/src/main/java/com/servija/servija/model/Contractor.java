@@ -32,4 +32,3 @@ public class Contractor extends User {
     @lombok.Builder.Default
     private Integer completedContracts = 0;
 }
-

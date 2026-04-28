@@ -2,6 +2,7 @@ package com.servija.servija.repository;
 
 import com.servija.servija.model.ServiceRequest;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -36,4 +37,16 @@ public interface ServiceRequestRepository extends JpaRepository<ServiceRequest, 
     BigDecimal findAverageCompletedResponseValueByServiceId(
             @Param("serviceId") Long serviceId,
             @Param("status") String status);
+
+    @Modifying
+    @Query(value = """
+            UPDATE service_requests
+            SET category_id = :categoryId,
+                subcategory_id = :subcategoryId
+            WHERE id = :requestId
+            """, nativeQuery = true)
+    void backfillCatalogAssignment(
+            @Param("requestId") Long requestId,
+            @Param("categoryId") Long categoryId,
+            @Param("subcategoryId") Long subcategoryId);
 }

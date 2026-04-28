@@ -6,7 +6,7 @@ import Login from "@/pages/Login/index.vue";
 import Perfil from "@/pages/Perfil/index.vue";
 import Dashboard from "@/pages/Dashboard/index.vue";
 import FreelancerDashboard from "@/pages/FreelancerDashboard/index.vue";
-import ClienteDashboard from "@/pages/ClienteDashboard/index.vue";
+import ClienteHomePage from "@/pages/ClienteDashboard/index.vue";
 import FreelancerProfileSettings from "@/pages/FreelancerProfileSettings/index.vue";
 import FreelancerProfessionalProfile from "@/pages/FreelancerProfessionalProfile/index.vue";
 import FreelancerPortfolio from "@/pages/FreelancerPortfolio/index.vue";
@@ -18,6 +18,7 @@ import FreelancerServicesPage from "@/pages/FreelancerServices/index.vue";
 import FreelancerProposalsPage from "@/pages/FreelancerProposals/index.vue";
 import FreelancerRequestDetailPage from "@/pages/FreelancerRequestDetail/index.vue";
 import FreelancerDeliveriesPage from "@/pages/FreelancerDeliveries/index.vue";
+import FreelancerProjectDetailPage from "@/pages/FreelancerProjectDetail/index.vue";
 import FreelancerWalletPage from "@/pages/FreelancerWallet/index.vue";
 
 
@@ -27,7 +28,6 @@ import ExplorePage from "@/pages/Explore/index.vue";
 import SearchPage from "@/pages/Search/index.vue";
 import MyRequestsPage from "@/pages/MyRequests/index.vue";
 import FavoritesPage from "@/pages/Favorites/index.vue";
-import ContractsPage from "@/pages/Contracts/index.vue";
 import FreelancerKYCPage from "@/pages/FreelancerKYC/index.vue";
 import ProviderProfilePage from "@/pages/ProviderProfile/index.vue";
 import ServiceDetailPage from "@/pages/ServiceDetail/index.vue";
@@ -39,6 +39,7 @@ import ClienteProjectsPage from "@/pages/ClienteProjects/index.vue";
 import ClienteDeliveryApprovalPage from "@/pages/ClienteDeliveryApproval/index.vue";
 import ClienteProjectDetailPage from "@/pages/ClienteProjectDetail/index.vue";
 import RateFreelancerPage from "@/pages/RateFreelancer/index.vue";
+import AdminCategoriesPage from "@/pages/AdminCategories/index.vue";
 
 const routes: RouteRecordRaw[] = [
   // ============ ROTAS PÚBLICAS ============
@@ -85,10 +86,20 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, userType: "provider" },
   },
   {
-    path: "/cliente-dashboard",
-    name: "cliente-dashboard",
-    component: ClienteDashboard,
+    path: "/cliente-home",
+    name: "cliente-home",
+    component: ClienteHomePage,
     meta: { requiresAuth: true, userType: "contractor" },
+  },
+  {
+    path: "/cliente-dashboard",
+    redirect: { name: "cliente-home" },
+  },
+  {
+    path: "/admin/categories",
+    name: "admin-categories",
+    component: AdminCategoriesPage,
+    meta: { requiresAuth: true, userType: "admin" },
   },
 
   // ============ PROFILE SETTINGS ESPECÍFICOS ============
@@ -172,6 +183,12 @@ const routes: RouteRecordRaw[] = [
     component: FreelancerDeliveriesPage,
     meta: { requiresAuth: true, userType: "provider" },
   },
+  {
+    path: "/freelancer-project-detail",
+    name: "freelancer-project-detail",
+    component: FreelancerProjectDetailPage,
+    meta: { requiresAuth: true, userType: "provider" },
+  },
 
   // ============ FREELANCER WALLET ============
   {
@@ -249,14 +266,6 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, userType: "contractor" },
   },
 
-  // Contracts (Cliente)
-  {
-    path: "/contracts",
-    name: "contracts",
-    component: ContractsPage,
-    meta: { requiresAuth: true, userType: "contractor" },
-  },
-
   // Freelancer KYC
   {
     path: "/freelancer-kyc",
@@ -325,6 +334,7 @@ const router = createRouter({
 router.beforeEach((to, from, next) => {
   const userString = localStorage.getItem("user");
   const user = userString ? JSON.parse(userString) : null;
+  const requiredUserType = to.meta.userType;
 
   // Se a rota requer autenticação e o usuário não está logado
   if (to.meta.requiresAuth && !user) {
@@ -332,6 +342,14 @@ router.beforeEach((to, from, next) => {
   }
   // Se o usuário está logado e tenta acessar login
   else if (to.name === "login" && user) {
+    next("/dashboard");
+  }
+  else if (
+    user &&
+    requiredUserType &&
+    requiredUserType !== "both" &&
+    user.type !== requiredUserType
+  ) {
     next("/dashboard");
   }
   // Caso contrário, prosseguir

@@ -156,13 +156,18 @@ public class ServiceController {
     // ==================== ENDPOINTS PÚBLICOS ====================
 
     @GetMapping("/public/all")
-    @Operation(summary = "Listar todos os serviços ativos (público)", description = "Retorna todos os serviços ativos disponíveis na plataforma")
+    @Operation(summary = "Listar todos os serviços ativos (público)", 
+                description = "Retorna todos os serviços ativos disponíveis na plataforma")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Lista de serviços retornada com sucesso", content = @Content(array = @ArraySchema(schema = @Schema(implementation = ServiceResponse.class))))
+            @ApiResponse(responseCode = "200", description = "Lista de serviços retornada com sucesso", 
+            content = @Content(array = @ArraySchema(schema = @Schema(implementation = ServiceResponse.class))))
     })
-    public ResponseEntity<List<ServiceResponse>> getAllActiveServices() {
+    public ResponseEntity<List<ServiceResponse>> getAllActiveServices(
+            @RequestParam(required = false) String categorySlug,
+            @RequestParam(required = false) String subcategorySlug,
+            @RequestParam(required = false, name = "q") String query) {
         try {
-            List<ServiceResponse> services = serviceService.getAllActiveServices();
+            List<ServiceResponse> services = serviceService.getActiveServices(categorySlug, subcategorySlug, query);
             return ResponseEntity.ok(services);
         } catch (Exception e) {
             return ResponseEntity.internalServerError().build();

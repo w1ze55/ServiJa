@@ -6,6 +6,8 @@ import com.servija.servija.dto.CounterProposalDTO;
 import com.servija.servija.dto.FreelancerAttachmentDTO;
 import com.servija.servija.dto.FreelancerAttachmentsRequest;
 import com.servija.servija.dto.FreelancerResponseDTO;
+import com.servija.servija.dto.ProjectAttachmentsRequest;
+import com.servija.servija.dto.ResponseMilestoneDTO;
 import com.servija.servija.dto.ServiceRequestDTO;
 import com.servija.servija.dto.ServiceRequestResponse;
 import com.servija.servija.exception.ResourceNotFoundException;
@@ -37,6 +39,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.regex.Pattern;
 
 @Service
@@ -56,11 +59,13 @@ public class ServiceRequestService {
     private final WebSocketService webSocketService;
     private final NotificationService notificationService;
     private final FreelancerWalletService walletService;
+    private final CategoryCatalogService categoryCatalogService;
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private static final BigDecimal MIN_NEGOTIATED_AMOUNT = new BigDecimal("20.00");
     private static final BigDecimal MAX_NEGOTIATED_AMOUNT = new BigDecimal("1000000.00");
     private static final BigDecimal LEGACY_BUDGET_PLACEHOLDER = MIN_NEGOTIATED_AMOUNT;
+    private static final List<String> VALID_MILESTONE_STATUSES = List.of("pending", "in_progress", "completed");
 
     @Transactional
     public ServiceRequestResponse create(String contractorEmail, ServiceRequestDTO dto) {
@@ -161,12 +166,31 @@ public class ServiceRequestService {
             }
         }
 
+        CategoryCatalogService.CategorySelection categorySelection = selectedService != null
+                ? resolveSelectionFromService(selectedService)
+                : categoryCatalogService.resolveSelection(
+                        dto.getCategoryId(),
+                        dto.getSubcategoryId(),
+                        dto.getCategory(),
+                        dto.getSubcategory(),
+                        true,
+                        true,
+                        false,
+                        false);
+
+        String requestServiceName = StringUtils.hasText(dto.getServiceName())
+                ? dto.getServiceName().trim()
+                : selectedService != null ? selectedService.getTitle() : null;
+
         ServiceRequest request = ServiceRequest.builder()
                 .contractor(contractor)
                 .freelancer(freelancer)
                 .service(selectedService)
-                .serviceName(dto.getServiceName())
-                .category(dto.getCategory())
+                .serviceName(requestServiceName)
+                .category(categorySelection.getCategoryLabel())
+                .subcategory(categorySelection.getSubcategoryLabel())
+                .serviceCategory(categorySelection.getCategory())
+                .serviceSubcategory(categorySelection.getSubcategory())
                 .description(normalizedDescription)
                 .deadline(normalizedDeadline)
                 .workModel(requestWorkModel)
@@ -185,7 +209,7 @@ public class ServiceRequestService {
                     saved.getId(),
                     freelancer.getEmail(),
                     contractor.getName(),
-                    dto.getServiceName());
+                    requestServiceName);
             notificationService.notifyNewServiceRequest(saved, contractor);
         }
 
@@ -230,6 +254,9 @@ public class ServiceRequestService {
                                 service_id,
                                 service_name,
                                 category,
+                                subcategory,
+                                category_id,
+                                subcategory_id,
                                 description,
                                 budget,
                                 deadline,
@@ -242,7 +269,7 @@ public class ServiceRequestService {
                                 legacy_low_value_allowed,
                                 created_at,
                                 updated_at
-                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                             """,
                     Statement.RETURN_GENERATED_KEYS);
 
@@ -259,21 +286,32 @@ public class ServiceRequestService {
             }
             statement.setString(4, request.getServiceName());
             statement.setString(5, request.getCategory());
-            statement.setString(6, request.getDescription());
-            statement.setBigDecimal(7, LEGACY_BUDGET_PLACEHOLDER);
-            statement.setString(8, request.getDeadline());
-            statement.setString(9, request.getWorkModel().name());
-            statement.setString(10,
-                    request.getStatus() != null ? request.getStatus().name() : ServiceRequest.Status.PENDING.name());
-            statement.setBoolean(11, Boolean.TRUE.equals(request.getChatEnabled()));
-            statement.setString(12, request.getAddress());
-            if (request.getDesiredDate() != null) {
-                statement.setDate(13, Date.valueOf(request.getDesiredDate()));
+            statement.setString(6, request.getSubcategory());
+            if (request.getServiceCategory() != null) {
+                statement.setLong(7, request.getServiceCategory().getId());
             } else {
-                statement.setNull(13, java.sql.Types.DATE);
+                statement.setNull(7, java.sql.Types.BIGINT);
             }
-            statement.setString(14, request.getAttachments());
-            statement.setBoolean(15, Boolean.TRUE.equals(request.getLegacyLowValueAllowed()));
+            if (request.getServiceSubcategory() != null) {
+                statement.setLong(8, request.getServiceSubcategory().getId());
+            } else {
+                statement.setNull(8, java.sql.Types.BIGINT);
+            }
+            statement.setString(9, request.getDescription());
+            statement.setBigDecimal(10, LEGACY_BUDGET_PLACEHOLDER);
+            statement.setString(11, request.getDeadline());
+            statement.setString(12, request.getWorkModel().name());
+            statement.setString(13,
+                    request.getStatus() != null ? request.getStatus().name() : ServiceRequest.Status.PENDING.name());
+            statement.setBoolean(14, Boolean.TRUE.equals(request.getChatEnabled()));
+            statement.setString(15, request.getAddress());
+            if (request.getDesiredDate() != null) {
+                statement.setDate(16, Date.valueOf(request.getDesiredDate()));
+            } else {
+                statement.setNull(16, java.sql.Types.DATE);
+            }
+            statement.setString(17, request.getAttachments());
+            statement.setBoolean(18, Boolean.TRUE.equals(request.getLegacyLowValueAllowed()));
             return statement;
         }, keyHolder);
 
@@ -403,7 +441,11 @@ public class ServiceRequestService {
             } catch (Exception e) {
                 throw new RuntimeException("Error serializing attachments", e);
             }
+        } else {
+            request.setResponseAttachments(null);
         }
+
+        request.setResponseMilestones(serializeResponseMilestones(dto.getMilestones()));
 
         ServiceRequest saved = serviceRequestRepository.save(request);
         String details = String.format("Valor: R$ %.2f | Prazo: %d dias", dto.getValue(), dto.getExecutionDays());
@@ -417,6 +459,48 @@ public class ServiceRequestService {
                 String.format("R$ %.2f", dto.getValue()));
         notificationService.notifyNewProposal(saved, freelancer);
 
+        return toResponse(saved);
+    }
+
+    @Transactional
+    public ServiceRequestResponse updateMilestoneStatus(Long id, String milestoneId, String status, String freelancerEmail) {
+        if (!StringUtils.hasText(status)) {
+            throw new IllegalArgumentException("Informe o status do marco");
+        }
+
+        ServiceRequest request = serviceRequestRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Solicitacao nao encontrada"));
+
+        User freelancer = userRepository.findByEmail(freelancerEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("Freelancer nao encontrado"));
+
+        if (request.getFreelancer() == null || !request.getFreelancer().getId().equals(freelancer.getId())) {
+            throw new IllegalStateException("Apenas o freelancer responsavel pode atualizar marcos");
+        }
+
+        List<ResponseMilestoneDTO> milestones = parseResponseMilestones(request.getResponseMilestones());
+        if (milestones.isEmpty()) {
+            throw new ResourceNotFoundException("Nao ha marcos cadastrados para esta solicitacao");
+        }
+
+        String normalizedMilestoneId = milestoneId != null ? milestoneId.trim() : "";
+        String normalizedStatus = normalizeMilestoneStatus(status);
+        boolean updated = false;
+
+        for (ResponseMilestoneDTO milestone : milestones) {
+            if (normalizedMilestoneId.equals(milestone.getId())) {
+                milestone.setStatus(normalizedStatus);
+                updated = true;
+                break;
+            }
+        }
+
+        if (!updated) {
+            throw new ResourceNotFoundException("Marco nao encontrado");
+        }
+
+        request.setResponseMilestones(serializeResponseMilestones(milestones));
+        ServiceRequest saved = serviceRequestRepository.save(request);
         return toResponse(saved);
     }
 
@@ -725,6 +809,39 @@ public class ServiceRequestService {
         return toResponse(saved);
     }
 
+    @Transactional
+    public ServiceRequestResponse addContractorAttachments(Long id, ProjectAttachmentsRequest body, String contractorEmail) {
+        ServiceRequest request = serviceRequestRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("SolicitaÃ§Ã£o nÃ£o encontrada"));
+
+        User contractor = userRepository.findByEmail(contractorEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("UsuÃ¡rio nÃ£o encontrado"));
+
+        if (request.getContractor() == null || !request.getContractor().getId().equals(contractor.getId())) {
+            throw new IllegalStateException("Apenas o cliente da solicitaÃ§Ã£o pode enviar arquivos");
+        }
+
+        List<String> attachmentsToAdd = resolveProjectAttachmentUrls(body);
+        if (attachmentsToAdd.isEmpty()) {
+            throw new IllegalArgumentException("Informe pelo menos um arquivo");
+        }
+
+        List<String> existing = parseAttachmentUrls(request.getAttachments());
+        existing.addAll(attachmentsToAdd);
+
+        try {
+            request.setAttachments(objectMapper.writeValueAsString(existing));
+        } catch (Exception e) {
+            log.error("Erro ao serializar attachments do cliente", e);
+            throw new RuntimeException("Erro ao salvar arquivos");
+        }
+
+        ServiceRequest saved = serviceRequestRepository.save(request);
+        notificationService.notifyAttachmentAdded(saved, contractor, attachmentsToAdd.size());
+        log.info("Contractor attachments adicionados Ã  solicitaÃ§Ã£o {}: {} arquivos", id, attachmentsToAdd.size());
+        return toResponse(saved);
+    }
+
     private List<String> parseAttachmentUrls(String json) {
         if (!StringUtils.hasText(json)) {
             return new ArrayList<>();
@@ -826,6 +943,21 @@ public class ServiceRequestService {
         return resolved;
     }
 
+    private List<String> resolveProjectAttachmentUrls(ProjectAttachmentsRequest body) {
+        List<String> resolved = new ArrayList<>();
+        if (body == null || body.getUrls() == null || body.getUrls().isEmpty()) {
+            return resolved;
+        }
+
+        for (String url : body.getUrls()) {
+            if (StringUtils.hasText(url)) {
+                resolved.add(url.trim());
+            }
+        }
+
+        return resolved;
+    }
+
     private FreelancerAttachmentDTO buildFreelancerAttachment(String url, String name, String description) {
         String normalizedUrl = url.trim();
         String normalizedName = StringUtils.hasText(name) ? name.trim() : extractFileName(normalizedUrl);
@@ -859,6 +991,91 @@ public class ServiceRequestService {
         return url != null && url.contains(".s3.") && url.contains("amazonaws.com");
     }
 
+    private String serializeResponseMilestones(List<ResponseMilestoneDTO> milestones) {
+        List<ResponseMilestoneDTO> normalizedMilestones = normalizeResponseMilestones(milestones);
+        if (normalizedMilestones.isEmpty()) {
+            return null;
+        }
+
+        try {
+            return objectMapper.writeValueAsString(normalizedMilestones);
+        } catch (Exception e) {
+            log.error("Erro ao serializar response milestones", e);
+            throw new RuntimeException("Erro ao salvar marcos da proposta");
+        }
+    }
+
+    private List<ResponseMilestoneDTO> parseResponseMilestones(String json) {
+        if (!StringUtils.hasText(json)) {
+            return new ArrayList<>();
+        }
+
+        try {
+            JsonNode root = objectMapper.readTree(json);
+            if (!root.isArray()) {
+                return new ArrayList<>();
+            }
+
+            List<ResponseMilestoneDTO> milestones = new ArrayList<>();
+            for (JsonNode node : root) {
+                if (!node.isObject()) {
+                    continue;
+                }
+
+                String title = node.path("title").asText(null);
+                if (!StringUtils.hasText(title)) {
+                    continue;
+                }
+
+                milestones.add(ResponseMilestoneDTO.builder()
+                        .id(StringUtils.hasText(node.path("id").asText(null))
+                                ? node.path("id").asText().trim()
+                                : UUID.randomUUID().toString())
+                        .title(title.trim())
+                        .description(StringUtils.hasText(node.path("description").asText(null))
+                                ? node.path("description").asText().trim()
+                                : null)
+                        .status(normalizeMilestoneStatus(node.path("status").asText(null)))
+                        .build());
+            }
+            return milestones;
+        } catch (Exception e) {
+            log.warn("Erro ao deserializar response milestones: {}", e.getMessage());
+            return new ArrayList<>();
+        }
+    }
+
+    private List<ResponseMilestoneDTO> normalizeResponseMilestones(List<ResponseMilestoneDTO> milestones) {
+        List<ResponseMilestoneDTO> normalized = new ArrayList<>();
+        if (milestones == null) {
+            return normalized;
+        }
+
+        for (ResponseMilestoneDTO milestone : milestones) {
+            if (milestone == null || !StringUtils.hasText(milestone.getTitle())) {
+                continue;
+            }
+
+            normalized.add(ResponseMilestoneDTO.builder()
+                    .id(StringUtils.hasText(milestone.getId()) ? milestone.getId().trim() : UUID.randomUUID().toString())
+                    .title(milestone.getTitle().trim())
+                    .description(StringUtils.hasText(milestone.getDescription()) ? milestone.getDescription().trim() : null)
+                    .status(normalizeMilestoneStatus(milestone.getStatus()))
+                    .build());
+        }
+
+        return normalized;
+    }
+
+    private String normalizeMilestoneStatus(String status) {
+        if (!StringUtils.hasText(status)) {
+            return "pending";
+        }
+
+        String normalized = status.trim().toLowerCase();
+        return VALID_MILESTONE_STATUSES.contains(normalized) ? normalized : "pending";
+    }
+
     private ServiceRequest.WorkModel resolveRequestWorkModel(
             ServiceRequestDTO dto,
             com.servija.servija.model.Service service) {
@@ -877,6 +1094,19 @@ public class ServiceRequestService {
         }
     }
 
+    private CategoryCatalogService.CategorySelection resolveSelectionFromService(
+            com.servija.servija.model.Service service) {
+        return categoryCatalogService.resolveSelection(
+                service.getServiceCategory() != null ? service.getServiceCategory().getId() : null,
+                service.getServiceSubcategory() != null ? service.getServiceSubcategory().getId() : null,
+                service.getCategory(),
+                null,
+                true,
+                false,
+                true,
+                false);
+    }
+
     private ServiceRequestResponse toResponse(ServiceRequest request) {
         return ServiceRequestResponse.builder()
                 .id(request.getId())
@@ -887,7 +1117,19 @@ public class ServiceRequestService {
                 .freelancerName(request.getFreelancer() != null ? request.getFreelancer().getName() : null)
                 .freelancerAvatar(request.getFreelancer() != null ? request.getFreelancer().getAvatarUrl() : null)
                 .serviceName(request.getServiceName())
+                .categoryId(request.getServiceCategory() != null ? request.getServiceCategory().getId() : null)
+                .categorySlug(request.getServiceCategory() != null ? request.getServiceCategory().getSlug() : null)
+                .categoryLabel(request.getServiceCategory() != null ? request.getServiceCategory().getName()
+                        : request.getCategory())
                 .category(request.getCategory())
+                .subcategoryId(
+                        request.getServiceSubcategory() != null ? request.getServiceSubcategory().getId() : null)
+                .subcategorySlug(
+                        request.getServiceSubcategory() != null ? request.getServiceSubcategory().getSlug() : null)
+                .subcategoryLabel(
+                        request.getServiceSubcategory() != null ? request.getServiceSubcategory().getName()
+                                : request.getSubcategory())
+                .subcategory(request.getSubcategory())
                 .description(normalizeRequestDescription(request.getDescription()))
                 .deadline(request.getDeadline())
                 .workModel(request.getWorkModel() != null ? request.getWorkModel().name() : null)
@@ -908,6 +1150,7 @@ public class ServiceRequestService {
                 .freelancerAttachments(parseAttachmentUrls(request.getFreelancerAttachments()))
                 .freelancerAttachmentDetails(parseFreelancerAttachmentDetails(request.getFreelancerAttachments()))
                 .responseAttachments(parseAttachmentUrls(request.getResponseAttachments()))
+                .milestones(parseResponseMilestones(request.getResponseMilestones()))
                 .createdAt(request.getCreatedAt())
                 .updatedAt(request.getUpdatedAt())
                 .build();

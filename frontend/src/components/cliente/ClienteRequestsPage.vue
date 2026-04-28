@@ -51,6 +51,7 @@ import Textarea from '../ui/textarea.vue';
 import Label from '../ui/label.vue';
 import WorkModelBadge from '../shared/WorkModelBadge.vue';
 import { useClientRequestStore, type ServiceRequest } from '@/stores/clientRequestStore';
+import { useCategoryCatalogStore } from '@/stores/categoryCatalogStore';
 import { useServiceRequestWebSocket } from '@/composables/useServiceRequestWebSocket';
 import { formatApiDate, getApiDateTimestamp } from '@/utils/apiDate';
 import { toast } from '@/utils/toast';
@@ -64,6 +65,7 @@ interface Props {
 
 const props = defineProps<Props>();
 const store = useClientRequestStore();
+const categoryCatalogStore = useCategoryCatalogStore();
 
 const searchQuery = ref('');
 const categoryFilter = ref('all');
@@ -80,7 +82,10 @@ const showCreateDialog = ref(false);
 const isCreating = ref(false);
 const newRequest = ref({
   service: '',
+  categoryId: null as number | null,
+  subcategoryId: null as number | null,
   category: '',
+  subcategory: '',
   description: '',
   budget: 20,
   deadline: '',
@@ -97,7 +102,22 @@ const cancelReason = ref('');
 // WebSocket
 let wsConnection: any = null;
 
-const categories = ['Eletricista', 'Encanador', 'Pintor', 'Pedreiro', 'Designer', 'Desenvolvedor'];
+const legacyCategories = ['Eletricista', 'Encanador', 'Pintor', 'Pedreiro', 'Designer', 'Desenvolvedor'];
+const categories = computed(() =>
+  categoryCatalogStore.activePublicCategories.length > 0
+    ? categoryCatalogStore.activePublicCategories.map((category) => category.name)
+    : legacyCategories
+);
+const catalogCategories = computed(() => categoryCatalogStore.activePublicCategories);
+const selectedSubcategories = computed(() =>
+  categoryCatalogStore.getSubcategoriesByCategoryId(newRequest.value.categoryId)
+);
+const selectedCategoryLabel = computed(
+  () => catalogCategories.value.find((category) => category.id === newRequest.value.categoryId)?.name || ''
+);
+const selectedSubcategoryLabel = computed(
+  () => selectedSubcategories.value.find((subcategory) => subcategory.id === newRequest.value.subcategoryId)?.name || ''
+);
 
 // Mapeamento de valores de ordenação para português
 const sortOptions = {
@@ -175,6 +195,7 @@ const matchesSelectedTimeFilter = (dateValue?: string | null) => {
 };
 
 onMounted(() => {
+  categoryCatalogStore.loadPublicCategories();
   store.loadRequests();
 
   // Conectar WebSocket
@@ -263,6 +284,33 @@ const handleServiceRequestNotification = (event: any) => {
   }
 };
 
+watch(
+  () => newRequest.value.categoryId,
+  (categoryId) => {
+    const selectedCategory = catalogCategories.value.find((category) => category.id === categoryId);
+    newRequest.value.category = selectedCategory?.name || '';
+
+    const subcategoryStillValid = selectedSubcategories.value.some(
+      (subcategory) => subcategory.id === newRequest.value.subcategoryId
+    );
+
+    if (!subcategoryStillValid) {
+      newRequest.value.subcategoryId = null;
+      newRequest.value.subcategory = '';
+    }
+  }
+);
+
+watch(
+  () => newRequest.value.subcategoryId,
+  (subcategoryId) => {
+    const selectedSubcategory = selectedSubcategories.value.find(
+      (subcategory) => subcategory.id === subcategoryId
+    );
+    newRequest.value.subcategory = selectedSubcategory?.name || '';
+  }
+);
+
 const filteredRequests = computed(() => {
   let filtered = store.requests.filter((request) => {
     const matchesSearch =
@@ -348,7 +396,10 @@ const handleViewDetails = (request: ServiceRequest) => {
 const handleOpenCreateDialog = () => {
   newRequest.value = {
     service: '',
+    categoryId: null,
+    subcategoryId: null,
     category: '',
+    subcategory: '',
     description: '',
     budget: 20,
     deadline: '',
@@ -364,8 +415,12 @@ const handleCreateRequest = async () => {
     toast.error('Informe o serviço desejado');
     return;
   }
-  if (!newRequest.value.category) {
+  if (!newRequest.value.categoryId) {
     toast.error('Selecione uma categoria');
+    return;
+  }
+  if (selectedSubcategories.value.length > 0 && !newRequest.value.subcategoryId) {
+    toast.error('Selecione uma subcategoria');
     return;
   }
   if (!newRequest.value.description.trim()) {
@@ -401,7 +456,10 @@ const handleCreateRequest = async () => {
   try {
     const result = await store.createRequest({
       service: newRequest.value.service,
+      categoryId: newRequest.value.categoryId,
+      subcategoryId: newRequest.value.subcategoryId,
       category: newRequest.value.category,
+      subcategory: newRequest.value.subcategory,
       description: newRequest.value.description,
       deadline: newRequest.value.deadline,
       workModel: newRequest.value.workModel as WorkModelValue,
@@ -869,13 +927,47 @@ watch(currentTab, () => {
 
           <div class="space-y-2">
             <Label for="category">Categoria *</Label>
-            <Select :model-value="newRequest.category" @update:model-value="(val: string) => newRequest.category = val">
+            <Select
+              :model-value="newRequest.categoryId ? String(newRequest.categoryId) : ''"
+              @update:model-value="(val: string) => newRequest.categoryId = val ? Number(val) : null"
+            >
               <SelectTrigger>
-                <SelectValue placeholder="Selecione a categoria" />
+                <SelectValue
+                  :label="selectedCategoryLabel || undefined"
+                  placeholder="Selecione a categoria"
+                />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem v-for="cat in categories" :key="cat" :value="cat">
-                  {{ cat }}
+                <SelectItem v-for="category in catalogCategories" :key="category.id" :value="String(category.id)">
+                  {{ category.name }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div class="space-y-2">
+            <Label for="subcategory">
+              Subcategoria
+              <span v-if="selectedSubcategories.length > 0" class="text-red-500">*</span>
+            </Label>
+            <Select
+              :model-value="newRequest.subcategoryId ? String(newRequest.subcategoryId) : ''"
+              @update:model-value="(val: string) => newRequest.subcategoryId = val ? Number(val) : null"
+              :disabled="!newRequest.categoryId || selectedSubcategories.length === 0"
+            >
+              <SelectTrigger>
+                <SelectValue
+                  :label="selectedSubcategoryLabel || undefined"
+                  :placeholder="selectedSubcategories.length > 0 ? 'Selecione a subcategoria' : 'Escolha uma categoria primeiro'"
+                />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem
+                  v-for="subcategory in selectedSubcategories"
+                  :key="subcategory.id"
+                  :value="String(subcategory.id)"
+                >
+                  {{ subcategory.name }}
                 </SelectItem>
               </SelectContent>
             </Select>
@@ -893,7 +985,7 @@ watch(currentTab, () => {
           </div>
 
           <div class="rounded-lg border border-blue-100 bg-blue-50/60 p-3 text-sm text-[#435574]">
-            O valor nao e informado nesta etapa. Descreva o escopo e o freelancer enviara o orcamento depois.
+            O valor não é informado nesta etapa. Descreva o escopo e o freelancer enviará o orçamento depois.
           </div>
 
           <div class="grid grid-cols-2 gap-4">

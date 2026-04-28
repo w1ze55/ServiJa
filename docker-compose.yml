@@ -1,14 +1,37 @@
 services:
+  mysql:
+    image: mysql:8.0
+    container_name: servija_mysql
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-servija_db}
+      MYSQL_USER: ${LOCAL_DB_USER:-servija_user}
+      MYSQL_PASSWORD: ${LOCAL_DB_PASS:-servija_pass}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-servija_root}
+    ports:
+      - "4306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - frontend_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
     container_name: servija_backend
+    depends_on:
+      mysql:
+        condition: service_healthy
     environment:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-local}
-      SPRING_DATASOURCE_URL: ${SERVIJA_DB_URL}
-      SPRING_DATASOURCE_USERNAME: ${SERVIJA_DB_USER}
-      SPRING_DATASOURCE_PASSWORD: ${SERVIJA_DB_PASS}
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-servija_db}?useSSL=false&serverTimezone=America/Sao_Paulo&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: ${LOCAL_DB_USER:-servija_user}
+      SPRING_DATASOURCE_PASSWORD: ${LOCAL_DB_PASS:-servija_pass}
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRATION: ${JWT_EXPIRATION:-86400000}
       MAIL_HOST: ${MAIL_HOST}
@@ -16,6 +39,12 @@ services:
       MAIL_USERNAME: ${MAIL_USERNAME}
       MAIL_PASSWORD: ${MAIL_PASSWORD}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
+      SERVIJA_ADMIN_BOOTSTRAP_ENABLED: ${SERVIJA_ADMIN_BOOTSTRAP_ENABLED:-false}
+      SERVIJA_ADMIN_BOOTSTRAP_NAME: ${SERVIJA_ADMIN_BOOTSTRAP_NAME:-}
+      SERVIJA_ADMIN_BOOTSTRAP_EMAIL: ${SERVIJA_ADMIN_BOOTSTRAP_EMAIL:-}
+      SERVIJA_ADMIN_BOOTSTRAP_PASSWORD: ${SERVIJA_ADMIN_BOOTSTRAP_PASSWORD:-}
+      SERVIJA_ADMIN_BOOTSTRAP_CPF: ${SERVIJA_ADMIN_BOOTSTRAP_CPF:-}
+      SERVIJA_ADMIN_BOOTSTRAP_PHONE: ${SERVIJA_ADMIN_BOOTSTRAP_PHONE:-}
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
       AWS_S3_REGION: ${AWS_S3_REGION}
@@ -54,3 +83,6 @@ services:
 networks:
   frontend_network:
     driver: bridge
+
+volumes:
+  mysql_data:

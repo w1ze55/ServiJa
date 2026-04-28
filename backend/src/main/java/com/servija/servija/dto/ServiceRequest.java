@@ -14,7 +14,10 @@ import java.util.List;
 @AllArgsConstructor
 public class ServiceRequest {
     private String title;
+    private Long categoryId;
+    private Long subcategoryId;
     private String category;
+    private String subcategory;
     private String description;
     private BigDecimal price;
     private String priceType; // FIXED, HOURLY, DAILY

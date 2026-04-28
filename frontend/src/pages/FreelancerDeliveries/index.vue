@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router';
 import MainLayout from '@/components/layout/MainLayout.vue';
-import FreelancerDeliveriesPage from '@/components/freelancer/FreelancerDeliveriesPage.vue';
+import FreelancerProjectsPage from '@/components/freelancer/FreelancerProjectsPage.vue';
 import { useNavigation } from '@/utils/navigation';
 import { ref, onMounted } from 'vue';
 
@@ -13,7 +13,7 @@ onMounted(() => {
   const userData = localStorage.getItem('user');
   if (userData) {
     user.value = JSON.parse(userData);
-    if (user.value.type !== 'provider') router.push('/cliente-dashboard');
+    if (user.value.type !== 'provider') router.push('/cliente-home');
   } else {
     router.push('/login');
   }
@@ -26,6 +26,6 @@ const handleSearch = (query: string) => router.push({ path: '/search', query: { 
 
 <template>
   <MainLayout v-if="user" :user="user" current-page="freelancer-deliveries" :on-navigate="handleNavigate" :on-logout="handleLogout" :on-search="handleSearch">
-    <FreelancerDeliveriesPage :on-navigate="handleNavigate" />
+    <FreelancerProjectsPage :on-navigate="handleNavigate" />
   </MainLayout>
 </template>
