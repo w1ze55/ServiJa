@@ -17,7 +17,7 @@ import SettingsPage from "@/pages/Settings/index.vue";
 import FreelancerServicesPage from "@/pages/FreelancerServices/index.vue";
 import FreelancerProposalsPage from "@/pages/FreelancerProposals/index.vue";
 import FreelancerRequestDetailPage from "@/pages/FreelancerRequestDetail/index.vue";
-import FreelancerDeliveriesPage from "@/pages/FreelancerDeliveries/index.vue";
+import FreelancerDeliveriesRoutePage from "@/pages/FreelancerDeliveries/index.vue";
 import FreelancerProjectDetailPage from "@/pages/FreelancerProjectDetail/index.vue";
 import FreelancerWalletPage from "@/pages/FreelancerWallet/index.vue";
 
@@ -180,7 +180,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: "/freelancer-deliveries",
     name: "freelancer-deliveries",
-    component: FreelancerDeliveriesPage,
+    component: FreelancerDeliveriesRoutePage,
     meta: { requiresAuth: true, userType: "provider" },
   },
   {

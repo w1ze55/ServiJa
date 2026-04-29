@@ -49,7 +49,7 @@ const adjustmentStore = useDeliveryAdjustmentStore();
 
 const searchQuery = ref('');
 const categoryFilter = ref('all');
-const currentTab = ref<'active' | 'need_action' | 'completed'>('active');
+const currentTab = ref<'in_progress' | 'need_action' | 'awaiting_approval'>('in_progress');
 
 let wsConnection: ReturnType<typeof useServiceRequestWebSocket> | null = null;
 
@@ -80,7 +80,7 @@ const getMilestoneProgress = (project: Proposal) => {
     return Math.round((completed / milestones.length) * 100);
   }
 
-  if (project.status === 'completed' || project.status === 'delivered') {
+  if (project.status === 'delivered') {
     return 100;
   }
 
@@ -91,21 +91,21 @@ const getProjectAmount = (project: Proposal) => project.freelancerResponse?.valu
 
 const allProjects = computed(() =>
   proposalStore.proposals.filter((project) =>
-    ['in_progress', 'delivered', 'completed'].includes(project.status)
+    ['in_progress', 'delivered'].includes(project.status)
   )
 );
 
 const stats = computed(() => {
-  const activeProjects = allProjects.value.filter(
-    (project) => project.status === 'in_progress' || project.status === 'delivered'
+  const projectsAwaitingApproval = allProjects.value.filter(
+    (project) => project.status === 'delivered' && !hasPendingAdjustment(project)
   );
-  const projectsNeedingAction = activeProjects.filter((project) => hasPendingAdjustment(project));
+  const projectsNeedingAction = allProjects.value.filter((project) => hasPendingAdjustment(project));
 
   return {
-    inProgress: activeProjects.filter((project) => project.status === 'in_progress').length,
+    inProgress: allProjects.value.filter((project) => project.status === 'in_progress').length,
     needAction: projectsNeedingAction.length,
-    completed: allProjects.value.filter((project) => project.status === 'completed').length,
-    totalPipeline: activeProjects.reduce((sum, project) => sum + getProjectAmount(project), 0),
+    awaitingApproval: projectsAwaitingApproval.length,
+    totalPipeline: allProjects.value.reduce((sum, project) => sum + getProjectAmount(project), 0),
   };
 });
 
@@ -140,14 +140,6 @@ const getProjectStatusMeta = (project: Proposal) => {
     };
   }
 
-  if (project.status === 'completed') {
-    return {
-      label: 'Concluído',
-      class: 'bg-teal-100 text-teal-700',
-      step: 'Projeto concluído com sucesso',
-    };
-  }
-
   return {
     label: 'Em andamento',
     class: 'bg-blue-100 text-blue-700',
@@ -164,11 +156,11 @@ const filteredProjects = computed(() => {
     const matchesCategory = categoryFilter.value === 'all' || project.category === categoryFilter.value;
 
     const matchesTab =
-      currentTab.value === 'active'
-        ? project.status === 'in_progress' || project.status === 'delivered'
+      currentTab.value === 'in_progress'
+        ? project.status === 'in_progress'
         : currentTab.value === 'need_action'
           ? hasPendingAdjustment(project)
-          : project.status === 'completed';
+          : project.status === 'delivered' && !hasPendingAdjustment(project);
 
     return matchesSearch && matchesCategory && matchesTab;
   });
@@ -293,8 +285,8 @@ onUnmounted(() => {
             <CheckCircle class="h-6 w-6 text-green-600" />
           </div>
           <div>
-            <p class="text-sm text-[#435574]">Concluídos</p>
-            <p class="text-2xl font-bold text-[#263238]">{{ stats.completed }}</p>
+            <p class="text-sm text-[#435574]">Aguardando aprovação</p>
+            <p class="text-2xl font-bold text-[#263238]">{{ stats.awaitingApproval }}</p>
           </div>
         </div>
       </Card>
@@ -342,14 +334,14 @@ onUnmounted(() => {
 
     <Tabs v-model="currentTab">
       <TabsList class="grid w-full grid-cols-3">
-        <TabsTrigger value="active">
+        <TabsTrigger value="in_progress">
           Em andamento ({{ stats.inProgress }})
         </TabsTrigger>
         <TabsTrigger value="need_action">
           Requer ação ({{ stats.needAction }})
         </TabsTrigger>
-        <TabsTrigger value="completed">
-          Concluídos ({{ stats.completed }})
+        <TabsTrigger value="awaiting_approval">
+          Aguardando aprovação ({{ stats.awaitingApproval }})
         </TabsTrigger>
       </TabsList>
 
@@ -364,7 +356,7 @@ onUnmounted(() => {
           <p class="text-[#435574]">
             {{ searchQuery || categoryFilter !== 'all'
               ? 'Tente ajustar os filtros de busca.'
-              : 'Seus projetos ativos e Concluídos aparecerao aqui.' }}
+              : 'Seus projetos em andamento, com ajustes pendentes e aguardando aprovação aparecerão aqui.' }}
           </p>
         </Card>
 
