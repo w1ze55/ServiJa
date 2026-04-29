@@ -60,12 +60,12 @@ const handleFavoriteClick = (e: MouseEvent) => {
     @click="handleCardClick"
   >
     <!-- Service Image -->
-    <div class="relative h-40 bg-gradient-to-br from-[#286AD8]/10 to-[#435574]/10 overflow-hidden">
+    <div class="relative h-48 bg-gradient-to-br from-[#286AD8]/10 to-[#435574]/10 overflow-hidden">
       <img
         v-if="service.images && service.images.length > 0"
         :src="service.images[0]"
         :alt="service.title"
-        class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+        class="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-300"
       />
       <div v-else class="w-full h-full flex items-center justify-center">
         <Briefcase class="h-12 w-12 text-[#286AD8]/30" />
@@ -90,13 +90,19 @@ const handleFavoriteClick = (e: MouseEvent) => {
     </div>
 
     <!-- Content -->
-    <div class="p-4">
-      <h3 class="font-semibold text-[#263238] mb-1 line-clamp-1 group-hover:text-[#286AD8] transition-colors">
-        {{ service.title }}
-      </h3>
-      <Badge v-if="formatWorkModel(service.workModel)" variant="outline" class="mb-2 bg-white text-[#435574]">
-        {{ formatWorkModel(service.workModel) }}
-      </Badge>
+    <div class="p-4 flex min-h-[208px] flex-col">
+      <div class="mb-2 flex items-start justify-between gap-2">
+        <h3 class="min-w-0 flex-1 font-semibold text-[#263238] line-clamp-1 group-hover:text-[#286AD8] transition-colors">
+          {{ service.title }}
+        </h3>
+        <Badge
+          v-if="formatWorkModel(service.workModel)"
+          variant="outline"
+          class="shrink-0 bg-white text-[#435574]"
+        >
+          {{ formatWorkModel(service.workModel) }}
+        </Badge>
+      </div>
 
       <!-- Freelancer -->
       <div class="flex items-center justify-between gap-3 mb-3">
@@ -123,7 +129,7 @@ const handleFavoriteClick = (e: MouseEvent) => {
       <p class="text-sm text-[#435574] mb-3 line-clamp-2">{{ service.description }}</p>
 
       <!-- Footer -->
-      <div class="flex items-center justify-between pt-3 border-t border-gray-100">
+      <div class="mt-auto flex items-center justify-between pt-3 border-t border-gray-100">
         <div class="flex items-center gap-1 text-[#286AD8]">
           <DollarSign class="h-4 w-4" />
           <span class="font-bold text-sm">{{ getServicePriceDisplay(service) }}</span>

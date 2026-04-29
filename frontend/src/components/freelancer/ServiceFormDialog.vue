@@ -15,6 +15,7 @@ import SelectItem from '../ui/select-item.vue';
 import SelectTrigger from '../ui/select-trigger.vue';
 import SelectValue from '../ui/select-value.vue';
 import Badge from '../ui/badge.vue';
+import ImageUploadField from '../shared/ImageUploadField.vue';
 import { toast } from '../../utils/toast';
 import { uploadImages, deleteImage } from '../../api/uploadService';
 import { useCategoryCatalogStore } from '@/stores/categoryCatalogStore';
@@ -343,7 +344,7 @@ const uploadSelectedImages = async (files: File[]) => {
   }
 
   if (formData.value.images.length + files.length > 5) {
-    toast.error('MÃ¡ximo de 5 imagens permitido');
+    toast.error('Máximo de 5 imagens permitido');
     return;
   }
 
@@ -355,7 +356,7 @@ const uploadSelectedImages = async (files: File[]) => {
 
   const oversizedFiles = files.filter((file) => file.size > 10 * 1024 * 1024);
   if (oversizedFiles.length > 0) {
-    toast.error('Cada imagem deve ter no mÃ¡ximo 10MB');
+    toast.error('Cada imagem deve ter no máximo 10MB');
     return;
   }
 
@@ -385,98 +386,12 @@ const handleDragEnter = (e: DragEvent) => {
   isDragOver.value = true;
 };
 
-const handleDragOver = (e: DragEvent) => {
-  if (isUploading.value || !hasDraggedFiles(e)) {
-    return;
-  }
-
-  isDragOver.value = true;
-};
-
-const handleDragLeave = () => {
-  if (isUploading.value) {
-    return;
-  }
-
-  dragCounter.value = Math.max(dragCounter.value - 1, 0);
-  if (dragCounter.value === 0) {
-    isDragOver.value = false;
-  }
-};
-
-const handleImageDrop = async (e: DragEvent) => {
-  dragCounter.value = 0;
-  isDragOver.value = false;
-
-  if (isUploading.value || !hasDraggedFiles(e)) {
-    return;
-  }
-
-  const files = Array.from(e.dataTransfer?.files || []);
-  await uploadSelectedImages(files);
-};
-
-const handleImageUpload = async (e: Event) => {
-  const target = e.target as HTMLInputElement;
-  const files = target.files ? Array.from(target.files) : [];
-
-  try {
-    await uploadSelectedImages(files);
-  } finally {
-    // Limpar o input para permitir novo upload do mesmo arquivo
-    target.value = '';
-  }
-
-  return;
-  /*
-  if (files && files.length > 0) {
-    // Verificar limite de 5 imagens
-    if (formData.value.images.length + files.length > 5) {
-      toast.error('Máximo de 5 imagens permitido');
-      return;
-    }
-
-    // Validar tamanho dos arquivos (10MB max)
-    const fileArray = Array.from(files);
-    const oversizedFiles = fileArray.filter((file) => file.size > 10 * 1024 * 1024);
-    if (oversizedFiles.length > 0) {
-      toast.error('Cada imagem deve ter no máximo 10MB');
-      return;
-    }
-
-    isUploading.value = true;
-    try {
-      const uploadedUrls = await uploadImages(fileArray);
-      handleInputChange('images', [...formData.value.images, ...uploadedUrls]);
-      toast.success(`${files.length} imagem(ns) enviada(s) com sucesso`);
-    } catch (error) {
-      console.error('Erro ao fazer upload:', error);
-      toast.error('Erro ao enviar imagem(ns). Tente novamente.');
-    } finally {
-      isUploading.value = false;
-      // Limpar o input para permitir novo upload do mesmo arquivo
-      target.value = '';
-    }
-  }
-  */
-};
-
-const handleRemoveImage = async (index: number) => {
-  const imageUrl = formData.value.images[index];
-  
-  // Remover da lista local imediatamente
-  handleInputChange(
-    'images',
-    formData.value.images.filter((_, i) => i !== index)
-  );
-
-  // Tentar deletar do servidor (não bloqueia a UI)
+const handleRemovedImage = async (imageUrl: string) => {
   if (imageUrl && !imageUrl.startsWith('blob:')) {
     try {
       await deleteImage(imageUrl);
     } catch (error) {
       console.error('Erro ao deletar imagem do servidor:', error);
-      // Não mostrar erro ao usuário pois a imagem já foi removida da lista
     }
   }
 };
@@ -702,69 +617,14 @@ const handleRemoveImage = async (index: number) => {
         </div>
 
         <!-- Upload de Imagens -->
-        <div class="space-y-2">
-          <Label for="images">
-            Imagens do Serviço <span class="text-gray-400">(opcional)</span>
-          </Label>
-          <div 
-            class="border-2 border-dashed rounded-lg p-6 transition-colors"
-            :class="isUploading || isDragOver ? 'border-[#286AD8] bg-blue-50' : 'border-gray-300 hover:border-[#286AD8]'"
-            @dragenter.prevent="handleDragEnter"
-            @dragover.prevent="handleDragOver"
-            @dragleave.prevent="handleDragLeave"
-            @drop.prevent="handleImageDrop"
-          >
-            <label
-              v-if="!isUploading"
-              for="images"
-              class="flex min-h-32 w-full flex-col items-center justify-center cursor-pointer"
-            >
-              <Upload class="h-10 w-10 text-gray-400 mb-2" />
-              <p class="text-sm text-gray-600 text-center">
-                Clique para fazer upload ou arraste as imagens aqui
-              </p>
-              <p class="text-xs text-gray-400 mt-1">
-                PNG, JPG até 10MB (máximo 5 imagens)
-              </p>
-              <input
-                id="images"
-                type="file"
-                accept="image/*"
-                multiple
-                class="hidden"
-                @change="handleImageUpload"
-                :disabled="isUploading"
-              />
-            </label>
-            <div v-else class="flex flex-col items-center justify-center">
-              <Loader2 class="h-10 w-10 text-[#286AD8] mb-2 animate-spin" />
-              <p class="text-sm text-[#286AD8] text-center">
-                Enviando imagens...
-              </p>
-            </div>
-          </div>
-
-          <div v-if="formData.images.length > 0" class="grid grid-cols-3 md:grid-cols-5 gap-3 mt-3">
-            <div
-              v-for="(image, index) in formData.images"
-              :key="index"
-              class="relative group"
-            >
-              <img
-                :src="image"
-                :alt="`Preview ${index + 1}`"
-                class="w-full h-24 object-cover rounded-lg"
-              />
-              <button
-                type="button"
-                @click="handleRemoveImage(index)"
-                class="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-              >
-                <X class="h-3 w-3" />
-              </button>
-            </div>
-          </div>
-        </div>
+        <ImageUploadField
+          label="Imagens do Serviço (opcional)"
+          helper-text="PNG, JPG até 10MB (máximo 5 imagens)"
+          :max-files="5"
+          :model-value="formData.images"
+          @update:model-value="(urls) => handleInputChange('images', urls)"
+          @image-removed="handleRemovedImage"
+        />
 
         <!-- Buttons -->
         <div class="flex justify-end gap-3 pt-4 border-t">

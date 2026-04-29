@@ -773,7 +773,7 @@ Arquivos centrais:
 |---|---|---|
 | `/freelancer-proposals` | `FreelancerProposalsPage.vue` | Lista solicitações recebidas e negociações. |
 | `/freelancer-proposal-detail` | `FreelancerRequestDetailPage.vue` | Envia proposta, responde contraproposta, atualiza marcos e marca entrega. |
-| `/freelancer-deliveries` | `FreelancerDeliveriesPage.vue` | Lista entregas/projetos em execução. |
+| `/freelancer-deliveries` | `FreelancerProjectsPage.vue` | Lista entregas/projetos em execução. |
 | `/freelancer-project-detail` | `FreelancerProjectDetailPage.vue` | Acompanhamento detalhado pelo freelancer. |
 | `/freelancer-wallet` | `FreelancerWalletPage.vue` | Carteira e recebimentos do freelancer. |
 

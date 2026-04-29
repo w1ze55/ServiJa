@@ -1120,7 +1120,7 @@ const getLinkLabel = (link: ProfessionalLink) => {
 
         <div v-else class="space-y-4">
           <div>
-            <p class="text-sm text-[#435574] mb-1">Tipo de Serviço</p>
+            <p class="text-sm text-[#435574] mb-1">Categoria de Serviço</p>
             <div class="flex items-center gap-2">
               <Wrench class="h-4 w-4 text-[#286AD8]" />
               <span class="text-[#263238]">{{ profileData.serviceType || 'Não definido' }}</span>
