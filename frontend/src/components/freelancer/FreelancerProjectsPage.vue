@@ -293,11 +293,6 @@ onUnmounted(() => {
           Acompanhe o progresso dos serviços aceitos e finalize suas entregas.
         </p>
       </div>
-
-      <Button variant="outline" @click="handleRefresh">
-        <RefreshCw class="h-4 w-4 mr-2" />
-        Atualizar
-      </Button>
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
