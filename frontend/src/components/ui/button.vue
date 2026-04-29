@@ -4,8 +4,8 @@ import { computed } from "vue";
 import { buttonVariants } from "./button-variants";
 
 interface Props {
-  variant?: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link';
-  size?: 'default' | 'sm' | 'lg' | 'icon';
+  variant?: 'default' | 'destructive' | 'success' | 'warning' | 'outline' | 'secondary' | 'ghost' | 'link';
+  size?: 'default' | 'sm' | 'lg' | 'xl' | 'icon';
   asChild?: boolean;
   class?: string;
   [key: string]: any;

@@ -34,7 +34,7 @@ onMounted(async () => {
 });
 
 const handleBackToDashboard = () => {
-  router.push('/cliente-dashboard');
+  router.push('/cliente-home');
 };
 
 const handleDownloadReceipt = async () => {
@@ -132,7 +132,8 @@ const handleDownloadReceipt = async () => {
           <Button
             @click="handleDownloadReceipt"
             :disabled="isDownloadingReceipt"
-            class="w-full bg-[#286AD8] hover:bg-[#435574]"
+            variant="default"
+            class="w-full"
             size="lg"
           >
             <Loader2 v-if="isDownloadingReceipt" class="h-5 w-5 mr-2 animate-spin" />

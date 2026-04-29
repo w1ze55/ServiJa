@@ -105,10 +105,6 @@
   text-decoration: underline;
 }
 
-.login-page-submit-button {
-  width: 100%;
-}
-
 .login-page-signup-wrapper {
   margin-top: 1.5rem;
   text-align: center;
@@ -118,42 +114,9 @@
   color: rgb(75, 85, 99);
 }
 
-.login-page-signup-button {
-  color: rgb(37, 99, 235);
-  background: none;
-  border: none;
-  cursor: pointer;
-  transition: color 0.2s;
-}
-
-.login-page-signup-button:hover {
-  color: rgb(29, 78, 216);
-  text-decoration: underline;
-}
-
 .login-page-back-wrapper {
   margin-top: 1rem;
   text-align: center;
 }
-
-.login-page-back-button {
-  font-size: 0.875rem;
-  color: rgb(107, 114, 128);
-  background: none;
-  border: none;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.25rem;
-  margin: 0 auto;
-  transition: color 0.2s;
-}
-
-.login-page-back-button:hover {
-  color: rgb(55, 65, 81);
-}
-
-
 
 

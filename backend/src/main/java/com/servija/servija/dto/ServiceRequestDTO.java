@@ -1,13 +1,15 @@
 package com.servija.servija.dto;
 
-import jakarta.validation.constraints.*;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import java.util.List;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 @Data
 @Builder
@@ -15,28 +17,30 @@ import java.math.BigDecimal;
 @AllArgsConstructor
 public class ServiceRequestDTO {
 
-    @NotBlank(message = "O nome do serviço é obrigatório")
+    @NotBlank(message = "O nome do servico e obrigatorio")
     private String serviceName;
 
-    @NotBlank(message = "A categoria é obrigatória")
+    private Long categoryId;
+
+    private Long subcategoryId;
+
     private String category;
 
-    @NotBlank(message = "A descrição é obrigatória")
+    private String subcategory;
+
+    @NotBlank(message = "A descricao e obrigatoria")
     private String description;
 
-    @NotNull(message = "O orçamento é obrigatório")
-    @DecimalMin(value = "5.00", message = "O orçamento mínimo é R$ 5,00")
-    @DecimalMax(value = "1000000.00", message = "O orçamento máximo é R$ 1.000.000,00")
     private BigDecimal budget;
 
-    @NotBlank(message = "O prazo é obrigatório")
-    @Size(max = 50, message = "O prazo deve ter no máximo 50 caracteres")
+    @NotBlank(message = "O prazo e obrigatorio")
+    @Size(max = 50, message = "O prazo deve ter no maximo 50 caracteres")
     private String deadline;
 
-    @Pattern(regexp = "^(PRESENCIAL|REMOTO|HIBRIDO)$", message = "Modelo de trabalho inválido")
+    @Pattern(regexp = "^(PRESENCIAL|REMOTO|HIBRIDO)$", message = "Modelo de trabalho invalido")
     private String workModel;
 
-    @Size(max = 500, message = "O endereço deve ter no máximo 500 caracteres")
+    @Size(max = 500, message = "O endereco deve ter no maximo 500 caracteres")
     private String address;
 
     private String desiredDate;

@@ -4,6 +4,7 @@ import com.servija.servija.model.Payment;
 import com.servija.servija.model.ServiceRequest;
 import com.servija.servija.model.User;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -36,4 +37,12 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
             String paymentMethod,
             List<Payment.PaymentStatus> statuses,
             java.math.BigDecimal totalAmount);
+
+    @Query("""
+            select distinct p.asaasCustomerId
+            from Payment p
+            where p.asaasCustomerId is not null
+              and p.asaasCustomerId <> ''
+            """)
+    List<String> findDistinctAsaasCustomerIds();
 }

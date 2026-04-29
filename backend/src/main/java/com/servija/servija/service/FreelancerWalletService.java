@@ -116,4 +116,28 @@ public class FreelancerWalletService {
 
         return wallet.getAvailableBalance().compareTo(amount) >= 0;
     }
+
+    /**
+     * Retorna saldo da carteira como Map para uso em APIs e relatórios
+     */
+    public java.util.Map<String, BigDecimal> getWalletBalance(String email) {
+        FreelancerWallet wallet = getOrCreateWallet(email);
+        java.util.Map<String, BigDecimal> balance = new java.util.HashMap<>();
+        balance.put("availableBalance", wallet.getAvailableBalance());
+        balance.put("pendingBalance", wallet.getPendingBalance());
+        balance.put("totalEarned", wallet.getTotalEarned());
+        balance.put("totalWithdrawn", wallet.getTotalWithdrawn());
+        return balance;
+    }
+
+    /**
+     * Move saldo pendente para disponível por email (usado pelo scheduler)
+     */
+    @Transactional
+    public void releasePendingToAvailable(String email, BigDecimal amount) {
+        FreelancerWallet wallet = getOrCreateWallet(email);
+        wallet.movePendingToAvailable(amount);
+        walletRepository.save(wallet);
+        log.info("Saldo liberado (auto-release): R$ {} para {}", amount, email);
+    }
 }

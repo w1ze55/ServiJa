@@ -70,6 +70,13 @@ public class User implements UserDetails {
     @Column
     private LocalDateTime resetPasswordTokenExpiry;
 
+    @Column(nullable = false)
+    @lombok.Builder.Default
+    private Integer resetPasswordAttempts = 0;
+
+    @Column
+    private LocalDateTime resetPasswordLockUntil;
+
     @Lob
     @Column(columnDefinition = "MEDIUMTEXT")
     private String avatarUrl; // Armazena base64 da imagem
@@ -88,7 +95,8 @@ public class User implements UserDetails {
 
     public enum UserType {
         CONTRACTOR,
-        FREELANCER
+        FREELANCER,
+        ADMIN
     }
 
     @Override

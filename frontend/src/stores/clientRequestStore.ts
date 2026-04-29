@@ -47,9 +47,12 @@ export interface ServiceRequest {
     freelancerAvatar?: string;
     freelancerLocation?: string;
     service: string;
+    categoryId?: number | null;
+    subcategoryId?: number | null;
     category: string;
+    subcategory?: string;
     description: string;
-    budget: number;
+    budget?: number | null;
     deadline: string;
     workModel?: WorkModelValue | null;
     status: 'pending' | 'sent' | 'negotiating' | 'accepted' | 'in_progress' | 'delivered' | 'rejected' | 'completed' | 'cancelled';
@@ -72,9 +75,11 @@ export interface ServiceRequest {
 export interface CreateServiceRequestInput {
     freelancerId?: string;
     service: string;
+    categoryId?: number | null;
+    subcategoryId?: number | null;
     category: string;
+    subcategory?: string;
     description: string;
-    budget: number;
     deadline: string;
     workModel: WorkModelValue;
     address?: string;
@@ -175,6 +180,11 @@ export const useClientRequestStore = defineStore('clientRequest', () => {
         ...req,
         id: String(req.id),
         service: req.serviceName,
+        categoryId: req.categoryId ?? null,
+        subcategoryId: req.subcategoryId ?? null,
+        category: req.categoryLabel || req.category || '',
+        subcategory: req.subcategoryLabel || req.subcategory || '',
+        budget: req.budget ?? existingRequest?.budget ?? null,
         workModel: normalizeWorkModel(req.workModel),
         status: mapApiStatusToLocal(req.status),
         updatedAt: req.updatedAt || req.createdAt,
@@ -259,9 +269,11 @@ export const useClientRequestStore = defineStore('clientRequest', () => {
         try {
             const requestData = {
                 serviceName: input.service,
+                categoryId: input.categoryId,
+                subcategoryId: input.subcategoryId,
                 category: input.category,
+                subcategory: input.subcategory,
                 description: input.description,
-                budget: input.budget,
                 deadline: input.deadline,
                 workModel: input.workModel,
                 address: input.address,

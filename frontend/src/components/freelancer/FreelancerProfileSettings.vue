@@ -34,6 +34,7 @@ import { toast } from '@/utils/toast'
 import { formatCPF, formatPhone } from '@/utils/masks'
 import { useUserStore } from '@/stores/userStore'
 import { uploadAvatar } from '@/api/uploadService'
+import { dispatchUserLocationUpdated } from '@/utils/userLocationCache'
 
 const userStore = useUserStore()
 
@@ -54,6 +55,17 @@ interface Address {
   state: string
   zipCode: string
   isDefault: boolean
+}
+
+const syncSidebarUserLocation = () => {
+  const userId = userStore.user?.id
+
+  if (!userId) {
+    return
+  }
+
+  const primaryAddress = addresses.value.find((address) => address.isDefault) || addresses.value[0] || null
+  dispatchUserLocationUpdated(userId, primaryAddress)
 }
 
 const isEditingPersonal = ref(false)
@@ -363,6 +375,7 @@ const handleSetDefaultAddress = async (addressId: string) => {
       ...addr,
       isDefault: addr.id === addressId,
     }))
+    syncSidebarUserLocation()
     toast.success('Endereço padrão atualizado')
   } catch (error: any) {
     const errorMessage = error.response?.data?.message || 'Erro ao definir endereço padrão'
@@ -386,6 +399,7 @@ const reloadAddresses = async () => {
       zipCode: addr.zipCode,
       isDefault: addr.isDefault,
     }))
+    syncSidebarUserLocation()
   } catch (error) {
     console.error('Erro ao recarregar endereços:', error)
   }
@@ -393,11 +407,12 @@ const reloadAddresses = async () => {
 
 const handleDeleteAddress = async () => {
   if (addressToDelete.value) {
-    try {
-      await api.delete(`/addresses/${addressToDelete.value.id}`)
-      addresses.value = addresses.value.filter((addr) => addr.id !== addressToDelete.value!.id)
-      addressToDelete.value = null
-      toast.success('Endereço removido')
+      try {
+        await api.delete(`/addresses/${addressToDelete.value.id}`)
+        addresses.value = addresses.value.filter((addr) => addr.id !== addressToDelete.value!.id)
+        syncSidebarUserLocation()
+        addressToDelete.value = null
+        toast.success('Endereço removido')
     } catch (error: any) {
       const errorMessage = error.response?.data?.message || 'Erro ao remover endereço'
       toast.error(errorMessage)
@@ -735,7 +750,6 @@ const getInitials = (name: string) => {
           <div class="flex gap-2 pt-4">
             <Button 
               @click="handleSavePersonalData" 
-              class="bg-[#286AD8] hover:bg-[#435574]"
               :disabled="isSavingPersonal"
             >
               <Check class="h-4 w-4 mr-2" />
@@ -834,7 +848,6 @@ const getInitials = (name: string) => {
           <div class="flex gap-2 pt-4">
             <Button 
               @click="handleSavePassword" 
-              class="bg-[#286AD8] hover:bg-[#435574]"
               :disabled="isSavingPassword"
             >
               <Check class="h-4 w-4 mr-2" />
@@ -879,7 +892,7 @@ const getInitials = (name: string) => {
               <div class="flex-1">
                 <div class="flex items-center gap-2 mb-2">
                   <h4 class="font-medium text-[#263238]">{{ address.label }}</h4>
-                  <span v-if="address.isDefault" class="text-xs bg-[#286AD8] text-white px-2 py-0.5 rounded">
+                  <span v-if="address.isDefault" class="text-xs bg-primary text-white px-2 py-0.5 rounded">
                     Padrão
                   </span>
                 </div>
@@ -940,7 +953,7 @@ const getInitials = (name: string) => {
               incluindo histórico de serviços, avaliações e mensagens. Esta ação não pode ser desfeita.
             </p>
           </div>
-          <Button @click="showDeleteDialog = true" variant="destructive" class="bg-red-600 hover:bg-red-700">
+          <Button @click="showDeleteDialog = true" variant="destructive">
             <Trash2 class="h-4 w-4 mr-2" />
             Excluir Conta
           </Button>
@@ -1111,7 +1124,6 @@ const getInitials = (name: string) => {
           <AlertDialogCancel @click="closeAddressDialog">Cancelar</AlertDialogCancel>
           <AlertDialogAction
             @click="handleSaveAddress"
-            class="bg-[#286AD8] hover:bg-[#435574]"
             :disabled="isSavingAddress"
           >
             {{ isSavingAddress ? 'Salvando...' : (editingAddress ? 'Salvar Alterações' : 'Adicionar') }}
@@ -1132,7 +1144,7 @@ const getInitials = (name: string) => {
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel @click="addressToDelete = null">Cancelar</AlertDialogCancel>
-          <AlertDialogAction @click="handleDeleteAddress" class="bg-red-600 hover:bg-red-700">
+          <AlertDialogAction @click="handleDeleteAddress" class="bg-destructive hover:bg-destructive/90">
             Sim, Remover
           </AlertDialogAction>
         </AlertDialogFooter>
@@ -1167,7 +1179,7 @@ const getInitials = (name: string) => {
           <AlertDialogCancel @click="showDeleteDialog = false">Cancelar</AlertDialogCancel>
           <AlertDialogAction
             @click="showDeleteDialog = false; showDeleteConfirmation = true"
-            class="bg-red-600 hover:bg-red-700"
+            class="bg-destructive hover:bg-destructive/90"
           >
             Prosseguir com Exclusão
           </AlertDialogAction>
@@ -1195,7 +1207,7 @@ const getInitials = (name: string) => {
           <AlertDialogCancel @click="showDeleteConfirmation = false; deletePassword = ''">Cancelar</AlertDialogCancel>
           <AlertDialogAction 
             @click="handleDeleteAccount" 
-            class="bg-red-600 hover:bg-red-700"
+            class="bg-destructive hover:bg-destructive/90"
             :disabled="isDeletingAccount"
           >
             {{ isDeletingAccount ? 'Excluindo...' : 'Confirmar Exclusão' }}

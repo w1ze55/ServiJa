@@ -4,7 +4,6 @@ import {
   ArrowLeft,
   Calendar,
   MapPin,
-  DollarSign,
   Clock,
   FileText,
   Download,
@@ -90,6 +89,7 @@ const isLoading = ref(false);
 const proposal = ref<Proposal | null>(null);
 
 const MAX_EXECUTION_DAYS = 365;
+const PLATFORM_FEE_PERCENTAGE = 0.05;
 
 const proposalForm = ref({
   value: '',
@@ -103,8 +103,6 @@ const milestones = ref<Array<Omit<Milestone, 'status'> & { status?: Milestone['s
 const milestoneForm = ref({
   title: '',
   description: '',
-  deadline: '',
-  value: '',
 });
 const showAddMilestone = ref(false);
 
@@ -286,7 +284,8 @@ const getInitials = (name: string) => {
     .slice(0, 2);
 };
 
-const formatCurrency = (value: string | number) => {
+const formatCurrency = (value?: string | number | null) => {
+  if (value == null) return 'A combinar';
   if (typeof value === 'number') {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
@@ -313,6 +312,15 @@ const parseCurrencyValue = (value: string): number => {
   const numbers = value.replace(/[^\d,]/g, '').replace(',', '.');
   return parseFloat(numbers) || 0;
 };
+
+const roundCurrency = (value: number) => Math.round(value * 100) / 100;
+
+const proposalGrossValue = computed(() => parseCurrencyValue(proposalForm.value.value));
+const proposalPlatformFee = computed(() => roundCurrency(proposalGrossValue.value * PLATFORM_FEE_PERCENTAGE));
+const proposalNetValue = computed(() =>
+  roundCurrency(Math.max(0, proposalGrossValue.value - proposalPlatformFee.value))
+);
+const shouldShowProposalNetValue = computed(() => proposalGrossValue.value > 0);
 
 const handleExecutionDaysInput = (value: string) => {
   const clean = value.replace(/\D/g, '');
@@ -392,37 +400,24 @@ const validateProposal = () => {
     errors.push(`Prazo de execução não pode ser maior que ${MAX_EXECUTION_DAYS} dias`);
   }
 
-  if (milestones.value.length > 0) {
-    const milestonesTotal = milestones.value.reduce((sum, m) => {
-      const mValue = parseCurrencyValue(String(m.value));
-      return sum + (isNaN(mValue) ? 0 : mValue);
-    }, 0);
-
-    if (Math.abs(milestonesTotal - value) > 0.01) {
-      errors.push('A soma dos valores dos marcos deve ser igual ao valor total da proposta');
-    }
-  }
-
   return errors;
 };
 
 const handleAddMilestone = () => {
-  if (!milestoneForm.value.title || !milestoneForm.value.deadline || !milestoneForm.value.value) {
-    toast.error('Preencha todos os campos obrigatórios do marco');
+  if (!milestoneForm.value.title.trim()) {
+    toast.error('Informe o título do marco');
     return;
   }
 
   const newMilestone = {
     id: Date.now().toString(),
-    title: milestoneForm.value.title,
-    description: milestoneForm.value.description,
-    deadline: milestoneForm.value.deadline,
-    value: parseCurrencyValue(milestoneForm.value.value),
+    title: milestoneForm.value.title.trim(),
+    description: milestoneForm.value.description.trim(),
     status: 'pending' as const,
   };
 
   milestones.value = [...milestones.value, newMilestone];
-  milestoneForm.value = { title: '', description: '', deadline: '', value: '' };
+  milestoneForm.value = { title: '', description: '' };
   showAddMilestone.value = false;
   toast.success('Marco adicionado com sucesso');
 };
@@ -707,18 +702,10 @@ const getStatusBadge = (currentProposal: Proposal) => {
             <Button
               v-if="(proposal.status === 'pending' || proposal.status === 'negotiating') && !proposal.freelancerResponse"
               @click="showSendProposalDialog = true"
-              class="bg-[#286AD8] hover:bg-[#435574]"
+              variant="default"
             >
               <Send class="h-4 w-4 mr-2" />
-              {{ proposal.freelancerResponse ? 'Atualizar Proposta' : 'Enviar Proposta' }}
-            </Button>
-            <Button
-              v-if="proposal.status === 'in_progress'"
-              @click="showCompleteDialog = true"
-              class="bg-green-600 hover:bg-green-700"
-            >
-              <CheckCircle class="h-4 w-4 mr-2" />
-              Marcar como Entregue
+              {{ proposal.freelancerResponse ? 'Atualizar Orçamento' : 'Enviar Orçamento' }}
             </Button>
           </div>
         </div>
@@ -778,7 +765,7 @@ const getStatusBadge = (currentProposal: Proposal) => {
           Mensagens
           <Badge
             v-if="clientMessagesCount > 0"
-            class="ml-1 bg-[#286AD8] text-white text-xs"
+            class="ml-1 bg-primary text-white text-xs"
           >
             {{ clientMessagesCount }}
           </Badge>
@@ -851,7 +838,8 @@ const getStatusBadge = (currentProposal: Proposal) => {
               <Button
                 @click="handleAcceptCounterProposal"
                 :disabled="isLoading"
-                class="flex-1 min-w-[150px] bg-green-600 hover:bg-green-700"
+                variant="success"
+                class="flex-1 min-w-[150px]"
               >
                 <Check class="h-4 w-4 mr-2" />
                 Aceitar Contra Proposta
@@ -860,7 +848,7 @@ const getStatusBadge = (currentProposal: Proposal) => {
                 @click="showRejectCounterDialog = true"
                 variant="outline"
                 :disabled="isLoading"
-                class="flex-1 min-w-[150px] border-[#286AD8] text-[#286AD8] hover:bg-blue-50"
+                class="flex-1 min-w-[150px]"
               >
                 <XCircle class="h-4 w-4 mr-2" />
                 Manter Proposta Inicial
@@ -936,35 +924,6 @@ const getStatusBadge = (currentProposal: Proposal) => {
                       <p v-if="milestone.description" class="text-sm text-[#435574] mb-2">
                         {{ milestone.description }}
                       </p>
-                      <div class="flex items-center gap-4 text-sm text-[#435574]">
-                        <span class="flex items-center gap-1">
-                          <Calendar class="h-4 w-4" />
-                          {{ new Date(milestone.deadline).toLocaleDateString('pt-BR') }}
-                        </span>
-                        <span class="flex items-center gap-1">
-                          <DollarSign class="h-4 w-4" />
-                          {{ formatCurrency(milestone.value) }}
-                        </span>
-                      </div>
-                    </div>
-                    <div v-if="proposal.status === 'accepted' || proposal.status === 'in_progress'" class="flex gap-2">
-                      <Button
-                        v-if="milestone.status === 'pending'"
-                        @click="handleUpdateMilestoneStatus(milestone.id, 'in_progress')"
-                        size="sm"
-                        variant="outline"
-                      >
-                        Iniciar
-                      </Button>
-                      <Button
-                        v-if="milestone.status === 'in_progress'"
-                        @click="handleUpdateMilestoneStatus(milestone.id, 'completed')"
-                        size="sm"
-                        class="bg-green-600 hover:bg-green-700"
-                      >
-                        <Check class="h-3 w-3 mr-1" />
-                        Concluir
-                      </Button>
                     </div>
                   </div>
                 </Card>
@@ -1047,6 +1006,7 @@ const getStatusBadge = (currentProposal: Proposal) => {
           :messages="proposal.messages || []"
           current-user-role="freelancer"
           :is-locked="proposal.status !== 'in_progress' && proposal.status !== 'delivered'"
+          :service-status="proposal.status"
           :is-sending="isSendingMessage"
           @send-message="handleSendMessage"
         />
@@ -1141,9 +1101,9 @@ const getStatusBadge = (currentProposal: Proposal) => {
     <Dialog :open="showSendProposalDialog" @update:open="(val) => showSendProposalDialog = val">
       <DialogContent class="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{{ proposal?.freelancerResponse ? 'Atualizar Proposta' : 'Enviar Proposta' }}</DialogTitle>
+          <DialogTitle>{{ proposal?.freelancerResponse ? 'Atualizar Orçamento' : 'Enviar Orçamento' }}</DialogTitle>
           <DialogDescription>
-            Preencha os detalhes da sua proposta para este serviço
+            Preencha os detalhes do seu orçamento para este serviço
           </DialogDescription>
         </DialogHeader>
 
@@ -1158,6 +1118,17 @@ const getStatusBadge = (currentProposal: Proposal) => {
                 @update:model-value="(val) => proposalForm.value = handleCurrencyInput(val as string)"
                 placeholder="R$ 0,00"
               />
+              <div
+                v-if="shouldShowProposalNetValue"
+                class="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm"
+              >
+                <p class="text-gray-600 mb-1">
+                  Valor a receber: {{ formatCurrency(proposalNetValue) }}
+                </p>
+                <p class="text-gray-600">
+                  Já considerando 5% da plataforma ({{ formatCurrency(proposalPlatformFee) }}).
+                </p>
+              </div>
             </div>
 
             <div class="space-y-2">
@@ -1223,18 +1194,6 @@ const getStatusBadge = (currentProposal: Proposal) => {
                   placeholder="Descrição do marco"
                   :rows="2"
                 />
-                <div class="grid grid-cols-2 gap-3">
-                  <Input
-                    type="date"
-                    :model-value="milestoneForm.deadline"
-                    @update:model-value="(val) => milestoneForm.deadline = val as string"
-                  />
-                  <Input
-                    :model-value="milestoneForm.value"
-                    @update:model-value="(val) => milestoneForm.value = handleCurrencyInput(val as string)"
-                    placeholder="Valor do marco"
-                  />
-                </div>
                 <div class="flex gap-2">
                   <Button @click="handleAddMilestone" size="sm" class="flex-1">
                     Adicionar
@@ -1267,16 +1226,6 @@ const getStatusBadge = (currentProposal: Proposal) => {
                     <p v-if="milestone.description" class="text-sm text-[#435574] mb-2">
                       {{ milestone.description }}
                     </p>
-                    <div class="flex items-center gap-4 text-sm text-[#435574]">
-                      <span class="flex items-center gap-1">
-                        <Calendar class="h-4 w-4" />
-                        {{ new Date(milestone.deadline).toLocaleDateString('pt-BR') }}
-                      </span>
-                      <span class="flex items-center gap-1">
-                        <DollarSign class="h-4 w-4" />
-                        {{ formatCurrency(milestone.value) }}
-                      </span>
-                    </div>
                   </div>
                   <Button
                     @click="handleRemoveMilestone(milestone.id)"
@@ -1328,7 +1277,7 @@ const getStatusBadge = (currentProposal: Proposal) => {
           <Button @click="showSendProposalDialog = false" variant="outline">
             Cancelar
           </Button>
-          <Button @click="handlePrepareProposal" class="bg-[#286AD8] hover:bg-[#435574]">
+          <Button @click="handlePrepareProposal" variant="default">
             <Send class="h-4 w-4 mr-2" />
             Enviar Proposta
           </Button>
@@ -1345,6 +1294,12 @@ const getStatusBadge = (currentProposal: Proposal) => {
             Você está prestes a enviar uma proposta de
             <strong>{{ proposalForm.value }}</strong> com prazo de
             <strong>{{ proposalForm.executionDays }} dias</strong>.
+            <template v-if="shouldShowProposalNetValue">
+              <br />
+              <br />
+              Valor a receber após a taxa da plataforma (5%):
+              <strong>{{ formatCurrency(proposalNetValue) }}</strong>.
+            </template>
             <template v-if="milestones.length > 0">
               <br />
               <br />
@@ -1360,7 +1315,6 @@ const getStatusBadge = (currentProposal: Proposal) => {
           <AlertDialogCancel @click="showConfirmDialog = false">Revisar</AlertDialogCancel>
           <AlertDialogAction
             @click="handleConfirmSendProposal"
-            class="bg-[#286AD8] hover:bg-[#435574]"
             :disabled="isLoading"
           >
             {{ isLoading ? 'Enviando...' : 'Confirmar Envio' }}
@@ -1394,7 +1348,7 @@ const getStatusBadge = (currentProposal: Proposal) => {
           <Button @click="showRejectDialog = false" variant="outline">
             Cancelar
           </Button>
-          <Button @click="handleRejectProposal" class="bg-red-600 hover:bg-red-700" :disabled="isLoading">
+          <Button @click="handleRejectProposal" variant="destructive" :disabled="isLoading">
             {{ isLoading ? 'Recusando...' : 'Confirmar Recusa' }}
           </Button>
         </DialogFooter>
@@ -1426,7 +1380,7 @@ const getStatusBadge = (currentProposal: Proposal) => {
           <Button @click="showRejectCounterDialog = false" variant="outline">
             Cancelar
           </Button>
-          <Button @click="handleRejectCounterProposal" class="bg-[#286AD8] hover:bg-[#435574] text-white" :disabled="isLoading">
+          <Button @click="handleRejectCounterProposal" variant="default" :disabled="isLoading">
             {{ isLoading ? 'Enviando...' : 'Confirmar e Manter Inicial' }}
           </Button>
         </DialogFooter>
@@ -1448,7 +1402,6 @@ const getStatusBadge = (currentProposal: Proposal) => {
           <AlertDialogCancel @click="showCompleteDialog = false">Cancelar</AlertDialogCancel>
           <AlertDialogAction
             @click="handleCompleteProposal"
-            class="bg-[#286AD8] hover:bg-[#435574]"
             :disabled="isLoading"
           >
             {{ isLoading ? 'Enviando...' : 'Confirmar Entrega' }}

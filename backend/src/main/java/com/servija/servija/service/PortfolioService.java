@@ -14,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -29,6 +30,7 @@ public class PortfolioService {
     private final FreelancerService freelancerService;
     private final FileStorageService fileStorageService;
     private final ObjectMapper objectMapper;
+    private final CategoryCatalogService categoryCatalogService;
 
     @Transactional(readOnly = true)
     public List<PortfolioProjectResponse> getProjects() {
@@ -58,12 +60,15 @@ public class PortfolioService {
     @Transactional
     public PortfolioProjectResponse createProject(PortfolioProjectRequest request) {
         Freelancer freelancer = freelancerService.getCurrentFreelancer();
+        CategoryCatalogService.CategorySelection categorySelection = resolveRequiredSelection(request);
 
         PortfolioProject project = PortfolioProject.builder()
                 .freelancer(freelancer)
                 .title(request.getTitle())
                 .description(request.getDescription())
-                .category(request.getCategory())
+                .category(categorySelection.getCategoryLabel())
+                .serviceCategory(categorySelection.getCategory())
+                .serviceSubcategory(categorySelection.getSubcategory())
                 .videoUrl(request.getVideoUrl())
                 .projectUrl(request.getProjectUrl())
                 .completedDate(request.getCompletedDate())
@@ -121,9 +126,6 @@ public class PortfolioService {
         if (request.getDescription() != null) {
             project.setDescription(request.getDescription());
         }
-        if (request.getCategory() != null) {
-            project.setCategory(request.getCategory());
-        }
         if (request.getTags() != null) {
             try {
                 project.setTags(objectMapper.writeValueAsString(request.getTags()));
@@ -145,6 +147,13 @@ public class PortfolioService {
         }
         if (request.getFeatured() != null) {
             project.setFeatured(request.getFeatured());
+        }
+
+        if (hasCategorySelection(request)) {
+            CategoryCatalogService.CategorySelection categorySelection = resolveRequiredSelection(request);
+            project.setCategory(categorySelection.getCategoryLabel());
+            project.setServiceCategory(categorySelection.getCategory());
+            project.setServiceSubcategory(categorySelection.getSubcategory());
         }
 
         // Atualizar imagens (remover antigas e adicionar novas)
@@ -242,7 +251,19 @@ public class PortfolioService {
                 .id(project.getId())
                 .title(project.getTitle())
                 .description(project.getDescription())
+                .categoryId(project.getServiceCategory() != null ? project.getServiceCategory().getId() : null)
+                .categorySlug(project.getServiceCategory() != null ? project.getServiceCategory().getSlug() : null)
+                .categoryLabel(project.getServiceCategory() != null ? project.getServiceCategory().getName()
+                        : project.getCategory())
                 .category(project.getCategory())
+                .subcategoryId(
+                        project.getServiceSubcategory() != null ? project.getServiceSubcategory().getId() : null)
+                .subcategorySlug(
+                        project.getServiceSubcategory() != null ? project.getServiceSubcategory().getSlug() : null)
+                .subcategoryLabel(
+                        project.getServiceSubcategory() != null ? project.getServiceSubcategory().getName() : null)
+                .subcategory(
+                        project.getServiceSubcategory() != null ? project.getServiceSubcategory().getName() : null)
                 .tags(tags)
                 .videoUrl(project.getVideoUrl())
                 .projectUrl(project.getProjectUrl())
@@ -251,5 +272,24 @@ public class PortfolioService {
                 .featured(project.getFeatured())
                 .images(images)
                 .build();
+    }
+
+    private boolean hasCategorySelection(PortfolioProjectRequest request) {
+        return request.getCategoryId() != null
+                || request.getSubcategoryId() != null
+                || StringUtils.hasText(request.getCategory())
+                || StringUtils.hasText(request.getSubcategory());
+    }
+
+    private CategoryCatalogService.CategorySelection resolveRequiredSelection(PortfolioProjectRequest request) {
+        return categoryCatalogService.resolveSelection(
+                request.getCategoryId(),
+                request.getSubcategoryId(),
+                request.getCategory(),
+                request.getSubcategory(),
+                true,
+                true,
+                false,
+                false);
     }
 }

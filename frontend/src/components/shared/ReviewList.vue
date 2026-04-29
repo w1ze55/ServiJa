@@ -7,6 +7,7 @@ import Avatar from '@/components/ui/avatar.vue';
 import AvatarImage from '@/components/ui/avatar-image.vue';
 import AvatarFallback from '@/components/ui/avatar-fallback.vue';
 import Button from '@/components/ui/button.vue';
+import AiReviewSummary from '../freelancer/AiReviewSummary.vue';
 
 export interface ReviewItem {
   id: number;
@@ -20,6 +21,7 @@ export interface ReviewItem {
 
 interface Props {
   reviews: ReviewItem[];
+  freelancerId?: string | number;
   isLoading?: boolean;
   pageSize?: number;
 }
@@ -140,6 +142,7 @@ const formatDate = (dateStr: string) =>
           </div>
         </div>
       </Card>
+      <AiReviewSummary :freelancer-id="String(props.freelancerId)" />
 
       <!-- Individual reviews -->
       <div class="space-y-4">
@@ -191,10 +194,7 @@ const formatDate = (dateStr: string) =>
             :variant="currentPage === page ? 'default' : 'outline'"
             size="sm"
             @click="goToPage(page)"
-            :class="[
-              'h-9 w-9 p-0',
-              currentPage === page ? 'bg-[#286AD8] hover:bg-[#286AD8]/90' : 'hover:bg-gray-100'
-            ]"
+            class="h-9 w-9 p-0"
           >
             {{ page }}
           </Button>
@@ -219,7 +219,7 @@ const formatDate = (dateStr: string) =>
 
     <!-- Empty reviews -->
     <Card v-else class="p-10 text-center">
-      <Award class="h-10 w-10 text-gray-200 mx-auto mb-3" />
+      <Star class="h-10 w-10 text-gray-200 mx-auto mb-3" />
       <p class="font-medium text-[#263238]">Ainda sem avaliações</p>
       <p class="text-sm text-[#435574] mt-1">Este serviço ainda não foi avaliado. Seja o primeiro!</p>
     </Card>

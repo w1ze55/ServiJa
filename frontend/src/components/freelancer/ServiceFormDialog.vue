@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { X, Upload, Plus, Loader2 } from 'lucide-vue-next';
 import Dialog from '../ui/dialog.vue';
 import DialogContent from '../ui/dialog-content.vue';
@@ -15,14 +15,18 @@ import SelectItem from '../ui/select-item.vue';
 import SelectTrigger from '../ui/select-trigger.vue';
 import SelectValue from '../ui/select-value.vue';
 import Badge from '../ui/badge.vue';
+import ImageUploadField from '../shared/ImageUploadField.vue';
 import { toast } from '../../utils/toast';
 import { uploadImages, deleteImage } from '../../api/uploadService';
-import { CATEGORIES } from '@/constants/categories';
+import { useCategoryCatalogStore } from '@/stores/categoryCatalogStore';
 
 export interface ServiceFormData {
   id?: string;
+  categoryId?: number | null;
+  subcategoryId?: number | null;
   title: string;
   category: string;
+  subcategory?: string;
   description: string;
   price: number;
   priceType: 'fixo' | 'hora' | 'dia';
@@ -41,6 +45,7 @@ interface Props {
 }
 
 const props = defineProps<Props>();
+const categoryCatalogStore = useCategoryCatalogStore();
 
 const WORK_MODELS = [
   { value: 'presencial', label: 'Presencial' },
@@ -50,8 +55,11 @@ const WORK_MODELS = [
 
 const formData = ref<ServiceFormData>({
   id: props.service?.id,
+  categoryId: props.service?.categoryId ?? null,
+  subcategoryId: props.service?.subcategoryId ?? null,
   title: props.service?.title || '',
   category: props.service?.category || '',
+  subcategory: props.service?.subcategory || '',
   description: props.service?.description || '',
   price: props.service?.price || 0,
   priceType: props.service?.priceType || 'fixo',
@@ -65,15 +73,29 @@ const formData = ref<ServiceFormData>({
 const tagInput = ref('');
 const errors = ref<Record<string, string>>({});
 const isUploading = ref(false);
+const isDragOver = ref(false);
+const dragCounter = ref(0);
 
-const categories = CATEGORIES;
+const categories = computed(() => categoryCatalogStore.activePublicCategories);
+const selectedSubcategories = computed(() =>
+  categoryCatalogStore.getSubcategoriesByCategoryId(formData.value.categoryId || null)
+);
+const selectedCategoryLabel = computed(
+  () => categories.value.find((category) => category.id === formData.value.categoryId)?.name || ''
+);
+const selectedSubcategoryLabel = computed(
+  () => selectedSubcategories.value.find((subcategory) => subcategory.id === formData.value.subcategoryId)?.name || ''
+);
 
 watch(() => props.service, (newService) => {
   if (newService) {
     formData.value = {
       id: newService.id,
+      categoryId: newService.categoryId ?? null,
+      subcategoryId: newService.subcategoryId ?? null,
       title: newService.title || '',
       category: newService.category || '',
+      subcategory: newService.subcategory || '',
       description: newService.description || '',
       price: newService.price || 0,
       priceType: newService.priceType || 'fixo',
@@ -87,6 +109,10 @@ watch(() => props.service, (newService) => {
   }
 }, { immediate: true });
 
+onMounted(() => {
+  categoryCatalogStore.loadPublicCategories();
+});
+
 watch(() => props.open, (isOpen) => {
   if (!isOpen) {
     handleClose();
@@ -98,6 +124,37 @@ watch(() => formData.value.category, () => {
   if (errors.value.category) {
     const newErrors = { ...errors.value };
     delete newErrors.category;
+    errors.value = newErrors;
+  }
+});
+
+watch(() => formData.value.categoryId, (categoryId) => {
+  const selectedCategory = categories.value.find((category) => category.id === categoryId);
+  formData.value.category = selectedCategory?.name || '';
+
+  const subcategoryStillValid = selectedSubcategories.value.some(
+    (subcategory) => subcategory.id === formData.value.subcategoryId
+  );
+
+  if (!subcategoryStillValid) {
+    formData.value.subcategoryId = null;
+    formData.value.subcategory = '';
+  }
+
+  if (errors.value.category) {
+    const newErrors = { ...errors.value };
+    delete newErrors.category;
+    errors.value = newErrors;
+  }
+});
+
+watch(() => formData.value.subcategoryId, (subcategoryId) => {
+  const selectedSubcategory = selectedSubcategories.value.find((subcategory) => subcategory.id === subcategoryId);
+  formData.value.subcategory = selectedSubcategory?.name || '';
+
+  if (errors.value.subcategory) {
+    const newErrors = { ...errors.value };
+    delete newErrors.subcategory;
     errors.value = newErrors;
   }
 });
@@ -205,8 +262,12 @@ const validateForm = () => {
     newErrors.title = 'Título deve ter no máximo 50 caracteres';
   }
 
-  if (!formData.value.category) {
+  if (!formData.value.categoryId) {
     newErrors.category = 'Categoria é obrigatória';
+  }
+
+  if (selectedSubcategories.value.length > 0 && !formData.value.subcategoryId) {
+    newErrors.subcategory = 'Subcategoria é obrigatória';
   }
 
   if (!formData.value.description.trim()) {
@@ -241,15 +302,27 @@ const handleSubmit = (e: Event) => {
     return;
   }
 
-  props.onSubmit(formData.value);
+  const selectedCategory = categories.value.find((category) => category.id === formData.value.categoryId);
+  const selectedSubcategory = selectedSubcategories.value.find(
+    (subcategory) => subcategory.id === formData.value.subcategoryId
+  );
+
+  props.onSubmit({
+    ...formData.value,
+    category: selectedCategory?.name || formData.value.category,
+    subcategory: selectedSubcategory?.name || formData.value.subcategory,
+  });
   handleClose();
 };
 
 const handleClose = () => {
   formData.value = {
     id: undefined,
+    categoryId: null,
+    subcategoryId: null,
     title: '',
     category: '',
+    subcategory: '',
     description: '',
     price: 0,
     priceType: 'fixo',
@@ -265,56 +338,60 @@ const handleClose = () => {
   props.onClose();
 };
 
-const handleImageUpload = async (e: Event) => {
-  const target = e.target as HTMLInputElement;
-  const files = target.files;
-  if (files && files.length > 0) {
-    // Verificar limite de 5 imagens
-    if (formData.value.images.length + files.length > 5) {
-      toast.error('Máximo de 5 imagens permitido');
-      return;
-    }
+const uploadSelectedImages = async (files: File[]) => {
+  if (files.length === 0 || isUploading.value) {
+    return;
+  }
 
-    // Validar tamanho dos arquivos (10MB max)
-    const fileArray = Array.from(files);
-    const oversizedFiles = fileArray.filter((file) => file.size > 10 * 1024 * 1024);
-    if (oversizedFiles.length > 0) {
-      toast.error('Cada imagem deve ter no máximo 10MB');
-      return;
-    }
+  if (formData.value.images.length + files.length > 5) {
+    toast.error('Máximo de 5 imagens permitido');
+    return;
+  }
 
-    isUploading.value = true;
-    try {
-      const uploadedUrls = await uploadImages(fileArray);
-      handleInputChange('images', [...formData.value.images, ...uploadedUrls]);
-      toast.success(`${files.length} imagem(ns) enviada(s) com sucesso`);
-    } catch (error) {
-      console.error('Erro ao fazer upload:', error);
-      toast.error('Erro ao enviar imagem(ns). Tente novamente.');
-    } finally {
-      isUploading.value = false;
-      // Limpar o input para permitir novo upload do mesmo arquivo
-      target.value = '';
-    }
+  const invalidFiles = files.filter((file) => !file.type.startsWith('image/'));
+  if (invalidFiles.length > 0) {
+    toast.error('Envie apenas arquivos de imagem');
+    return;
+  }
+
+  const oversizedFiles = files.filter((file) => file.size > 10 * 1024 * 1024);
+  if (oversizedFiles.length > 0) {
+    toast.error('Cada imagem deve ter no máximo 10MB');
+    return;
+  }
+
+  isUploading.value = true;
+  try {
+    const uploadedUrls = await uploadImages(files);
+    handleInputChange('images', [...formData.value.images, ...uploadedUrls]);
+    toast.success(`${files.length} imagem(ns) enviada(s) com sucesso`);
+  } catch (error) {
+    console.error('Erro ao fazer upload:', error);
+    toast.error('Erro ao enviar imagem(ns). Tente novamente.');
+  } finally {
+    isUploading.value = false;
   }
 };
 
-const handleRemoveImage = async (index: number) => {
-  const imageUrl = formData.value.images[index];
-  
-  // Remover da lista local imediatamente
-  handleInputChange(
-    'images',
-    formData.value.images.filter((_, i) => i !== index)
-  );
+const hasDraggedFiles = (e: DragEvent) => {
+  return Array.from(e.dataTransfer?.types || []).includes('Files');
+};
 
-  // Tentar deletar do servidor (não bloqueia a UI)
+const handleDragEnter = (e: DragEvent) => {
+  if (isUploading.value || !hasDraggedFiles(e)) {
+    return;
+  }
+
+  dragCounter.value += 1;
+  isDragOver.value = true;
+};
+
+const handleRemovedImage = async (imageUrl: string) => {
   if (imageUrl && !imageUrl.startsWith('blob:')) {
     try {
       await deleteImage(imageUrl);
     } catch (error) {
       console.error('Erro ao deletar imagem do servidor:', error);
-      // Não mostrar erro ao usuário pois a imagem já foi removida da lista
     }
   }
 };
@@ -357,18 +434,47 @@ const handleRemoveImage = async (index: number) => {
             Categoria <span class="text-red-500">*</span>
           </Label>
           <Select
-            v-model="formData.category"
+            :model-value="formData.categoryId ? String(formData.categoryId) : ''"
+            @update:model-value="(value) => handleInputChange('categoryId', value ? Number(value) : null)"
           >
             <SelectTrigger :class="errors.category ? 'border-red-500' : ''">
-              <SelectValue placeholder="Selecione uma categoria" />
+              <SelectValue
+                :label="selectedCategoryLabel || undefined"
+                placeholder="Selecione uma categoria"
+              />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem v-for="cat in categories" :key="cat.value" :value="cat.value">
-                {{ cat.label }}
+              <SelectItem v-for="cat in categories" :key="cat.id" :value="String(cat.id)">
+                {{ cat.name }}
               </SelectItem>
             </SelectContent>
           </Select>
           <p v-if="errors.category" class="text-sm text-red-500">{{ errors.category }}</p>
+        </div>
+
+        <div class="space-y-2">
+          <Label for="subcategory">
+            Subcategoria
+            <span v-if="selectedSubcategories.length > 0" class="text-red-500">*</span>
+          </Label>
+          <Select
+            :model-value="formData.subcategoryId ? String(formData.subcategoryId) : ''"
+            @update:model-value="(value) => handleInputChange('subcategoryId', value ? Number(value) : null)"
+            :disabled="!formData.categoryId || selectedSubcategories.length === 0"
+          >
+            <SelectTrigger :class="errors.subcategory ? 'border-red-500' : ''">
+              <SelectValue
+                :label="selectedSubcategoryLabel || undefined"
+                :placeholder="selectedSubcategories.length > 0 ? 'Selecione uma subcategoria' : 'Escolha uma categoria primeiro'"
+              />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem v-for="subcategory in selectedSubcategories" :key="subcategory.id" :value="String(subcategory.id)">
+                {{ subcategory.name }}
+              </SelectItem>
+            </SelectContent>
+          </Select>
+          <p v-if="errors.subcategory" class="text-sm text-red-500">{{ errors.subcategory }}</p>
         </div>
 
         <!-- Descrição -->
@@ -511,72 +617,21 @@ const handleRemoveImage = async (index: number) => {
         </div>
 
         <!-- Upload de Imagens -->
-        <div class="space-y-2">
-          <Label for="images">
-            Imagens do Serviço <span class="text-gray-400">(opcional)</span>
-          </Label>
-          <div 
-            class="border-2 border-dashed rounded-lg p-6 transition-colors"
-            :class="isUploading ? 'border-[#286AD8] bg-blue-50' : 'border-gray-300 hover:border-[#286AD8]'"
-          >
-            <label
-              v-if="!isUploading"
-              for="images"
-              class="flex flex-col items-center justify-center cursor-pointer"
-            >
-              <Upload class="h-10 w-10 text-gray-400 mb-2" />
-              <p class="text-sm text-gray-600 text-center">
-                Clique para fazer upload ou arraste as imagens aqui
-              </p>
-              <p class="text-xs text-gray-400 mt-1">
-                PNG, JPG até 10MB (máximo 5 imagens)
-              </p>
-              <input
-                id="images"
-                type="file"
-                accept="image/*"
-                multiple
-                class="hidden"
-                @change="handleImageUpload"
-                :disabled="isUploading"
-              />
-            </label>
-            <div v-else class="flex flex-col items-center justify-center">
-              <Loader2 class="h-10 w-10 text-[#286AD8] mb-2 animate-spin" />
-              <p class="text-sm text-[#286AD8] text-center">
-                Enviando imagens...
-              </p>
-            </div>
-          </div>
-
-          <div v-if="formData.images.length > 0" class="grid grid-cols-3 md:grid-cols-5 gap-3 mt-3">
-            <div
-              v-for="(image, index) in formData.images"
-              :key="index"
-              class="relative group"
-            >
-              <img
-                :src="image"
-                :alt="`Preview ${index + 1}`"
-                class="w-full h-24 object-cover rounded-lg"
-              />
-              <button
-                type="button"
-                @click="handleRemoveImage(index)"
-                class="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-              >
-                <X class="h-3 w-3" />
-              </button>
-            </div>
-          </div>
-        </div>
+        <ImageUploadField
+          label="Imagens do Serviço (opcional)"
+          helper-text="PNG, JPG até 10MB (máximo 5 imagens)"
+          :max-files="5"
+          :model-value="formData.images"
+          @update:model-value="(urls) => handleInputChange('images', urls)"
+          @image-removed="handleRemovedImage"
+        />
 
         <!-- Buttons -->
         <div class="flex justify-end gap-3 pt-4 border-t">
           <Button type="button" variant="outline" @click="handleClose">
             Cancelar
           </Button>
-          <Button type="submit" class="bg-[#286AD8] hover:bg-[#435574]">
+          <Button type="submit">
             {{ service?.id ? 'Salvar Alterações' : 'Cadastrar Serviço' }}
           </Button>
         </div>

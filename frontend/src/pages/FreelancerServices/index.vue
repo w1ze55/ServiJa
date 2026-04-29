@@ -40,11 +40,15 @@ import ServicePreviewModal from '@/components/freelancer/ServicePreviewModal.vue
 import { toast } from '@/utils/toast';
 import api from '@/api/config/axios';
 import { useNavigation } from '@/utils/navigation';
+import { useCategoryCatalogStore } from '@/stores/categoryCatalogStore';
 
 interface Service {
   id: string;
   title: string;
+  categoryId?: number | null;
+  subcategoryId?: number | null;
   category: string;
+  subcategory?: string;
   description: string;
   price: number;
   priceType: string;
@@ -65,6 +69,7 @@ interface ServiceStats {
 
 const router = useRouter();
 const { navigate, logout } = useNavigation();
+const categoryCatalogStore = useCategoryCatalogStore();
 
 // Obter usuário do localStorage
 const userString = localStorage.getItem('user');
@@ -87,7 +92,7 @@ const isLoading = ref(false);
 const services = ref<Service[]>([]);
 const stats = ref<ServiceStats>({ total: 0, active: 0, inactive: 0 });
 
-const categories = [
+const legacyCategories = [
   'Eletricista',
   'Encanador',
   'Pintor',
@@ -112,6 +117,11 @@ const categories = [
   'Arquiteto',
   'Outro',
 ];
+const categories = computed(() =>
+  categoryCatalogStore.activePublicCategories.length > 0
+    ? categoryCatalogStore.activePublicCategories.map((category) => category.name)
+    : legacyCategories
+);
 
 const normalizeWorkModel = (value?: string | null): 'presencial' | 'remoto' | 'hibrido' => {
   const normalized = value?.toUpperCase();
@@ -133,37 +143,44 @@ const getWorkModelLabel = (value: Service['workModel']) => {
 };
 
 // Carregar serviços da API
+const mapServiceResponse = (service: any): Service => {
+  const priceTypeMap: Record<string, string> = {
+    FIXED: 'fixo',
+    HOURLY: 'por hora',
+    DAILY: 'por dia',
+  };
+  const deliveryUnitMap: Record<string, string> = {
+    DAYS: 'dias',
+    WEEKS: 'semanas',
+    MONTHS: 'meses',
+  };
+
+  return {
+    id: String(service.id),
+    title: service.title,
+    categoryId: service.categoryId ?? null,
+    subcategoryId: service.subcategoryId ?? null,
+    category: service.categoryLabel || service.category || '',
+    subcategory: service.subcategoryLabel || service.subcategory || '',
+    description: service.description,
+    price: Number(service.price),
+    priceType: priceTypeMap[service.priceType] || 'fixo',
+    workModel: normalizeWorkModel(service.workModel),
+    deliveryTime: service.deliveryTime,
+    deliveryUnit: deliveryUnitMap[service.deliveryUnit] || 'dias',
+    tags: service.tags || [],
+    images: service.images || [],
+    isActive: service.isActive,
+    createdAt: service.createdAt,
+  };
+};
+
 const loadServices = async () => {
   isLoading.value = true;
   try {
     const response = await api.get('/services/my');
     // Mapear valores do backend para português
-    const priceTypeMap: Record<string, string> = {
-      'FIXED': 'fixo',
-      'HOURLY': 'por hora',
-      'DAILY': 'por dia',
-    };
-    const deliveryUnitMap: Record<string, string> = {
-      'DAYS': 'dias',
-      'WEEKS': 'semanas',
-      'MONTHS': 'meses',
-    };
-    
-    services.value = response.data.map((s: any) => ({
-      id: String(s.id),
-      title: s.title,
-      category: s.category,
-      description: s.description,
-      price: Number(s.price),
-      priceType: priceTypeMap[s.priceType] || 'fixo',
-      workModel: normalizeWorkModel(s.workModel),
-      deliveryTime: s.deliveryTime,
-      deliveryUnit: deliveryUnitMap[s.deliveryUnit] || 'dias',
-      tags: s.tags || [],
-      images: s.images || [],
-      isActive: s.isActive,
-      createdAt: s.createdAt,
-    }));
+    services.value = response.data.map(mapServiceResponse);
   } catch (error) {
     console.error('Erro ao carregar serviços:', error);
     toast.error('Erro ao carregar serviços');
@@ -284,7 +301,10 @@ const handleEditService = (serviceId: string) => {
     editingService.value = {
       id: service.id,
       title: service.title,
+      categoryId: service.categoryId ?? null,
+      subcategoryId: service.subcategoryId ?? null,
       category: service.category,
+      subcategory: service.subcategory || '',
       description: service.description,
       price: service.price,
       priceType: priceTypeMap[service.priceType] || 'fixo',
@@ -338,7 +358,10 @@ const handleServiceFormSubmit = async (formData: ServiceFormData) => {
     
     const payload = {
       title: formData.title,
+      categoryId: formData.categoryId,
+      subcategoryId: formData.subcategoryId,
       category: formData.category,
+      subcategory: formData.subcategory,
       description: formData.description,
       price: formData.price,
       priceType: priceTypeMap[formData.priceType] || 'FIXED',
@@ -354,76 +377,22 @@ const handleServiceFormSubmit = async (formData: ServiceFormData) => {
 
     if (formData.id) {
       // Atualizar
-      const response = await api.put(`/services/${formData.id}`, payload);
+      await api.put(`/services/${formData.id}`, payload);
       
       // Mapear valores do backend para português
-      const priceTypeMapResponse: Record<string, string> = {
-        'FIXED': 'fixo',
-        'HOURLY': 'por hora',
-        'DAILY': 'por dia',
-      };
-      const deliveryUnitMapResponse: Record<string, string> = {
-        'DAYS': 'dias',
-        'WEEKS': 'semanas',
-        'MONTHS': 'meses',
-      };
-      
-      services.value = services.value.map((s) =>
-        s.id === formData.id
-          ? {
-              ...s,
-              title: response.data.title,
-              category: response.data.category,
-              description: response.data.description,
-              price: Number(response.data.price),
-              priceType: priceTypeMapResponse[response.data.priceType] || 'fixo',
-              workModel: normalizeWorkModel(response.data.workModel),
-              deliveryTime: response.data.deliveryTime,
-              deliveryUnit: deliveryUnitMapResponse[response.data.deliveryUnit] || 'dias',
-              tags: response.data.tags || [],
-              images: response.data.images || [],
-              isActive: response.data.isActive,
-            }
-          : s
-      );
       toast.success('Serviço atualizado com sucesso');
     } else {
       // Criar
-      const response = await api.post('/services', payload);
+      await api.post('/services', payload);
       
       // Mapear valores do backend para português
-      const priceTypeMapResponse: Record<string, string> = {
-        'FIXED': 'fixo',
-        'HOURLY': 'por hora',
-        'DAILY': 'por dia',
-      };
-      const deliveryUnitMapResponse: Record<string, string> = {
-        'DAYS': 'dias',
-        'WEEKS': 'semanas',
-        'MONTHS': 'meses',
-      };
-      
-      services.value = [
-        {
-          id: String(response.data.id),
-          title: response.data.title,
-          category: response.data.category,
-          description: response.data.description,
-          price: Number(response.data.price),
-          priceType: priceTypeMapResponse[response.data.priceType] || 'fixo',
-          workModel: normalizeWorkModel(response.data.workModel),
-          deliveryTime: response.data.deliveryTime,
-          deliveryUnit: deliveryUnitMapResponse[response.data.deliveryUnit] || 'dias',
-          tags: response.data.tags || [],
-          images: response.data.images || [],
-          isActive: response.data.isActive,
-          createdAt: response.data.createdAt,
-        },
-        ...services.value,
-      ];
       toast.success('Novo serviço criado com sucesso');
     }
-    loadStats();
+    await Promise.all([
+      categoryCatalogStore.loadPublicCategories(),
+      loadServices(),
+      loadStats(),
+    ]);
   } catch (error) {
     console.error('Erro ao salvar serviço:', error);
     toast.error('Erro ao salvar serviço');
@@ -462,8 +431,11 @@ const handleLogout = () => {
 
 // Lifecycle
 onMounted(() => {
-  loadServices();
-  loadStats();
+  Promise.all([
+    categoryCatalogStore.loadPublicCategories(),
+    loadServices(),
+    loadStats(),
+  ]);
 });
 </script>
 
@@ -482,7 +454,7 @@ onMounted(() => {
           <h1 class="text-2xl font-bold text-[#263238] mb-2">Meus Serviços</h1>
           <p class="text-[#435574]">Gerencie os serviços que você oferece</p>
         </div>
-        <Button @click="handleAddService" class="bg-[#286AD8] hover:bg-[#435574]">
+        <Button variant="default" @click="handleAddService">
           <Plus class="h-4 w-4 mr-2" />
           Novo Serviço
         </Button>
@@ -587,8 +559,8 @@ onMounted(() => {
             </p>
             <Button
               v-if="!searchQuery && categoryFilter === 'Todos'"
+              variant="default"
               @click="handleAddService"
-              class="bg-[#286AD8] hover:bg-[#435574]"
             >
               <Plus class="h-4 w-4 mr-2" />
               Criar Primeiro Serviço
@@ -642,6 +614,9 @@ onMounted(() => {
                   <td class="px-6 py-4 whitespace-nowrap">
                     <div class="flex flex-wrap gap-2">
                       <Badge variant="secondary">{{ service.category }}</Badge>
+                      <Badge v-if="service.subcategory" variant="outline" class="bg-white text-[#435574]">
+                        {{ service.subcategory }}
+                      </Badge>
                       <Badge variant="outline" class="bg-white text-[#435574]">
                         {{ getWorkModelLabel(service.workModel) }}
                       </Badge>
@@ -725,6 +700,9 @@ onMounted(() => {
                 <div class="flex flex-wrap gap-2">
                   <Badge variant="secondary" class="text-xs">
                     {{ service.category }}
+                  </Badge>
+                  <Badge v-if="service.subcategory" variant="outline" class="text-xs bg-white text-[#435574]">
+                    {{ service.subcategory }}
                   </Badge>
                   <Badge variant="outline" class="text-xs bg-white text-[#435574]">
                     {{ getWorkModelLabel(service.workModel) }}
@@ -816,7 +794,6 @@ onMounted(() => {
               @click="currentPage = pageNum"
               :variant="currentPage === pageNum ? 'default' : 'outline'"
               size="sm"
-              :class="currentPage === pageNum ? 'bg-[#286AD8] hover:bg-[#435574]' : ''"
             >
               {{ pageNum }}
             </Button>
@@ -846,7 +823,7 @@ onMounted(() => {
             <AlertDialogCancel @click="serviceToDelete = null">Cancelar</AlertDialogCancel>
             <AlertDialogAction
               @click="handleDeleteService"
-              class="bg-red-600 hover:bg-red-700"
+              class="bg-destructive hover:bg-destructive/90"
             >
               Sim, Excluir
             </AlertDialogAction>
@@ -871,7 +848,7 @@ onMounted(() => {
             <AlertDialogCancel @click="serviceToToggle = null">Cancelar</AlertDialogCancel>
             <AlertDialogAction
               @click="handleToggleService"
-              class="bg-[#286AD8] hover:bg-[#435574]"
+              class="bg-primary hover:bg-primary/90"
             >
               Confirmar
             </AlertDialogAction>

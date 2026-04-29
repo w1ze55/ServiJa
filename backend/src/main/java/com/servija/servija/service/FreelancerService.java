@@ -6,31 +6,38 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.servija.servija.dto.FreelancerProfileRequest;
 import com.servija.servija.dto.FreelancerProfileResponse;
 import com.servija.servija.dto.NearbyFreelancerResponse;
+import com.servija.servija.dto.ProfessionalLinkResponse;
+import com.servija.servija.dto.ServiceCityRequest;
+import com.servija.servija.dto.ServiceCityResponse;
 import com.servija.servija.model.Address;
 import com.servija.servija.model.Freelancer;
+import com.servija.servija.model.ProfessionalLink;
+import com.servija.servija.model.ServiceCity;
+import com.servija.servija.model.ServiceSubcategory;
+import com.servija.servija.model.ServiceRequest;
 import com.servija.servija.model.User;
 import com.servija.servija.repository.AddressRepository;
 import com.servija.servija.repository.FreelancerRepository;
-import com.servija.servija.repository.UserRepository;
-import com.servija.servija.repository.ServiceRequestRepository;
 import com.servija.servija.repository.ReviewRepository;
-import com.servija.servija.model.ServiceRequest;
+import com.servija.servija.repository.ServiceRequestRepository;
+import com.servija.servija.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import com.servija.servija.dto.ServiceCityResponse;
-import com.servija.servija.dto.ProfessionalLinkResponse;
-import com.servija.servija.model.ServiceCity;
-import com.servija.servija.model.ProfessionalLink;
+import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -44,6 +51,8 @@ public class FreelancerService {
     private final ServiceRequestRepository serviceRequestRepository;
     private final ReviewRepository reviewRepository;
     private final ObjectMapper objectMapper;
+    private final CategoryCatalogService categoryCatalogService;
+    private final IbgeLocationService ibgeLocationService;
 
     @Transactional(readOnly = true)
     public FreelancerProfileResponse getProfile() {
@@ -77,9 +86,6 @@ public class FreelancerService {
         if (request.getProfession() != null) {
             freelancer.setProfessionalTitle(request.getProfession());
         }
-        if (request.getCategory() != null) {
-            freelancer.setCategory(request.getCategory());
-        }
         if (request.getBio() != null) {
             freelancer.setBio(request.getBio());
         }
@@ -88,7 +94,33 @@ public class FreelancerService {
         }
 
         // Atualizar configurações de serviço
-        if (request.getServiceType() != null) {
+        if (hasCategorySelection(request)) {
+            List<Long> requestedSubcategoryIds = normalizeSubcategoryIds(request);
+            CategoryCatalogService.CategorySelection categorySelection = categoryCatalogService.resolveSelection(
+                    request.getCategoryId(),
+                    requestedSubcategoryIds.isEmpty() ? request.getSubcategoryId() : requestedSubcategoryIds.get(0),
+                    request.getCategory(),
+                    request.getSubcategory(),
+                    true,
+                    requestedSubcategoryIds.isEmpty(),
+                    false,
+                    false);
+            List<ServiceSubcategory> resolvedSubcategories = resolveRequestedSubcategories(
+                    categorySelection,
+                    requestedSubcategoryIds);
+            ServiceSubcategory primarySubcategory = !resolvedSubcategories.isEmpty()
+                    ? resolvedSubcategories.get(0)
+                    : categorySelection.getSubcategory();
+
+            freelancer.setCategory(categorySelection.getCategoryLabel());
+            freelancer.setServiceCategory(categorySelection.getCategory());
+            freelancer.setServiceSubcategory(primarySubcategory);
+            freelancer.getServiceSubcategories().clear();
+            freelancer.getServiceSubcategories().addAll(resolvedSubcategories);
+            freelancer.setServiceType(StringUtils.hasText(request.getServiceType())
+                    ? request.getServiceType()
+                    : categorySelection.getCategoryLabel());
+        } else if (request.getServiceType() != null) {
             freelancer.setServiceType(request.getServiceType());
         }
         if (request.getCities() != null) {
@@ -101,11 +133,15 @@ public class FreelancerService {
 
         // Atualizar serviceCities (formato novo - entidades)
         if (request.getServiceCities() != null) {
+            List<NormalizedServiceCity> normalizedCities = validateAndNormalizeServiceCities(
+                    freelancer,
+                    request.getServiceCities());
+
             // Remover todas as cidades antigas
             freelancer.getServiceCities().clear();
 
             // Adicionar as novas cidades
-            for (ServiceCityResponse cityDto : request.getServiceCities()) {
+            for (NormalizedServiceCity cityDto : normalizedCities) {
                 ServiceCity serviceCity = ServiceCity.builder()
                         .freelancer(freelancer)
                         .city(cityDto.getCity())
@@ -229,13 +265,33 @@ public class FreelancerService {
         // Calcular média das avaliações e total de reviews a partir da tabela reviews
         Double averageRating = reviewRepository.findAverageRatingByReviewedId(freelancer.getId());
         long totalReviewsCount = reviewRepository.countByReviewedId(freelancer.getId());
+        List<ServiceSubcategory> freelancerSubcategories = getResolvedFreelancerSubcategories(freelancer);
+        ServiceSubcategory primarySubcategory = freelancer.getServiceSubcategory() != null
+                ? freelancer.getServiceSubcategory()
+                : (!freelancerSubcategories.isEmpty() ? freelancerSubcategories.get(0) : null);
 
         return FreelancerProfileResponse.builder()
                 .id(freelancer.getId())
                 .name(freelancer.getName())
                 .email(freelancer.getEmail())
                 .profession(freelancer.getProfessionalTitle())
+                .categoryId(freelancer.getServiceCategory() != null ? freelancer.getServiceCategory().getId() : null)
+                .categorySlug(
+                        freelancer.getServiceCategory() != null ? freelancer.getServiceCategory().getSlug() : null)
+                .categoryLabel(
+                        freelancer.getServiceCategory() != null ? freelancer.getServiceCategory().getName()
+                                : freelancer.getCategory())
                 .category(freelancer.getCategory())
+                .subcategoryId(primarySubcategory != null ? primarySubcategory.getId() : null)
+                .subcategoryIds(freelancerSubcategories.stream().map(ServiceSubcategory::getId).toList())
+                .subcategorySlug(primarySubcategory != null
+                        ? primarySubcategory.getSlug()
+                        : null)
+                .subcategoryLabel(primarySubcategory != null
+                        ? primarySubcategory.getName()
+                        : null)
+                .subcategory(primarySubcategory != null ? primarySubcategory.getName() : null)
+                .subcategoryLabels(freelancerSubcategories.stream().map(ServiceSubcategory::getName).toList())
                 .bio(freelancer.getBio())
                 .profilePhoto(freelancer.getAvatarUrl())
                 .serviceType(freelancer.getServiceType())
@@ -269,7 +325,9 @@ public class FreelancerService {
         List<Freelancer> freelancers;
 
         if (category != null && !category.isEmpty()) {
-            freelancers = freelancerRepository.findByCategoryWithLocation(category);
+            freelancers = freelancerRepository.findAllWithLocation().stream()
+                    .filter(freelancer -> matchesCategoryFilter(freelancer, category))
+                    .collect(Collectors.toList());
         } else {
             freelancers = freelancerRepository.findAllWithLocation();
         }
@@ -302,6 +360,86 @@ public class FreelancerService {
     /**
      * Calcular distância entre dois pontos usando fórmula de Haversine
      */
+    private List<NormalizedServiceCity> validateAndNormalizeServiceCities(
+            Freelancer freelancer,
+            List<ServiceCityRequest> requestedCities) {
+        Map<Long, ServiceCity> existingCitiesById = freelancer.getServiceCities().stream()
+                .filter(existingCity -> existingCity.getId() != null)
+                .collect(Collectors.toMap(ServiceCity::getId, existingCity -> existingCity));
+        LinkedHashSet<String> uniqueCities = new LinkedHashSet<>();
+        List<NormalizedServiceCity> normalizedCities = new ArrayList<>();
+
+        for (ServiceCityRequest requestedCity : requestedCities) {
+            if (requestedCity == null) {
+                throw new IllegalArgumentException("Cidade de atendimento inválida.");
+            }
+
+            String normalizedState = normalizeState(requestedCity.getState());
+            String normalizedCity = normalizeCityValue(requestedCity.getCity());
+
+            if (!StringUtils.hasText(normalizedCity)) {
+                throw new IllegalArgumentException("Cidade de atendimento obrigatória.");
+            }
+
+            if (!StringUtils.hasText(normalizedState)) {
+                throw new IllegalArgumentException("Estado da cidade de atendimento obrigatório.");
+            }
+
+            ServiceCity existingCity = null;
+            if (requestedCity.getId() != null) {
+                existingCity = existingCitiesById.get(requestedCity.getId());
+                if (existingCity == null) {
+                    throw new IllegalArgumentException("Cidade de atendimento inválida.");
+                }
+            }
+
+            boolean unchangedExistingCity = existingCity != null
+                    && normalizeState(existingCity.getState()).equals(normalizedState)
+                    && normalizeLocationValue(existingCity.getCity()).equals(normalizeLocationValue(normalizedCity));
+
+            boolean validState = ibgeLocationService.isValidState(normalizedState);
+            if (!validState && !unchangedExistingCity) {
+                throw new IllegalArgumentException("Estado de atendimento invalido: " + normalizedState + ".");
+            }
+
+            Optional<String> canonicalCity = validState
+                    ? ibgeLocationService.findCanonicalCity(normalizedState, normalizedCity)
+                    : Optional.empty();
+            if (canonicalCity.isEmpty() && !unchangedExistingCity) {
+                throw new IllegalArgumentException(
+                        "A cidade '" + normalizedCity + "' não pertence ao estado " + normalizedState + ".");
+            }
+
+            String cityToPersist = canonicalCity.orElse(normalizedCity);
+            String duplicateKey = normalizedState + ":" + normalizeLocationValue(cityToPersist);
+            if (!uniqueCities.add(duplicateKey)) {
+                throw new IllegalArgumentException(
+                        "A cidade '" + cityToPersist + "/" + normalizedState + "' já foi informada.");
+            }
+
+            normalizedCities.add(new NormalizedServiceCity(cityToPersist, normalizedState));
+        }
+
+        return normalizedCities;
+    }
+
+    private String normalizeState(String state) {
+        return state == null ? "" : state.trim().toUpperCase(Locale.ROOT);
+    }
+
+    private String normalizeCityValue(String city) {
+        return city == null ? "" : city.trim();
+    }
+
+    private String normalizeLocationValue(String value) {
+        return value == null
+                ? ""
+                : java.text.Normalizer.normalize(value, java.text.Normalizer.Form.NFD)
+                        .replaceAll("\\p{M}", "")
+                        .trim()
+                        .toLowerCase(Locale.ROOT);
+    }
+
     private Double calculateDistance(double lat1, double lon1, double lat2, double lon2) {
         final double R = 6371; // Raio da Terra em km
 
@@ -336,5 +474,118 @@ public class FreelancerService {
                 .available(freelancer.getAvailable())
                 .category(freelancer.getCategory())
                 .build();
+    }
+
+    private boolean hasCategorySelection(FreelancerProfileRequest request) {
+        return request.getCategoryId() != null
+                || request.getSubcategoryId() != null
+                || (request.getSubcategoryIds() != null && !request.getSubcategoryIds().isEmpty())
+                || StringUtils.hasText(request.getCategory())
+                || StringUtils.hasText(request.getSubcategory());
+    }
+
+    private boolean matchesCategoryFilter(Freelancer freelancer, String filter) {
+        if (!StringUtils.hasText(filter)) {
+            return true;
+        }
+
+        String normalizedFilter = filter.trim().toLowerCase();
+        return (freelancer.getServiceCategory() != null
+                && (freelancer.getServiceCategory().getSlug().equalsIgnoreCase(filter)
+                        || freelancer.getServiceCategory().getName().equalsIgnoreCase(filter)))
+                || (freelancer.getServiceSubcategory() != null
+                        && (freelancer.getServiceSubcategory().getSlug().equalsIgnoreCase(filter)
+                                || freelancer.getServiceSubcategory().getName().equalsIgnoreCase(filter)))
+                || getResolvedFreelancerSubcategories(freelancer).stream()
+                        .anyMatch(subcategory -> subcategory.getSlug().equalsIgnoreCase(filter)
+                                || subcategory.getName().equalsIgnoreCase(filter))
+                || (freelancer.getCategory() != null && freelancer.getCategory().toLowerCase().equals(normalizedFilter))
+                || (freelancer.getServiceType() != null
+                        && freelancer.getServiceType().toLowerCase().equals(normalizedFilter));
+    }
+
+    private List<Long> normalizeSubcategoryIds(FreelancerProfileRequest request) {
+        LinkedHashSet<Long> subcategoryIds = new LinkedHashSet<>();
+
+        if (request.getSubcategoryIds() != null) {
+            request.getSubcategoryIds().stream()
+                    .filter(Objects::nonNull)
+                    .forEach(subcategoryIds::add);
+        }
+        if (request.getSubcategoryId() != null) {
+            subcategoryIds.add(request.getSubcategoryId());
+        }
+
+        return new ArrayList<>(subcategoryIds);
+    }
+
+    private List<ServiceSubcategory> resolveRequestedSubcategories(
+            CategoryCatalogService.CategorySelection categorySelection,
+            List<Long> requestedSubcategoryIds) {
+        List<ServiceSubcategory> resolvedSubcategories = new ArrayList<>();
+
+        if (categorySelection.getSubcategory() != null) {
+            addSubcategoryIfMissing(resolvedSubcategories, categorySelection.getSubcategory());
+        }
+
+        for (Long subcategoryId : requestedSubcategoryIds) {
+            CategoryCatalogService.CategorySelection selection = categoryCatalogService.resolveSelection(
+                    categorySelection.getCategoryId(),
+                    subcategoryId,
+                    categorySelection.getCategoryLabel(),
+                    null,
+                    true,
+                    false,
+                    false,
+                    false);
+            if (selection.getSubcategory() != null) {
+                addSubcategoryIfMissing(resolvedSubcategories, selection.getSubcategory());
+            }
+        }
+
+        return resolvedSubcategories;
+    }
+
+    private List<ServiceSubcategory> getResolvedFreelancerSubcategories(Freelancer freelancer) {
+        List<ServiceSubcategory> resolvedSubcategories = new ArrayList<>();
+
+        if (freelancer.getServiceSubcategories() != null) {
+            freelancer.getServiceSubcategories().stream()
+                    .filter(Objects::nonNull)
+                    .sorted(Comparator.comparing(ServiceSubcategory::getSortOrder).thenComparing(ServiceSubcategory::getName))
+                    .forEach(subcategory -> addSubcategoryIfMissing(resolvedSubcategories, subcategory));
+        }
+
+        if (freelancer.getServiceSubcategory() != null) {
+            addSubcategoryIfMissing(resolvedSubcategories, freelancer.getServiceSubcategory());
+        }
+
+        return resolvedSubcategories;
+    }
+
+    private void addSubcategoryIfMissing(List<ServiceSubcategory> subcategories, ServiceSubcategory candidate) {
+        boolean alreadyPresent = subcategories.stream()
+                .anyMatch(existing -> Objects.equals(existing.getId(), candidate.getId()));
+        if (!alreadyPresent) {
+            subcategories.add(candidate);
+        }
+    }
+
+    private static final class NormalizedServiceCity {
+        private final String city;
+        private final String state;
+
+        private NormalizedServiceCity(String city, String state) {
+            this.city = city;
+            this.state = state;
+        }
+
+        public String getCity() {
+            return city;
+        }
+
+        public String getState() {
+            return state;
+        }
     }
 }

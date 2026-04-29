@@ -48,6 +48,7 @@ public class SecurityConfig {
                                 "/api/freelancer/nearby",
                                 "/api/freelancer/*/profile",
                                 "/api/portfolio/freelancer/**",
+                                "/api/categories/public/**",
                                 "/api/services/public/**",
                                 "/api/files/**",
                                 "/error",
@@ -55,7 +56,8 @@ public class SecurityConfig {
                                 "/v3/api-docs/**",
                                 "/swagger-ui.html",
                                 "/ws/**",
-                                "/api/webhooks/**")
+                                "/api/webhooks/**",
+                                "/api/reviews/ai/summary/**")
                         .permitAll()
                         .anyRequest().authenticated())
                 .sessionManagement(session -> session

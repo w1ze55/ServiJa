@@ -1,5 +1,6 @@
 package com.servija.servija.dto;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -16,7 +17,7 @@ import java.util.List;
 public class FreelancerResponseDTO {
 
     @NotNull(message = "O valor é obrigatório")
-    @DecimalMin(value = "5.00", message = "O valor mínimo é R$ 5,00")
+    @DecimalMin(value = "20.00", message = "O valor mínimo é R$ 20,00")
     @DecimalMax(value = "1000000.00", message = "O valor máximo é R$ 1.000.000,00")
     private BigDecimal value;
 
@@ -29,6 +30,9 @@ public class FreelancerResponseDTO {
     private String scope;
 
     private String notes;
+
+    @Valid
+    private List<ResponseMilestoneDTO> milestones;
 
     private List<String> attachments;
 }

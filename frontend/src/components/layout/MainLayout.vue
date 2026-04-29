@@ -14,7 +14,6 @@ import {
   LogOut,
   MessageSquare,
   Bell,
-  Clock,
   Briefcase,
 
   Images,
@@ -43,6 +42,11 @@ import { useUserStore } from "@/stores/userStore";
 import { useNotificationStore } from "@/stores/notificationStore";
 import { useNotificationsRealtime } from "@/composables/useNotificationsRealtime";
 import { useProfileWebSocket } from "@/composables/useProfileWebSocket";
+import {
+  getCachedUserLocation,
+  setCachedUserLocation,
+  userLocationUpdatedEventName,
+} from "@/utils/userLocationCache";
 import PendingReviewBanner from "../shared/PendingReviewBanner.vue";
 import NotificationsDropdown from "@/components/notifications/NotificationsDropdown.vue";
 import type { NotificationStreamEvent } from "@/types/notifications";
@@ -65,6 +69,16 @@ interface UserAddress {
   city: string;
   state: string;
   isDefault: boolean;
+}
+
+interface UserLocationUpdatedEventDetail {
+  userId: string;
+  address: {
+    id?: string;
+    city: string;
+    state: string;
+    isDefault: boolean;
+  } | null;
 }
 
 interface Props {
@@ -117,6 +131,23 @@ const userLocation = ref("Carregando...");
 const userAddresses = ref<UserAddress[]>([]);
 const defaultAddress = ref<UserAddress | null>(null);
 
+const applyCachedAddress = (cachedAddress: UserLocationUpdatedEventDetail["address"]) => {
+  if (!cachedAddress) {
+    defaultAddress.value = null;
+    return false;
+  }
+
+  defaultAddress.value = {
+    id: cachedAddress.id ? Number(cachedAddress.id) : 0,
+    label: "",
+    city: cachedAddress.city,
+    state: cachedAddress.state,
+    isDefault: cachedAddress.isDefault,
+  };
+  userLocation.value = `${cachedAddress.city}, ${cachedAddress.state}`;
+  return true;
+};
+
 // Carregar endereços do usuário
 const loadUserAddresses = async () => {
   try {
@@ -128,6 +159,9 @@ const loadUserAddresses = async () => {
       null;
     if (defaultAddress.value) {
       userLocation.value = `${defaultAddress.value.city}, ${defaultAddress.value.state}`;
+      if (currentUser.value?.id) {
+        setCachedUserLocation(currentUser.value.id, defaultAddress.value);
+      }
     } else {
       getUserLocationFromGPS();
     }
@@ -215,12 +249,44 @@ const openMap = () => {
   router.push("/map");
 };
 
+const initializeUserLocation = async () => {
+  const userId = currentUser.value?.id;
+
+  if (!userId) {
+    getUserLocationFromGPS();
+    return;
+  }
+
+  const cachedLocation = getCachedUserLocation(userId);
+  if (cachedLocation && applyCachedAddress(cachedLocation.address)) {
+    return;
+  }
+
+  await loadUserAddresses();
+};
+
+const handleUserLocationUpdated = (event: Event) => {
+  const detail = (event as CustomEvent<UserLocationUpdatedEventDetail>).detail;
+
+  if (!detail || detail.userId !== currentUser.value?.id) {
+    return;
+  }
+
+  if (applyCachedAddress(detail.address)) {
+    return;
+  }
+
+  userLocation.value = "Localização não definida";
+  defaultAddress.value = null;
+};
+
 // Lifecycle
 onMounted(() => {
-  loadUserAddresses();
+  initializeUserLocation();
   notificationStore.ensurePreviewLoaded();
 
   window.addEventListener("notification-stream-event", handleNotificationStreamEvent as EventListener);
+  window.addEventListener(userLocationUpdatedEventName, handleUserLocationUpdated as EventListener);
 
   // Carregar estado do pin da sidebar
   const pinnedState = localStorage.getItem("sidebarPinned");
@@ -232,6 +298,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener("notification-stream-event", handleNotificationStreamEvent as EventListener);
+  window.removeEventListener(userLocationUpdatedEventName, handleUserLocationUpdated as EventListener);
   notificationConnection?.disconnect();
   notificationConnection = null;
   profileConnection?.disconnect();
@@ -273,7 +340,7 @@ const menuItems = computed(() =>
         // Menu para Freelancers
         { id: "freelancer-dashboard", label: "Dashboard", icon: Home },
         { id: "freelancer-proposals", label: "Propostas", icon: FileText },
-        { id: "freelancer-deliveries", label: "Entregas", icon: Package },
+        { id: "freelancer-deliveries", label: "Minhas entregas", icon: Package },
         { id: "freelancer-wallet", label: "Carteira", icon: Wallet },
 
         { id: "messages", label: "Mensagens", icon: MessageSquare },
@@ -654,14 +721,7 @@ const handleNotificationStreamEvent = (event: Event) => {
                   <span>Notificações</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                  v-if="currentUser.type === 'contractor'"
-                  @click="props.onNavigate('contracts')"
-                >
-                  <Clock class="mr-2 h-4 w-4" />
-                  <span>Histórico de Contratações</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  v-else
+                  v-if="currentUser.type === 'provider'"
                   @click="props.onNavigate('freelancer-dashboard')"
                 >
                   <DollarSign class="mr-2 h-4 w-4" />

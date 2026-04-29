@@ -200,7 +200,8 @@ const getInitials = (name: string) => {
               <div class="hidden md:flex flex-col gap-2 min-w-[200px]">
                 <Button
                   @click="handleRequestQuote"
-                  class="w-full bg-[#286AD8] hover:bg-[#435574]"
+                  variant="default"
+                  class="w-full"
                 >
                   <FileText class="h-4 w-4 mr-2" />
                   Solicitar orçamento
@@ -208,7 +209,7 @@ const getInitials = (name: string) => {
                 <Button
                   @click="handleSendMessage"
                   variant="outline"
-                  class="w-full border-[#286AD8] text-[#286AD8] hover:bg-blue-50"
+                  class="w-full"
                 >
                   <MessageCircle class="h-4 w-4 mr-2" />
                   Enviar mensagem
@@ -249,7 +250,8 @@ const getInitials = (name: string) => {
         <div class="md:hidden flex flex-col gap-2 mt-6">
           <Button
             @click="handleRequestQuote"
-            class="w-full bg-[#286AD8] hover:bg-[#435574]"
+            variant="default"
+            class="w-full"
           >
             <FileText class="h-4 w-4 mr-2" />
             Solicitar orçamento
@@ -257,7 +259,7 @@ const getInitials = (name: string) => {
           <Button
             @click="handleSendMessage"
             variant="outline"
-            class="w-full border-[#286AD8] text-[#286AD8] hover:bg-blue-50"
+            class="w-full"
           >
             <MessageCircle class="h-4 w-4 mr-2" />
             Enviar mensagem

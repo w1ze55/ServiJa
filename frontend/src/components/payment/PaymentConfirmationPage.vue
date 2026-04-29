@@ -106,7 +106,7 @@ const formatPaymentMethod = (method?: string) => {
             v-if="onDownloadReceipt"
             @click="props.onDownloadReceipt"
             variant="outline"
-            class="w-full border-[#286AD8] text-[#286AD8] hover:bg-blue-50"
+            class="w-full text-primary border-primary hover:bg-blue-50"
             size="lg"
           >
             <Download class="h-4 w-4 mr-2" />
@@ -116,7 +116,8 @@ const formatPaymentMethod = (method?: string) => {
           <Button
             v-if="onGoToService"
             @click="props.onGoToService"
-            class="w-full bg-[#286AD8] hover:bg-[#435574] transition-colors"
+            variant="default"
+            class="w-full"
             size="lg"
           >
             Acompanhar Serviço
@@ -186,7 +187,8 @@ const formatPaymentMethod = (method?: string) => {
           <Button
             v-if="onRetry"
             @click="props.onRetry"
-            class="w-full bg-[#286AD8] hover:bg-[#435574] transition-colors"
+            variant="default"
+            class="w-full"
             size="lg"
           >
             Tentar Novamente

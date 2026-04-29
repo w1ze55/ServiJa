@@ -22,6 +22,15 @@ public class FreelancerProfileRequest {
     
     @Size(max = 50, message = "Categoria deve ter no máximo 50 caracteres")
     private String category;
+
+    private Long categoryId;
+
+    private Long subcategoryId;
+
+    private List<Long> subcategoryIds;
+
+    @Size(max = 160, message = "Subcategoria deve ter no máximo 160 caracteres")
+    private String subcategory;
     
     @Size(max = 1000, message = "Bio deve ter no máximo 1000 caracteres")
     private String bio;
@@ -34,7 +43,7 @@ public class FreelancerProfileRequest {
     @Size(max = 20, message = "Máximo de 20 cidades permitidas")
     private List<String> cities;
     
-    private List<ServiceCityResponse> serviceCities;
+    private List<ServiceCityRequest> serviceCities;
     
     private SocialLinks socialLinks;
     

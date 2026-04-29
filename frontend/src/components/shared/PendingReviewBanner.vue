@@ -126,14 +126,15 @@ onUnmounted(() => {
         </div>
         <p class="text-sm text-amber-900 truncate">
           <strong>{{ reviewStore.pendingCount }}</strong>
-          {{ reviewStore.pendingCount === 1 ? 'avaliacao pendente' : 'avaliacoes pendentes' }}
-          — Sua opiniao ajuda a comunidade!
+          {{ reviewStore.pendingCount === 1 ? 'avaliação pendente' : 'avaliações pendentes' }}
+          — Sua opinião ajuda a comunidade!
         </p>
       </div>
       <div class="flex items-center gap-2 flex-shrink-0">
         <Button
+          variant="warning"
           size="sm"
-          class="bg-amber-600 hover:bg-amber-700 text-white text-xs"
+          class="text-xs"
           @click="currentPending && goToReview(currentPending.serviceRequestId)"
         >
           Avaliar agora
@@ -170,7 +171,7 @@ onUnmounted(() => {
             </div>
             <h2 class="text-xl font-bold text-[#263238]">Avalie seu serviço!</h2>
             <p class="text-sm text-[#435574] mt-1">
-              Sua avaliacao ajuda outros usuarios a encontrar os melhores profissionais
+              Sua avaliação ajuda outros usuários a encontrar os melhores profissionais
             </p>
           </div>
 
@@ -193,14 +194,15 @@ onUnmounted(() => {
           <!-- Info sobre pendentes -->
           <div v-if="reviewStore.pendingCount > 1" class="text-center">
             <p class="text-xs text-[#435574]">
-              + {{ reviewStore.pendingCount - 1 }} {{ reviewStore.pendingCount - 1 === 1 ? 'outra avaliacao pendente' : 'outras avaliacoes pendentes' }}
+              + {{ reviewStore.pendingCount - 1 }} {{ reviewStore.pendingCount - 1 === 1 ? 'outra avaliação pendente' : 'outras avaliações pendentes' }}
             </p>
           </div>
 
           <!-- Botoes -->
           <div class="space-y-3">
             <Button
-              class="w-full bg-[#286AD8] hover:bg-[#435574] text-white"
+              variant="default"
+              class="w-full"
               size="lg"
               @click="goToReview(currentPending.serviceRequestId)"
             >

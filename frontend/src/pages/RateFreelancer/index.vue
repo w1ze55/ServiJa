@@ -150,7 +150,7 @@ onUnmounted(() => {
         </div>
         <h2 class="text-xl font-semibold text-[#263238]">Você já avaliou este serviço</h2>
         <p class="text-[#435574]">Sua avaliação já foi registrada. Obrigado!</p>
-        <Button @click="handleBack" class="bg-[#286AD8] hover:bg-[#435574]">
+        <Button variant="default" @click="handleBack">
           Voltar para Meus Projetos
         </Button>
       </div>
@@ -160,7 +160,7 @@ onUnmounted(() => {
       <div class="text-center py-12">
         <h2 class="text-xl font-semibold text-[#263238] mb-2">Solicitação não encontrada</h2>
         <p class="text-[#435574] mb-4">A solicitação que você está procurando não existe ou foi removida.</p>
-        <Button @click="handleBack" class="bg-[#286AD8] hover:bg-[#435574]">
+        <Button variant="default" @click="handleBack">
           Voltar para Meus Projetos
         </Button>
       </div>

@@ -98,7 +98,7 @@ onMounted(async () => {
   if (userData) {
     user.value = JSON.parse(userData);
     if (user.value.type !== 'provider') {
-      router.push('/cliente-dashboard');
+      router.push('/cliente-home');
       return;
     }
   } else {
@@ -165,7 +165,7 @@ onUnmounted(() => {
         </div>
         <h2 class="text-xl font-semibold text-[#263238]">Você já avaliou este cliente</h2>
         <p class="text-[#435574]">Sua avaliação já foi registrada. Obrigado!</p>
-        <Button @click="handleBack" class="bg-[#286AD8] hover:bg-[#435574]">
+        <Button variant="default" @click="handleBack">
           Voltar para Entregas
         </Button>
       </div>

@@ -45,11 +45,6 @@ const handleNavigate = (page: string, params?: any) => {
     return;
   }
 
-  if (page === 'contracts') {
-    router.push('/contracts');
-    return;
-  }
-
   // Fallback para navegação padrão
   const userType = user.value?.type === 'provider' ? 'provider' : 'contractor';
   navigate(page, userType, params);

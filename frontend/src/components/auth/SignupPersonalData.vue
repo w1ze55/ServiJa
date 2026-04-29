@@ -203,14 +203,15 @@ const handleSubmit = (e: Event) => {
 <template>
   <div :class="props.inline ? '' : 'signup-personal-data-container'">
     <div :class="props.inline ? '' : 'signup-personal-data-card'">
-      <button
+      <Button
         v-if="!props.inline"
+        variant="ghost"
         @click="emit('back')"
-        class="signup-personal-data-back-button"
+        class="mb-6"
       >
         <ArrowLeft class="h-4 w-4" />
         Voltar
-      </button>
+      </Button>
 
       <div v-if="!props.inline" class="signup-personal-data-header">
         <div class="signup-personal-data-progress-header">
@@ -409,7 +410,7 @@ const handleSubmit = (e: Event) => {
           </div>
         </div>
 
-        <Button type="submit" class="signup-personal-data-submit-button" size="lg" :disabled="isLoading">
+        <Button type="submit" class="w-full" size="lg" :disabled="isLoading">
           {{ isLoading ? 'Validando...' : 'Continuar' }}
         </Button>
       </form>
@@ -448,22 +449,6 @@ const handleSubmit = (e: Event) => {
   max-width: none;
   box-shadow: none;
   padding: 0;
-}
-
-.signup-personal-data-back-button {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  color: rgb(75, 85, 99);
-  background: none;
-  border: none;
-  cursor: pointer;
-  margin-bottom: 1.5rem;
-  transition: color 0.2s;
-}
-
-.signup-personal-data-back-button:hover {
-  color: rgb(17, 24, 39);
 }
 
 .signup-personal-data-header {
@@ -615,8 +600,5 @@ const handleSubmit = (e: Event) => {
   text-decoration: underline;
 }
 
-.signup-personal-data-submit-button {
-  width: 100%;
-}
 </style>
 

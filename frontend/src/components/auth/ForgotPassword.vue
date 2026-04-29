@@ -106,7 +106,7 @@ const handleSubmit = async (e: Event) => {
           um código de 6 dígitos para redefinir sua senha.
         </p>
         <p class="text-sm text-gray-500 mb-6">
-          O código expira em 1 hora. Verifique também sua caixa de spam.
+          O código expira em 30 minutos. Verifique também sua caixa de spam.
         </p>
 
         <Alert class="mb-6 bg-blue-50 border-blue-200 text-left">
@@ -128,13 +128,14 @@ const handleSubmit = async (e: Event) => {
     class="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4"
   >
     <div class="w-full max-w-md bg-white rounded-lg shadow-xl p-8">
-      <button
+      <Button
+        variant="ghost"
         @click="props.onBack"
-        class="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6"
+        class="mb-6"
       >
         <ArrowLeft class="h-4 w-4" />
         Voltar para login
-      </button>
+      </Button>
 
       <div class="text-center mb-8">
         <div class="inline-flex p-4 bg-blue-100 rounded-full mb-4">
@@ -175,7 +176,7 @@ const handleSubmit = async (e: Event) => {
       <div class="mt-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
         <h5 class="text-sm text-gray-900 mb-2">Segurança</h5>
         <ul class="text-sm text-gray-700 space-y-1">
-          <li>• O código de recuperação expira em 1 hora</li>
+          <li>• O código de recuperação expira em 30 minutos</li>
           <li>• Você pode solicitar no máximo 3 códigos a cada 5 minutos</li>
           <li>• Seu código anterior será invalidado ao solicitar um novo</li>
         </ul>

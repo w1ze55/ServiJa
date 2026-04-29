@@ -39,12 +39,12 @@ public class PaymentService {
     private final WebSocketService webSocketService;
     private final NotificationService notificationService;
 
-    private static final BigDecimal PLATFORM_FEE_PERCENTAGE = new BigDecimal("0.10"); // 10%
+    private static final BigDecimal PLATFORM_FEE_PERCENTAGE = new BigDecimal("0.05"); // 5%
     private static final BigDecimal ASAAS_PIX_FEE = new BigDecimal("0.99"); // Taxa Asaas para PIX (promocional)
     private static final BigDecimal ASAAS_BOLETO_FEE = new BigDecimal("0.99"); // Taxa Asaas para Boleto (promocional)
     private static final BigDecimal ASAAS_CREDIT_CARD_FIXED_FEE = new BigDecimal("0.49"); // Taxa fixa cartão
     private static final BigDecimal ASAAS_CREDIT_CARD_PERCENTAGE = new BigDecimal("0.0199"); // 1,99% cartão
-                                                                                             // (promocional)
+    private static final BigDecimal MIN_NEGOTIATED_AMOUNT = new BigDecimal("20.00"); // Valor mínimo para pagamento
     private static final int RELEASE_DAYS = 7; // Dias para liberar saldo ao freelancer
 
     @Transactional
@@ -63,15 +63,21 @@ public class PaymentService {
             throw new IllegalStateException("A solicitação deve estar aceita para realizar o pagamento");
         }
 
-        // Verificar se já existe um pagamento para esta solicitação
         boolean paymentExists = paymentRepository.existsByServiceRequest(serviceRequest);
         if (paymentExists) {
             throw new IllegalStateException("Já existe um pagamento para esta solicitação");
         }
 
-        BigDecimal amount = request.getAmount(); // Valor que o CLIENTE paga
+        BigDecimal agreedAmount = resolveAgreedAmount(serviceRequest);
+        validatePaymentAmount(request.getAmount(), agreedAmount);
+        validateMinimumPaymentAmount(serviceRequest, agreedAmount);
 
-        // Calcular taxa do gateway baseado no método de pagamento
+        BigDecimal totalAmount = agreedAmount;
+
+        BigDecimal platformFee = agreedAmount.multiply(PLATFORM_FEE_PERCENTAGE);
+
+        BigDecimal freelancerAmount = agreedAmount.subtract(platformFee);
+
         BigDecimal gatewayFee = BigDecimal.ZERO;
         switch (request.getPaymentMethod().toLowerCase()) {
             case "pix":
@@ -82,21 +88,9 @@ public class PaymentService {
                 break;
             case "credit-card":
                 gatewayFee = ASAAS_CREDIT_CARD_FIXED_FEE
-                        .add(amount.multiply(ASAAS_CREDIT_CARD_PERCENTAGE));
+                        .add(agreedAmount.multiply(ASAAS_CREDIT_CARD_PERCENTAGE));
                 break;
         }
-
-        // Valor líquido após deduzir taxa do gateway
-        BigDecimal netAmount = amount.subtract(gatewayFee);
-
-        // Taxa da plataforma (10% do valor líquido)
-        BigDecimal platformFee = netAmount.multiply(PLATFORM_FEE_PERCENTAGE);
-
-        // Valor que o freelancer receberá (após todas as deduções)
-        BigDecimal freelancerAmount = netAmount.subtract(platformFee);
-
-        // totalAmount é o que o cliente paga (não muda)
-        BigDecimal totalAmount = amount;
 
         // Obter CPF do contratante (usar CPF do request se fornecido, senão usar do
         // perfil)
@@ -109,7 +103,6 @@ public class PaymentService {
                     "CPF/CNPJ do contratante não cadastrado. Por favor, informe o CPF para realizar o pagamento.");
         }
 
-        // Criar ou recuperar cliente no Asaas
         String asaasCustomerId = asaasService.getOrCreateCustomer(
                 contractor.getEmail(),
                 contractor.getName(),
@@ -196,6 +189,32 @@ public class PaymentService {
         return mapToResponse(payment);
     }
 
+    private BigDecimal resolveAgreedAmount(ServiceRequest serviceRequest) {
+        BigDecimal agreedAmount = serviceRequest.getResponseValue() != null
+                ? serviceRequest.getResponseValue()
+                : serviceRequest.getCounterValue();
+
+        if (agreedAmount == null) {
+            throw new IllegalStateException("A solicitação aceita não possui valor negociado para pagamento");
+        }
+
+        return agreedAmount;
+    }
+
+    private void validatePaymentAmount(BigDecimal requestedAmount, BigDecimal agreedAmount) {
+        if (requestedAmount == null || requestedAmount.compareTo(agreedAmount) != 0) {
+            throw new IllegalStateException(
+                    "O valor do pagamento não confere com o valor aceito na solicitação. Atualize a página e tente novamente.");
+        }
+    }
+
+    private void validateMinimumPaymentAmount(ServiceRequest serviceRequest, BigDecimal agreedAmount) {
+        boolean legacyLowValueAllowed = Boolean.TRUE.equals(serviceRequest.getLegacyLowValueAllowed());
+        if (!legacyLowValueAllowed && agreedAmount.compareTo(MIN_NEGOTIATED_AMOUNT) < 0) {
+            throw new IllegalStateException("O valor mínimo para pagamento é R$ 20,00");
+        }
+    }
+
     private void processPixPayment(Payment payment, String asaasCustomerId, ServiceRequest serviceRequest) {
         try {
             // Criar cobrança PIX no Asaas
@@ -232,9 +251,6 @@ public class PaymentService {
         // Extrair últimos 4 dígitos
         String cardNumber = cardData.getNumber().replaceAll("\\s", "");
         payment.setCardLastDigits(cardNumber.substring(cardNumber.length() - 4));
-
-        // Por enquanto, simular aprovação instantânea
-        // TODO: Integrar com gateway de cartão de crédito do Asaas
         payment.setStatus(Payment.PaymentStatus.COMPLETED);
         payment.setCompletedAt(LocalDateTime.now());
 

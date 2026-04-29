@@ -57,7 +57,12 @@ async function handleLogin(email: string, password: string) {
     }
     
     // Mapear tipo de usuário da API para o formato do frontend
-    const userType = userData.user?.userType === 'FREELANCER' ? 'provider' : 'contractor'
+    const apiUserType = userData.user?.userType
+    const userType = apiUserType === 'ADMIN'
+      ? 'admin'
+      : apiUserType === 'FREELANCER'
+        ? 'provider'
+        : 'contractor'
     
     const user: User = {
       id: userData.user?.id?.toString() || '',
@@ -103,7 +108,11 @@ function handleEmailVerified(token: string, userData: any) {
   }
   
   // Mapear tipo de usuário da API para o formato do frontend
-  const userType = userData.userType === 'FREELANCER' ? 'provider' : 'contractor'
+  const userType = userData.userType === 'ADMIN'
+    ? 'admin'
+    : userData.userType === 'FREELANCER'
+      ? 'provider'
+      : 'contractor'
   
   const user: User = {
     id: userData.id?.toString() || '',

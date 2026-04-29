@@ -11,13 +11,19 @@ export interface Proposal {
   clientEmail?: string;
   clientPhone?: string;
   service: string;
+  categoryId?: number | null;
   category: string;
+  categoryLabel?: string;
+  subcategoryId?: number | null;
+  subcategory?: string;
+  subcategoryLabel?: string;
   description: string;
-  budget: number;
+  budget?: number | null;
   deadline: string;
   workModel?: WorkModelValue | null;
   status: 'pending' | 'negotiating' | 'accepted' | 'in_progress' | 'delivered' | 'rejected' | 'completed' | 'archived';
   receivedAt: string;
+  updatedAt?: string;
   attachments?: ProposalAttachment[];
   freelancerAttachments?: ProposalAttachment[];
   viewed: boolean;
@@ -56,8 +62,6 @@ export interface Milestone {
   id: string;
   title: string;
   description: string;
-  deadline: string;
-  value: number;
   status: 'pending' | 'in_progress' | 'completed';
 }
 
@@ -91,6 +95,16 @@ export const useProposalStore = defineStore('proposal', () => {
   const proposals = ref<Proposal[]>([]);
   const isLoading = ref(false);
   const error = ref<string | null>(null);
+
+  const getFirstNonEmptyString = (...values: unknown[]): string => {
+    for (const value of values) {
+      if (typeof value === 'string' && value.trim()) {
+        return value.trim();
+      }
+    }
+
+    return '';
+  };
 
   const extractFileName = (url: string): string => {
     try {
@@ -141,6 +155,27 @@ export const useProposalStore = defineStore('proposal', () => {
       description: attachment.description?.trim() || undefined,
     }));
 
+  const mapMilestones = (
+    milestones: Array<{
+      id?: string | number | null;
+      title?: string | null;
+      description?: string | null;
+      status?: string | null;
+    }> | undefined,
+    requestId: string | number
+  ): Milestone[] | undefined => {
+    const normalized = (milestones || [])
+      .filter((milestone) => typeof milestone?.title === 'string' && milestone.title.trim())
+      .map((milestone, index) => ({
+        id: String(milestone.id ?? `milestone-${requestId}-${index}`),
+        title: milestone.title!.trim(),
+        description: typeof milestone.description === 'string' ? milestone.description.trim() : '',
+        status: milestone.status === 'completed' || milestone.status === 'in_progress' ? milestone.status : 'pending',
+      }));
+
+    return normalized.length > 0 ? normalized : undefined;
+  };
+
   const stats = computed<ProposalStats>(() => ({
     pending: proposals.value.filter((p) => p.status === 'pending').length,
     negotiating: proposals.value.filter((p) => p.status === 'negotiating' || p.status === 'accepted').length,
@@ -156,43 +191,55 @@ export const useProposalStore = defineStore('proposal', () => {
       const response = await api.get('/service-requests/received');
 
       // Mapear dados da API para o formato da store
-      proposals.value = response.data
-        .filter((req: any) => req.status !== 'CANCELLED')
-        .map((req: any) => ({
-        id: req.id.toString(),
-        clientName: req.contractorName,
-        clientAvatar: req.contractorAvatar,
-        clientLocation: req.address || 'Não informado',
-        service: req.serviceName,
-        category: req.category,
-        description: req.description,
-        budget: Number(req.budget),
-        deadline: req.deadline,
-        workModel: normalizeWorkModel(req.workModel),
-        status: mapApiStatusToLocal(req.status),
-        receivedAt: req.createdAt,
-        attachments: mapAttachments(req.attachments, 'att', req.id),
-        viewed: true,
-        address: req.address,
-        desiredDate: req.desiredDate,
-        freelancerResponse: req.responseValue ? {
-          value: Number(req.responseValue),
-          executionDays: req.responseDays,
-          scope: req.responseScope,
-          notes: req.responseNotes,
-          sentAt: req.respondedAt,
-          milestones: req.milestones,
-          attachments: mapAttachments(req.responseAttachments, 'ratt', req.id)
-        } : undefined,
-        counterValue: req.counterValue,
-        counterDays: req.counterDays,
-        counterNotes: req.counterNotes,
-        cancelReason: req.cancelReason,
-        rejectReason: req.rejectReason,
-        freelancerAttachments: req.freelancerAttachmentDetails?.length
-          ? mapDetailedAttachments(req.freelancerAttachmentDetails, 'fatt', req.id)
-          : mapAttachments(req.freelancerAttachments, 'fatt', req.id),
-      }));
+      const activeRequests = response.data.filter((req: any) => req.status !== 'CANCELLED');
+
+      proposals.value = activeRequests
+        .map((req: any) => {
+          const categoryLabel = getFirstNonEmptyString(req.categoryLabel, req.category);
+          const subcategoryLabel = getFirstNonEmptyString(req.subcategoryLabel, req.subcategory);
+
+          return {
+            id: req.id.toString(),
+            clientName: req.contractorName,
+            clientAvatar: req.contractorAvatar,
+            clientLocation: req.address || 'Não informado',
+            service: req.serviceName,
+            categoryId: req.categoryId ?? null,
+            category: categoryLabel,
+            categoryLabel,
+            subcategoryId: req.subcategoryId ?? null,
+            subcategory: subcategoryLabel,
+            subcategoryLabel,
+            description: req.description,
+            budget: req.budget ?? null,
+            deadline: req.deadline,
+            workModel: normalizeWorkModel(req.workModel),
+            status: mapApiStatusToLocal(req.status),
+            receivedAt: req.createdAt,
+            updatedAt: req.updatedAt || req.createdAt,
+            attachments: mapAttachments(req.attachments, 'att', req.id),
+            viewed: true,
+            address: req.address,
+            desiredDate: req.desiredDate,
+            freelancerResponse: req.responseValue ? {
+              value: Number(req.responseValue),
+              executionDays: req.responseDays,
+              scope: req.responseScope,
+              notes: req.responseNotes,
+              sentAt: req.respondedAt,
+              milestones: mapMilestones(req.milestones, req.id),
+              attachments: mapAttachments(req.responseAttachments, 'ratt', req.id)
+            } : undefined,
+            counterValue: req.counterValue,
+            counterDays: req.counterDays,
+            counterNotes: req.counterNotes,
+            cancelReason: req.cancelReason,
+            rejectReason: req.rejectReason,
+            freelancerAttachments: req.freelancerAttachmentDetails?.length
+              ? mapDetailedAttachments(req.freelancerAttachmentDetails, 'fatt', req.id)
+              : mapAttachments(req.freelancerAttachments, 'fatt', req.id),
+          };
+        });
     } catch (err) {
       error.value = 'Erro ao carregar propostas';
       console.error('Erro ao carregar propostas:', err);
@@ -248,6 +295,7 @@ export const useProposalStore = defineStore('proposal', () => {
     if (proposal) {
       proposal.freelancerResponse = {
         ...response,
+        milestones: response.milestones ? [...response.milestones] : undefined,
         sentAt: new Date().toISOString(),
       };
       proposal.status = 'negotiating';
@@ -375,13 +423,12 @@ export const useProposalStore = defineStore('proposal', () => {
       const proposal = proposals.value.find((p) => p.id === proposalId);
       if (!proposal?.freelancerResponse?.milestones) return false;
 
+      const response = await api.patch(`/service-requests/${proposalId}/milestones/${milestoneId}`, { status });
+      const updatedMilestones = mapMilestones(response.data?.milestones, proposalId);
+      proposal.freelancerResponse.milestones = updatedMilestones || [];
+
       const milestone = proposal.freelancerResponse.milestones.find((m) => m.id === milestoneId);
       if (!milestone) return false;
-
-      milestone.status = status;
-
-      // TODO: Chamar API
-      // await api.patch(`/proposals/${proposalId}/milestones/${milestoneId}`, { status });
 
       const statusLabels: Record<string, string> = {
         pending: 'Pendente',

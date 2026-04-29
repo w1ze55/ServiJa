@@ -25,7 +25,14 @@ public class ServiceRequestResponse {
     private String freelancerAvatar;
     private String freelancerLocation;
     private String serviceName;
+    private Long categoryId;
+    private String categorySlug;
+    private String categoryLabel;
     private String category;
+    private Long subcategoryId;
+    private String subcategorySlug;
+    private String subcategoryLabel;
+    private String subcategory;
     private String description;
     private BigDecimal budget;
     private String deadline;
@@ -37,15 +44,14 @@ public class ServiceRequestResponse {
     private List<String> freelancerAttachments;
     private List<FreelancerAttachmentDTO> freelancerAttachmentDetails;
     private List<String> responseAttachments;
+    private List<ResponseMilestoneDTO> milestones;
 
-    // Freelancer response
     private BigDecimal responseValue;
     private Integer responseDays;
     private String responseScope;
     private String responseNotes;
     private LocalDateTime respondedAt;
 
-    // Counter-proposal
     private BigDecimal counterValue;
     private Integer counterDays;
     private String counterNotes;

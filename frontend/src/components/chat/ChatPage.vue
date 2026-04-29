@@ -394,14 +394,15 @@ const getInitials = (name: string) => {
         </Button>
       </div>
       <div class="emoji-grid">
-        <button
+        <Button
           v-for="emoji in emojis"
           :key="emoji"
+          variant="ghost"
           @click="insertEmoji(emoji)"
-          class="emoji-button"
+          class="text-2xl"
         >
           {{ emoji }}
-        </button>
+        </Button>
       </div>
     </div>
 
@@ -421,7 +422,6 @@ const getInitials = (name: string) => {
           variant="ghost"
           size="icon"
           @click="fileInputRef?.click()"
-          class="input-button"
         >
           <Paperclip class="icon-md" />
         </Button>
@@ -430,7 +430,6 @@ const getInitials = (name: string) => {
           variant="ghost"
           size="icon"
           @click="showEmojiPicker = !showEmojiPicker"
-          class="input-button"
         >
           <Smile class="icon-md" />
         </Button>
@@ -444,9 +443,10 @@ const getInitials = (name: string) => {
         />
 
         <Button
+          variant="default"
+          size="icon"
           @click="handleSend"
           :disabled="!messageText.trim()"
-          class="send-button"
         >
           <Send class="icon-sm" />
         </Button>
@@ -468,7 +468,7 @@ const getInitials = (name: string) => {
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel @click="showReportDialog = false">Cancelar</AlertDialogCancel>
-          <AlertDialogAction @click="handleReport" class="report-button">
+          <AlertDialogAction @click="handleReport" variant="destructive">
             Confirmar denúncia
           </AlertDialogAction>
         </AlertDialogFooter>
@@ -755,20 +755,6 @@ const getInitials = (name: string) => {
   gap: 0.5rem;
 }
 
-.emoji-button {
-  font-size: 1.5rem;
-  padding: 0.5rem;
-  border-radius: 0.25rem;
-  border: none;
-  background: none;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-
-.emoji-button:hover {
-  background-color: #f3f4f6;
-}
-
 .input-container {
   border-top: 1px solid #e5e7eb;
   padding: 1rem;
@@ -785,40 +771,9 @@ const getInitials = (name: string) => {
   display: none;
 }
 
-.input-button {
-  flex-shrink: 0;
-}
-
 .message-input {
   flex: 1;
 }
 
-.send-button {
-  background-color: #286AD8;
-  flex-shrink: 0;
-  border: none;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-
-.send-button:hover:not(:disabled) {
-  background-color: #435574;
-}
-
-.send-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.report-button {
-  background-color: #dc2626;
-  border: none;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-
-.report-button:hover {
-  background-color: #b91c1c;
-}
 </style>
 

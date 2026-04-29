@@ -24,6 +24,7 @@ import {
   Github,
   Linkedin,
   Instagram,
+  Images,
   Twitter,
   Facebook,
   Youtube,
@@ -33,6 +34,7 @@ import {
   MessageCircle,
   Paperclip,
   Trash2,
+  User,
 } from 'lucide-vue-next';
 import { uploadImages } from '@/api/uploadService';
 import Button from '../ui/button.vue';
@@ -62,6 +64,8 @@ import AvatarFallback from '../ui/avatar-fallback.vue';
 import api from '@/api/config/axios';
 import { toast } from '@/utils/toast';
 import { useFavoritesStore } from '@/stores/favorites';
+import { getServicePriceDisplay, type ServicePriceRangeData } from '@/utils/servicePricing';
+import { formatServiceRatingDisplay, hasServiceRating, type ServiceReviewSummary } from '@/utils/serviceReviews';
 
 interface FreelancerData {
   id: number;
@@ -69,6 +73,8 @@ interface FreelancerData {
   email: string;
   profession: string;
   category: string;
+  subcategory?: string;
+  subcategoryLabels?: string[];
   bio: string;
   profilePhoto: string;
   serviceType: string;
@@ -87,15 +93,13 @@ interface FreelancerData {
   };
 }
 
-interface ServiceItem {
+interface ServiceItem extends ServicePriceRangeData, ServiceReviewSummary {
   id: number;
   freelancerId: number;
   freelancerName: string;
   title: string;
   category: string;
   description: string;
-  price: number;
-  priceType: string;
   deliveryTime: number;
   deliveryUnit: string;
   workModel?: string | null;
@@ -247,7 +251,7 @@ const visibleServicePages = computed(() => {
   
   return pages;
 });
-const quoteBudget = ref('');
+const quoteBudget = ref('20');
 const formattedQuoteBudget = ref('');
 const quoteDeadline = ref('');
 const quoteDeadlineDate = ref('');
@@ -380,17 +384,6 @@ const getInitials = (name: string) => {
     .join('')
     .toUpperCase()
     .slice(0, 2);
-};
-
-const formatPrice = (price: number, priceType: string) => {
-  const formatted = new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  }).format(price);
-  const suffix = priceType === 'HOURLY' ? '/hora' : priceType === 'DAILY' ? '/dia' : '';
-  return `${formatted}${suffix}`;
 };
 
 const formatPriceDisplay = (value: number): string => {
@@ -730,14 +723,12 @@ const handleSendQuote = async () => {
     return;
   }
 
-  if (!quoteBudget.value || Number(quoteBudget.value) < 5) {
-    toast.error('Por favor, informe um orçamento de no mínimo R$ 5,00');
-    return;
-  }
-
   const deadline = quoteDeadlineType.value === 'decided'
     ? quoteDeadlineDate.value
     : `${quoteDeadline.value} dias`;
+  const desiredDate = quoteDeadlineType.value === 'decided'
+    ? quoteDeadlineDate.value
+    : undefined;
 
   if (!quoteDeadline.value && quoteDeadlineType.value === 'estimated') {
     toast.error('Por favor, informe a quantidade de dias');
@@ -781,8 +772,8 @@ const handleSendQuote = async () => {
       serviceName: requestedServiceTitle.value ? `${requestedServiceTitle.value} - Solicitação` : `${quoteCategory.value} - Solicitação`,
       category: quoteCategory.value,
       description: quoteMessage.value,
-      budget: Number(quoteBudget.value),
       deadline: deadline,
+      desiredDate,
       workModel: requestedServiceWorkModel.value?.toUpperCase(),
       address: serviceAddress,
       serviceId: requestedServiceId.value,
@@ -838,7 +829,7 @@ const formatFileSize = (bytes: number) => {
 const resetQuoteForm = () => {
   quoteMessage.value = '';
   quoteCategory.value = '';
-  quoteBudget.value = '';
+  quoteBudget.value = '20';
   formattedQuoteBudget.value = '';
   quoteDeadline.value = '';
   quoteDeadlineDate.value = '';
@@ -940,7 +931,7 @@ onMounted(() => {
         <AlertCircle class="h-12 w-12 text-red-400 mx-auto mb-4" />
         <h3 class="text-lg font-semibold text-[#263238] mb-2">Ops, algo deu errado</h3>
         <p class="text-[#435574] mb-4">{{ error }}</p>
-        <Button @click="loadFreelancerData" class="bg-[#286AD8]">
+        <Button @click="loadFreelancerData">
           Tentar novamente
         </Button>
       </div>
@@ -1033,11 +1024,9 @@ onMounted(() => {
 
               <!-- Services Tab -->
               <TabsContent value="services">
-                <div class="mb-6">
-                  <h3 class="text-[#263238] mb-1">Serviços cadastrados</h3>
-                  <p class="text-[#435574]">
-                    Disponíveis para contratação ({{ services.length }} itens)
-                  </p>
+                <div class="flex items-center gap-3 mb-5">
+                  <Briefcase class="h-6 w-6 text-[#286AD8]" />                  
+                  <h2 class="text-lg font-bold text-[#263238]">Serviços cadastrados</h2>
                 </div>
 
                 <div v-if="services.length > 0">
@@ -1069,13 +1058,18 @@ onMounted(() => {
                         <h3 class="font-semibold text-[#263238] mb-2 line-clamp-1 group-hover:text-[#286AD8]">
                           {{ service.title }}
                         </h3>
-                        <div v-if="service.workModel" class="mb-3">
-                          <Badge variant="outline" class="bg-white text-[#435574]">
-                            {{ getWorkModelLabel(normalizeWorkModel(service.workModel)) }}
-                          </Badge>
+                        <div class="flex items-center justify-between gap-3 mb-3">
+                          <div>
+                            <Badge v-if="service.workModel" variant="outline" class="bg-white text-[#435574]">
+                              {{ getWorkModelLabel(normalizeWorkModel(service.workModel)) }}
+                            </Badge>
+                          </div>
+                          <div class="flex items-center gap-1.5 text-xs text-[#435574] flex-shrink-0">
+                            <Star :class="`h-3.5 w-3.5 ${hasServiceRating(service) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`" />
+                            <span>{{ formatServiceRatingDisplay(service) }}</span>
+                          </div>
                         </div>
                         <p class="text-sm text-[#435574] mb-3 line-clamp-2">{{ service.description }}</p>
-
                         <!-- Tags -->
                         <div v-if="service.tags && service.tags.length > 0" class="flex flex-wrap gap-1 mb-3">
                           <Badge v-for="tag in service.tags.slice(0, 2)" :key="tag" variant="secondary" class="text-xs">
@@ -1090,7 +1084,7 @@ onMounted(() => {
                         <div class="flex items-center justify-between pt-3 border-t border-gray-100">
                           <div class="flex items-center gap-1 text-[#286AD8]">
                             <DollarSign class="h-4 w-4" />
-                            <span class="font-bold text-sm">{{ formatPrice(service.price, service.priceType) }}</span>
+                            <span class="font-bold text-sm">{{ getServicePriceDisplay(service) }}</span>
                           </div>
                           <div class="flex items-center gap-1 text-[#435574]">
                             <Clock class="h-3.5 w-3.5" />
@@ -1120,7 +1114,6 @@ onMounted(() => {
                         :variant="currentServicePage === page ? 'default' : 'outline'"
                         @click="goToServicePage(page as number)"
                         class="h-9 w-9 p-0"
-                        :class="currentServicePage === page ? 'bg-[#286AD8] hover:bg-[#286AD8]/90' : ''"
                       >
                         {{ page }}
                       </Button>
@@ -1146,7 +1139,8 @@ onMounted(() => {
               <!-- Reviews Tab -->
               <TabsContent value="reviews">
                 <ReviewList 
-                  :reviews="reviews" 
+                  :reviews="reviews"
+                  :freelancer-id="props.providerId"
                   :is-loading="isLoadingReviews"
                   :page-size="5"
                 />
@@ -1154,8 +1148,11 @@ onMounted(() => {
 
               <!-- About Tab -->
               <TabsContent value="about">
+                <div class="flex items-center gap-3 mb-5">
+                  <User class="h-6 w-6 text-[#286AD8]" />                  
+                  <h2 class="text-lg font-bold text-[#263238]">Sobre o profissional</h2>
+                </div>
                 <Card class="p-6">
-                  <h3 class="font-semibold text-[#263238] mb-4">Sobre o profissional</h3>
                   <p v-if="freelancer.bio" class="text-[#435574] mb-6 whitespace-pre-wrap">{{ freelancer.bio }}</p>
                   <p v-else class="text-[#435574] mb-6">Nenhuma descrição disponível.</p>
 
@@ -1191,11 +1188,9 @@ onMounted(() => {
 
               <!-- Portfolio Tab -->
               <TabsContent value="portfolio">
-                <div class="mb-6">
-                  <h3 class="text-[#263238] mb-1">Portfólio</h3>
-                  <p class="text-[#435574]">
-                    Galeria de trabalhos realizados ({{ portfolio.length }} itens)
-                  </p>
+                <div class="flex items-center gap-3 mb-5">
+                  <Images class="h-6 w-6 text-[#286AD8]" />
+                  <h2 class="text-lg font-bold text-[#263238]">Portfólio</h2>
                 </div>
 
                 <div v-if="portfolio.length > 0" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1260,8 +1255,9 @@ onMounted(() => {
                   </Card>
                 </div>
                 <Card v-else class="p-12 text-center">
-                  <Award class="h-12 w-12 text-[#435574]/30 mx-auto mb-4" />
-                  <p class="text-[#435574]">Nenhum item no portfólio ainda</p>
+                  <Award class="h-10 w-10 text-gray-200 mx-auto mb-3" />
+                  <p class="font-medium text-[#263238]">Ainda sem projetos</p>
+                  <p class="text-sm text-[#435574] mt-1">Este profissional ainda não tem projetos publicados.</p>
                 </Card>
               </TabsContent>
             </Tabs>
@@ -1283,6 +1279,23 @@ onMounted(() => {
                 <div v-if="freelancer.serviceType" class="flex items-center justify-between border-t pt-3">
                   <span class="text-sm text-[#435574]">Tipo:</span>
                   <span class="text-sm font-medium text-[#263238]">{{ freelancer.serviceType }}</span>
+                </div>
+
+                <div
+                  v-if="freelancer.subcategory || freelancer.subcategoryLabels?.length"
+                  class="border-t pt-3"
+                >
+                  <p class="text-sm text-[#435574] mb-2">Subcategorias:</p>
+                  <div class="flex flex-wrap gap-1">
+                    <Badge
+                      v-for="subcategory in (freelancer.subcategoryLabels?.length ? freelancer.subcategoryLabels : [freelancer.subcategory])"
+                      :key="subcategory"
+                      variant="outline"
+                      class="text-[10px] bg-white text-gray-600"
+                    >
+                      {{ subcategory }}
+                    </Badge>
+                  </div>
                 </div>
 
                 <div v-if="hasOnsiteServices && freelancer.serviceCities?.length" class="border-t pt-3">
@@ -1344,7 +1357,7 @@ onMounted(() => {
 
     <!-- Project Details Modal -->
     <Dialog :open="selectedProject !== null" @update:open="(val) => !val && (selectedProject = null)">
-      <DialogContent class="max-w-4xl max-h-[90vh] p-0 border-none bg-transparent" :hide-close="true">
+      <DialogContent class="max-w-[80vw] lg:max-w-5xl xl:max-w-6xl 2xl:max-w-7xl max-h-[90vh] p-0 border-none bg-transparent" :hide-close="true">
         <div class="relative bg-white rounded-xl overflow-hidden shadow-2xl h-[80vh]">
           <!-- Custom Close Button -->
           <button
@@ -1449,7 +1462,7 @@ onMounted(() => {
 
                 <!-- NEW: Project Links in Modal -->
                 <div v-if="selectedProject?.projectUrl || selectedProject?.videoUrl" class="flex flex-col sm:flex-row gap-3 pt-6 border-t border-gray-100">
-                  <Button v-if="selectedProject?.projectUrl" asChild class="flex-1 bg-[#286AD8] hover:bg-[#435574]">
+                  <Button v-if="selectedProject?.projectUrl" asChild class="flex-1">
                     <a :href="selectedProject.projectUrl" target="_blank" class="flex items-center justify-center">
                       <ExternalLink class="h-4 w-4 mr-2" />
                       Acessar Projeto
@@ -1478,7 +1491,7 @@ onMounted(() => {
             <DialogTitle>Solicitar Orçamento</DialogTitle>
           </DialogHeader>
 
-          <div>
+          <div v-if="false">
             <Label class="text-[#435574] mb-2 block text-sm">
               Orçamento estimado <span class="text-red-500">*</span>
             </Label>
@@ -1496,17 +1509,21 @@ onMounted(() => {
                 @paste.prevent="handleBudgetPaste"
                 class="pl-10"
                 :class="{ 
-                  'border-red-500 focus-visible:ring-red-500': quoteBudget && Number(quoteBudget) < 5,
+                  'border-red-500 focus-visible:ring-red-500': quoteBudget && Number(quoteBudget) < 20,
                   'border-amber-500 focus-visible:ring-amber-500': Number(quoteBudget) >= 1000000
                 }"
               />
             </div>
-            <p v-if="quoteBudget && Number(quoteBudget) < 5" class="text-[11px] text-red-500 font-medium mt-1">
-              O orçamento mínimo é R$ 5,00
+            <p v-if="quoteBudget && Number(quoteBudget) < 20" class="text-[11px] text-red-500 font-medium mt-1">
+              O orçamento mínimo é R$ 20,00
             </p>
             <p v-else-if="Number(quoteBudget) >= 1000000" class="text-[11px] text-amber-600 font-medium mt-1">
               Valor máximo atingido: R$ 1.000.000,00
             </p>
+          </div>
+
+          <div class="rounded-lg border border-blue-100 bg-blue-50/60 p-3 text-sm text-[#435574]">
+            O valor não é informado nesta etapa. Descreva o escopo e o freelancer enviará o orçamento depois.
           </div>
 
           <div class="space-y-3">
@@ -1741,7 +1758,7 @@ onMounted(() => {
 
           <Button
             @click="handleSendQuote"
-            class="w-full bg-[#286AD8]"
+            class="w-full"
             :disabled="isSendingQuote"
           >
             <Loader2 v-if="isSendingQuote" class="h-4 w-4 mr-2 animate-spin" />
