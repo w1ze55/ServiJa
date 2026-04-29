@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, inject, ref, watch } from 'vue';
+import { computed, inject, Ref, ref, watch } from 'vue';
 import { cn } from './utils';
 
 interface Props {

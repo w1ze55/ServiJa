@@ -120,21 +120,6 @@ const handleGoToChat = () => {
                 Se precisar alinhar novos detalhes, continue a conversa pelo chat.
               </p>
             </div>
-
-            <DialogFooter class="sm:justify-between">
-              <Button
-                v-if="props.onGoToChat"
-                @click="handleGoToChat"
-                variant="outline"
-                class="border-primary text-primary"
-              >
-                <MessageSquare class="mr-2 h-4 w-4" />
-                Ir para o Chat
-              </Button>
-              <Button @click="closeModal" variant="outline">
-                Fechar
-              </Button>
-            </DialogFooter>
           </div>
         </div>
       </div>

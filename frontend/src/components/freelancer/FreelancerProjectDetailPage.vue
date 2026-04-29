@@ -752,7 +752,7 @@ const handleUploadFiles = async () => {
             <h3 class="font-bold text-[#263238] mb-4 text-left">Cliente</h3>
             <Avatar class="h-24 w-24 mx-auto mb-4 border-4 border-blue-50">
               <AvatarImage :src="project.clientAvatar" />
-              <AvatarFallback class="bg-amber-100 text-amber-700 text-2xl font-bold">
+              <AvatarFallback class="bg-blue-100 text-blue-700 text-2xl font-bold">
                 {{ getInitials(project.clientName || 'Cliente') }}
               </AvatarFallback>
             </Avatar>
@@ -845,7 +845,7 @@ const handleUploadFiles = async () => {
               O cliente será notificado e poderá revisar a entrega. Certifique-se de que todos os arquivos
               e marcos estão finalizados antes de confirmar.
               <br /><br />
-              <span class="text-amber-600 font-medium">Esta acao nao pode ser desfeita.</span>
+              <span class="text-amber-600 font-medium">Esta ação nao pode ser desfeita.</span>
             </template>
           </AlertDialogDescription>
         </AlertDialogHeader>

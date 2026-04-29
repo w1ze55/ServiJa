@@ -343,7 +343,7 @@ const uploadSelectedImages = async (files: File[]) => {
   }
 
   if (formData.value.images.length + files.length > 5) {
-    toast.error('MÃ¡ximo de 5 imagens permitido');
+    toast.error('Máximo de 5 imagens permitido');
     return;
   }
 
@@ -355,7 +355,7 @@ const uploadSelectedImages = async (files: File[]) => {
 
   const oversizedFiles = files.filter((file) => file.size > 10 * 1024 * 1024);
   if (oversizedFiles.length > 0) {
-    toast.error('Cada imagem deve ter no mÃ¡ximo 10MB');
+    toast.error('Cada imagem deve ter no máximo 10MB');
     return;
   }
 

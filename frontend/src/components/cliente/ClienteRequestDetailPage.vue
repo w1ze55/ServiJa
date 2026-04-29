@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { ref, computed, onMounted, nextTick, watch } from 'vue';
 import {
   ArrowLeft,
@@ -18,7 +18,6 @@ import {
   FileText,
   Eye,
   Download,
-  Sparkles,
 } from 'lucide-vue-next';
 import FileAttachment from '../shared/FileAttachment.vue';
 import Button from '../ui/button.vue';
@@ -348,20 +347,21 @@ const getStatusColor = (status: string) => {
             request.status === 'accepted' &&
             !request.auditLog?.some((log) => log.operationKey === 'PAYMENT_CONFIRMED')
           " 
-          class="mt-4 p-4 rounded-lg border-2 border-green-300 bg-gradient-to-r from-green-50 to-blue-50 flex items-start gap-3"
+          class="mt-4 flex items-start gap-4 rounded-lg border border-emerald-200 bg-emerald-50/60 p-4 sm:p-5"
         >
-          <div class="flex-shrink-0 w-10 h-10 bg-green-600 rounded-full flex items-center justify-center">
-            <CreditCard class="h-5 w-5 text-white" />
+          <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border border-emerald-200 bg-white text-emerald-600">
+            <CreditCard class="h-5 w-5" />
           </div>
           <div class="flex-1">
-            <p class="font-semibold text-green-900 mb-1">Ação Necessária: Pagamento Pendente</p>
-            <p class="text-sm text-green-800 mb-3">
+            <p class="mb-1 font-semibold text-[#263238]">Ação Necessária: Pagamento Pendente</p>
+            <p class="mb-4 text-sm leading-6 text-[#435574]">
               Sua proposta foi aceita! Complete o pagamento agora para garantir o serviço e iniciar o trabalho com <span class="font-semibold">{{ request.freelancerName }}</span>.
             </p>
             <Button
               @click="handleGoToCheckout"
               variant="success"
               size="sm"
+              class="w-full sm:w-auto"
             >
               <CreditCard class="h-4 w-4 mr-2" />
               Realizar Pagamento Agora
@@ -825,82 +825,67 @@ const getStatusColor = (status: string) => {
       </DialogContent>
     </Dialog>
 
-    <!-- Celebration Modal - "Hora de Fechar!" -->
+    <!-- Accepted Proposal Modal -->
     <Dialog :open="showCelebrationModal" @update:open="(val) => showCelebrationModal = val">
       <DialogContent class="sm:max-w-lg">
-        <div class="text-center space-y-6 py-4">
-          <!-- Animated Icon -->
-          <div class="relative inline-flex">
-            <div class="absolute inset-0 animate-ping opacity-75">
-              <div class="w-24 h-24 bg-green-200 rounded-full mx-auto"></div>
+        <div class="space-y-6 py-2">
+          <DialogHeader class="space-y-4 text-center">
+            <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-green-100 text-green-600">
+              <CheckCircle class="h-7 w-7" />
             </div>
-            <div class="relative w-24 h-24 bg-gradient-to-br from-green-400 to-green-600 rounded-full mx-auto flex items-center justify-center">
-              <CheckCircle class="h-12 w-12 text-white" />
+            <div class="space-y-2">
+              <DialogTitle class="text-2xl font-semibold text-[#263238]">
+                Proposta aceita com sucesso
+              </DialogTitle>
+              <DialogDescription class="text-sm leading-6 text-[#435574]">
+                Você aceitou a proposta de
+                <span class="font-semibold text-[#263238]">{{ request?.freelancerName }}</span>.
+                Para garantir o serviço e iniciar o trabalho, siga para o pagamento.
+              </DialogDescription>
             </div>
-          </div>
+          </DialogHeader>
 
-          <!-- Title -->
-          <div>
-            <h2 class="text-3xl font-bold text-[#263238] mb-2 flex items-center justify-center gap-2">
-              <Sparkles class="h-6 w-6 text-yellow-500" />
-              Hora de Fechar!
-              <Sparkles class="h-6 w-6 text-yellow-500" />
-            </h2>
-            <p class="text-lg text-green-600 font-semibold">Proposta Aceita com Sucesso!</p>
-          </div>
-
-          <!-- Message -->
-          <div class="bg-gradient-to-r from-green-50 to-blue-50 rounded-lg p-6 space-y-3">
-            <p class="text-[#263238]">
-              Parabéns! Você acaba de aceitar a proposta de
-              <span class="font-semibold">{{ request?.freelancerName }}</span>
-            </p>
-            <p class="text-sm text-[#435574]">
-              Para garantir o serviço e iniciar o trabalho, realize o pagamento agora mesmo.
-            </p>
-          </div>
-
-          <!-- Service Summary -->
-          <div v-if="request?.freelancerResponse" class="bg-white border-2 border-green-200 rounded-lg p-4 space-y-2">
-            <div class="flex justify-between items-center">
-              <span class="text-sm text-[#435574]">Valor do serviço:</span>
-              <span class="text-lg font-bold text-green-600">
+          <div
+            v-if="request?.freelancerResponse"
+            class="rounded-lg border border-slate-200 bg-slate-50 p-4"
+          >
+            <div class="flex items-center justify-between gap-4 py-1">
+              <span class="text-sm text-[#435574]">Valor do serviço</span>
+              <span class="text-base font-semibold text-[#263238]">
                 {{ formatCurrency(request.freelancerResponse.value) }}
               </span>
             </div>
-            <div class="flex justify-between items-center">
-              <span class="text-sm text-[#435574]">Prazo de execução:</span>
-              <span class="font-semibold text-[#263238]">
+            <div class="mt-3 flex items-center justify-between gap-4 border-t border-slate-200 pt-3">
+              <span class="text-sm text-[#435574]">Prazo de execução</span>
+              <span class="text-sm font-semibold text-[#263238]">
                 {{ request.freelancerResponse.executionDays }} dias
               </span>
             </div>
           </div>
 
-          <!-- Action Buttons -->
-          <div class="space-y-3 pt-4">
+          <div class="flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-3 text-xs text-[#435574]">
+            <Lock class="h-4 w-4 text-green-600" />
+            <span>Pagamento seguro e protegido</span>
+          </div>
+
+          <DialogFooter class="flex-col gap-3 sm:flex-col">
             <Button
               @click="handleGoToCheckout"
               variant="success"
-              class="w-full py-6 text-lg"
+              class="w-full"
               size="lg"
             >
-              <CreditCard class="h-6 w-6 mr-2" />
-              Ir para Pagamento
+              <CreditCard class="h-5 w-5 mr-2" />
+              Ir para pagamento
             </Button>
             <Button
               @click="showCelebrationModal = false"
-              variant="ghost"
+              variant="outline"
               class="w-full"
             >
-              Fazer Depois
+              Fazer depois
             </Button>
-          </div>
-
-          <!-- Trust Badge -->
-          <div class="flex items-center justify-center gap-2 text-xs text-[#435574]">
-            <Lock class="h-4 w-4 text-green-600" />
-            <span>Pagamento 100% seguro e protegido</span>
-          </div>
+          </DialogFooter>
         </div>
       </DialogContent>
     </Dialog>
