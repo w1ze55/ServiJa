@@ -15,7 +15,7 @@ onMounted(() => {
     user.value = JSON.parse(userData);
     // Verificar se é realmente um freelancer
     if (user.value.type !== 'provider') {
-      router.push('/cliente-dashboard');
+      router.push('/cliente-home');
     }
   } else {
     router.push('/login');

@@ -38,7 +38,7 @@ onMounted(async () => {
 
     const negotiatedPrice = data.responseValue ?? data.counterValue;
     if (!negotiatedPrice) {
-      error.value = 'O freelancer ainda nao enviou um valor para esta solicitacao';
+      error.value = 'O freelancer ainda não enviou um valor para esta solicitação';
       isLoading.value = false;
       return;
     }

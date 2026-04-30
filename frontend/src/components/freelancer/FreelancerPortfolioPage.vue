@@ -12,7 +12,6 @@ import {
   Tag,
   X,
   X as CloseIcon,
-  Upload,
   Search,
   Filter,
   Grid3x3,
@@ -51,9 +50,9 @@ import SelectContent from '../ui/select-content.vue';
 import SelectItem from '../ui/select-item.vue';
 import SelectTrigger from '../ui/select-trigger.vue';
 import SelectValue from '../ui/select-value.vue';
+import ImageUploadField from '../shared/ImageUploadField.vue';
 import { toast } from '../../utils/toast';
 import api from '@/api/config/axios';
-import { uploadImages } from '@/api/uploadService';
 import { useCategoryCatalogStore } from '@/stores/categoryCatalogStore';
 
 interface PortfolioImage {
@@ -124,7 +123,6 @@ const projectForm = ref({
   category: '',
   subcategory: '',
   tags: [] as string[],
-  images: [] as File[],
   imageUrls: [] as string[],
   videoUrl: '',
   projectUrl: '',
@@ -135,7 +133,6 @@ const projectForm = ref({
 
 const tagInput = ref('');
 const isLoading = ref(false);
-const isUploading = ref(false);
 const selectedSubcategories = computed(() =>
   categoryCatalogStore.getSubcategoriesByCategoryId(projectForm.value.categoryId)
 );
@@ -256,47 +253,31 @@ const handleRemoveTag = (tag: string) => {
   };
 };
 
-const handleImageUploadClick = () => {
-  const input = document.getElementById('image-upload') as HTMLInputElement;
-  if (input) {
-    input.click();
-  }
+
+const handleProjectImageUrlsChange = (urls: string[]) => {
+  projectForm.value = {
+    ...projectForm.value,
+    imageUrls: urls,
+  };
 };
 
-const handleImageUpload = async (e: Event) => {
-  const target = e.target as HTMLInputElement;
-  if (target.files && target.files.length > 0) {
-    // Validar tamanho dos arquivos (10MB max)
-    const files = Array.from(target.files);
-    const oversizedFiles = files.filter((file) => file.size > 10 * 1024 * 1024);
-    if (oversizedFiles.length > 0) {
-      toast.error('Cada imagem deve ter no máximo 10MB');
-      target.value = ''; // Limpar input
-      return;
-    }
+const normalizeExternalUrl = (value: string) => {
+  const trimmedValue = value.trim();
 
-    isUploading.value = true;
-    try {
-      const uploadedUrls = await uploadImages(files);
-      projectForm.value = {
-        ...projectForm.value,
-        images: [], // Não precisamos mais dos Files
-        imageUrls: [...projectForm.value.imageUrls, ...uploadedUrls],
-      };
-      toast.success(`${files.length} imagem(ns) enviada(s) com sucesso`);
-    } catch (error) {
-      console.error('Erro ao fazer upload:', error);
-      toast.error('Erro ao enviar imagem(ns). Tente novamente.');
-    } finally {
-      isUploading.value = false;
-      target.value = ''; // Limpar input
-    }
+  if (!trimmedValue) {
+    return '';
   }
+
+  if (/^https?:\/\//i.test(trimmedValue)) {
+    return trimmedValue;
+  }
+
+  return `https://${trimmedValue}`;
 };
 
-const handleRemoveImage = (index: number) => {
-  const newUrls = projectForm.value.imageUrls.filter((_, i) => i !== index);
-  projectForm.value = { ...projectForm.value, imageUrls: newUrls };
+const normalizeProjectLinks = () => {
+  projectForm.value.videoUrl = normalizeExternalUrl(projectForm.value.videoUrl);
+  projectForm.value.projectUrl = normalizeExternalUrl(projectForm.value.projectUrl);
 };
 
 const handleSaveProject = async () => {
@@ -319,6 +300,8 @@ const handleSaveProject = async () => {
     toast.error('Adicione pelo menos uma imagem ao projeto');
     return;
   }
+
+  normalizeProjectLinks();
 
   isLoading.value = true;
 
@@ -377,7 +360,6 @@ const resetForm = () => {
     category: '',
     subcategory: '',
     tags: [],
-    images: [],
     imageUrls: [],
     videoUrl: '',
     projectUrl: '',
@@ -398,7 +380,6 @@ const handleEditProject = (project: PortfolioProject) => {
     category: project.category,
     subcategory: project.subcategory || '',
     tags: project.tags,
-    images: [],
     imageUrls: project.images.map((img) => img.url),
     videoUrl: project.videoUrl || '',
     projectUrl: project.projectUrl || '',
@@ -865,52 +846,13 @@ const handleTagKeyPress = (e: KeyboardEvent) => {
           </div>
 
           <!-- Images -->
-          <div class="space-y-2">
-            <Label>Imagens do Projeto *</Label>
-            <div 
-              class="border-2 border-dashed rounded-lg p-8 text-center transition-colors"
-              :class="isUploading ? 'border-[#286AD8] bg-blue-50' : 'border-gray-300 hover:border-[#286AD8] cursor-pointer'"
-            >
-              <template v-if="!isUploading">
-                <Upload class="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <p class="text-[#263238] mb-2">Clique para fazer upload ou arraste as imagens</p>
-                <p class="text-sm text-[#435574] mb-4">PNG, JPG até 10MB cada</p>
-                <input
-                  type="file"
-                  multiple
-                  accept="image/*"
-                  @change="handleImageUpload"
-                  class="hidden"
-                  id="image-upload"
-                  :disabled="isUploading"
-                />
-                <Button @click="handleImageUploadClick" size="sm">
-                  Selecionar Imagens
-                </Button>
-              </template>
-              <template v-else>
-                <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-[#286AD8] mx-auto mb-4"></div>
-                <p class="text-[#286AD8] mb-2">Enviando imagens...</p>
-                <p class="text-sm text-[#435574]">Aguarde o upload ser concluído</p>
-              </template>
-            </div>
-
-            <div v-if="projectForm.imageUrls.length > 0" class="grid grid-cols-3 gap-4 mt-4">
-              <div
-                v-for="(url, index) in projectForm.imageUrls"
-                :key="index"
-                class="relative group aspect-video rounded-lg overflow-hidden"
-              >
-                <img :src="url" :alt="`Preview ${index + 1}`" class="w-full h-full object-cover" />
-                <button
-                  @click="handleRemoveImage(index)"
-                  class="absolute top-2 right-2 bg-destructive text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                >
-                  <X class="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-          </div>
+          <ImageUploadField
+            label="Imagens do Projeto"
+            required
+            helper-text="PNG, JPG até 10MB cada"
+            :model-value="projectForm.imageUrls"
+            @update:model-value="handleProjectImageUrlsChange"
+          />
 
           <!-- Optional Links -->
           <div class="grid grid-cols-2 gap-4">
@@ -920,6 +862,7 @@ const handleTagKeyPress = (e: KeyboardEvent) => {
                 id="videoUrl"
                 :model-value="projectForm.videoUrl"
                 @update:model-value="(val: string) => projectForm.videoUrl = val"
+                @blur="projectForm.videoUrl = normalizeExternalUrl(projectForm.videoUrl)"
                 placeholder="https://youtube.com/..."
               />
             </div>
@@ -930,6 +873,7 @@ const handleTagKeyPress = (e: KeyboardEvent) => {
                 id="projectUrl"
                 :model-value="projectForm.projectUrl"
                 @update:model-value="(val: string) => projectForm.projectUrl = val"
+                @blur="projectForm.projectUrl = normalizeExternalUrl(projectForm.projectUrl)"
                 placeholder="https://..."
               />
             </div>

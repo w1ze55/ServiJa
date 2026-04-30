@@ -197,9 +197,9 @@ const projectProgress = computed(() => {
 
 const currentStepLabel = computed(() => {
   if (pendingAdjustment.value) return 'Cliente solicitou ajustes na entrega';
-  if (project.value?.status === 'delivered') return 'Entrega enviada, aguardando aprovacao do cliente';
-  if (project.value?.status === 'completed') return 'Projeto concluido';
-  if (hasMilestones.value) return `${completedMilestones.value} de ${projectMilestones.value.length} marcos concluidos`;
+  if (project.value?.status === 'delivered') return 'Entrega enviada, aguardando aprovação do cliente';
+  if (project.value?.status === 'completed') return 'Projeto concluído';
+  if (hasMilestones.value) return `${completedMilestones.value} de ${projectMilestones.value.length} marcos concluídos`;
   if (project.value?.status === 'in_progress') return 'Trabalho em andamento';
   return 'Projeto em acompanhamento';
 });
@@ -249,7 +249,7 @@ const formatCurrency = (value?: number | null) => {
 };
 
 const formatDate = (dateString?: string | null) => {
-  if (!dateString) return 'Nao informado';
+  if (!dateString) return 'Não informado';
   return formatApiDate(dateString, {
     day: '2-digit',
     month: '2-digit',
@@ -269,7 +269,7 @@ const getMilestoneStatusConfig = (status: Milestone['status']) => {
   switch (status) {
     case 'completed':
       return {
-        label: 'Concluido',
+        label: 'Concluído',
         class: 'bg-green-100 text-green-700 hover:bg-green-100',
       };
     case 'in_progress':
@@ -316,7 +316,7 @@ const handleMilestoneComplete = async (milestone: Milestone) => {
 
   if (success) {
     project.value = proposalStore.getProposalById(project.value.id) || project.value;
-    const label = newStatus === 'completed' ? 'marcado como concluido' : 'desmarcado';
+    const label = newStatus === 'completed' ? 'marcado como concluído' : 'desmarcado';
     toast.success(`Marco "${milestone.title}" ${label}.`);
     return;
   }
@@ -334,7 +334,7 @@ const handleCompleteDelivery = async () => {
     const success = await proposalStore.completeProposal(currentId);
 
     if (success) {
-      toast.success('Entrega concluida com sucesso! O cliente sera notificado.');
+      toast.success('Entrega concluída com sucesso! O cliente será notificado.');
       showCompleteDialog.value = false;
       await loadData();
       return;
@@ -363,7 +363,7 @@ const handleCompleteAdjustment = async () => {
 
     if (successAdjustment) {
       await proposalStore.completeProposal(currentId);
-      toast.success('Ajustes finalizados e enviados ao cliente para nova avaliacao.');
+      toast.success('Ajustes finalizados e enviados ao cliente para nova avaliação.');
       showCompleteAdjustmentDialog.value = false;
       await loadData();
       return;
@@ -391,7 +391,7 @@ const openUploadDialog = () => {
 
 const handleUploadFiles = async () => {
   if (!project.value) {
-    toast.error('Projeto nao encontrado');
+    toast.error('Projeto não encontrado');
     return;
   }
 
@@ -493,9 +493,9 @@ const handleUploadFiles = async () => {
       <div class="inline-flex p-6 bg-gray-100 rounded-full mb-6">
         <FileText class="h-16 w-16 text-gray-400" />
       </div>
-      <h2 class="text-xl font-semibold text-[#263238] mb-2">Projeto nao encontrado</h2>
+      <h2 class="text-xl font-semibold text-[#263238] mb-2">Projeto não encontrado</h2>
       <p class="text-[#435574] mb-6">
-        Nao foi possivel localizar esse projeto na sua lista de entregas.
+        Não foi possível localizar esse projeto na sua lista de entregas.
       </p>
       <Button @click="goBack" variant="default">Voltar para projetos</Button>
     </Card>
@@ -685,7 +685,7 @@ const handleUploadFiles = async () => {
                       :size="attachment.size"
                       :description="attachment.description"
                       variant="amber"
-                      sender-info="Enviado por voce"
+                      sender-info="Enviado por você"
                     />
                   </div>
                 </div>
@@ -699,7 +699,7 @@ const handleUploadFiles = async () => {
                     <h3 class="text-lg font-semibold text-[#263238]">Marcos do Projeto</h3>
                     <p class="text-sm text-[#435574]">
                       {{ completedMilestones }} de {{ projectMilestones.length }}
-                      {{ projectMilestones.length === 1 ? 'marco concluido' : 'marcos concluidos' }}
+                      {{ projectMilestones.length === 1 ? 'marco concluído' : 'marcos concluídos' }}
                     </p>
                   </div>
                   <Badge class="bg-white text-[#263238] border border-slate-200 hover:bg-white">
@@ -752,7 +752,7 @@ const handleUploadFiles = async () => {
             <h3 class="font-bold text-[#263238] mb-4 text-left">Cliente</h3>
             <Avatar class="h-24 w-24 mx-auto mb-4 border-4 border-blue-50">
               <AvatarImage :src="project.clientAvatar" />
-              <AvatarFallback class="bg-amber-100 text-amber-700 text-2xl font-bold">
+              <AvatarFallback class="bg-blue-100 text-blue-700 text-2xl font-bold">
                 {{ getInitials(project.clientName || 'Cliente') }}
               </AvatarFallback>
             </Avatar>
@@ -762,7 +762,7 @@ const handleUploadFiles = async () => {
             <div class="pt-4 border-t text-left space-y-3">
               <div class="flex items-start gap-2 text-sm text-[#435574]">
                 <MapPin class="h-4 w-4 text-blue-500 mt-0.5 shrink-0" />
-                <span>{{ project.clientLocation || 'Local nao informado' }}</span>
+                <span>{{ project.clientLocation || 'Local não informado' }}</span>
               </div>
               <div class="flex items-center gap-2 text-sm text-[#435574]">
                 <Calendar class="h-4 w-4 text-blue-500 shrink-0" />
@@ -785,7 +785,7 @@ const handleUploadFiles = async () => {
               </div>
               <div class="flex justify-between items-center text-sm">
                 <span class="text-[#435574]">Taxa da plataforma (5%)</span>
-                <span class="font-semibold text-amber-600">{{ formatCurrency(platformFee) }}</span>
+                <span class="font-semibold text-gray-600">{{ formatCurrency(platformFee) }}</span>
               </div>
               <div class="pt-4 border-t flex justify-between items-center">
                 <span class="font-bold text-[#263238]">Valor a receber</span>
@@ -822,8 +822,8 @@ const handleUploadFiles = async () => {
                         : 'text-green-600',
                   ]"
                 >
-                  <template v-if="remainingDays == null">Nao informado</template>
-                  <template v-else-if="remainingDays < 0">{{ Math.abs(remainingDays) }} dias atrasado</template>
+                  <template v-if="remainingDays == null">Não informado</template>
+                  <template v-else-if="remainingDays < 0">{{ Math.abs(remainingDays) }} dias de atraso</template>
                   <template v-else-if="remainingDays === 0">Vence hoje</template>
                   <template v-else>{{ remainingDays }} dias restantes</template>
                 </p>
@@ -840,12 +840,12 @@ const handleUploadFiles = async () => {
           <AlertDialogTitle>Concluir Entrega do Projeto</AlertDialogTitle>
           <AlertDialogDescription>
             <template v-if="project">
-              Voce esta prestes a marcar o projeto <strong>"{{ project.service }}"</strong> como concluido.
+              Você está prestes a marcar o projeto <strong>"{{ project.service }}"</strong> como concluído.
               <br /><br />
-              O cliente sera notificado e podera revisar a entrega. Certifique-se de que todos os arquivos
-              e marcos estao finalizados antes de confirmar.
+              O cliente será notificado e poderá revisar a entrega. Certifique-se de que todos os arquivos
+              e marcos estão finalizados antes de confirmar.
               <br /><br />
-              <span class="text-amber-600 font-medium">Esta acao nao pode ser desfeita.</span>
+              <span class="text-amber-600 font-medium">Esta ação nao pode ser desfeita.</span>
             </template>
           </AlertDialogDescription>
         </AlertDialogHeader>
@@ -856,7 +856,7 @@ const handleUploadFiles = async () => {
           <AlertDialogAction @click="handleCompleteDelivery" :disabled="isCompleting">
             <Loader2 v-if="isCompleting" class="h-4 w-4 mr-2 animate-spin" />
             <Check v-else class="h-4 w-4 mr-2" />
-            {{ isCompleting ? 'Concluindo...' : 'Confirmar Conclusao' }}
+            {{ isCompleting ? 'Concluindo...' : 'Confirmar Conclusão' }}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
@@ -871,11 +871,11 @@ const handleUploadFiles = async () => {
           <AlertDialogTitle>Finalizar e Reenviar Projeto</AlertDialogTitle>
           <AlertDialogDescription>
             <template v-if="project">
-              Voce esta prestes a finalizar os ajustes do projeto
+              Você está prestes a finalizar os ajustes do projeto
               <strong>"{{ project.service }}"</strong>. <br /><br />
-              Certifique-se de que todas as correcoes solicitadas pelo cliente foram realizadas e que voce fez
-              o upload dos novos arquivos, caso necessario. <br /><br />
-              O projeto sera novamente enviado para avaliacao e aprovacao final do cliente.
+              Certifique-se de que todas as correções solicitadas pelo cliente foram realizadas e que você fez
+              o upload dos novos arquivos, caso necessário. <br /><br />
+              O projeto será novamente enviado para avaliação e aprovação final do cliente.
             </template>
           </AlertDialogDescription>
         </AlertDialogHeader>

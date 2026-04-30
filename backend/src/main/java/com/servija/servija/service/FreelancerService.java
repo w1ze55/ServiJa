@@ -6,16 +6,21 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.servija.servija.dto.FreelancerProfileRequest;
 import com.servija.servija.dto.FreelancerProfileResponse;
 import com.servija.servija.dto.NearbyFreelancerResponse;
+import com.servija.servija.dto.ProfessionalLinkResponse;
+import com.servija.servija.dto.ServiceCityRequest;
+import com.servija.servija.dto.ServiceCityResponse;
 import com.servija.servija.model.Address;
 import com.servija.servija.model.Freelancer;
+import com.servija.servija.model.ProfessionalLink;
+import com.servija.servija.model.ServiceCity;
 import com.servija.servija.model.ServiceSubcategory;
+import com.servija.servija.model.ServiceRequest;
 import com.servija.servija.model.User;
 import com.servija.servija.repository.AddressRepository;
 import com.servija.servija.repository.FreelancerRepository;
-import com.servija.servija.repository.UserRepository;
-import com.servija.servija.repository.ServiceRequestRepository;
 import com.servija.servija.repository.ReviewRepository;
-import com.servija.servija.model.ServiceRequest;
+import com.servija.servija.repository.ServiceRequestRepository;
+import com.servija.servija.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
@@ -24,17 +29,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
-import com.servija.servija.dto.ServiceCityResponse;
-import com.servija.servija.dto.ProfessionalLinkResponse;
-import com.servija.servija.model.ServiceCity;
-import com.servija.servija.model.ProfessionalLink;
-
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -49,6 +52,7 @@ public class FreelancerService {
     private final ReviewRepository reviewRepository;
     private final ObjectMapper objectMapper;
     private final CategoryCatalogService categoryCatalogService;
+    private final IbgeLocationService ibgeLocationService;
 
     @Transactional(readOnly = true)
     public FreelancerProfileResponse getProfile() {
@@ -129,17 +133,29 @@ public class FreelancerService {
 
         // Atualizar serviceCities (formato novo - entidades)
         if (request.getServiceCities() != null) {
+            List<NormalizedServiceCity> normalizedCities = validateAndNormalizeServiceCities(
+                    freelancer,
+                    request.getServiceCities());
+
             // Remover todas as cidades antigas
             freelancer.getServiceCities().clear();
 
             // Adicionar as novas cidades
-            for (ServiceCityResponse cityDto : request.getServiceCities()) {
+            for (NormalizedServiceCity cityDto : normalizedCities) {
                 ServiceCity serviceCity = ServiceCity.builder()
                         .freelancer(freelancer)
                         .city(cityDto.getCity())
-                        .state(cityDto.getState())
-                        .build();
-                freelancer.getServiceCities().add(serviceCity);
+                        .state(cityDto.getState());
+
+                // Reusar coordenadas já persistidas quando disponíveis; caso contrário geocodifica
+                if (cityDto.getLatitude() != null && cityDto.getLongitude() != null) {
+                    builder.latitude(cityDto.getLatitude()).longitude(cityDto.getLongitude());
+                } else {
+                    geocodingService.geocodeCity(cityDto.getCity(), cityDto.getState())
+                            .ifPresent(coords -> builder.latitude(coords.latitude()).longitude(coords.longitude()));
+                }
+
+                freelancer.getServiceCities().add(builder.build());
             }
         }
 
@@ -226,6 +242,8 @@ public class FreelancerService {
                             .id(sc.getId())
                             .city(sc.getCity())
                             .state(sc.getState())
+                            .latitude(sc.getLatitude())
+                            .longitude(sc.getLongitude())
                             .build())
                     .collect(Collectors.toList());
         }
@@ -314,7 +332,6 @@ public class FreelancerService {
             BigDecimal longitude,
             Double radiusKm,
             String category) {
-        List<Freelancer> freelancers;
 
         if (category != null && !category.isEmpty()) {
             freelancers = freelancerRepository.findAllWithLocation().stream()
@@ -324,16 +341,53 @@ public class FreelancerService {
             freelancers = freelancerRepository.findAllWithLocation();
         }
 
-        return freelancers.stream()
-                .map(f -> {
-                    Double distance = calculateDistance(
-                            latitude.doubleValue(),
-                            longitude.doubleValue(),
-                            f.getLatitude().doubleValue(),
-                            f.getLongitude().doubleValue());
-                    return mapToNearbyResponse(f, distance);
-                })
-                .filter(f -> f.getDistance() <= radiusKm)
+        // Freelancers com coordenadas em service_cities (novo modelo)
+        List<Freelancer> withServiceCities = hasCategory
+                ? freelancerRepository.findByCategoryWithServiceCityCoordinates(category)
+                : freelancerRepository.findAllWithServiceCityCoordinates();
+
+        // Freelancers com coordenadas diretas na tabela freelancers (legado)
+        List<Freelancer> withDirectCoords = hasCategory
+                ? freelancerRepository.findByCategoryWithLocation(category)
+                : freelancerRepository.findAllWithLocation();
+
+        double userLat = latitude.doubleValue();
+        double userLon = longitude.doubleValue();
+
+        // IDs já cobertos via service_cities
+        java.util.Set<Long> coveredIds = withServiceCities.stream()
+                .map(Freelancer::getId)
+                .collect(Collectors.toSet());
+
+        // Candidatos via service_cities
+        java.util.Map<Long, NearbyFreelancerResponse> results = withServiceCities.stream()
+                .flatMap(f -> f.getServiceCities().stream()
+                        .filter(sc -> sc.getLatitude() != null && sc.getLongitude() != null)
+                        .map(sc -> {
+                            double distance = calculateDistance(userLat, userLon,
+                                    sc.getLatitude().doubleValue(), sc.getLongitude().doubleValue());
+                            return mapToNearbyResponse(f, sc.getLatitude(), sc.getLongitude(), distance);
+                        }))
+                .filter(r -> r.getDistance() <= radiusKm)
+                .collect(Collectors.toMap(
+                        NearbyFreelancerResponse::getId,
+                        r -> r,
+                        (r1, r2) -> r1.getDistance() <= r2.getDistance() ? r1 : r2));
+
+        // Candidatos via coordenadas diretas (apenas os não cobertos pelo modelo novo)
+        withDirectCoords.stream()
+                .filter(f -> !coveredIds.contains(f.getId()))
+                .forEach(f -> {
+                    double distance = calculateDistance(userLat, userLon,
+                            f.getLatitude().doubleValue(), f.getLongitude().doubleValue());
+                    if (distance <= radiusKm) {
+                        results.merge(f.getId(),
+                                mapToNearbyResponse(f, f.getLatitude(), f.getLongitude(), distance),
+                                (r1, r2) -> r1.getDistance() <= r2.getDistance() ? r1 : r2);
+                    }
+                });
+
+        return results.values().stream()
                 .sorted(Comparator.comparingDouble(NearbyFreelancerResponse::getDistance))
                 .collect(Collectors.toList());
     }
@@ -352,6 +406,86 @@ public class FreelancerService {
     /**
      * Calcular distância entre dois pontos usando fórmula de Haversine
      */
+    private List<NormalizedServiceCity> validateAndNormalizeServiceCities(
+            Freelancer freelancer,
+            List<ServiceCityRequest> requestedCities) {
+        Map<Long, ServiceCity> existingCitiesById = freelancer.getServiceCities().stream()
+                .filter(existingCity -> existingCity.getId() != null)
+                .collect(Collectors.toMap(ServiceCity::getId, existingCity -> existingCity));
+        LinkedHashSet<String> uniqueCities = new LinkedHashSet<>();
+        List<NormalizedServiceCity> normalizedCities = new ArrayList<>();
+
+        for (ServiceCityRequest requestedCity : requestedCities) {
+            if (requestedCity == null) {
+                throw new IllegalArgumentException("Cidade de atendimento inválida.");
+            }
+
+            String normalizedState = normalizeState(requestedCity.getState());
+            String normalizedCity = normalizeCityValue(requestedCity.getCity());
+
+            if (!StringUtils.hasText(normalizedCity)) {
+                throw new IllegalArgumentException("Cidade de atendimento obrigatória.");
+            }
+
+            if (!StringUtils.hasText(normalizedState)) {
+                throw new IllegalArgumentException("Estado da cidade de atendimento obrigatório.");
+            }
+
+            ServiceCity existingCity = null;
+            if (requestedCity.getId() != null) {
+                existingCity = existingCitiesById.get(requestedCity.getId());
+                if (existingCity == null) {
+                    throw new IllegalArgumentException("Cidade de atendimento inválida.");
+                }
+            }
+
+            boolean unchangedExistingCity = existingCity != null
+                    && normalizeState(existingCity.getState()).equals(normalizedState)
+                    && normalizeLocationValue(existingCity.getCity()).equals(normalizeLocationValue(normalizedCity));
+
+            boolean validState = ibgeLocationService.isValidState(normalizedState);
+            if (!validState && !unchangedExistingCity) {
+                throw new IllegalArgumentException("Estado de atendimento invalido: " + normalizedState + ".");
+            }
+
+            Optional<String> canonicalCity = validState
+                    ? ibgeLocationService.findCanonicalCity(normalizedState, normalizedCity)
+                    : Optional.empty();
+            if (canonicalCity.isEmpty() && !unchangedExistingCity) {
+                throw new IllegalArgumentException(
+                        "A cidade '" + normalizedCity + "' não pertence ao estado " + normalizedState + ".");
+            }
+
+            String cityToPersist = canonicalCity.orElse(normalizedCity);
+            String duplicateKey = normalizedState + ":" + normalizeLocationValue(cityToPersist);
+            if (!uniqueCities.add(duplicateKey)) {
+                throw new IllegalArgumentException(
+                        "A cidade '" + cityToPersist + "/" + normalizedState + "' já foi informada.");
+            }
+
+            normalizedCities.add(new NormalizedServiceCity(cityToPersist, normalizedState));
+        }
+
+        return normalizedCities;
+    }
+
+    private String normalizeState(String state) {
+        return state == null ? "" : state.trim().toUpperCase(Locale.ROOT);
+    }
+
+    private String normalizeCityValue(String city) {
+        return city == null ? "" : city.trim();
+    }
+
+    private String normalizeLocationValue(String value) {
+        return value == null
+                ? ""
+                : java.text.Normalizer.normalize(value, java.text.Normalizer.Form.NFD)
+                        .replaceAll("\\p{M}", "")
+                        .trim()
+                        .toLowerCase(Locale.ROOT);
+    }
+
     private Double calculateDistance(double lat1, double lon1, double lat2, double lon2) {
         final double R = 6371; // Raio da Terra em km
 
@@ -367,8 +501,7 @@ public class FreelancerService {
         return R * c;
     }
 
-    private NearbyFreelancerResponse mapToNearbyResponse(Freelancer freelancer, Double distance) {
-        // Calcular média das avaliações e total de reviews a partir da tabela reviews
+    private NearbyFreelancerResponse mapToNearbyResponse(Freelancer freelancer, BigDecimal latitude, BigDecimal longitude, Double distance) {
         Double averageRating = reviewRepository.findAverageRatingByReviewedId(freelancer.getId());
         long totalReviewsCount = reviewRepository.countByReviewedId(freelancer.getId());
 
@@ -380,9 +513,9 @@ public class FreelancerService {
                 .rating(averageRating != null ? BigDecimal.valueOf(averageRating) : null)
                 .totalReviews((int) totalReviewsCount)
                 .location(freelancer.getLocation())
-                .latitude(freelancer.getLatitude())
-                .longitude(freelancer.getLongitude())
-                .distance(Math.round(distance * 100.0) / 100.0) // Arredondar para 2 casas decimais
+                .latitude(latitude)
+                .longitude(longitude)
+                .distance(Math.round(distance * 100.0) / 100.0)
                 .available(freelancer.getAvailable())
                 .category(freelancer.getCategory())
                 .build();
@@ -480,6 +613,24 @@ public class FreelancerService {
                 .anyMatch(existing -> Objects.equals(existing.getId(), candidate.getId()));
         if (!alreadyPresent) {
             subcategories.add(candidate);
+        }
+    }
+
+    private static final class NormalizedServiceCity {
+        private final String city;
+        private final String state;
+
+        private NormalizedServiceCity(String city, String state) {
+            this.city = city;
+            this.state = state;
+        }
+
+        public String getCity() {
+            return city;
+        }
+
+        public String getState() {
+            return state;
         }
     }
 }

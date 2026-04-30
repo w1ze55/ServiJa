@@ -33,8 +33,7 @@ public class GeminiService {
             GenerateContentResponse response = client.models.generateContent(
                     model,
                     prompt,
-                    null
-            );
+                    null);
             String text = response.text();
             if (text == null || text.isBlank()) {
                 throw new RuntimeException("Gemini retornou resposta vazia");

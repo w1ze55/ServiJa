@@ -17,6 +17,8 @@ public interface AddressRepository extends JpaRepository<Address, Long> {
     List<Address> findByUserOrderByIsDefaultDescCreatedAtDesc(User user);
     
     List<Address> findByUserIdOrderByIsDefaultDescCreatedAtDesc(Long userId);
+
+    List<Address> findByUserIdInOrderByUserIdAscIsDefaultDescCreatedAtDesc(List<Long> userIds);
     
     Optional<Address> findByIdAndUserId(Long id, Long userId);
     

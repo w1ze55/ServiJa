@@ -197,7 +197,7 @@ const handleSearch = (query: string) => {
 };
 
 const handleBack = () => {
-  router.push('/cliente-dashboard');
+  router.push('/cliente-home');
 };
 
 const handleViewProject = (projectId: string) => {

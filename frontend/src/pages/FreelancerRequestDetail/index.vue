@@ -18,7 +18,7 @@ onMounted(() => {
     user.value = JSON.parse(userData);
 
     if (user.value.type !== 'provider') {
-      router.push('/cliente-dashboard');
+      router.push('/cliente-home');
     }
   } else {
     router.push('/login');

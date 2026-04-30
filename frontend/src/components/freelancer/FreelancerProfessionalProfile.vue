@@ -39,6 +39,7 @@ import AlertDialogFooter from '../ui/alert-dialog-footer.vue'
 import AlertDialogHeader from '../ui/alert-dialog-header.vue'
 import AlertDialogTitle from '../ui/alert-dialog-title.vue'
 import api from '@/api/config/axios'
+import { ibgeService, type IbgeState } from '@/api/services/ibgeService'
 import { toast } from '@/utils/toast'
 import { useCategoryCatalogStore } from '@/stores/categoryCatalogStore'
 import { freelancerService } from '@/api/services/freelancerService'
@@ -51,6 +52,12 @@ const props = defineProps<Props>();
 
 interface ServiceCity {
   id: string
+  city: string
+  state: string
+}
+
+interface ServiceCityPayload {
+  id?: number
   city: string
   state: string
 }
@@ -117,11 +124,23 @@ const LINK_TYPES = [
   { value: 'other', label: 'Outro', icon: LinkIcon },
 ]
 
-const BRAZILIAN_STATES = [
-  'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA',
-  'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN',
-  'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'
-]
+const createEmptyCity = () => ({
+  city: '',
+  state: '',
+})
+
+const normalizeLocationName = (value: string) =>
+  value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase()
+
+const createTemporaryId = (prefix: string) =>
+  `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+
+const getPersistedServiceCityId = (id: string | undefined) =>
+  id && /^\d+$/.test(id) ? Number(id) : undefined
 
 const isLoading = ref(false)
 const isEditingServiceSettings = ref(false)
@@ -192,12 +211,12 @@ const buildProfessionalProfile = (data: any): ProfessionalProfile => {
   const subcategoryIds = mapSubcategoryIds(data)
   const subcategoryLabels = mapSubcategoryLabels(data)
   const mappedCities: ServiceCity[] = (data?.serviceCities || []).map((c: any) => ({
-    id: c.id?.toString() || Date.now().toString(),
+    id: c.id?.toString() || createTemporaryId('city'),
     city: c.city,
     state: c.state,
   }))
   const mappedLinks: ProfessionalLink[] = (data?.professionalLinks || []).map((l: any) => ({
-    id: l.id?.toString() || Date.now().toString(),
+    id: l.id?.toString() || createTemporaryId('link'),
     type: l.type || 'website',
     url: l.url,
     label: l.label || '',
@@ -238,16 +257,59 @@ const toggleSubcategory = (subcategoryId: number, checked: boolean) => {
 // City Dialog
 const showCityDialog = ref(false)
 const editingCity = ref<ServiceCity | null>(null)
-const newCity = ref({
-  city: '',
-  state: '',
-})
+const newCity = ref(createEmptyCity())
 const cityErrors = ref({
   city: '',
   state: '',
 })
 const isSavingCity = ref(false)
 const cityToDelete = ref<ServiceCity | null>(null)
+const stateOptions = ref<IbgeState[]>([])
+const citySearchCEP = ref('')
+const stateSearchQuery = ref('')
+const citySearchQuery = ref('')
+const stateOptionsRequest = ref<Promise<IbgeState[]> | null>(null)
+const cityOptionsCache = ref<Record<string, string[]>>({})
+const activeCityRequests = ref(0)
+const cityOptionsRequests = new Map<string, Promise<string[]>>()
+const isLoadingCEP = ref(false)
+
+const selectedState = computed(() =>
+  stateOptions.value.find((state) => state.sigla === newCity.value.state) ?? null
+)
+const selectedStateLabel = computed(() =>
+  selectedState.value ? `${selectedState.value.sigla} - ${selectedState.value.nome}` : ''
+)
+const availableCitiesForSelectedState = computed(() =>
+  newCity.value.state ? cityOptionsCache.value[newCity.value.state] || [] : []
+)
+const filteredStateOptions = computed(() => {
+  const query = normalizeLocationName(stateSearchQuery.value)
+
+  if (!query) {
+    return stateOptions.value
+  }
+
+  return stateOptions.value.filter((state) =>
+    normalizeLocationName(`${state.sigla} ${state.nome}`).includes(query)
+  )
+})
+const filteredCityOptions = computed(() => {
+  const query = normalizeLocationName(citySearchQuery.value)
+
+  if (!query) {
+    return availableCitiesForSelectedState.value
+  }
+
+  return availableCitiesForSelectedState.value.filter((city) =>
+    normalizeLocationName(city).includes(query)
+  )
+})
+const isLoadingStates = computed(() => stateOptionsRequest.value !== null)
+const isLoadingCities = computed(() => activeCityRequests.value > 0)
+const isCitySelectDisabled = computed(() =>
+  isLoadingCEP.value || isLoadingCities.value || !newCity.value.state
+)
 
 // Link Dialog
 const showLinkDialog = ref(false)
@@ -265,6 +327,7 @@ const linkToDelete = ref<ProfessionalLink | null>(null)
 
 onMounted(async () => {
   await categoryCatalogStore.loadPublicCategories()
+  void loadStateOptions()
   await loadProfileData()
 })
 
@@ -278,14 +341,14 @@ const loadProfileData = async () => {
     
     // Mapear serviceCities do backend (ids são numéricos)
     const mappedCities: ServiceCity[] = (data.serviceCities || []).map((c: any) => ({
-      id: c.id?.toString() || Date.now().toString(),
+      id: c.id?.toString() || createTemporaryId('city'),
       city: c.city,
       state: c.state,
     }))
 
     // Mapear professionalLinks do backend
     const mappedLinks: ProfessionalLink[] = (data.professionalLinks || []).map((l: any) => ({
-      id: l.id?.toString() || Date.now().toString(),
+      id: l.id?.toString() || createTemporaryId('link'),
       type: l.type || 'website',
       url: l.url,
       label: l.label || '',
@@ -333,7 +396,7 @@ const loadProfileData = async () => {
 // Service settings
 const handleSaveServiceSettings = async () => {
   if (!editedData.value.categoryId) {
-    toast.error('Categoria e obrigatoria')
+    toast.error('Categoria é obrigatória')
     return
     /*
     toast.error('Tipo de serviço é obrigatório')
@@ -344,7 +407,7 @@ const handleSaveServiceSettings = async () => {
   }
 
   if (selectedSubcategories.value.length > 0 && editedData.value.subcategoryIds.length === 0) {
-    toast.error('Subcategoria e obrigatoria')
+    toast.error('Subcategoria é obrigatória')
     return
   }
 
@@ -435,8 +498,155 @@ const clearCityErrors = () => {
   cityErrors.value = { city: '', state: '' }
 }
 
-// ViaCEP Integration para cidades
-const isLoadingCEP = ref(false)
+const clearCitySearchInputs = () => {
+  stateSearchQuery.value = ''
+  citySearchQuery.value = ''
+}
+
+const loadStateOptions = async (): Promise<IbgeState[]> => {
+  if (stateOptions.value.length > 0) {
+    return stateOptions.value
+  }
+
+  if (stateOptionsRequest.value) {
+    return stateOptionsRequest.value
+  }
+
+  stateOptionsRequest.value = ibgeService
+    .listStates()
+    .then((states) => {
+      stateOptions.value = states
+      return states
+    })
+    .catch((error) => {
+      console.error('Erro ao carregar estados do IBGE:', error)
+      toast.error('Não foi possível carregar os estados.')
+      throw error
+    })
+    .finally(() => {
+      stateOptionsRequest.value = null
+    })
+
+  return stateOptionsRequest.value
+}
+
+const ensureStateOptionsLoaded = async () => {
+  if (stateOptions.value.length === 0) {
+    await loadStateOptions()
+  }
+}
+
+const loadCitiesByState = async (state: string): Promise<string[]> => {
+  const normalizedState = state.trim().toUpperCase()
+
+  if (!normalizedState) {
+    return []
+  }
+
+  const cachedCities = cityOptionsCache.value[normalizedState]
+  if (cachedCities) {
+    return cachedCities
+  }
+
+  const pendingRequest = cityOptionsRequests.get(normalizedState)
+  if (pendingRequest) {
+    return pendingRequest
+  }
+
+  activeCityRequests.value += 1
+
+  const request = ibgeService
+    .listCitiesByState(normalizedState)
+    .then((cities) => {
+      const sortedCities = [...cities].sort((left, right) => left.localeCompare(right, 'pt-BR'))
+      cityOptionsCache.value = {
+        ...cityOptionsCache.value,
+        [normalizedState]: sortedCities,
+      }
+      return sortedCities
+    })
+    .catch((error) => {
+      console.error(`Erro ao carregar cidades do estado ${normalizedState}:`, error)
+      toast.error('Não foi possível carregar as cidades deste estado.')
+      throw error
+    })
+    .finally(() => {
+      activeCityRequests.value = Math.max(0, activeCityRequests.value - 1)
+      cityOptionsRequests.delete(normalizedState)
+    })
+
+  cityOptionsRequests.set(normalizedState, request)
+  return request
+}
+
+const findCanonicalCityName = (cities: string[], cityName: string) => {
+  const normalizedCityName = normalizeLocationName(cityName)
+  return cities.find((city) => normalizeLocationName(city) === normalizedCityName)
+}
+
+const syncCityFromStateOptions = (
+  cities: string[],
+  cityName: string,
+  source: 'cep' | 'edit'
+) => {
+  const canonicalCity = findCanonicalCityName(cities, cityName)
+
+  if (!canonicalCity) {
+    newCity.value.city = ''
+    citySearchQuery.value = ''
+    cityErrors.value.city = 'Selecione uma cidade válida para o estado informado'
+
+    if (source === 'cep') {
+      toast.error('CEP localizado, mas selecione manualmente uma cidade válida.')
+    } else {
+      toast.error('A cidade salva não foi encontrada na base atual do IBGE. Selecione outra para continuar.')
+    }
+
+    return false
+  }
+
+  newCity.value.city = canonicalCity
+  cityErrors.value.city = ''
+  citySearchQuery.value = ''
+  return true
+}
+
+const selectState = async (
+  state: string,
+  options?: {
+    cityToSelect?: string
+    source?: 'cep' | 'edit'
+  }
+) => {
+  const previousState = newCity.value.state.trim().toUpperCase()
+  const normalizedState = state.trim().toUpperCase()
+  newCity.value.state = normalizedState
+  cityErrors.value.state = ''
+  stateSearchQuery.value = ''
+  const shouldResetCity = previousState !== normalizedState || Boolean(options?.cityToSelect)
+
+  if (shouldResetCity) {
+    newCity.value.city = ''
+    cityErrors.value.city = ''
+    citySearchQuery.value = ''
+  }
+
+  if (!normalizedState) {
+    return []
+  }
+
+  const cities = await loadCitiesByState(normalizedState)
+
+  if (newCity.value.state !== normalizedState) {
+    return cities
+  }
+
+  if (options?.cityToSelect && options.source) {
+    syncCityFromStateOptions(cities, options.cityToSelect, options.source)
+  }
+
+  return cities
+}
 
 const fetchCityByCEP = async (cep: string) => {
   const cleanCEP = cep.replace(/\D/g, '')
@@ -456,9 +666,24 @@ const fetchCityByCEP = async (cep: string) => {
       return
     }
 
-    // Preencher cidade e estado automaticamente
-    newCity.value.city = data.localidade || ''
-    newCity.value.state = data.uf || ''
+    const state = typeof data.uf === 'string' ? data.uf.trim().toUpperCase() : ''
+    const city = typeof data.localidade === 'string' ? data.localidade.trim() : ''
+
+    if (!state || !city) {
+      toast.error('Não foi possível identificar a cidade deste CEP.')
+      return
+    }
+
+    try {
+      await ensureStateOptionsLoaded()
+    } catch {
+      // O fluxo por CEP ainda pode continuar com a UF retornada.
+    }
+
+    await selectState(state, {
+      cityToSelect: city,
+      source: 'cep',
+    })
 
     toast.success('Cidade encontrada!')
   } catch (error) {
@@ -468,8 +693,6 @@ const fetchCityByCEP = async (cep: string) => {
     isLoadingCEP.value = false
   }
 }
-
-const citySearchCEP = ref('')
 
 const formatCEP = (value: string) => {
   const numbers = value.replace(/\D/g, '')
@@ -483,89 +706,144 @@ const handleCEPInput = (value: string) => {
   // Auto-buscar quando CEP completo (8 dígitos)
   const cleanCEP = formatted.replace(/\D/g, '')
   if (cleanCEP.length === 8) {
-    fetchCityByCEP(cleanCEP)
+    void fetchCityByCEP(cleanCEP)
   }
 }
 
-const openAddCityDialog = () => {
-  editingCity.value = null
-  newCity.value = { city: '', state: '' }
-  citySearchCEP.value = ''
-  clearCityErrors()
-  showCityDialog.value = true
+const handleStateSelection = async (state: string) => {
+  await selectState(state)
 }
 
-const openEditCityDialog = (city: ServiceCity) => {
+const handleCitySelection = (city: string) => {
+  newCity.value.city = city
+  cityErrors.value.city = ''
+  citySearchQuery.value = ''
+}
+
+const openAddCityDialog = async () => {
+  editingCity.value = null
+  newCity.value = createEmptyCity()
+  citySearchCEP.value = ''
+  clearCityErrors()
+  clearCitySearchInputs()
+  showCityDialog.value = true
+
+  try {
+    await ensureStateOptionsLoaded()
+  } catch {
+    // O usuário ainda pode tentar novamente ao abrir o seletor.
+  }
+}
+
+const openEditCityDialog = async (city: ServiceCity) => {
   editingCity.value = city
   newCity.value = { city: city.city, state: city.state }
   citySearchCEP.value = ''
   clearCityErrors()
+  clearCitySearchInputs()
   showCityDialog.value = true
+
+  try {
+    await ensureStateOptionsLoaded()
+    await selectState(city.state, {
+      cityToSelect: city.city,
+      source: 'edit',
+    })
+  } catch {
+    // Se a carga falhar, o backend ainda validara a combinacao ao salvar.
+  }
 }
 
 const closeCityDialog = () => {
   showCityDialog.value = false
   editingCity.value = null
+  newCity.value = createEmptyCity()
   citySearchCEP.value = ''
   clearCityErrors()
+  clearCitySearchInputs()
 }
 
 const validateCityForm = (): boolean => {
   clearCityErrors()
-  let isValid = true
+  const normalizedState = newCity.value.state.trim().toUpperCase()
+  const canonicalCity = findCanonicalCityName(availableCitiesForSelectedState.value, newCity.value.city)
+
+  if (!normalizedState) {
+    cityErrors.value.state = 'Estado é obrigatório'
+  }
 
   if (!newCity.value.city.trim()) {
     cityErrors.value.city = 'Cidade é obrigatória'
-    isValid = false
   }
 
-  if (!newCity.value.state) {
-    cityErrors.value.state = 'Estado é obrigatório'
-    isValid = false
+  if (normalizedState && !canonicalCity) {
+    cityErrors.value.city = 'Selecione uma cidade válida para o estado informado'
   }
 
-  // Verificar se a cidade já existe
+  if (cityErrors.value.city || cityErrors.value.state) {
+    return false
+  }
+
+  newCity.value.state = normalizedState
+  newCity.value.city = canonicalCity!
+
   const cityExists = profileData.value.serviceCities.some(
-    (c) => c.city.toLowerCase() === newCity.value.city.toLowerCase() && 
-           c.state === newCity.value.state &&
-           c.id !== editingCity.value?.id
+    (city) =>
+      normalizeLocationName(city.city) === normalizeLocationName(newCity.value.city) &&
+      city.state.toUpperCase() === newCity.value.state &&
+      city.id !== editingCity.value?.id
   )
+
   if (cityExists) {
     cityErrors.value.city = 'Esta cidade já foi adicionada'
-    isValid = false
+    return false
   }
 
-  return isValid
+  return true
 }
+
+const buildServiceCitiesPayload = (cities: ServiceCity[]): ServiceCityPayload[] =>
+  cities.map((city) => {
+    const payload: ServiceCityPayload = {
+      city: city.city,
+      state: city.state,
+    }
+    const persistedId = getPersistedServiceCityId(city.id)
+
+    if (persistedId !== undefined) {
+      payload.id = persistedId
+    }
+
+    return payload
+  })
 
 const handleSaveCity = async () => {
   if (!validateCityForm()) return
 
   isSavingCity.value = true
   try {
-    if (editingCity.value) {
-      profileData.value.serviceCities = profileData.value.serviceCities.map((c) =>
-        c.id === editingCity.value!.id
-          ? { ...c, city: newCity.value.city, state: newCity.value.state }
-          : c
-      )
-    } else {
-      profileData.value.serviceCities.push({
-        id: Date.now().toString(),
-        city: newCity.value.city,
-        state: newCity.value.state,
-      })
-    }
+    const nextServiceCities = editingCity.value
+      ? profileData.value.serviceCities.map((city) =>
+          city.id === editingCity.value!.id
+            ? { ...city, city: newCity.value.city, state: newCity.value.state }
+            : city
+        )
+        : [
+          ...profileData.value.serviceCities,
+          {
+            id: createTemporaryId('city'),
+            city: newCity.value.city,
+            state: newCity.value.state,
+          },
+        ]
 
-    // Enviar lista completa para o backend como entidades
-    const citiesToSend = profileData.value.serviceCities.map(c => ({
-      city: c.city,
-      state: c.state,
-    }))
+    const citiesToSend = buildServiceCitiesPayload(nextServiceCities)
 
     await api.put('/freelancer/profile', {
       serviceCities: citiesToSend,
     })
+
+    profileData.value.serviceCities = nextServiceCities
 
     toast.success(editingCity.value ? 'Cidade atualizada!' : 'Cidade adicionada!')
 
@@ -584,18 +862,17 @@ const handleDeleteCity = async () => {
   if (!cityToDelete.value) return
 
   try {
-    profileData.value.serviceCities = profileData.value.serviceCities.filter(
-      (c) => c.id !== cityToDelete.value!.id
+    const nextServiceCities = profileData.value.serviceCities.filter(
+      (city) => city.id !== cityToDelete.value!.id
     )
 
-    const citiesToSend = profileData.value.serviceCities.map(c => ({
-      city: c.city,
-      state: c.state,
-    }))
+    const citiesToSend = buildServiceCitiesPayload(nextServiceCities)
 
     await api.put('/freelancer/profile', {
       serviceCities: citiesToSend,
     })
+
+    profileData.value.serviceCities = nextServiceCities
 
     toast.success('Cidade removida')
     await loadProfileData()
@@ -663,13 +940,13 @@ const handleSaveLink = async () => {
           ? { ...l, type: newLink.value.type, url: newLink.value.url, label: newLink.value.label }
           : l
       )
-    } else {
-      profileData.value.professionalLinks.push({
-        id: Date.now().toString(),
-        type: newLink.value.type,
-        url: newLink.value.url,
-        label: newLink.value.label,
-      })
+      } else {
+        profileData.value.professionalLinks.push({
+          id: createTemporaryId('link'),
+          type: newLink.value.type,
+          url: newLink.value.url,
+          label: newLink.value.label,
+        })
     }
 
     // Enviar lista completa para o backend como entidades
@@ -753,7 +1030,7 @@ const getLinkLabel = (link: ProfessionalLink) => {
     <template v-else>
       <!-- Service Type -->
       <Card class="p-6">
-        <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center justify-between">
           <h3 class="text-lg font-semibold text-[#263238]">Configurações de Trabalho</h3>
           <Button v-if="!isEditingServiceSettings" @click="isEditingServiceSettings = true" variant="outline" size="sm">
             <Edit class="h-4 w-4 mr-2" />
@@ -843,7 +1120,7 @@ const getLinkLabel = (link: ProfessionalLink) => {
 
         <div v-else class="space-y-4">
           <div>
-            <p class="text-sm text-[#435574] mb-1">Tipo de Serviço</p>
+            <p class="text-sm text-[#435574] mb-1">Categoria de Serviço</p>
             <div class="flex items-center gap-2">
               <Wrench class="h-4 w-4 text-[#286AD8]" />
               <span class="text-[#263238]">{{ profileData.serviceType || 'Não definido' }}</span>
@@ -868,7 +1145,7 @@ const getLinkLabel = (link: ProfessionalLink) => {
 
       <!-- Service Cities -->
       <Card class="p-6">
-        <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center justify-between">
           <h3 class="text-lg font-semibold text-[#263238]">Cidades de Atendimento</h3>
           <Button @click="openAddCityDialog" variant="outline" size="sm">
             <Plus class="h-4 w-4 mr-2" />
@@ -910,7 +1187,7 @@ const getLinkLabel = (link: ProfessionalLink) => {
 
       <!-- Biography -->
       <Card class="p-6">
-        <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center justify-between">
           <h3 class="text-lg font-semibold text-[#263238]">Biografia</h3>
           <Button v-if="!isEditingBio" @click="isEditingBio = true" variant="outline" size="sm">
             <Edit class="h-4 w-4 mr-2" />
@@ -989,7 +1266,7 @@ const getLinkLabel = (link: ProfessionalLink) => {
 
       <!-- Professional Links -->
       <Card class="p-6">
-        <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center justify-between">
           <h3 class="text-lg font-semibold text-[#263238]">Links Profissionais</h3>
           <Button @click="openAddLinkDialog" variant="outline" size="sm">
             <Plus class="h-4 w-4 mr-2" />
@@ -1085,26 +1362,9 @@ const getLinkLabel = (link: ProfessionalLink) => {
             <div class="absolute inset-0 flex items-center">
               <span class="w-full border-t" />
             </div>
-            <div class="relative flex justify-center text-xs uppercase">
+            <div class="relative flex justify-center text-xs">
               <span class="bg-white px-2 text-[#435574]">Ou preencha manualmente</span>
             </div>
-          </div>
-
-          <!-- Cidade -->
-          <div class="flex flex-col gap-1">
-            <Label for="city-name">Cidade *</Label>
-            <Input
-              id="city-name"
-              :model-value="newCity.city"
-              @update:model-value="(val) => { newCity.city = val as string; cityErrors.city = '' }"
-              placeholder="Nome da cidade"
-              :disabled="isLoadingCEP"
-              :class="{ 'border-red-500 focus:ring-red-500': cityErrors.city, 'bg-gray-50': isLoadingCEP }"
-            />
-            <p v-if="cityErrors.city" class="text-xs text-red-500 flex items-center gap-1">
-              <AlertTriangle class="h-3 w-3" />
-              {{ cityErrors.city }}
-            </p>
           </div>
 
           <!-- Estado -->
@@ -1112,21 +1372,98 @@ const getLinkLabel = (link: ProfessionalLink) => {
             <Label for="city-state">Estado *</Label>
             <Select
               :model-value="newCity.state"
-              @update:model-value="(val: string) => { newCity.state = val; cityErrors.state = '' }"
-              :disabled="isLoadingCEP"
+              @update:model-value="(val: string) => void handleStateSelection(val)"
+              :disabled="isLoadingCEP || isLoadingStates"
             >
-              <SelectTrigger :class="{ 'border-red-500 focus:ring-red-500': cityErrors.state, 'bg-gray-50': isLoadingCEP }">
-                <SelectValue placeholder="Selecione o estado" />
+              <SelectTrigger
+                id="city-state"
+                :disabled="isLoadingCEP || isLoadingStates"
+                :class="{ 'border-red-500 focus:ring-red-500': cityErrors.state, 'bg-gray-50': isLoadingCEP || isLoadingStates }"
+              >
+                <SelectValue
+                  :label="selectedStateLabel || undefined"
+                  :placeholder="isLoadingStates ? 'Carregando estados...' : 'Selecione o estado'"
+                />
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem v-for="state in BRAZILIAN_STATES" :key="state" :value="state">
-                  {{ state }}
-                </SelectItem>
+              <SelectContent class="p-0">
+                <div class="border-b border-gray-100 p-2">
+                  <Input
+                    :model-value="stateSearchQuery"
+                    @update:model-value="(val) => stateSearchQuery = val as string"
+                    placeholder="Pesquisar estado"
+                    class="h-8"
+                  />
+                </div>
+                <div v-if="isLoadingStates" class="px-3 py-2 text-sm text-[#435574]">
+                  Carregando estados...
+                </div>
+                <div v-else-if="filteredStateOptions.length === 0" class="px-3 py-2 text-sm text-[#435574]">
+                  Nenhum estado encontrado
+                </div>
+                <template v-else>
+                  <SelectItem
+                    v-for="state in filteredStateOptions"
+                    :key="state.sigla"
+                    :value="state.sigla"
+                  >
+                    {{ state.sigla }} - {{ state.nome }}
+                  </SelectItem>
+                </template>
               </SelectContent>
             </Select>
             <p v-if="cityErrors.state" class="text-xs text-red-500 flex items-center gap-1">
               <AlertTriangle class="h-3 w-3" />
               {{ cityErrors.state }}
+            </p>
+          </div>
+
+          <!-- Cidade -->
+          <div class="flex flex-col gap-1">
+            <Label for="city-name">Cidade *</Label>
+            <Select
+              :model-value="newCity.city"
+              @update:model-value="(val: string) => handleCitySelection(val)"
+              :disabled="isCitySelectDisabled"
+            >
+              <SelectTrigger
+                id="city-name"
+                :disabled="isCitySelectDisabled"
+                :class="{ 'border-red-500 focus:ring-red-500': cityErrors.city, 'bg-gray-50': isCitySelectDisabled }"
+              >
+                <SelectValue
+                  :label="newCity.city || undefined"
+                  :placeholder="!newCity.state ? 'Selecione um estado primeiro' : (isLoadingCities ? 'Carregando cidades...' : 'Selecione a cidade')"
+                />
+              </SelectTrigger>
+              <SelectContent class="p-0">
+                <div class="border-b border-gray-100 p-2">
+                  <Input
+                    :model-value="citySearchQuery"
+                    @update:model-value="(val) => citySearchQuery = val as string"
+                    placeholder="Pesquisar cidade"
+                    class="h-8"
+                  />
+                </div>
+                <div v-if="isLoadingCities" class="px-3 py-2 text-sm text-[#435574]">
+                  Carregando cidades...
+                </div>
+                <div v-else-if="filteredCityOptions.length === 0" class="px-3 py-2 text-sm text-[#435574]">
+                  Nenhuma cidade encontrada
+                </div>
+                <template v-else>
+                  <SelectItem
+                    v-for="city in filteredCityOptions"
+                    :key="city"
+                    :value="city"
+                  >
+                    {{ city }}
+                  </SelectItem>
+                </template>
+              </SelectContent>
+            </Select>
+            <p v-if="cityErrors.city" class="text-xs text-red-500 flex items-center gap-1">
+              <AlertTriangle class="h-3 w-3" />
+              {{ cityErrors.city }}
             </p>
           </div>
         </div>
@@ -1135,7 +1472,7 @@ const getLinkLabel = (link: ProfessionalLink) => {
           <AlertDialogCancel @click="closeCityDialog">Cancelar</AlertDialogCancel>
           <AlertDialogAction 
             @click="handleSaveCity" 
-            :disabled="isSavingCity || isLoadingCEP"
+            :disabled="isSavingCity || isLoadingCEP || isLoadingStates || isLoadingCities"
           >
             {{ isSavingCity ? 'Salvando...' : (editingCity ? 'Salvar Alterações' : 'Adicionar') }}
           </AlertDialogAction>

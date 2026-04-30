@@ -302,8 +302,6 @@ public class AsaasService {
             paymentData.put("billingType", billingType); // BOLETO, CREDIT_CARD, PIX
             paymentData.put("value", value);
             paymentData.put("dueDate", dueDate.format(DateTimeFormatter.ISO_DATE));
-
-            // Mantem a carta desativada, mas a mensageria e cortada no nivel do cliente.
             paymentData.put("postalService", false);
 
             if (description != null && !description.isEmpty()) {

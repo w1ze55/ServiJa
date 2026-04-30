@@ -6,7 +6,7 @@ import Login from "@/pages/Login/index.vue";
 import Perfil from "@/pages/Perfil/index.vue";
 import Dashboard from "@/pages/Dashboard/index.vue";
 import FreelancerDashboard from "@/pages/FreelancerDashboard/index.vue";
-import ClienteDashboard from "@/pages/ClienteDashboard/index.vue";
+import ClienteHomePage from "@/pages/ClienteDashboard/index.vue";
 import FreelancerProfileSettings from "@/pages/FreelancerProfileSettings/index.vue";
 import FreelancerProfessionalProfile from "@/pages/FreelancerProfessionalProfile/index.vue";
 import FreelancerPortfolio from "@/pages/FreelancerPortfolio/index.vue";
@@ -17,7 +17,7 @@ import SettingsPage from "@/pages/Settings/index.vue";
 import FreelancerServicesPage from "@/pages/FreelancerServices/index.vue";
 import FreelancerProposalsPage from "@/pages/FreelancerProposals/index.vue";
 import FreelancerRequestDetailPage from "@/pages/FreelancerRequestDetail/index.vue";
-import FreelancerDeliveriesPage from "@/pages/FreelancerDeliveries/index.vue";
+import FreelancerDeliveriesRoutePage from "@/pages/FreelancerDeliveries/index.vue";
 import FreelancerProjectDetailPage from "@/pages/FreelancerProjectDetail/index.vue";
 import FreelancerWalletPage from "@/pages/FreelancerWallet/index.vue";
 
@@ -87,10 +87,14 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, userType: "provider" },
   },
   {
-    path: "/cliente-dashboard",
-    name: "cliente-dashboard",
-    component: ClienteDashboard,
+    path: "/cliente-home",
+    name: "cliente-home",
+    component: ClienteHomePage,
     meta: { requiresAuth: true, userType: "contractor" },
+  },
+  {
+    path: "/cliente-dashboard",
+    redirect: { name: "cliente-home" },
   },
   {
     path: "/admin/categories",
@@ -183,7 +187,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: "/freelancer-deliveries",
     name: "freelancer-deliveries",
-    component: FreelancerDeliveriesPage,
+    component: FreelancerDeliveriesRoutePage,
     meta: { requiresAuth: true, userType: "provider" },
   },
   {

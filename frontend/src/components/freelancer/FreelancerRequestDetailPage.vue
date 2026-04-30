@@ -925,25 +925,6 @@ const getStatusBadge = (currentProposal: Proposal) => {
                         {{ milestone.description }}
                       </p>
                     </div>
-                    <div v-if="proposal.status === 'accepted' || proposal.status === 'in_progress'" class="flex gap-2">
-                      <Button
-                        v-if="milestone.status === 'pending'"
-                        @click="handleUpdateMilestoneStatus(milestone.id, 'in_progress')"
-                        size="sm"
-                        variant="outline"
-                      >
-                        Iniciar
-                      </Button>
-                      <Button
-                        v-if="milestone.status === 'in_progress'"
-                        @click="handleUpdateMilestoneStatus(milestone.id, 'completed')"
-                        size="sm"
-                        variant="success"
-                      >
-                        <Check class="h-3 w-3 mr-1" />
-                        Concluir
-                      </Button>
-                    </div>
                   </div>
                 </Card>
               </div>

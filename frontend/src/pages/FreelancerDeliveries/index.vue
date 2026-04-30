@@ -13,7 +13,7 @@ onMounted(() => {
   const userData = localStorage.getItem('user');
   if (userData) {
     user.value = JSON.parse(userData);
-    if (user.value.type !== 'provider') router.push('/cliente-dashboard');
+    if (user.value.type !== 'provider') router.push('/cliente-home');
   } else {
     router.push('/login');
   }

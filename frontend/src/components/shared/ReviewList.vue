@@ -219,7 +219,7 @@ const formatDate = (dateStr: string) =>
 
     <!-- Empty reviews -->
     <Card v-else class="p-10 text-center">
-      <Award class="h-10 w-10 text-gray-200 mx-auto mb-3" />
+      <Star class="h-10 w-10 text-gray-200 mx-auto mb-3" />
       <p class="font-medium text-[#263238]">Ainda sem avaliações</p>
       <p class="text-sm text-[#435574] mt-1">Este serviço ainda não foi avaliado. Seja o primeiro!</p>
     </Card>

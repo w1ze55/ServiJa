@@ -45,8 +45,8 @@ const isSubmitting = ref(false);
 const isBusy = computed(() => Boolean(props.isLoading) || isSubmitting.value);
 const dialogDescription = computed(() =>
   props.serviceName
-    ? `Descreva os ajustes necessarios para a entrega de ${props.serviceName}.`
-    : 'Descreva os ajustes necessarios para a entrega.'
+    ? `Descreva os ajustes necessários para a entrega de ${props.serviceName}.`
+    : 'Descreva os ajustes necessários para a entrega.'
 );
 
 watch(
@@ -114,27 +114,12 @@ const handleGoToChat = () => {
           <AlertCircle class="mt-0.5 h-5 w-5 flex-shrink-0 text-yellow-600" />
           <div class="space-y-3">
             <div>
-              <p class="font-medium text-[#263238]">Solicitacao de ajuste ja enviada</p>
+              <p class="font-medium text-[#263238]">Solicitação de ajuste já enviada</p>
               <p>
-                Voce ja utilizou sua unica solicitacao de ajuste para esta entrega.
+                Você já utilizou sua única solicitação de ajuste para esta entrega.
                 Se precisar alinhar novos detalhes, continue a conversa pelo chat.
               </p>
             </div>
-
-            <DialogFooter class="sm:justify-between">
-              <Button
-                v-if="props.onGoToChat"
-                @click="handleGoToChat"
-                variant="outline"
-                class="border-primary text-primary"
-              >
-                <MessageSquare class="mr-2 h-4 w-4" />
-                Ir para o Chat
-              </Button>
-              <Button @click="closeModal" variant="outline">
-                Fechar
-              </Button>
-            </DialogFooter>
           </div>
         </div>
       </div>
@@ -150,7 +135,7 @@ const handleGoToChat = () => {
                 consiga corrigir a entrega sem ambiguidades.
               </p>
               <p class="text-xs font-medium text-yellow-700">
-                Atencao: voce pode solicitar ajustes apenas uma vez por entrega.
+                Atenção: você pode solicitar ajustes apenas uma vez por entrega.
               </p>
             </div>
           </div>
@@ -159,7 +144,7 @@ const handleGoToChat = () => {
         <Textarea
           v-model="adjustmentsReason"
           :rows="5"
-          placeholder="Descreva os ajustes necessarios..."
+          placeholder="Descreva os ajustes necessários..."
         />
 
         <DialogFooter>
@@ -171,7 +156,7 @@ const handleGoToChat = () => {
             :disabled="!adjustmentsReason.trim() || isBusy"
             variant="warning"
           >
-            Enviar Solicitacao
+            Enviar Solicitação
           </Button>
         </DialogFooter>
       </template>
@@ -181,18 +166,18 @@ const handleGoToChat = () => {
   <AlertDialog v-model:open="showConfirmationDialog">
     <AlertDialogContent>
       <AlertDialogHeader>
-        <AlertDialogTitle>Confirmar Solicitacao de Ajuste</AlertDialogTitle>
+        <AlertDialogTitle>Confirmar Solicitação de Ajuste</AlertDialogTitle>
         <AlertDialogDescription class="space-y-3">
           <span class="block">
-            Voce tem direito a apenas <strong>uma unica solicitacao de ajuste</strong>.
-            Depois do envio, nao sera possivel solicitar novos ajustes por aqui.
+            Você tem direito a apenas <strong>uma única solicitação de ajuste</strong>.
+            Depois do envio, não será possível solicitar novos ajustes por aqui.
           </span>
           <span class="block">
-            Se precisar alinhar novas alteracoes no futuro, voce e o freelancer
-            deverao continuar pelo <strong>chat</strong>.
+            Se precisar alinhar novas alterações no futuro, você e o freelancer
+            deverão continuar pelo <strong>chat</strong>.
           </span>
           <span class="block font-medium text-yellow-700">
-            Deseja realmente enviar esta solicitacao?
+            Deseja realmente enviar esta solicitação?
           </span>
         </AlertDialogDescription>
       </AlertDialogHeader>
@@ -205,7 +190,7 @@ const handleGoToChat = () => {
           :disabled="isBusy"
           class="bg-warning hover:bg-warning/90"
         >
-          Sim, Enviar Solicitacao
+          Sim, Enviar Solicitação
         </AlertDialogAction>
       </AlertDialogFooter>
     </AlertDialogContent>
