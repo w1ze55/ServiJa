@@ -39,6 +39,16 @@ public class JwtService {
         return buildToken(extraClaims, userDetails, jwtExpiration);
     }
 
+    public String generateToken(UserDetails userDetails, Map<String, Object> extraClaims, long ttlMs) {
+        return buildToken(extraClaims, userDetails, ttlMs);
+    }
+
+    public String generateImpersonationToken(UserDetails targetUser, Long adminId) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("impersonatedBy", adminId);
+        return buildToken(claims, targetUser, 1800000L);
+    }
+
     private String buildToken(
             Map<String, Object> extraClaims,
             UserDetails userDetails,

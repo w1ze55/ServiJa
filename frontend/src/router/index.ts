@@ -40,6 +40,7 @@ import ClienteDeliveryApprovalPage from "@/pages/ClienteDeliveryApproval/index.v
 import ClienteProjectDetailPage from "@/pages/ClienteProjectDetail/index.vue";
 import RateFreelancerPage from "@/pages/RateFreelancer/index.vue";
 import AdminCategoriesPage from "@/pages/AdminCategories/index.vue";
+import AdminUsersPage from "@/pages/AdminUsers/index.vue";
 
 const routes: RouteRecordRaw[] = [
   // ============ ROTAS PÚBLICAS ============
@@ -99,6 +100,12 @@ const routes: RouteRecordRaw[] = [
     path: "/admin/categories",
     name: "admin-categories",
     component: AdminCategoriesPage,
+    meta: { requiresAuth: true, userType: "admin" },
+  },
+  {
+    path: "/admin/users",
+    name: "admin-users",
+    component: AdminUsersPage,
     meta: { requiresAuth: true, userType: "admin" },
   },
 

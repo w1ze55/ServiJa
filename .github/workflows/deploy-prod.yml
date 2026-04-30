@@ -1,4 +1,4 @@
-name: Deploy Servija AWS (Prod)
+name: Deploy Servija (Prod)
 
 on:
   push:
@@ -6,30 +6,59 @@ on:
       - main
 
 jobs:
-  deploy:
+  build-and-deploy:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout do código
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Deploy via SSH no EC2 (Prod)
-        uses: appleboy/ssh-action@v1.0.3
+      # ── Backend build ──────────────────────────────────────────
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
         with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ec2-user
-          key: ${{ secrets.EC2_SSH_KEY }}
-          port: 22
-          script: |
-            cd /var/www/ServiJa
+          distribution: temurin
+          java-version: '21'
 
-            git checkout main
-            git pull origin main
+      - name: Build backend JAR
+        run: mvn package -DskipTests
+        working-directory: backend
 
-            # Para apenas os containers de produção (não afeta homolog)
-            docker compose -f docker-compose.prod.yml down
+      # ── Frontend build ─────────────────────────────────────────
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
 
-            # Rebuild e start produção
-            docker compose --env-file .env.prod -f docker-compose.prod.yml up --build -d
+      - name: Build frontend
+        run: npm ci && npm run build
+        working-directory: frontend
+        env:
+          VITE_API_URL: https://servija.app
 
-            # Reinicia o proxy para reconhecer as mudanças (se existir)
-            docker compose -f docker-compose.proxy.yml up -d --force-recreate
+      # ── Prepare SSH key ────────────────────────────────────────
+      - name: Write SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+
+      # ── Deploy artifacts ───────────────────────────────────────
+      - name: Copy JAR to server
+        run: |
+          scp -i ~/.ssh/deploy_key \
+            backend/target/servija-0.0.1-SNAPSHOT.jar \
+            ubuntu@${{ secrets.EC2_HOST }}:/app/prod/app.jar
+
+      - name: Copy Vue dist to server
+        run: |
+          scp -i ~/.ssh/deploy_key -r \
+            frontend/dist/* \
+            ubuntu@${{ secrets.EC2_HOST }}:/var/www/prod/
+
+      # ── Set permissions & restart ────────────────────────────
+      - name: Fix permissions and restart service
+        run: |
+          ssh -i ~/.ssh/deploy_key ubuntu@${{ secrets.EC2_HOST }} \
+            'chmod -R o+rX /var/www/prod/ && sudo systemctl restart servija-prod'

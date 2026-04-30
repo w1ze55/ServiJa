@@ -43,15 +43,11 @@ export function useServiceRequestWebSocket(userEmail: string) {
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080';
     const wsUrl = `${apiUrl}/ws`;
 
-    console.log('🔌 Conectando WebSocket de solicitações em:', wsUrl);
-    console.log('📧 Email do usuário:', userEmail);
-
     // Criar uma promise que resolve quando a conexão for estabelecida
     connectionPromise.value = new Promise<void>((resolve, reject) => {
       const stompClient = new Client({
         webSocketFactory: () => new SockJS(wsUrl),
         debug: (str) => {
-          console.log('STOMP (Solicitações):', str);
         },
         reconnectDelay: 5000,
         heartbeatIncoming: 4000,
@@ -87,15 +83,12 @@ export function useServiceRequestWebSocket(userEmail: string) {
       };
 
       stompClient.onStompError = (frame) => {
-        console.error('❌ Erro STOMP (Solicitações):', frame.headers['message']);
-        console.error('Detalhes:', frame.body);
         connected.value = false;
         connectionPromise.value = null;
         reject(new Error('Erro ao conectar WebSocket'));
       };
 
       stompClient.onWebSocketClose = () => {
-        console.log('🔌 WebSocket de solicitações desconectado');
         connected.value = false;
         connectionPromise.value = null;
       };
@@ -112,7 +105,6 @@ export function useServiceRequestWebSocket(userEmail: string) {
       client.value.deactivate();
       client.value = null;
       connected.value = false;
-      console.log('🔌 WebSocket de solicitações desconectado manualmente');
     }
   };
 

@@ -86,7 +86,7 @@ public class AuthService {
                 .orElseThrow(() -> new ResourceNotFoundException("Usuario nao encontrado"));
 
         if (!user.getActive()) {
-            throw new InvalidCredentialsException("Conta desativada");
+            throw new InvalidCredentialsException("Conta suspensa");
         }
 
         UserDetails userDetails = userDetailsService.loadUserByUsername(user.getEmail());
