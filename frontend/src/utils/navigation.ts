@@ -51,6 +51,8 @@ export const clientRoutes: Record<string, string> = {
 export const adminRoutes: Record<string, string> = {
   'home': '/admin/categories',
   'admin-categories': '/admin/categories',
+  'admin-users': '/admin/users',
+  'users': '/admin/users',
 };
 
 // Função para obter a rota baseada no tipo de usuário

@@ -93,6 +93,9 @@ public class User implements UserDetails {
     @Column(nullable = false)
     private LocalDateTime updatedAt;
 
+    @Column
+    private LocalDateTime deletedAt;
+
     public enum UserType {
         CONTRACTOR,
         FREELANCER,

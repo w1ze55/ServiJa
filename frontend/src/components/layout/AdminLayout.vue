@@ -1,14 +1,18 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { useRouter } from "vue-router";
-import { FolderTree, LogOut, Shield } from "lucide-vue-next";
+import { useRouter, useRoute } from "vue-router";
+import { FolderTree, LogOut, Shield, Users } from "lucide-vue-next";
 import Button from "@/components/ui/button.vue";
 import { useUserStore } from "@/stores/userStore";
 
 const router = useRouter();
+const route = useRoute();
 const userStore = useUserStore();
 
 const currentUser = computed(() => userStore.user);
+
+const isCategoriesActive = computed(() => route.path.startsWith('/admin/categories'));
+const isUsersActive = computed(() => route.path.startsWith('/admin/users'));
 
 const logout = () => {
   userStore.clearUser();
@@ -36,16 +40,29 @@ const logout = () => {
               Admin
             </p>
           </div>
-        </div> 
+        </div>
       </div>
 
-      <nav class="flex-1 px-4 py-6">
+      <nav class="flex-1 space-y-1 px-4 py-6">
         <button
-          class="flex w-full items-center gap-3 rounded-xl bg-white/10 px-4 py-3 text-left text-sm font-medium"
+          :class="[
+            'flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-medium transition-colors',
+            isCategoriesActive ? 'bg-white/20 text-white' : 'text-white/70 hover:bg-white/10 hover:text-white'
+          ]"
           @click="router.push('/admin/categories')"
         >
           <FolderTree class="h-4 w-4" />
           Catálogo de categorias
+        </button>
+        <button
+          :class="[
+            'flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-medium transition-colors',
+            isUsersActive ? 'bg-white/20 text-white' : 'text-white/70 hover:bg-white/10 hover:text-white'
+          ]"
+          @click="router.push('/admin/users')"
+        >
+          <Users class="h-4 w-4" />
+          Usuários
         </button>
       </nav>
 

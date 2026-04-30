@@ -1,9 +1,10 @@
 <script setup lang="ts">
-// Novo App.vue simplificado usando Vue Router
+import ImpersonationBanner from '@/components/ImpersonationBanner.vue';
 </script>
 
 <template>
   <div class="min-h-screen">
+    <ImpersonationBanner />
     <router-view />
   </div>
 </template>
