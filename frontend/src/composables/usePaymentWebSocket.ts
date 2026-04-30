@@ -32,7 +32,6 @@ export function usePaymentWebSocket(userEmail: string) {
     const wsUrl = `${apiUrl}/ws`;
 
     console.log('🔌 Conectando WebSocket de pagamentos em:', wsUrl);
-    console.log('📧 Email do usuário:', userEmail);
 
     const stompClient = new Client({
       webSocketFactory: () => new SockJS(wsUrl),
@@ -53,7 +52,6 @@ export function usePaymentWebSocket(userEmail: string) {
 
       // Subscrever ao tópico de pagamentos do usuário (mesmo padrão das solicitações)
       const destination = `/topic/payment/${userEmail}`;
-      console.log('📡 Inscrevendo em:', destination);
       
       stompClient.subscribe(destination, (message) => {
         console.log('📨 Notificação de pagamento recebida:', message.body);

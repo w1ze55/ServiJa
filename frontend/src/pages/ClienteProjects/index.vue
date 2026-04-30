@@ -284,7 +284,6 @@ onMounted(() => {
   store.loadRequests();
 
   const userEmail = getUserEmail();
-  console.log('Tentando conectar WebSocket para projetos:', userEmail);
 
   if (userEmail) {
     wsConnection = useServiceRequestWebSocket(userEmail);
@@ -292,7 +291,6 @@ onMounted(() => {
       console.error('Erro ao conectar WebSocket de projetos:', error);
     });
 
-    console.log('WebSocket inicializado para projetos (Cliente)');
     window.addEventListener('service-request-notification', handleServiceRequestNotification);
   } else {
     console.error('Não foi possível extrair email do token');
@@ -300,7 +298,6 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
-  console.log('Desconectando WebSocket de projetos (Cliente)');
   window.removeEventListener('service-request-notification', handleServiceRequestNotification);
   if (wsConnection) {
     wsConnection.disconnect();

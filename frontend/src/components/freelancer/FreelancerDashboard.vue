@@ -252,14 +252,7 @@ const handleNotification = (event: any) => {
 onMounted(async () => {
   const userEmail = getUserEmail();
   if (userEmail) {
-    console.log('🔌 Inicializando WebSocket no Dashboard para:', userEmail);
     wsConnection = useServiceRequestWebSocket(userEmail);
-    try {
-      await wsConnection.connect();
-      console.log('✅ WebSocket conectado com sucesso no Dashboard');
-    } catch (error) {
-      console.error('❌ Erro ao conectar WebSocket no Dashboard:', error);
-    }
     window.addEventListener('service-request-notification', handleNotification);
   } else {
     console.warn('⚠️ Email do usuário não encontrado para WebSocket');
@@ -267,7 +260,6 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
-  console.log('🔌 Desconectando WebSocket do Dashboard');
   window.removeEventListener('service-request-notification', handleNotification);
   if (wsConnection) {
     wsConnection.disconnect();

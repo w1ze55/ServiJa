@@ -53,6 +53,7 @@ public class FreelancerService {
     private final ObjectMapper objectMapper;
     private final CategoryCatalogService categoryCatalogService;
     private final IbgeLocationService ibgeLocationService;
+    private final GeocodingService geocodingService;
 
     @Transactional(readOnly = true)
     public FreelancerProfileResponse getProfile() {
@@ -142,12 +143,11 @@ public class FreelancerService {
 
             // Adicionar as novas cidades
             for (NormalizedServiceCity cityDto : normalizedCities) {
-                ServiceCity serviceCity = ServiceCity.builder()
+                var builder = ServiceCity.builder()
                         .freelancer(freelancer)
                         .city(cityDto.getCity())
                         .state(cityDto.getState());
 
-                // Reusar coordenadas já persistidas quando disponíveis; caso contrário geocodifica
                 if (cityDto.getLatitude() != null && cityDto.getLongitude() != null) {
                     builder.latitude(cityDto.getLatitude()).longitude(cityDto.getLongitude());
                 } else {
@@ -333,13 +333,7 @@ public class FreelancerService {
             Double radiusKm,
             String category) {
 
-        if (category != null && !category.isEmpty()) {
-            freelancers = freelancerRepository.findAllWithLocation().stream()
-                    .filter(freelancer -> matchesCategoryFilter(freelancer, category))
-                    .collect(Collectors.toList());
-        } else {
-            freelancers = freelancerRepository.findAllWithLocation();
-        }
+        boolean hasCategory = category != null && !category.isEmpty();
 
         // Freelancers com coordenadas em service_cities (novo modelo)
         List<Freelancer> withServiceCities = hasCategory
@@ -463,7 +457,9 @@ public class FreelancerService {
                         "A cidade '" + cityToPersist + "/" + normalizedState + "' já foi informada.");
             }
 
-            normalizedCities.add(new NormalizedServiceCity(cityToPersist, normalizedState));
+            BigDecimal lat = existingCity != null ? existingCity.getLatitude() : null;
+            BigDecimal lng = existingCity != null ? existingCity.getLongitude() : null;
+            normalizedCities.add(new NormalizedServiceCity(cityToPersist, normalizedState, lat, lng));
         }
 
         return normalizedCities;
@@ -619,10 +615,18 @@ public class FreelancerService {
     private static final class NormalizedServiceCity {
         private final String city;
         private final String state;
+        private final BigDecimal latitude;
+        private final BigDecimal longitude;
 
         private NormalizedServiceCity(String city, String state) {
+            this(city, state, null, null);
+        }
+
+        private NormalizedServiceCity(String city, String state, BigDecimal latitude, BigDecimal longitude) {
             this.city = city;
             this.state = state;
+            this.latitude = latitude;
+            this.longitude = longitude;
         }
 
         public String getCity() {
@@ -631,6 +635,14 @@ public class FreelancerService {
 
         public String getState() {
             return state;
+        }
+
+        public BigDecimal getLatitude() {
+            return latitude;
+        }
+
+        public BigDecimal getLongitude() {
+            return longitude;
         }
     }
 }

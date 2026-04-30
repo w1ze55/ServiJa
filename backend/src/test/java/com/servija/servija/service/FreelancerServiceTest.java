@@ -55,6 +55,9 @@ class FreelancerServiceTest {
     @Mock
     private IbgeLocationService ibgeLocationService;
 
+    @Mock
+    private GeocodingService geocodingService;
+
     private FreelancerService freelancerService;
 
     @BeforeEach
@@ -67,7 +70,8 @@ class FreelancerServiceTest {
                 reviewRepository,
                 new ObjectMapper(),
                 categoryCatalogService,
-                ibgeLocationService));
+                ibgeLocationService,
+                geocodingService));
     }
 
     @Test

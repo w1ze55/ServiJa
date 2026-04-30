@@ -200,15 +200,12 @@ onMounted(() => {
 
   // Conectar WebSocket
   const userEmail = getUserEmail();
-  console.log('🔍 Tentando conectar WebSocket para:', userEmail);
 
   if (userEmail) {
     wsConnection = useServiceRequestWebSocket(userEmail);
     wsConnection.connect().catch((error: any) => {
       console.error('❌ Erro ao conectar WebSocket:', error);
     });
-
-    console.log('✅ WebSocket inicializado para solicitações (Cliente)');
 
     // Escutar notificações de solicitações
     window.addEventListener('service-request-notification', handleServiceRequestNotification);
@@ -218,7 +215,6 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
-  console.log('🔌 Desconectando WebSocket de solicitações (Cliente)');
   window.removeEventListener('service-request-notification', handleServiceRequestNotification);
   if (wsConnection) {
     wsConnection.disconnect();
