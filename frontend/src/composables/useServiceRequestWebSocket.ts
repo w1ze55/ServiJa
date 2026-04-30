@@ -55,12 +55,10 @@ export function useServiceRequestWebSocket(userEmail: string) {
       });
 
       stompClient.onConnect = () => {
-        console.log('✅ WebSocket de solicitações conectado');
         connected.value = true;
 
         // Subscrever ao tópico de solicitações do usuário
         stompClient.subscribe(`/topic/service-request/${userEmail}`, (message) => {
-          console.log('📩 Nova notificação de solicitação recebida:', message.body);
           
           try {
             const notification: ServiceRequestNotification = JSON.parse(message.body);
@@ -72,7 +70,6 @@ export function useServiceRequestWebSocket(userEmail: string) {
             });
             window.dispatchEvent(event);
 
-            console.log('🔔 Notificação processada:', notification.type);
           } catch (error) {
             console.error('❌ Erro ao processar notificação:', error);
           }

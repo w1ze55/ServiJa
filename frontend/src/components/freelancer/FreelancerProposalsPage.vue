@@ -392,8 +392,6 @@ onMounted(() => {
     paymentWsConnection = usePaymentWebSocket(userEmail);
     paymentWsConnection.connect();
 
-    console.log("✅ WebSocket de pagamentos inicializado");
-
     // Escutar notificações de pagamentos
     window.addEventListener("payment-notification", handlePaymentNotification);
   } else {
