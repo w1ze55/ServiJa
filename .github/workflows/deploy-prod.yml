@@ -36,6 +36,12 @@ jobs:
         env:
           VITE_API_URL: https://servija.app
 
+      - name: Build frontend-admin
+        run: npm ci && npm run build
+        working-directory: frontend-admin
+        env:
+          VITE_API_URL: https://servija.app
+
       # ── Prepare SSH key ────────────────────────────────────────
       - name: Write SSH key
         run: |
@@ -57,8 +63,14 @@ jobs:
             frontend/dist/* \
             ubuntu@${{ secrets.EC2_HOST }}:/var/www/prod/
 
+      - name: Copy admin dist to server
+        run: |
+          scp -i ~/.ssh/deploy_key -r \
+            frontend-admin/dist/* \
+            ubuntu@${{ secrets.EC2_HOST }}:/var/www/prod-admin/
+
       # ── Set permissions & restart ────────────────────────────
       - name: Fix permissions and restart service
         run: |
           ssh -i ~/.ssh/deploy_key ubuntu@${{ secrets.EC2_HOST }} \
-            'chmod -R o+rX /var/www/prod/ && sudo systemctl restart servija-prod'
+            'sudo mkdir -p /var/www/prod-admin && sudo chown -R ubuntu:ubuntu /var/www/prod-admin && chmod -R o+rX /var/www/prod/ /var/www/prod-admin/ && sudo systemctl restart servija-prod'

@@ -46,6 +46,9 @@ export const useUserStore = defineStore('user', () => {
         user.value = null
         localStorage.removeItem('user')
         localStorage.removeItem('token')
+        localStorage.removeItem('adminToken')
+        localStorage.removeItem('adminUser')
+        localStorage.removeItem('impersonatedUserName')
     }
 
     // Chamar init imediatamente

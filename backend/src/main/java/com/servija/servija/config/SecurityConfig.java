@@ -78,8 +78,12 @@ public class SecurityConfig {
             origins = Arrays.asList(
                     "http://localhost:5173",
                     "http://localhost:5174",
+                    "http://localhost:3001",
                     "https://servija.app",
-                    "https://homolog.servija.app");
+                    "https://homolog.servija.app",
+                    // Em produção, CORS_ALLOWED_ORIGINS deve incluir https://admin.servija.app e https://homolog-admin.servija.app
+                    "https://admin.servija.app",
+                    "https://homolog-admin.servija.app");
         } else {
             origins = Arrays.stream(allowedOrigins.split(","))
                     .map(String::trim)

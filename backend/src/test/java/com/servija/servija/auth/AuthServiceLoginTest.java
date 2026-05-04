@@ -107,7 +107,7 @@ class AuthServiceLoginTest {
 
         assertThatThrownBy(() -> authService.login(loginRequest))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessage("Usuário não encontrado");
+                .hasMessage("Usuario nao encontrado");
     }
 
     @Test
@@ -118,7 +118,7 @@ class AuthServiceLoginTest {
 
         assertThatThrownBy(() -> authService.login(loginRequest))
                 .isInstanceOf(InvalidCredentialsException.class)
-                .hasMessage("Conta desativada");
+                .hasMessage("Conta suspensa");
     }
 
     @Test
@@ -137,5 +137,64 @@ class AuthServiceLoginTest {
                             && token.getCredentials().equals("Senha@123");
                 })
         );
+    }
+
+    @Test
+    @DisplayName("Login de app deve rejeitar usuario ADMIN")
+    void login_adminUser_rejected() {
+        User admin = User.builder()
+                .id(99L)
+                .name("Admin")
+                .email("joao@email.com")
+                .cpf("12345678901")
+                .phone("11999999999")
+                .password("encoded-password")
+                .userType(User.UserType.ADMIN)
+                .emailVerified(true)
+                .active(true)
+                .build();
+
+        when(userRepository.findByEmail("joao@email.com")).thenReturn(Optional.of(admin));
+
+        assertThatThrownBy(() -> authService.login(loginRequest))
+                .isInstanceOf(InvalidCredentialsException.class)
+                .hasMessage("Credenciais invalidas");
+    }
+
+    @Test
+    @DisplayName("Login admin deve aceitar apenas ADMIN")
+    void loginAdmin_nonAdmin_rejected() {
+        when(userRepository.findByEmail("joao@email.com")).thenReturn(Optional.of(activeUser));
+
+        assertThatThrownBy(() -> authService.loginAdmin(loginRequest))
+                .isInstanceOf(InvalidCredentialsException.class)
+                .hasMessage("Credenciais invalidas");
+    }
+
+    @Test
+    @DisplayName("Login admin deve retornar token para ADMIN ativo")
+    void loginAdmin_validAdmin_returnsToken() {
+        User admin = User.builder()
+                .id(2L)
+                .name("Admin")
+                .email("joao@email.com")
+                .cpf("10987654321")
+                .phone("11888888888")
+                .password("encoded-password")
+                .userType(User.UserType.ADMIN)
+                .emailVerified(true)
+                .active(true)
+                .build();
+
+        when(userRepository.findByEmail("joao@email.com")).thenReturn(Optional.of(admin));
+
+        UserDetails mockUserDetails = mock(UserDetails.class);
+        when(userDetailsService.loadUserByUsername("joao@email.com")).thenReturn(mockUserDetails);
+        when(jwtService.generateToken(mockUserDetails)).thenReturn("jwt-admin");
+
+        AuthResponse response = authService.loginAdmin(loginRequest);
+
+        assertThat(response.getToken()).isEqualTo("jwt-admin");
+        assertThat(response.getUser().getUserType()).isEqualTo(User.UserType.ADMIN);
     }
 }
