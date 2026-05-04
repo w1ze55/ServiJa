@@ -36,6 +36,12 @@ jobs:
         env:
           VITE_API_URL: https://homolog.servija.app
 
+      - name: Build frontend-admin
+        run: npm ci && npm run build
+        working-directory: frontend-admin
+        env:
+          VITE_API_URL: https://homolog.servija.app
+
       # ── Prepare SSH key ────────────────────────────────────────
       - name: Configure SSH key
         run: |
@@ -57,8 +63,14 @@ jobs:
             frontend/dist/* \
             ubuntu@${{ secrets.EC2_HOST }}:/var/www/homolog/
 
+      - name: Upload admin dist to EC2
+        run: |
+          scp -i ~/.ssh/deploy_key -r \
+            frontend-admin/dist/* \
+            ubuntu@${{ secrets.EC2_HOST }}:/var/www/homolog-admin/
+
       # ── Set permissions & restart ────────────────────────────
       - name: Fix permissions and restart service
         run: |
           ssh -i ~/.ssh/deploy_key ubuntu@${{ secrets.EC2_HOST }} \
-            'chmod -R o+rX /var/www/homolog/ && sudo systemctl restart servija-homolog'
+            'sudo mkdir -p /var/www/homolog-admin && sudo chown -R ubuntu:ubuntu /var/www/homolog-admin && chmod -R o+rX /var/www/homolog/ /var/www/homolog-admin/ && sudo systemctl restart servija-homolog'

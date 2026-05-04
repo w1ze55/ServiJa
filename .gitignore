@@ -30,3 +30,9 @@ build/
 # Maven
 target/
 backend/.m2/
+
+# Node / Vite (nunca versionar dependências nem build local)
+node_modules/
+**/node_modules/
+frontend/dist/
+frontend-admin/dist/

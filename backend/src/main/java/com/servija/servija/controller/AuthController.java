@@ -72,6 +72,17 @@ public class AuthController {
         return ResponseEntity.ok(response);
     }
 
+    @PostMapping("/admin/login")
+    @Operation(summary = "Login do painel administrativo", description = "Autentica apenas usuarios com perfil ADMIN. Demais tipos recebem erro de credenciais.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Login realizado com sucesso", content = @Content(schema = @Schema(implementation = AuthResponse.class))),
+            @ApiResponse(responseCode = "401", description = "Credenciais invalidas ou usuario nao administrador", content = @Content(schema = @Schema(implementation = MessageResponse.class)))
+    })
+    public ResponseEntity<AuthResponse> loginAdmin(@Valid @RequestBody LoginRequest request) {
+        AuthResponse response = authService.loginAdmin(request);
+        return ResponseEntity.ok(response);
+    }
+
     @PostMapping("/verify-email")
     @Operation(summary = "Verificar e-mail", description = "Verifica o e-mail do usuario usando o codigo enviado durante o registro e retorna um token JWT para autenticacao automatica")
     @ApiResponses(value = {

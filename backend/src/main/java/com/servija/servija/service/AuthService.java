@@ -85,6 +85,31 @@ public class AuthService {
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new ResourceNotFoundException("Usuario nao encontrado"));
 
+        if (user.getUserType() == User.UserType.ADMIN) {
+            throw new InvalidCredentialsException("Credenciais invalidas");
+        }
+
+        if (!user.getActive()) {
+            throw new InvalidCredentialsException("Conta suspensa");
+        }
+
+        UserDetails userDetails = userDetailsService.loadUserByUsername(user.getEmail());
+        String token = jwtService.generateToken(userDetails);
+
+        return buildAuthResponse(user, token);
+    }
+
+    public AuthResponse loginAdmin(LoginRequest request) {
+        authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword()));
+
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new ResourceNotFoundException("Usuario nao encontrado"));
+
+        if (user.getUserType() != User.UserType.ADMIN) {
+            throw new InvalidCredentialsException("Credenciais invalidas");
+        }
+
         if (!user.getActive()) {
             throw new InvalidCredentialsException("Conta suspensa");
         }
