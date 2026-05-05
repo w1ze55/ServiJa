@@ -2,6 +2,7 @@ package com.servija.servija.service;
 
 import com.servija.servija.dto.PaymentRequest;
 import com.servija.servija.dto.PaymentResponse;
+import com.servija.servija.exception.AsaasIntegrationException;
 import com.servija.servija.exception.ResourceNotFoundException;
 import com.servija.servija.model.Payment;
 import com.servija.servija.model.PaymentStatusHistory;
@@ -237,6 +238,8 @@ public class PaymentService {
             payment.setStatus(Payment.PaymentStatus.PROCESSING);
 
             log.info("Pagamento PIX criado no Asaas: {}", payment.getAsaasPaymentId());
+        } catch (AsaasIntegrationException e) {
+            throw e;
         } catch (Exception e) {
             log.error("Erro ao criar pagamento PIX no Asaas", e);
             throw new RuntimeException("Erro ao processar pagamento PIX: " + e.getMessage());
@@ -403,6 +406,8 @@ public class PaymentService {
                     "expirationDate", pixData.getOrDefault("expirationDate", ""),
                     "description", pixData.getOrDefault("description", ""),
                     "status", payment.getStatus().name());
+        } catch (AsaasIntegrationException e) {
+            throw e;
         } catch (Exception e) {
             log.error("Erro ao obter QR Code PIX", e);
             throw new RuntimeException("Erro ao obter QR Code PIX: " + e.getMessage());
