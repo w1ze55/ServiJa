@@ -25,7 +25,6 @@ import SelectContent from "@/components/ui/select-content.vue";
 import SelectItem from "@/components/ui/select-item.vue";
 import SelectTrigger from "@/components/ui/select-trigger.vue";
 import SelectValue from "@/components/ui/select-value.vue";
-import Slider from "@/components/ui/slider.vue";
 import api from "@/api/config/axios";
 import { toast } from "@/utils/toast";
 import { useUserStore } from "@/stores/userStore";
@@ -380,12 +379,8 @@ const initMap = () => {
 
   map.value = mapInstance;
 
-  L.control.zoom({ position: "bottomright" }).addTo(mapInstance);
-
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    attribution:
-      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-  }).addTo(mapInstance);
+  L.control.zoom({ position: "bottomleft" }).addTo(mapInstance);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",).addTo(mapInstance);
 
   providerLayer.value = L.layerGroup().addTo(mapInstance);
 };
@@ -728,12 +723,6 @@ const clearFilters = async () => {
   appliedFilters.value = { ...defaults };
   showFilters.value = false;
   await refreshMapData();
-};
-
-const updateDraftRadius = (value: number | number[]) => {
-  draftFilters.value.radius = Array.isArray(value)
-    ? Number(value[0])
-    : Number(value);
 };
 
 const handleDraftCategoryChange = (value: string) => {
@@ -1159,12 +1148,14 @@ onUnmounted(() => {
                 >{{ draftFilters.radius }} km</span
               >
             </div>
-            <Slider
-              :value="draftFilters.radius"
-              :min="5"
-              :max="100"
-              :step="5"
-              @update:value="updateDraftRadius"
+            <input
+              v-model.number="draftFilters.radius"
+              type="range"
+              min="5"
+              max="100"
+              step="5"
+              class="map-radius-slider"
+              aria-label="Distancia maxima"
             />
             <div class="flex justify-between text-xs text-gray-400">
               <span>5 km</span>
@@ -1365,10 +1356,6 @@ onUnmounted(() => {
                   <h3 class="text-xl font-bold text-[#263238] leading-tight">
                     {{ selectedProvider.name }}
                   </h3>
-                  <span
-                    class="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-[#286AD8]"
-                    >Profissional</span
-                  >
                 </div>
                 <p class="mt-1 text-sm font-medium text-[#286AD8]">
                   {{ selectedProvider.professionalTitle }}
@@ -1590,6 +1577,52 @@ onUnmounted(() => {
 .leaflet-control-zoom a {
   color: #263238 !important;
   border-bottom-color: #e5e7eb !important;
+}
+
+.map-radius-slider {
+  width: 100%;
+  height: 24px;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.map-radius-slider::-webkit-slider-runnable-track {
+  height: 8px;
+  border-radius: 9999px;
+  background: #e5e7eb;
+}
+
+.map-radius-slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  margin-top: -6px;
+  border-radius: 9999px;
+  border: 3px solid #286ad8;
+  background: #ffffff;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.22);
+}
+
+.map-radius-slider::-moz-range-track {
+  height: 8px;
+  border-radius: 9999px;
+  background: #e5e7eb;
+}
+
+.map-radius-slider::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 9999px;
+  border: 3px solid #286ad8;
+  background: #ffffff;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.22);
+}
+
+.map-radius-slider:focus-visible {
+  outline: 2px solid rgba(40, 106, 216, 0.35);
+  outline-offset: 4px;
+  border-radius: 9999px;
 }
 
 @media (min-width: 1024px) {
