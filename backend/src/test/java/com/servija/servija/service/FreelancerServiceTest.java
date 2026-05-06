@@ -2,13 +2,18 @@ package com.servija.servija.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.servija.servija.dto.FreelancerProfileRequest;
+import com.servija.servija.dto.NearbyFreelancerResponse;
 import com.servija.servija.dto.ServiceCityRequest;
 import com.servija.servija.model.Freelancer;
+import com.servija.servija.model.Service;
+import com.servija.servija.model.ServiceCategory;
 import com.servija.servija.model.ServiceCity;
 import com.servija.servija.model.ServiceRequest;
+import com.servija.servija.model.ServiceSubcategory;
 import com.servija.servija.repository.AddressRepository;
 import com.servija.servija.repository.FreelancerRepository;
 import com.servija.servija.repository.ReviewRepository;
+import com.servija.servija.repository.ServiceRepository;
 import com.servija.servija.repository.ServiceRequestRepository;
 import com.servija.servija.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -18,6 +23,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -25,6 +31,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
@@ -36,6 +43,9 @@ class FreelancerServiceTest {
 
     @Mock
     private FreelancerRepository freelancerRepository;
+
+    @Mock
+    private ServiceRepository serviceRepository;
 
     @Mock
     private UserRepository userRepository;
@@ -64,6 +74,7 @@ class FreelancerServiceTest {
     void setUp() {
         freelancerService = spy(new FreelancerService(
                 freelancerRepository,
+                serviceRepository,
                 userRepository,
                 addressRepository,
                 serviceRequestRepository,
@@ -195,6 +206,62 @@ class FreelancerServiceTest {
                 .hasMessageContaining("não pertence ao estado");
     }
 
+    @Test
+    @DisplayName("Deve buscar freelancers prÃ³ximos por serviÃ§o, tag e subcategoria")
+    void findNearbyFreelancers_filtersByServiceSearchAndCatalog() {
+        ServiceCategory category = ServiceCategory.builder()
+                .id(10L)
+                .slug("eletrica")
+                .name("ElÃ©trica")
+                .build();
+        ServiceSubcategory subcategory = ServiceSubcategory.builder()
+                .id(20L)
+                .category(category)
+                .slug("instalacao")
+                .name("InstalaÃ§Ã£o")
+                .build();
+
+        Freelancer matching = buildNearbyFreelancer(1L, "JoÃ£o Silva", -23.5505, -46.6333);
+        Freelancer other = buildNearbyFreelancer(2L, "Maria Souza", -23.5510, -46.6340);
+        Service service = Service.builder()
+                .id(100L)
+                .freelancer(matching)
+                .title("InstalaÃ§Ã£o de ventilador")
+                .description("ServiÃ§o residencial")
+                .category("ElÃ©trica")
+                .serviceCategory(category)
+                .serviceSubcategory(subcategory)
+                .tags("[\"ventilador\",\"urgente\"]")
+                .isActive(true)
+                .build();
+
+        when(freelancerRepository.findAllWithServiceCityCoordinates()).thenReturn(List.of(matching, other));
+        when(freelancerRepository.findAllWithLocation()).thenReturn(List.of());
+        when(serviceRepository.findByFreelancerIdInAndIsActiveOrderByCreatedAtDesc(any(), eq(true)))
+                .thenReturn(List.of(service));
+        when(reviewRepository.findAverageRatingByReviewedId(anyLong())).thenReturn(4.8);
+        when(reviewRepository.countByReviewedId(anyLong())).thenReturn(12L);
+
+        List<NearbyFreelancerResponse> result = freelancerService.findNearbyFreelancers(
+                BigDecimal.valueOf(-23.5505),
+                BigDecimal.valueOf(-46.6333),
+                10.0,
+                null,
+                "ventilador",
+                10L,
+                null,
+                null,
+                "instalacao",
+                BigDecimal.valueOf(4),
+                true);
+
+        assertThat(result).singleElement().satisfies(response -> {
+            assertThat(response.getId()).isEqualTo(1L);
+            assertThat(response.getCategoryId()).isEqualTo(10L);
+            assertThat(response.getSubcategoryLabel()).isEqualTo("InstalaÃ§Ã£o");
+        });
+    }
+
     private void mockCurrentFreelancer(Freelancer freelancer) {
         freelancer.setId(1L);
         doReturn(freelancer).when(freelancerService).getCurrentFreelancer();
@@ -215,6 +282,23 @@ class FreelancerServiceTest {
         freelancer.setServiceCities(new ArrayList<>());
         freelancer.setProfessionalLinks(new ArrayList<>());
         freelancer.setServiceSubcategories(new ArrayList<>());
+        return freelancer;
+    }
+
+    private Freelancer buildNearbyFreelancer(Long id, String name, double latitude, double longitude) {
+        Freelancer freelancer = buildFreelancer();
+        freelancer.setId(id);
+        freelancer.setName(name);
+        freelancer.setProfessionalTitle("Profissional");
+        freelancer.setAvailable(true);
+        freelancer.setCompletedJobs(3);
+        freelancer.getServiceCities().add(ServiceCity.builder()
+                .freelancer(freelancer)
+                .city("SÃ£o Paulo")
+                .state("SP")
+                .latitude(BigDecimal.valueOf(latitude))
+                .longitude(BigDecimal.valueOf(longitude))
+                .build());
         return freelancer;
     }
 }

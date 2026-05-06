@@ -1,581 +1,1003 @@
 <script setup lang="ts">
-import { ref, onMounted, watch, computed } from 'vue'
-import { useRouter } from 'vue-router'
-import { MapPin, Navigation, ArrowLeft, Star, MessageSquare, Filter, Search, X, ChevronRight, Briefcase, Clock } from 'lucide-vue-next'
-import 'leaflet/dist/leaflet.css'
-import L from 'leaflet'
-import Button from '@/components/ui/button.vue'
-import Avatar from '@/components/ui/avatar.vue'
-import AvatarImage from '@/components/ui/avatar-image.vue'
-import AvatarFallback from '@/components/ui/avatar-fallback.vue'
-import Input from '@/components/ui/input.vue'
-import api from '@/api/config/axios'
-import { toast } from '@/utils/toast'
-import { useUserStore } from '@/stores/userStore'
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { useRouter } from "vue-router";
+import {
+  ArrowLeft,
+  Briefcase,
+  Check,
+  ChevronRight,
+  Filter,
+  MapPin,
+  Navigation,
+  RotateCcw,
+  Search,
+  SlidersHorizontal,
+  Star,
+  X,
+} from "lucide-vue-next";
+import "leaflet/dist/leaflet.css";
+import L from "leaflet";
+import Avatar from "@/components/ui/avatar.vue";
+import AvatarImage from "@/components/ui/avatar-image.vue";
+import AvatarFallback from "@/components/ui/avatar-fallback.vue";
+import Select from "@/components/ui/select.vue";
+import SelectContent from "@/components/ui/select-content.vue";
+import SelectItem from "@/components/ui/select-item.vue";
+import SelectTrigger from "@/components/ui/select-trigger.vue";
+import SelectValue from "@/components/ui/select-value.vue";
+import Slider from "@/components/ui/slider.vue";
+import api from "@/api/config/axios";
+import { toast } from "@/utils/toast";
+import { useUserStore } from "@/stores/userStore";
+import { useCategoryCatalogStore } from "@/stores/categoryCatalogStore";
 
 interface Provider {
-  id: string
-  name: string
-  avatar?: string
-  professionalTitle: string
-  rating: number
-  totalReviews: number
-  location: string
-  latitude: number
-  longitude: number
-  distance?: number
-  available: boolean
-  category?: string
+  markerId: string;
+  id: string;
+  name: string;
+  avatar?: string;
+  professionalTitle: string;
+  rating: number;
+  totalReviews: number;
+  location: string;
+  latitude: number;
+  longitude: number;
+  distance?: number;
+  available: boolean;
+  completedJobs?: number;
+  category?: string;
+  categoryId?: number | null;
+  categorySlug?: string;
+  categoryLabel?: string;
+  subcategoryId?: number | null;
+  subcategorySlug?: string;
+  subcategoryLabel?: string;
+  subcategoryIds?: number[];
+  subcategoryLabels?: string[];
 }
 
 interface UserLocation {
-  latitude: number
-  longitude: number
-  address: string
-  city: string
-  state: string
+  latitude: number;
+  longitude: number;
+  address: string;
+  city: string;
+  state: string;
 }
 
-const router = useRouter()
-const userStore = useUserStore()
+interface MapFilters {
+  radius: number;
+  minRating: number;
+  categoryId: number | null;
+  categorySlug: string;
+  subcategoryId: number | null;
+  subcategorySlug: string;
+  onlyAvailable: boolean;
+}
 
-// Estado
-const mapContainer = ref<HTMLElement | null>(null)
-const map = ref<L.Map | null>(null)
-const userMarker = ref<L.Marker | null>(null)
-const providerMarkers = ref<L.Marker[]>([])
-const isLoading = ref(false)
-const isLocating = ref(false)
-const selectedProvider = ref<Provider | null>(null)
-const searchRadius = ref(50)
-const searchQuery = ref('')
+const router = useRouter();
+const userStore = useUserStore();
+const categoryCatalogStore = useCategoryCatalogStore();
+
+const mapContainer = ref<HTMLElement | null>(null);
+const map = ref<L.Map | null>(null);
+const userMarker = ref<L.Marker | null>(null);
+const providerLayer = ref<L.LayerGroup | null>(null);
+const isLoading = ref(false);
+const isLocating = ref(false);
+const selectedProvider = ref<Provider | null>(null);
+const showFilters = ref(false);
+const searchQuery = ref("");
+const debouncedSearchQuery = ref("");
+const nearbyProviders = ref<Provider[]>([]);
 
 const userLocation = ref<UserLocation>({
   latitude: 0,
   longitude: 0,
-  address: '',
-  city: '',
-  state: ''
-})
+  address: "",
+  city: "",
+  state: "",
+});
 
-const nearbyProviders = ref<Provider[]>([])
+const createDefaultFilters = (): MapFilters => ({
+  radius: 50,
+  minRating: 0,
+  categoryId: null,
+  categorySlug: "",
+  subcategoryId: null,
+  subcategorySlug: "",
+  onlyAvailable: false,
+});
 
-// Filtros
-const showFilters = ref(false)
-const selectedCategory = ref('')
-const onlyAvailable = ref(false)
+const appliedFilters = ref<MapFilters>(createDefaultFilters());
+const draftFilters = ref<MapFilters>(createDefaultFilters());
+let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
-// Categorias disponíveis
-const categories = [
-  'Eletricista',
-  'Encanador',
-  'Pintor',
-  'Diarista',
-  'Marceneiro',
-  'Desenvolvedor',
-  'Designer',
-  'Pedreiro',
-  'Jardineiro'
-]
+const isProviderView = computed(() => userStore.user?.type === "provider");
+const categories = computed(() => categoryCatalogStore.activePublicCategories);
+const draftCategory = computed(
+  () =>
+    categories.value.find(
+      (category) => category.id === draftFilters.value.categoryId,
+    ) || null,
+);
+const draftSubcategories = computed(
+  () => draftCategory.value?.subcategories || [],
+);
+const draftSubcategory = computed(
+  () =>
+    draftSubcategories.value.find(
+      (subcategory) => subcategory.id === draftFilters.value.subcategoryId,
+    ) || null,
+);
 
-// Profissionais filtrados
-const filteredProviders = computed(() => {
-  let result = nearbyProviders.value
+const hasActiveFilters = computed(() => {
+  const defaults = createDefaultFilters();
+  return (
+    appliedFilters.value.radius !== defaults.radius ||
+    appliedFilters.value.minRating !== defaults.minRating ||
+    !!appliedFilters.value.categoryId ||
+    !!appliedFilters.value.subcategoryId ||
+    appliedFilters.value.onlyAvailable
+  );
+});
 
-  if (searchQuery.value) {
-    const query = searchQuery.value.toLowerCase()
-    result = result.filter(p => 
-      p.name.toLowerCase().includes(query) ||
-      p.professionalTitle.toLowerCase().includes(query)
+const searchTerm = computed(() => debouncedSearchQuery.value.trim());
+
+const displayedProviders = computed(() => {
+  if (!isProviderView.value) {
+    return nearbyProviders.value;
+  }
+
+  const query = normalizeText(searchTerm.value);
+  return nearbyProviders.value.filter((provider) => {
+    if (query && !matchesProviderLocally(provider, query)) return false;
+    if (
+      appliedFilters.value.minRating > 0 &&
+      provider.rating < appliedFilters.value.minRating
     )
-  }
-
-  if (selectedCategory.value && selectedCategory.value !== 'Todos') {
-    result = result.filter(p => 
-      p.professionalTitle.toLowerCase().includes(selectedCategory.value.toLowerCase()) ||
-      p.category?.toLowerCase().includes(selectedCategory.value.toLowerCase())
+      return false;
+    if (appliedFilters.value.onlyAvailable && !provider.available) return false;
+    if (
+      appliedFilters.value.categoryId &&
+      provider.categoryId !== appliedFilters.value.categoryId
     )
+      return false;
+    if (
+      appliedFilters.value.categorySlug &&
+      normalizeText(provider.categorySlug) !==
+        normalizeText(appliedFilters.value.categorySlug)
+    )
+      return false;
+    if (appliedFilters.value.subcategoryId) {
+      const ids = provider.subcategoryIds || [];
+      if (
+        provider.subcategoryId !== appliedFilters.value.subcategoryId &&
+        !ids.includes(appliedFilters.value.subcategoryId)
+      ) {
+        return false;
+      }
+    }
+    if (
+      appliedFilters.value.subcategorySlug &&
+      normalizeText(provider.subcategorySlug) !==
+        normalizeText(appliedFilters.value.subcategorySlug)
+    ) {
+      return false;
+    }
+    return true;
+  });
+});
+
+const selectedCategoryLabel = computed(() => {
+  const category = categories.value.find(
+    (item) => item.id === appliedFilters.value.categoryId,
+  );
+  return category?.name || "";
+});
+
+const selectedSubcategoryLabel = computed(() => {
+  const category = categories.value.find(
+    (item) => item.id === appliedFilters.value.categoryId,
+  );
+  return (
+    category?.subcategories.find(
+      (item) => item.id === appliedFilters.value.subcategoryId,
+    )?.name || ""
+  );
+});
+
+const normalizeText = (value?: string | null) =>
+  (value || "")
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .trim()
+    .toLowerCase();
+
+const matchesProviderLocally = (provider: Provider, query: string) => {
+  const haystack = [
+    provider.name,
+    provider.professionalTitle,
+    provider.category,
+    provider.categoryLabel,
+    provider.categorySlug,
+    provider.subcategoryLabel,
+    provider.subcategorySlug,
+    ...(provider.subcategoryLabels || []),
+  ];
+  return haystack.some((value) => normalizeText(value).includes(query));
+};
+
+const isValidCoordinate = (latitude: unknown, longitude: unknown) => {
+  const lat = Number(latitude);
+  const lng = Number(longitude);
+  return (
+    Number.isFinite(lat) &&
+    Number.isFinite(lng) &&
+    lat >= -90 &&
+    lat <= 90 &&
+    lng >= -180 &&
+    lng <= 180 &&
+    !(lat === 0 && lng === 0)
+  );
+};
+
+const escapeHtml = (value: string) =>
+  value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+
+const getInitials = (name: string) => {
+  return name
+    .split(" ")
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join("")
+    .substring(0, 2)
+    .toUpperCase();
+};
+
+const stringToColor = (str: string) => {
+  let hash = 0;
+  for (let i = 0; i < str.length; i += 1) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const h = Math.abs(hash) % 360;
+  return `hsl(${h}, 45%, 42%)`;
+};
+
+const formatDistance = (distance?: number) => {
+  const normalizedDistance = Number(distance || 0);
+  if (normalizedDistance < 1) {
+    return `${Math.round(normalizedDistance * 1000)}m`;
+  }
+  return `${normalizedDistance.toFixed(1)}km`;
+};
+
+const getCategoryDisplay = (provider: Provider) =>
+  provider.categoryLabel ||
+  provider.category ||
+  provider.professionalTitle ||
+  "Area nao informada";
+
+const getSubcategoryDisplay = (provider: Provider) =>
+  provider.subcategoryLabel || provider.subcategoryLabels?.[0] || "";
+
+const normalizeProvider = (
+  rawProvider: any,
+  index: number,
+): Provider | null => {
+  if (!isValidCoordinate(rawProvider?.latitude, rawProvider?.longitude)) {
+    return null;
   }
 
-  if (onlyAvailable.value) {
-    result = result.filter(p => p.available)
-  }
+  const latitude = Number(rawProvider.latitude);
+  const longitude = Number(rawProvider.longitude);
+  const id = String(rawProvider.id);
 
-  return result
-})
+  return {
+    markerId:
+      rawProvider.markerId ||
+      `${id}-${latitude.toFixed(6)}-${longitude.toFixed(6)}-${index}`,
+    id,
+    name: rawProvider.name || "Profissional",
+    avatar: rawProvider.avatar || rawProvider.profilePhoto || "",
+    professionalTitle:
+      rawProvider.professionalTitle || rawProvider.profession || "Profissional",
+    rating: rawProvider.rating ? Number(rawProvider.rating) : 0,
+    totalReviews: rawProvider.totalReviews || rawProvider.reviewCount || 0,
+    location: rawProvider.location || "",
+    latitude,
+    longitude,
+    distance: rawProvider.distance ? Number(rawProvider.distance) : 0,
+    available: rawProvider.available ?? true,
+    completedJobs: rawProvider.completedJobs ?? undefined,
+    category: rawProvider.category || rawProvider.categoryLabel || "",
+    categoryId: rawProvider.categoryId ?? null,
+    categorySlug: rawProvider.categorySlug || "",
+    categoryLabel: rawProvider.categoryLabel || rawProvider.category || "",
+    subcategoryId: rawProvider.subcategoryId ?? null,
+    subcategorySlug: rawProvider.subcategorySlug || "",
+    subcategoryLabel:
+      rawProvider.subcategoryLabel || rawProvider.subcategory || "",
+    subcategoryIds: Array.isArray(rawProvider.subcategoryIds)
+      ? rawProvider.subcategoryIds
+      : [],
+    subcategoryLabels: Array.isArray(rawProvider.subcategoryLabels)
+      ? rawProvider.subcategoryLabels
+      : [],
+  };
+};
 
-// Ícones customizados
 const createUserIcon = () => {
   return L.divIcon({
-    className: 'custom-marker',
+    className: "custom-user-marker",
     html: `
-      <div class="relative">
-        <div class="w-10 h-10 bg-blue-500 rounded-full border-4 border-white shadow-lg flex items-center justify-center">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="10"/>
-            <circle cx="12" cy="12" r="3"/>
+      <div class="user-marker-icon" aria-label="Sua localizacao">
+        <div class="user-marker-dot">
+          <svg xmlns="http://www.w3.org/2000/svg" class="user-marker-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <circle cx="12" cy="12" r="3"></circle>
           </svg>
         </div>
-        <div class="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-8 border-l-transparent border-r-transparent border-t-blue-500"></div>
+        <div class="user-marker-tail"></div>
       </div>
     `,
-    iconSize: [40, 48],
-    iconAnchor: [20, 48]
-  })
-}
+    iconSize: [44, 52],
+    iconAnchor: [22, 52],
+  });
+};
 
-const createProviderIcon = (available: boolean, rating: number) => {
-  const bgColor = available ? 'bg-green-500' : 'bg-gray-400'
-  const borderColor = available ? 'border-green-600' : 'border-gray-500'
-  
+const createProviderIcon = (provider: Provider) => {
+  const initials = escapeHtml(getInitials(provider.name));
+  const avatar = provider.avatar
+    ? `<img src="${escapeHtml(provider.avatar)}" alt="${escapeHtml(provider.name)}" class="provider-marker-image" />`
+    : `<span>${initials}</span>`;
+
   return L.divIcon({
-    className: 'custom-marker',
+    className: "custom-provider-marker",
     html: `
-      <div class="relative group cursor-pointer">
-        <div class="w-10 h-10 ${bgColor} rounded-full border-2 ${borderColor} shadow-lg flex items-center justify-center text-white font-bold text-sm transition-transform hover:scale-110">
-          ${rating > 0 ? rating.toFixed(1) : '…'}
+      <div class="provider-marker-icon ${provider.available ? "is-available" : "is-unavailable"}" aria-label="${escapeHtml(provider.name)}">
+        <div class="provider-marker-avatar">
+          ${avatar}
         </div>
-        <div class="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-8 border-l-transparent border-r-transparent ${available ? 'border-t-green-500' : 'border-t-gray-400'}"></div>
+        <div class="provider-marker-tail"></div>
       </div>
     `,
-    iconSize: [40, 48],
-    iconAnchor: [20, 48]
-  })
-}
+    iconSize: [46, 54],
+    iconAnchor: [23, 54],
+  });
+};
 
-// Inicializar mapa
 const initMap = () => {
-  if (!mapContainer.value || map.value) return
+  if (!mapContainer.value || map.value) return;
 
-  map.value = L.map(mapContainer.value, {
-    zoomControl: false
-  })
+  const mapInstance = L.map(mapContainer.value, {
+    zoomControl: false,
+  }).setView([-23.5505, -46.6333], 12);
 
-  // Adicionar controle de zoom no canto direito
-  L.control.zoom({ position: 'topright' }).addTo(map.value as L.Map)
+  map.value = mapInstance;
 
-  // Adicionar tiles do OpenStreetMap
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-  }).addTo(map.value as L.Map)
-}
+  L.control.zoom({ position: "bottomright" }).addTo(mapInstance);
 
-// Buscar localização a partir do perfil cadastrado no banco
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution:
+      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+  }).addTo(mapInstance);
+
+  providerLayer.value = L.layerGroup().addTo(mapInstance);
+};
+
 const loadUserAddressFromProfile = async () => {
-  isLocating.value = true
+  isLocating.value = true;
 
   try {
-    if (userStore.user?.type === 'provider') {
-      await loadLocationFromServiceCities()
+    if (isProviderView.value) {
+      await loadLocationFromServiceCities();
     } else {
-      await loadLocationFromAddress()
+      await loadLocationFromAddress();
     }
   } finally {
-    isLocating.value = false
+    isLocating.value = false;
   }
-}
+};
 
-// Freelancer: posiciona o mapa na própria cidade de atendimento e exibe apenas a si mesmo
 const loadLocationFromServiceCities = async () => {
-  try {
-    const response = await api.get('/freelancer/profile')
-    const profile = response.data
-    const serviceCities: any[] = profile?.serviceCities || []
+  isLoading.value = true;
 
-    const citiesWithCoords = serviceCities.filter(
-      (sc: any) => sc.latitude != null && sc.longitude != null
-    )
+  try {
+    const response = await api.get("/freelancer/profile");
+    const profile = response.data;
+    const serviceCities: any[] = profile?.serviceCities || [];
+    const citiesWithCoords = serviceCities.filter((city: any) =>
+      isValidCoordinate(city.latitude, city.longitude),
+    );
 
     if (citiesWithCoords.length === 0) {
-      toast.info('Cadastre uma cidade de atendimento no seu perfil para visualizá-la no mapa.')
-      return
+      nearbyProviders.value = [];
+      clearProviderMarkers();
+      toast.info(
+        "Cadastre uma cidade de atendimento no seu perfil para visualiza-la no mapa.",
+      );
+      return;
     }
 
-    // Centraliza no mapa pela primeira cidade cadastrada
-    const firstCity = citiesWithCoords[0]
+    const firstCity = citiesWithCoords[0];
     userLocation.value = {
-      latitude: parseFloat(firstCity.latitude),
-      longitude: parseFloat(firstCity.longitude),
-      address: '',
+      latitude: Number(firstCity.latitude),
+      longitude: Number(firstCity.longitude),
+      address: "",
       city: firstCity.city,
-      state: firstCity.state
-    }
+      state: firstCity.state,
+    };
 
-    if (map.value) {
-      map.value.setView([userLocation.value.latitude, userLocation.value.longitude], 10)
-    }
+    map.value?.setView(
+      [userLocation.value.latitude, userLocation.value.longitude],
+      10,
+    );
+    updateUserMarker();
 
-    updateUserMarker()
-
-    // Freelancer só vê a si mesmo: monta os marcadores com suas próprias cidades de atendimento
-    nearbyProviders.value = citiesWithCoords.map((sc: any) => ({
-      id: String(profile.id),
-      name: profile.name,
-      avatar: profile.profilePhoto || '',
-      professionalTitle: profile.profession || 'Profissional',
-      rating: profile.rating ? Number(profile.rating) : 0,
-      totalReviews: profile.totalReviews || 0,
-      location: `${sc.city}, ${sc.state}`,
-      latitude: parseFloat(sc.latitude),
-      longitude: parseFloat(sc.longitude),
-      distance: 0,
-      available: profile.available ?? true,
-      category: profile.category || ''
-    }))
-
-    updateProviderMarkers()
-    fitMapToBounds()
+    nearbyProviders.value = citiesWithCoords
+      .map((city: any, index: number) =>
+        normalizeProvider(
+          {
+            id: profile.id,
+            markerId: `${profile.id}-${city.id || index}`,
+            name: profile.name,
+            avatar: profile.profilePhoto || "",
+            professionalTitle: profile.profession || "Profissional",
+            rating: profile.rating ? Number(profile.rating) : 0,
+            totalReviews: profile.totalReviews || 0,
+            completedJobs: profile.completedJobs,
+            location: `${city.city}, ${city.state}`,
+            latitude: city.latitude,
+            longitude: city.longitude,
+            distance: 0,
+            available: profile.available ?? true,
+            category: profile.category,
+            categoryId: profile.categoryId,
+            categorySlug: profile.categorySlug,
+            categoryLabel: profile.categoryLabel,
+            subcategoryId: profile.subcategoryId,
+            subcategorySlug: profile.subcategorySlug,
+            subcategoryLabel: profile.subcategoryLabel,
+            subcategoryIds: profile.subcategoryIds,
+            subcategoryLabels: profile.subcategoryLabels,
+          },
+          index,
+        ),
+      )
+      .filter((provider): provider is Provider => provider !== null);
   } catch (error) {
-    console.error('Erro ao carregar cidades de atendimento:', error)
-    toast.error('Não foi possível carregar suas cidades de atendimento.')
+    console.error("Erro ao carregar cidades de atendimento:", error);
+    nearbyProviders.value = [];
+    clearProviderMarkers();
+    toast.error("Nao foi possivel carregar suas cidades de atendimento.");
+  } finally {
+    isLoading.value = false;
   }
-}
+};
 
-// Contratante: geocodifica o endereço padrão cadastrado
 const loadLocationFromAddress = async () => {
   try {
-    const response = await api.get('/addresses')
-    const addresses = response.data || []
-    const defaultAddress = addresses.find((addr: any) => addr.isDefault) || addresses[0]
+    const response = await api.get("/addresses");
+    const addresses = response.data || [];
+    const defaultAddress =
+      addresses.find((addr: any) => addr.isDefault) || addresses[0];
 
     if (!defaultAddress) {
-      toast.info('Cadastre um endereço no seu perfil para ver profissionais próximos.')
-      return
+      nearbyProviders.value = [];
+      clearProviderMarkers();
+      toast.info(
+        "Cadastre um endereco no seu perfil para ver profissionais proximos.",
+      );
+      return;
     }
 
-    const fullAddress = `${defaultAddress.street}, ${defaultAddress.number}, ${defaultAddress.neighborhood}, ${defaultAddress.city}, ${defaultAddress.state}, Brasil`
-
+    const fullAddress = `${defaultAddress.street}, ${defaultAddress.number}, ${defaultAddress.neighborhood}, ${defaultAddress.city}, ${defaultAddress.state}, Brasil`;
     const geoResponse = await fetch(
-      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(fullAddress)}&limit=1`
-    )
-    const geoData = await geoResponse.json()
+      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(fullAddress)}&limit=1`,
+    );
+    const geoData = await geoResponse.json();
 
-    if (geoData && geoData.length > 0) {
-      userLocation.value = {
-        latitude: parseFloat(geoData[0].lat),
-        longitude: parseFloat(geoData[0].lon),
-        address: defaultAddress.street,
-        city: defaultAddress.city,
-        state: defaultAddress.state
-      }
-
-      if (map.value) {
-        map.value.setView([userLocation.value.latitude, userLocation.value.longitude], 14)
-      }
-
-      updateUserMarker()
-      await loadNearbyProviders()
-    } else {
-      toast.error('Não foi possível localizar seu endereço no mapa. Verifique os dados cadastrados.')
+    if (
+      !geoData ||
+      geoData.length === 0 ||
+      !isValidCoordinate(geoData[0].lat, geoData[0].lon)
+    ) {
+      nearbyProviders.value = [];
+      clearProviderMarkers();
+      toast.error(
+        "Nao foi possivel localizar seu endereco no mapa. Verifique os dados cadastrados.",
+      );
+      return;
     }
+
+    userLocation.value = {
+      latitude: Number(geoData[0].lat),
+      longitude: Number(geoData[0].lon),
+      address: defaultAddress.street,
+      city: defaultAddress.city,
+      state: defaultAddress.state,
+    };
+
+    map.value?.setView(
+      [userLocation.value.latitude, userLocation.value.longitude],
+      14,
+    );
+    updateUserMarker();
+    await loadNearbyProviders();
   } catch (error) {
-    console.error('Erro ao carregar endereço:', error)
-    updateUserMarker()
-    await loadNearbyProviders()
-  } finally {
-    isLocating.value = false
+    console.error("Erro ao carregar endereco:", error);
+    nearbyProviders.value = [];
+    clearProviderMarkers();
+    toast.error("Nao foi possivel carregar sua localizacao.");
   }
-}
+};
+
+const buildNearbyParams = () => {
+  const params: Record<string, unknown> = {
+    latitude: userLocation.value.latitude,
+    longitude: userLocation.value.longitude,
+    radius: appliedFilters.value.radius,
+  };
+
+  if (searchTerm.value) params.q = searchTerm.value;
+  if (appliedFilters.value.categoryId)
+    params.categoryId = appliedFilters.value.categoryId;
+  if (appliedFilters.value.categorySlug)
+    params.categorySlug = appliedFilters.value.categorySlug;
+  if (appliedFilters.value.subcategoryId)
+    params.subcategoryId = appliedFilters.value.subcategoryId;
+  if (appliedFilters.value.subcategorySlug)
+    params.subcategorySlug = appliedFilters.value.subcategorySlug;
+  if (appliedFilters.value.minRating > 0)
+    params.minRating = appliedFilters.value.minRating;
+  if (appliedFilters.value.onlyAvailable) params.available = true;
+
+  return params;
+};
 
 const loadNearbyProviders = async () => {
-  isLoading.value = true
-  nearbyProviders.value = []
-  
-  try {
-    const response = await api.get('/freelancer/nearby', {
-      params: {
-        latitude: userLocation.value.latitude,
-        longitude: userLocation.value.longitude,
-        radius: searchRadius.value
-      }
-    })
-    
-    nearbyProviders.value = (response.data || []).map((p: any) => ({
-      id: String(p.id),
-      name: p.name,
-      avatar: p.avatar || '',
-      professionalTitle: p.professionalTitle || 'Profissional',
-      rating: p.rating ? Number(p.rating) : 0,
-      totalReviews: p.totalReviews || 0,
-      location: p.location || '',
-      latitude: Number(p.latitude),
-      longitude: Number(p.longitude),
-      distance: p.distance || 0,
-      available: p.available ?? true,
-      category: p.category || ''
-    }))
+  if (
+    !isValidCoordinate(
+      userLocation.value.latitude,
+      userLocation.value.longitude,
+    )
+  ) {
+    nearbyProviders.value = [];
+    clearProviderMarkers();
+    return;
+  }
 
-    updateProviderMarkers()
-    fitMapToBounds()
+  isLoading.value = true;
+
+  try {
+    const response = await api.get("/freelancer/nearby", {
+      params: buildNearbyParams(),
+    });
+
+    nearbyProviders.value = (response.data || [])
+      .map((provider: any, index: number) => normalizeProvider(provider, index))
+      .filter(
+        (provider: Provider | null): provider is Provider => provider !== null,
+      );
   } catch (error: any) {
-    console.error('Erro ao carregar profissionais:', error)
+    console.error("Erro ao carregar profissionais:", error);
+    nearbyProviders.value = [];
+    clearProviderMarkers();
     if (error.response?.status !== 403) {
-      toast.error('Erro ao carregar profissionais')
+      toast.error("Erro ao carregar profissionais");
     }
   } finally {
-    isLoading.value = false
+    isLoading.value = false;
   }
-}
+};
+
+const refreshMapData = async () => {
+  if (isProviderView.value) {
+    updateProviderMarkers();
+    fitMapToBounds();
+    return;
+  }
+
+  await loadNearbyProviders();
+};
+
+const updateUserMarker = () => {
+  if (
+    !map.value ||
+    !isValidCoordinate(
+      userLocation.value.latitude,
+      userLocation.value.longitude,
+    )
+  )
+    return;
+
+  const latLng: L.LatLngExpression = [
+    userLocation.value.latitude,
+    userLocation.value.longitude,
+  ];
+
+  if (userMarker.value) {
+    userMarker.value.setLatLng(latLng);
+    return;
+  }
+
+  userMarker.value = L.marker(latLng, { icon: createUserIcon() }).addTo(
+    map.value as L.Map,
+  );
+  userMarker.value.bindTooltip("Sua localizacao", {
+    direction: "top",
+    offset: [0, -48],
+  });
+};
+
+const clearProviderMarkers = () => {
+  providerLayer.value?.clearLayers();
+};
+
+const updateProviderMarkers = () => {
+  if (!map.value) return;
+
+  if (!providerLayer.value) {
+    providerLayer.value = L.layerGroup().addTo(map.value as L.Map);
+  }
+
+  providerLayer.value.clearLayers();
+
+  displayedProviders.value.forEach((provider) => {
+    const marker = L.marker([provider.latitude, provider.longitude], {
+      icon: createProviderIcon(provider),
+      riseOnHover: true,
+    });
+
+    marker.on("click", () => {
+      selectedProvider.value = provider;
+    });
+
+    marker.addTo(providerLayer.value as L.LayerGroup);
+  });
+};
 
 const fitMapToBounds = () => {
-  if (!map.value || userLocation.value.latitude === 0) return
+  if (
+    !map.value ||
+    !isValidCoordinate(
+      userLocation.value.latitude,
+      userLocation.value.longitude,
+    )
+  )
+    return;
 
-  if (filteredProviders.value.length === 0) {
-    map.value.setView([userLocation.value.latitude, userLocation.value.longitude], 14)
-    return
+  if (displayedProviders.value.length === 0) {
+    map.value.setView(
+      [userLocation.value.latitude, userLocation.value.longitude],
+      14,
+    );
+    return;
   }
 
   const bounds = L.latLngBounds([
-    [userLocation.value.latitude, userLocation.value.longitude]
-  ])
+    [userLocation.value.latitude, userLocation.value.longitude],
+  ]);
+  displayedProviders.value.forEach((provider) => {
+    bounds.extend([provider.latitude, provider.longitude]);
+  });
 
-  filteredProviders.value.forEach(p => {
-    bounds.extend([p.latitude, p.longitude])
-  })
+  map.value.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
+};
 
-  map.value.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 })
-}
-
-// Atualizar marcador do usuário
-const updateUserMarker = () => {
-  if (!map.value) return
-  
-  if (userMarker.value) {
-    userMarker.value.setLatLng([userLocation.value.latitude, userLocation.value.longitude])
-  } else {
-    userMarker.value = L.marker(
-      [userLocation.value.latitude, userLocation.value.longitude],
-      { icon: createUserIcon() }
-    ).addTo(map.value as L.Map)
-    
-    userMarker.value.bindPopup('<strong>Sua localização</strong>')
-  }
-}
-
-// Atualizar marcadores dos profissionais
-const updateProviderMarkers = () => {
-  if (!map.value) return
-  
-  providerMarkers.value.forEach(marker => marker.remove())
-  providerMarkers.value = []
-  
-  filteredProviders.value.forEach(provider => {
-    const marker = L.marker(
-      [provider.latitude, provider.longitude],
-      { icon: createProviderIcon(provider.available, provider.rating) }
-    ).addTo(map.value as L.Map)
-    
-    marker.bindPopup(`
-      <div class="p-2 min-w-[200px]">
-        <strong class="text-lg">${provider.name}</strong>
-        <p class="text-gray-600">${provider.professionalTitle}</p>
-        <div class="flex items-center gap-1 mt-1">
-          <span class="text-yellow-500">…</span>
-          <span>${provider.rating.toFixed(1)}</span>
-          <span class="text-gray-400">(${provider.totalReviews})</span>
-        </div>
-      </div>
-    `)
-    
-    marker.on('click', () => {
-      selectedProvider.value = provider
-    })
-    
-    providerMarkers.value.push(marker)
-  })
-}
-
-// Centralizar no profissional
 const centerOnProvider = (provider: Provider) => {
-  selectedProvider.value = provider
-  if (map.value) {
-    map.value.setView([provider.latitude, provider.longitude], 16)
-  }
-}
-
-// Contatar profissional
-const contactProvider = (provider: Provider) => {
-  // TODO: Implementar navegação para chat ou perfil
-  toast.info(`Contatando ${provider.name}...`)
-}
+  selectedProvider.value = provider;
+  map.value?.setView([provider.latitude, provider.longitude], 16);
+};
 
 const goBack = () => {
-  router.back()
-}
+  router.back();
+};
 
-const getInitials = (name: string) => {
-  return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
-}
+const goToProviderProfile = (provider: Provider) => {
+  selectedProvider.value = null;
+  router.push({
+    name: "provider-profile",
+    params: { providerId: provider.id },
+  });
+};
 
-const formatDistance = (distance: number) => {
-  if (distance < 1) {
-    return `${Math.round(distance * 1000)}m`
+const openFilters = () => {
+  draftFilters.value = { ...appliedFilters.value };
+  showFilters.value = true;
+};
+
+const closeFilters = () => {
+  showFilters.value = false;
+};
+
+const applyFilters = async () => {
+  appliedFilters.value = { ...draftFilters.value };
+  showFilters.value = false;
+  await refreshMapData();
+};
+
+const clearFilters = async () => {
+  const defaults = createDefaultFilters();
+  draftFilters.value = { ...defaults };
+  appliedFilters.value = { ...defaults };
+  showFilters.value = false;
+  await refreshMapData();
+};
+
+const updateDraftRadius = (value: number | number[]) => {
+  draftFilters.value.radius = Array.isArray(value)
+    ? Number(value[0])
+    : Number(value);
+};
+
+const handleDraftCategoryChange = (value: string) => {
+  const categoryId = value ? Number(value) : null;
+  const category = categories.value.find((item) => item.id === categoryId);
+  draftFilters.value.categoryId = category?.id || null;
+  draftFilters.value.categorySlug = category?.slug || "";
+  draftFilters.value.subcategoryId = null;
+  draftFilters.value.subcategorySlug = "";
+};
+
+const handleDraftSubcategoryChange = (value: string) => {
+  const subcategoryId = value ? Number(value) : null;
+  const subcategory = draftSubcategories.value.find(
+    (item) => item.id === subcategoryId,
+  );
+  draftFilters.value.subcategoryId = subcategory?.id || null;
+  draftFilters.value.subcategorySlug = subcategory?.slug || "";
+};
+
+watch(searchQuery, (value) => {
+  if (searchDebounceTimer) {
+    clearTimeout(searchDebounceTimer);
   }
-  return `${distance.toFixed(1)}km`
-}
 
-const stringToColor = (str: string) => {
-  let hash = 0
-  for (let i = 0; i < str.length; i++) {
-    hash = str.charCodeAt(i) + ((hash << 5) - hash)
+  searchDebounceTimer = setTimeout(() => {
+    debouncedSearchQuery.value = value.trim();
+  }, 350);
+});
+
+watch(debouncedSearchQuery, async () => {
+  await refreshMapData();
+});
+
+watch(displayedProviders, () => {
+  updateProviderMarkers();
+  fitMapToBounds();
+
+  if (
+    selectedProvider.value &&
+    !displayedProviders.value.some(
+      (provider) => provider.markerId === selectedProvider.value?.markerId,
+    )
+  ) {
+    selectedProvider.value = null;
   }
-  const h = Math.abs(hash) % 360
-  return `hsl(${h}, 45%, 42%)`
-}
+});
 
-// Watch para atualizar marcadores quando filtros mudam
-watch([searchQuery, selectedCategory, onlyAvailable], () => {
-  updateProviderMarkers()
-})
-
-// Lifecycle
 onMounted(async () => {
-  initMap()
-  await loadUserAddressFromProfile()
-})
+  initMap();
+  categoryCatalogStore.loadPublicCategories().catch((error) => {
+    console.error("Erro ao carregar categorias:", error);
+  });
+  await loadUserAddressFromProfile();
+});
+
+onUnmounted(() => {
+  if (searchDebounceTimer) {
+    clearTimeout(searchDebounceTimer);
+  }
+  clearProviderMarkers();
+  userMarker.value?.remove();
+  map.value?.remove();
+  map.value = null;
+  providerLayer.value = null;
+  userMarker.value = null;
+});
 </script>
 
 <template>
   <div class="map-container w-full relative overflow-hidden">
-
-    <!-- Mapa (base) -->
     <div ref="mapContainer" class="absolute inset-0 z-0" />
 
-    <!-- Barra superior flutuante -->
-    <div class="absolute top-0 left-0 right-0 z-[1000] pointer-events-none">
+    <div class="absolute top-0 left-0 right-0 z-[700] pointer-events-none">
       <div class="flex items-start gap-3 p-3 pointer-events-auto">
-
-        <!-- Botão voltar -->
         <button
           @click="goBack"
           class="h-10 w-10 rounded-xl bg-white shadow-md flex items-center justify-center text-[#263238] hover:bg-gray-50 transition flex-shrink-0 mt-0.5"
+          aria-label="Voltar"
         >
           <ArrowLeft class="h-5 w-5" />
         </button>
 
-        <!-- Busca + filtros -->
         <div class="flex-1 flex flex-col gap-2">
           <div class="flex gap-2">
             <div class="relative flex-1">
-              <Search class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Search
+                class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400"
+              />
               <input
                 v-model="searchQuery"
-                placeholder="Buscar profissional ou serviço..."
-                class="w-full h-10 pl-9 pr-4 rounded-xl bg-white shadow-md text-sm text-[#263238] placeholder-gray-400 outline-none border border-transparent focus:border-[#435574]/30"
+                placeholder="Buscar profissional, servico ou categoria..."
+                class="w-full h-10 pl-9 pr-4 rounded-xl bg-white shadow-md text-sm text-[#263238] placeholder-gray-400 outline-none border border-transparent focus:border-[#286AD8]/40"
               />
             </div>
             <button
-              @click="showFilters = !showFilters"
+              @click="openFilters"
               class="h-10 px-3 rounded-xl bg-white shadow-md flex items-center gap-1.5 text-sm font-medium transition flex-shrink-0"
-              :class="showFilters ? 'text-[#435574] bg-[#435574]/10 shadow-none' : 'text-[#263238]'"
+              :class="
+                hasActiveFilters
+                  ? 'text-[#286AD8] bg-blue-50 shadow-none'
+                  : 'text-[#263238]'
+              "
             >
               <Filter class="h-4 w-4" />
               <span class="hidden sm:inline">Filtros</span>
             </button>
           </div>
 
-          <!-- Filtros expandidos -->
-          <div v-if="showFilters" class="flex flex-wrap gap-2">
-            <select
-              v-model="selectedCategory"
-              class="h-9 px-3 rounded-xl bg-white shadow-md text-sm text-[#263238] outline-none border border-transparent focus:border-[#435574]/30"
+          <div v-if="hasActiveFilters" class="hidden sm:flex flex-wrap gap-2">
+            <span
+              class="bg-white/90 shadow-sm rounded-full px-3 py-1 text-xs font-medium text-[#435574]"
             >
-              <option value="">Todas as categorias</option>
-              <option v-for="cat in categories" :key="cat" :value="cat">{{ cat }}</option>
-            </select>
-
-            <select
-              v-model="searchRadius"
-              @change="loadNearbyProviders"
-              class="h-9 px-3 rounded-xl bg-white shadow-md text-sm text-[#263238] outline-none border border-transparent focus:border-[#435574]/30"
+              Raio {{ appliedFilters.radius }}km
+            </span>
+            <span
+              v-if="appliedFilters.minRating > 0"
+              class="bg-white/90 shadow-sm rounded-full px-3 py-1 text-xs font-medium text-[#435574]"
             >
-              <option :value="10">10 km</option>
-              <option :value="25">25 km</option>
-              <option :value="50">50 km</option>
-              <option :value="100">100 km</option>
-            </select>
-
-            <label class="h-9 px-3 rounded-xl bg-white shadow-md flex items-center gap-2 text-sm text-[#263238] cursor-pointer">
-              <input type="checkbox" v-model="onlyAvailable" class="rounded accent-[#435574]" />
-              Só disponíveis
-            </label>
+              {{ appliedFilters.minRating }}+ estrelas
+            </span>
+            <span
+              v-if="selectedCategoryLabel"
+              class="bg-white/90 shadow-sm rounded-full px-3 py-1 text-xs font-medium text-[#435574]"
+            >
+              {{ selectedCategoryLabel }}
+            </span>
+            <span
+              v-if="selectedSubcategoryLabel"
+              class="bg-white/90 shadow-sm rounded-full px-3 py-1 text-xs font-medium text-[#435574]"
+            >
+              {{ selectedSubcategoryLabel }}
+            </span>
+            <span
+              v-if="appliedFilters.onlyAvailable"
+              class="bg-white/90 shadow-sm rounded-full px-3 py-1 text-xs font-medium text-[#435574]"
+            >
+              Disponiveis
+            </span>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Botão atualizar localização -->
     <button
       @click="loadUserAddressFromProfile"
       :disabled="isLocating"
-      class="absolute bottom-6 right-4 z-[1000] h-11 w-11 rounded-xl bg-white shadow-md flex items-center justify-center text-[#263238] hover:bg-gray-50 transition disabled:opacity-60"
-      title="Atualizar localização"
+      class="absolute right-4 z-[700] h-11 w-11 rounded-xl bg-white shadow-md flex items-center justify-center text-[#263238] hover:bg-gray-50 transition disabled:opacity-60 location-button"
+      title="Atualizar localizacao"
+      aria-label="Atualizar localizacao"
     >
       <Navigation v-if="!isLocating" class="h-5 w-5" />
-      <div v-else class="h-4 w-4 rounded-full border-2 border-[#435574] border-t-transparent animate-spin" />
+      <div
+        v-else
+        class="h-4 w-4 rounded-full border-2 border-[#286AD8] border-t-transparent animate-spin"
+      />
     </button>
 
-    <!-- Pill de contagem (desktop) -->
-    <div class="absolute top-16 left-1/2 -translate-x-1/2 z-[1000] hidden lg:block mt-2 pointer-events-none">
-      <div v-if="!isLoading && filteredProviders.length > 0" class="bg-white/90 backdrop-blur-sm shadow-md rounded-full px-4 py-1.5 text-xs font-medium text-[#435574]">
-        {{ filteredProviders.length }} {{ filteredProviders.length === 1 ? 'profissional encontrado' : 'profissionais encontrados' }} · raio {{ searchRadius }}km
+    <div
+      class="absolute top-16 left-1/2 -translate-x-1/2 z-[650] hidden lg:block mt-2 pointer-events-none"
+    >
+      <div
+        v-if="!isLoading && displayedProviders.length > 0"
+        class="bg-white/90 backdrop-blur-sm shadow-md rounded-full px-4 py-1.5 text-xs font-medium text-[#435574]"
+      >
+        {{ displayedProviders.length }}
+        {{
+          displayedProviders.length === 1
+            ? "profissional encontrado"
+            : "profissionais encontrados"
+        }}
+        · raio {{ appliedFilters.radius }}km
       </div>
-      <div v-if="isLoading" class="bg-white/90 backdrop-blur-sm shadow-md rounded-full px-4 py-1.5 text-xs font-medium text-[#435574] flex items-center gap-2">
-        <div class="h-3 w-3 rounded-full border-2 border-[#435574] border-t-transparent animate-spin" />
+      <div
+        v-if="isLoading"
+        class="bg-white/90 backdrop-blur-sm shadow-md rounded-full px-4 py-1.5 text-xs font-medium text-[#435574] flex items-center gap-2"
+      >
+        <div
+          class="h-3 w-3 rounded-full border-2 border-[#286AD8] border-t-transparent animate-spin"
+        />
         Buscando...
       </div>
     </div>
 
-    <!-- Sidebar desktop -->
-    <aside class="hidden lg:flex absolute left-3 z-[1000] flex-col gap-0 overflow-hidden sidebar-desktop">
-      <div class="bg-white rounded-2xl shadow-lg overflow-hidden flex flex-col h-full">
-
+    <aside
+      class="hidden lg:flex absolute left-3 z-[650] flex-col gap-0 overflow-hidden sidebar-desktop"
+    >
+      <div
+        class="bg-white rounded-2xl shadow-lg overflow-hidden flex flex-col h-full"
+      >
         <div class="px-4 pt-4 pb-3 border-b border-gray-100">
-          <p class="text-xs uppercase tracking-widest text-gray-400 font-medium mb-0.5">Próximos de você</p>
+          <p
+            class="text-xs uppercase tracking-widest text-gray-400 font-medium mb-0.5"
+          >
+            Proximos de voce
+          </p>
           <div class="flex items-center justify-between">
             <h2 class="text-base font-semibold text-[#263238]">
-              {{ userLocation.city || '—' }}<span v-if="userLocation.state">, {{ userLocation.state }}</span>
+              {{ userLocation.city || "-"
+              }}<span v-if="userLocation.state"
+                >, {{ userLocation.state }}</span
+              >
             </h2>
             <button
-              @click="loadNearbyProviders"
+              @click="refreshMapData"
               :disabled="isLoading"
-              class="h-7 w-7 rounded-lg hover:bg-gray-100 flex items-center justify-center text-[#435574] transition disabled:opacity-40"
+              class="h-7 w-7 rounded-lg hover:bg-gray-100 flex items-center justify-center text-[#286AD8] transition disabled:opacity-40"
+              aria-label="Atualizar profissionais"
             >
-              <Navigation class="h-3.5 w-3.5" :class="{ 'animate-spin': isLoading }" />
+              <Navigation
+                class="h-3.5 w-3.5"
+                :class="{ 'animate-spin': isLoading }"
+              />
             </button>
           </div>
         </div>
 
-        <!-- Loading -->
-        <div v-if="isLoading" class="flex-1 flex flex-col items-center justify-center gap-3 p-8 text-center">
-          <div class="h-8 w-8 rounded-full border-2 border-[#435574] border-t-transparent animate-spin" />
+        <div
+          v-if="isLoading"
+          class="flex-1 flex flex-col items-center justify-center gap-3 p-8 text-center"
+        >
+          <div
+            class="h-8 w-8 rounded-full border-2 border-[#286AD8] border-t-transparent animate-spin"
+          />
           <p class="text-sm text-gray-400">Buscando profissionais...</p>
         </div>
 
-        <!-- Vazio -->
-        <div v-else-if="filteredProviders.length === 0" class="flex-1 flex flex-col items-center justify-center gap-3 p-8 text-center">
-          <div class="h-14 w-14 rounded-2xl bg-gray-100 flex items-center justify-center">
+        <div
+          v-else-if="displayedProviders.length === 0"
+          class="flex-1 flex flex-col items-center justify-center gap-3 p-8 text-center"
+        >
+          <div
+            class="h-14 w-14 rounded-2xl bg-gray-100 flex items-center justify-center"
+          >
             <MapPin class="h-6 w-6 text-gray-400" />
           </div>
           <div>
-            <p class="text-sm font-medium text-[#263238]">Nenhum profissional aqui</p>
-            <p class="text-xs text-gray-400 mt-1">Aumente o raio de busca</p>
+            <p class="text-sm font-medium text-[#263238]">
+              Nenhum profissional aqui
+            </p>
+            <p class="text-xs text-gray-400 mt-1">
+              Ajuste a busca ou aumente o raio
+            </p>
           </div>
         </div>
 
-        <!-- Lista -->
         <div v-else class="flex-1 overflow-y-auto divide-y divide-gray-100">
           <button
-            v-for="provider in filteredProviders"
-            :key="provider.id"
+            v-for="provider in displayedProviders"
+            :key="provider.markerId"
             @click="centerOnProvider(provider)"
             class="w-full text-left px-4 py-3.5 hover:bg-gray-50 transition-colors flex items-center gap-3"
-            :class="{ 'bg-[#435574]/5 border-l-2 border-l-[#435574]': selectedProvider?.id === provider.id }"
+            :class="{
+              'bg-[#286AD8]/5 border-l-2 border-l-[#286AD8]':
+                selectedProvider?.markerId === provider.markerId,
+            }"
           >
             <div class="relative flex-shrink-0">
               <Avatar class="h-11 w-11">
                 <AvatarImage :src="provider.avatar" :alt="provider.name" />
-                <AvatarFallback class="text-white text-sm font-semibold" :style="{ background: stringToColor(provider.name) }">
+                <AvatarFallback
+                  class="text-white text-sm font-semibold"
+                  :style="{ background: stringToColor(provider.name) }"
+                >
                   {{ getInitials(provider.name) }}
                 </AvatarFallback>
               </Avatar>
@@ -586,15 +1008,23 @@ onMounted(async () => {
             </div>
 
             <div class="flex-1 min-w-0">
-              <p class="text-sm font-semibold text-[#263238] truncate leading-tight">{{ provider.name }}</p>
-              <p class="text-xs text-[#435574] truncate mt-0.5">{{ provider.professionalTitle }}</p>
+              <p
+                class="text-sm font-semibold text-[#263238] truncate leading-tight"
+              >
+                {{ provider.name }}
+              </p>
+              <p class="text-xs text-[#286AD8] truncate mt-0.5">
+                {{ provider.professionalTitle }}
+              </p>
               <div class="flex items-center gap-2.5 mt-1.5">
                 <span class="flex items-center gap-0.5 text-xs text-gray-500">
                   <Star class="h-3 w-3 fill-amber-400 text-amber-400" />
-                  {{ provider.rating > 0 ? provider.rating.toFixed(1) : '–' }}
+                  {{ provider.rating > 0 ? provider.rating.toFixed(1) : "-" }}
                 </span>
                 <span class="text-gray-300">·</span>
-                <span class="text-xs text-gray-400">{{ formatDistance(provider.distance || 0) }}</span>
+                <span class="text-xs text-gray-400">{{
+                  formatDistance(provider.distance)
+                }}</span>
               </div>
             </div>
 
@@ -604,141 +1034,58 @@ onMounted(async () => {
       </div>
     </aside>
 
-    <!-- Card detalhe do profissional selecionado (flutuante, desktop) -->
-    <Transition name="slide-up">
-      <div
-        v-if="selectedProvider"
-        class="hidden lg:block absolute bottom-6 left-[calc(320px+24px)] z-[1001] w-80"
-      >
-        <div class="bg-white rounded-2xl shadow-xl overflow-hidden">
-          <!-- Cabeçalho colorido -->
-          <div class="relative h-16 flex-shrink-0" :style="{ background: `linear-gradient(135deg, ${stringToColor(selectedProvider.name)}22, ${stringToColor(selectedProvider.name)}44)` }">
-            <button
-              @click="selectedProvider = null"
-              class="absolute top-3 right-3 h-6 w-6 rounded-full bg-white/80 flex items-center justify-center text-gray-500 hover:bg-white transition"
-            >
-              <X class="h-3.5 w-3.5" />
-            </button>
-            <div class="absolute -bottom-6 left-4">
-              <div class="relative">
-                <Avatar class="h-14 w-14 ring-2 ring-white shadow-md">
-                  <AvatarImage :src="selectedProvider.avatar" :alt="selectedProvider.name" />
-                  <AvatarFallback class="text-white text-lg font-bold" :style="{ background: stringToColor(selectedProvider.name) }">
-                    {{ getInitials(selectedProvider.name) }}
-                  </AvatarFallback>
-                </Avatar>
-                <span
-                  class="absolute bottom-0.5 right-0.5 h-4 w-4 rounded-full border-2 border-white"
-                  :class="selectedProvider.available ? 'bg-emerald-500' : 'bg-gray-300'"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div class="pt-9 px-4 pb-4">
-            <div class="flex items-start justify-between gap-2 mb-3">
-              <div>
-                <h3 class="font-bold text-[#263238] leading-tight">{{ selectedProvider.name }}</h3>
-                <p class="text-sm text-[#435574] mt-0.5">{{ selectedProvider.professionalTitle }}</p>
-              </div>
-              <span
-                class="text-xs px-2.5 py-1 rounded-full font-medium flex-shrink-0 mt-0.5"
-                :class="selectedProvider.available
-                  ? 'bg-emerald-50 text-emerald-700'
-                  : 'bg-gray-100 text-gray-500'"
-              >
-                {{ selectedProvider.available ? 'Disponível' : 'Ocupado' }}
-              </span>
-            </div>
-
-            <!-- Métricas -->
-            <div class="grid grid-cols-3 gap-2 mb-4">
-              <div class="bg-gray-50 rounded-xl px-2 py-2.5 text-center">
-                <div class="flex items-center justify-center gap-1 mb-0.5">
-                  <Star class="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-                  <span class="text-sm font-bold text-[#263238]">{{ selectedProvider.rating > 0 ? selectedProvider.rating.toFixed(1) : '–' }}</span>
-                </div>
-                <p class="text-[10px] text-gray-400 leading-tight">{{ selectedProvider.totalReviews }} avaliações</p>
-              </div>
-              <div class="bg-gray-50 rounded-xl px-2 py-2.5 text-center">
-                <div class="flex items-center justify-center gap-1 mb-0.5">
-                  <Navigation class="h-3.5 w-3.5 text-[#435574]" />
-                  <span class="text-sm font-bold text-[#263238]">{{ formatDistance(selectedProvider.distance || 0) }}</span>
-                </div>
-                <p class="text-[10px] text-gray-400 leading-tight">distância</p>
-              </div>
-              <div class="bg-gray-50 rounded-xl px-2 py-2.5 text-center">
-                <div class="flex items-center justify-center gap-1 mb-0.5">
-                  <Briefcase class="h-3.5 w-3.5 text-[#435574]" />
-                  <span class="text-sm font-bold text-[#263238]">–</span>
-                </div>
-                <p class="text-[10px] text-gray-400 leading-tight">trabalhos</p>
-              </div>
-            </div>
-
-            <div v-if="selectedProvider.category" class="mb-4">
-              <span class="inline-flex items-center gap-1 text-xs bg-[#435574]/10 text-[#435574] px-2.5 py-1 rounded-full font-medium">
-                <Briefcase class="h-3 w-3" />
-                {{ selectedProvider.category }}
-              </span>
-            </div>
-
-            <!-- Ações -->
-            <div class="flex gap-2">
-              <button
-                v-if="selectedProvider.available"
-                @click="contactProvider(selectedProvider)"
-                class="flex-1 h-10 rounded-xl bg-[#263238] text-white text-sm font-medium flex items-center justify-center gap-2 hover:bg-[#263238]/90 transition"
-              >
-                <MessageSquare class="h-4 w-4" />
-                Contatar
-              </button>
-              <button
-                class="flex-1 h-10 rounded-xl border border-gray-200 text-[#263238] text-sm font-medium flex items-center justify-center gap-2 hover:bg-gray-50 transition"
-              >
-                Ver perfil
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </Transition>
-
-    <!-- Bottom sheet mobile -->
-    <div class="lg:hidden absolute bottom-0 left-0 right-0 z-[1000] mobile-sheet rounded-t-2xl bg-white shadow-2xl overflow-hidden">
+    <div
+      class="lg:hidden absolute bottom-0 left-0 right-0 z-[650] mobile-sheet rounded-t-2xl bg-white shadow-2xl overflow-hidden"
+    >
       <div class="px-4 pt-3 pb-2 border-b border-gray-100">
         <div class="w-8 h-1 bg-gray-200 rounded-full mx-auto mb-3" />
         <div class="flex items-center justify-between">
           <p class="text-sm font-semibold text-[#263238]">
-            {{ filteredProviders.length }} {{ filteredProviders.length === 1 ? 'profissional' : 'profissionais' }}
+            {{ displayedProviders.length }}
+            {{
+              displayedProviders.length === 1 ? "profissional" : "profissionais"
+            }}
           </p>
-          <p class="text-xs text-gray-400">raio de {{ searchRadius }}km</p>
+          <p class="text-xs text-gray-400">
+            raio de {{ appliedFilters.radius }}km
+          </p>
         </div>
       </div>
 
       <div class="mobile-list overflow-y-auto">
         <div v-if="isLoading" class="p-8 flex flex-col items-center gap-3">
-          <div class="h-6 w-6 rounded-full border-2 border-[#435574] border-t-transparent animate-spin" />
+          <div
+            class="h-6 w-6 rounded-full border-2 border-[#286AD8] border-t-transparent animate-spin"
+          />
           <p class="text-sm text-gray-400">Buscando...</p>
         </div>
 
-        <div v-else-if="filteredProviders.length === 0" class="p-8 flex flex-col items-center gap-2 text-center">
+        <div
+          v-else-if="displayedProviders.length === 0"
+          class="p-8 flex flex-col items-center gap-2 text-center"
+        >
           <MapPin class="h-7 w-7 text-gray-300" />
           <p class="text-sm text-gray-400">Nenhum profissional encontrado</p>
         </div>
 
         <div v-else>
           <button
-            v-for="provider in filteredProviders"
-            :key="provider.id"
+            v-for="provider in displayedProviders"
+            :key="provider.markerId"
             @click="centerOnProvider(provider)"
             class="w-full text-left px-4 py-3 border-b border-gray-100 flex items-center gap-3 hover:bg-gray-50 transition-colors"
-            :class="{ 'bg-[#435574]/5': selectedProvider?.id === provider.id }"
+            :class="{
+              'bg-[#286AD8]/5':
+                selectedProvider?.markerId === provider.markerId,
+            }"
           >
             <div class="relative flex-shrink-0">
               <Avatar class="h-10 w-10">
                 <AvatarImage :src="provider.avatar" :alt="provider.name" />
-                <AvatarFallback class="text-white text-sm font-semibold" :style="{ background: stringToColor(provider.name) }">
+                <AvatarFallback
+                  class="text-white text-sm font-semibold"
+                  :style="{ background: stringToColor(provider.name) }"
+                >
                   {{ getInitials(provider.name) }}
                 </AvatarFallback>
               </Avatar>
@@ -749,53 +1096,385 @@ onMounted(async () => {
             </div>
 
             <div class="flex-1 min-w-0">
-              <p class="text-sm font-semibold text-[#263238] truncate">{{ provider.name }}</p>
-              <p class="text-xs text-[#435574] truncate">{{ provider.professionalTitle }}</p>
+              <p class="text-sm font-semibold text-[#263238] truncate">
+                {{ provider.name }}
+              </p>
+              <p class="text-xs text-[#286AD8] truncate">
+                {{ provider.professionalTitle }}
+              </p>
               <div class="flex items-center gap-2 mt-1">
                 <span class="flex items-center gap-0.5 text-xs text-gray-400">
                   <Star class="h-3 w-3 fill-amber-400 text-amber-400" />
-                  {{ provider.rating > 0 ? provider.rating.toFixed(1) : '–' }}
+                  {{ provider.rating > 0 ? provider.rating.toFixed(1) : "-" }}
                 </span>
                 <span class="text-gray-300 text-xs">·</span>
-                <span class="text-xs text-gray-400">{{ formatDistance(provider.distance || 0) }}</span>
+                <span class="text-xs text-gray-400">{{
+                  formatDistance(provider.distance)
+                }}</span>
               </div>
             </div>
-
-            <button
-              v-if="provider.available"
-              @click.stop="contactProvider(provider)"
-              class="h-9 w-9 rounded-xl bg-[#263238] flex items-center justify-center text-white flex-shrink-0"
-            >
-              <MessageSquare class="h-4 w-4" />
-            </button>
           </button>
         </div>
       </div>
     </div>
 
+    <Transition name="fade">
+      <div
+        v-if="showFilters"
+        class="fixed inset-0 z-[1200] bg-black/40"
+        @click="closeFilters"
+      />
+    </Transition>
+
+    <Transition name="drawer">
+      <aside
+        v-if="showFilters"
+        class="fixed right-0 top-0 z-[1210] flex h-full w-full max-w-md flex-col overflow-hidden bg-white shadow-2xl"
+      >
+        <div
+          class="p-6 border-b border-gray-200 flex items-center justify-between bg-white"
+        >
+          <div class="flex items-center gap-2">
+            <SlidersHorizontal class="h-5 w-5 text-[#286AD8]" />
+            <h3 class="font-semibold text-[#263238]">Filtros</h3>
+          </div>
+          <button
+            @click="closeFilters"
+            class="h-9 w-9 rounded-lg hover:bg-gray-100 flex items-center justify-center text-[#435574]"
+          >
+            <X class="h-5 w-5" />
+          </button>
+        </div>
+
+        <div class="flex-1 overflow-y-auto p-6 space-y-6">
+          <div class="space-y-3">
+            <div class="flex items-center justify-between">
+              <label
+                class="text-sm font-medium text-[#263238] flex items-center gap-2"
+              >
+                <MapPin class="h-4 w-4 text-[#286AD8]" />
+                Distancia
+              </label>
+              <span class="text-sm font-semibold text-[#286AD8]"
+                >{{ draftFilters.radius }} km</span
+              >
+            </div>
+            <Slider
+              :value="draftFilters.radius"
+              :min="5"
+              :max="100"
+              :step="5"
+              @update:value="updateDraftRadius"
+            />
+            <div class="flex justify-between text-xs text-gray-400">
+              <span>5 km</span>
+              <span>100 km</span>
+            </div>
+          </div>
+
+          <div class="space-y-3">
+            <label
+              class="text-sm font-medium text-[#263238] flex items-center gap-2"
+            >
+              <Star class="h-4 w-4 text-[#286AD8]" />
+              Avaliacao minima
+            </label>
+            <div class="grid grid-cols-6 gap-2">
+              <button
+                v-for="rating in [0, 1, 2, 3, 4, 5]"
+                :key="rating"
+                @click="draftFilters.minRating = rating"
+                class="h-11 rounded-lg border text-sm font-medium flex items-center justify-center gap-1 transition"
+                :class="
+                  draftFilters.minRating === rating
+                    ? 'border-[#286AD8] bg-blue-50 text-[#286AD8]'
+                    : 'border-gray-200 text-[#435574] hover:border-gray-300'
+                "
+              >
+                <Star
+                  v-if="rating > 0"
+                  class="h-3.5 w-3.5 fill-amber-400 text-amber-400"
+                />
+                {{ rating === 0 ? "Todas" : `${rating}+` }}
+              </button>
+            </div>
+          </div>
+
+          <div class="space-y-3">
+            <label
+              class="text-sm font-medium text-[#263238] flex items-center gap-2"
+            >
+              <Briefcase class="h-4 w-4 text-[#286AD8]" />
+              Categoria
+            </label>
+            <Select
+              :model-value="
+                draftFilters.categoryId ? String(draftFilters.categoryId) : ''
+              "
+              @update:model-value="handleDraftCategoryChange"
+            >
+              <SelectTrigger>
+                <SelectValue
+                  :label="draftCategory?.name || undefined"
+                  placeholder="Todas as categorias"
+                />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Todas as categorias</SelectItem>
+                <SelectItem
+                  v-for="category in categories"
+                  :key="category.id"
+                  :value="String(category.id)"
+                >
+                  {{ category.name }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div class="space-y-3">
+            <label
+              class="text-sm font-medium text-[#263238] flex items-center gap-2"
+            >
+              <Briefcase class="h-4 w-4 text-[#286AD8]" />
+              Subcategoria
+            </label>
+            <Select
+              :model-value="
+                draftFilters.subcategoryId
+                  ? String(draftFilters.subcategoryId)
+                  : ''
+              "
+              @update:model-value="handleDraftSubcategoryChange"
+            >
+              <SelectTrigger
+                :class="!draftCategory ? 'pointer-events-none opacity-60' : ''"
+              >
+                <SelectValue
+                  :label="draftSubcategory?.name || undefined"
+                  :placeholder="
+                    draftCategory
+                      ? 'Todas as subcategorias'
+                      : 'Selecione uma categoria'
+                  "
+                />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Todas as subcategorias</SelectItem>
+                <SelectItem
+                  v-for="subcategory in draftSubcategories"
+                  :key="subcategory.id"
+                  :value="String(subcategory.id)"
+                >
+                  {{ subcategory.name }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <label
+            class="flex items-center justify-between rounded-xl border border-gray-200 px-4 py-3 cursor-pointer"
+          >
+            <span class="text-sm font-medium text-[#263238]"
+              >Somente disponiveis</span
+            >
+            <input
+              type="checkbox"
+              v-model="draftFilters.onlyAvailable"
+              class="h-4 w-4 rounded accent-[#286AD8]"
+            />
+          </label>
+        </div>
+
+        <div class="p-6 border-t border-gray-200 flex gap-3">
+          <button
+            @click="clearFilters"
+            class="h-11 px-4 rounded-xl border border-gray-200 text-[#263238] text-sm font-medium flex items-center justify-center gap-2 hover:bg-gray-50 transition"
+          >
+            <RotateCcw class="h-4 w-4" />
+            Limpar
+          </button>
+          <button
+            @click="applyFilters"
+            class="flex-1 h-11 rounded-xl bg-[#263238] text-white text-sm font-medium flex items-center justify-center gap-2 hover:bg-[#263238]/90 transition"
+          >
+            <Check class="h-4 w-4" />
+            Aplicar filtros
+          </button>
+        </div>
+      </aside>
+    </Transition>
+
+    <Transition name="modal">
+      <div
+        v-if="selectedProvider"
+        class="fixed inset-0 z-[1300] flex items-center justify-center p-4"
+      >
+        <div
+          class="absolute inset-0 bg-black/45"
+          @click="selectedProvider = null"
+        />
+        <div
+          class="relative w-full max-w-lg max-h-[90vh] overflow-hidden rounded-2xl bg-white shadow-2xl"
+        >
+          <button
+            @click="selectedProvider = null"
+            class="absolute right-4 top-4 z-10 h-9 w-9 rounded-full bg-white/90 text-[#435574] shadow-sm flex items-center justify-center hover:bg-white"
+            aria-label="Fechar"
+          >
+            <X class="h-4 w-4" />
+          </button>
+
+          <div
+            class="relative h-24 bg-gradient-to-br from-blue-50 to-emerald-50"
+          >
+            <div class="absolute -bottom-9 left-6">
+              <div class="relative">
+                <Avatar class="h-20 w-20 ring-4 ring-white shadow-md">
+                  <AvatarImage
+                    :src="selectedProvider.avatar"
+                    :alt="selectedProvider.name"
+                  />
+                  <AvatarFallback
+                    class="text-white text-xl font-bold"
+                    :style="{
+                      background: stringToColor(selectedProvider.name),
+                    }"
+                  >
+                    {{ getInitials(selectedProvider.name) }}
+                  </AvatarFallback>
+                </Avatar>
+                <span
+                  class="absolute bottom-1 right-1 h-4 w-4 rounded-full border-2 border-white"
+                  :class="
+                    selectedProvider.available
+                      ? 'bg-emerald-500'
+                      : 'bg-gray-300'
+                  "
+                />
+              </div>
+            </div>
+          </div>
+
+          <div class="max-h-[calc(90vh-6rem)] overflow-y-auto px-6 pb-6 pt-12">
+            <div
+              class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"
+            >
+              <div class="min-w-0">
+                <div class="flex flex-wrap items-center gap-2">
+                  <h3 class="text-xl font-bold text-[#263238] leading-tight">
+                    {{ selectedProvider.name }}
+                  </h3>
+                  <span
+                    class="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-[#286AD8]"
+                    >Profissional</span
+                  >
+                </div>
+                <p class="mt-1 text-sm font-medium text-[#286AD8]">
+                  {{ selectedProvider.professionalTitle }}
+                </p>
+              </div>
+              <span
+                class="w-fit rounded-full px-3 py-1 text-xs font-semibold"
+                :class="
+                  selectedProvider.available
+                    ? 'bg-emerald-50 text-emerald-700'
+                    : 'bg-gray-100 text-gray-500'
+                "
+              >
+                {{ selectedProvider.available ? "Disponivel" : "Indisponivel" }}
+              </span>
+            </div>
+
+            <div class="mt-5 grid grid-cols-3 gap-2">
+              <div class="rounded-xl bg-gray-50 px-2 py-3 text-center">
+                <div class="flex items-center justify-center gap-1">
+                  <Star class="h-4 w-4 fill-amber-400 text-amber-400" />
+                  <span class="text-sm font-bold text-[#263238]">{{
+                    selectedProvider.rating > 0
+                      ? selectedProvider.rating.toFixed(1)
+                      : "-"
+                  }}</span>
+                </div>
+                <p class="mt-1 text-[11px] leading-tight text-gray-400">
+                  {{ selectedProvider.totalReviews }} avaliacoes
+                </p>
+              </div>
+              <div class="rounded-xl bg-gray-50 px-2 py-3 text-center">
+                <div class="flex items-center justify-center gap-1">
+                  <Navigation class="h-4 w-4 text-[#286AD8]" />
+                  <span class="text-sm font-bold text-[#263238]">{{
+                    formatDistance(selectedProvider.distance)
+                  }}</span>
+                </div>
+                <p class="mt-1 text-[11px] leading-tight text-gray-400">
+                  distancia
+                </p>
+              </div>
+              <div class="rounded-xl bg-gray-50 px-2 py-3 text-center">
+                <div class="flex items-center justify-center gap-1">
+                  <Briefcase class="h-4 w-4 text-[#286AD8]" />
+                  <span class="text-sm font-bold text-[#263238]">{{
+                    selectedProvider.completedJobs ?? "-"
+                  }}</span>
+                </div>
+                <p class="mt-1 text-[11px] leading-tight text-gray-400">
+                  trabalhos
+                </p>
+              </div>
+            </div>
+
+            <div class="mt-5 space-y-3">
+              <div
+                class="flex items-start gap-3 rounded-xl border border-gray-100 p-3"
+              >
+                <Briefcase class="mt-0.5 h-4 w-4 text-[#286AD8]" />
+                <div class="min-w-0">
+                  <p class="text-xs font-medium uppercase text-gray-400">
+                    Area de atuacao
+                  </p>
+                  <p class="mt-0.5 text-sm font-semibold text-[#263238]">
+                    {{ getCategoryDisplay(selectedProvider) }}
+                  </p>
+                  <p
+                    v-if="getSubcategoryDisplay(selectedProvider)"
+                    class="mt-0.5 text-xs text-[#435574]"
+                  >
+                    {{ getSubcategoryDisplay(selectedProvider) }}
+                  </p>
+                </div>
+              </div>
+
+              <div
+                v-if="selectedProvider.location"
+                class="flex items-start gap-3 rounded-xl border border-gray-100 p-3"
+              >
+                <MapPin class="mt-0.5 h-4 w-4 text-[#286AD8]" />
+                <div class="min-w-0">
+                  <p class="text-xs font-medium uppercase text-gray-400">
+                    Localizacao
+                  </p>
+                  <p class="mt-0.5 text-sm font-semibold text-[#263238]">
+                    {{ selectedProvider.location }}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <button
+              @click="goToProviderProfile(selectedProvider)"
+              class="mt-6 h-11 w-full rounded-xl bg-[#263238] text-white text-sm font-medium flex items-center justify-center hover:bg-[#263238]/90 transition"
+            >
+              Ver perfil
+            </button>
+          </div>
+        </div>
+      </div>
+    </Transition>
   </div>
 </template>
 
 <style>
-.custom-marker {
-  background: transparent !important;
-  border: none !important;
-}
-
-.leaflet-popup-content-wrapper {
-  border-radius: 14px;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
-  border: none;
-}
-
-.leaflet-popup-content {
-  margin: 10px 14px;
-}
-
-.leaflet-popup-tip-container {
-  display: none;
-}
-
 .map-container {
   height: 100dvh;
 }
@@ -814,20 +1493,172 @@ onMounted(async () => {
   max-height: calc(48dvh - 68px);
 }
 
-@supports not (height: 100dvh) {
-  .map-container { height: 100vh; }
-  .sidebar-desktop { max-height: calc(100vh - 96px); }
-  .mobile-sheet { max-height: 48vh; }
-  .mobile-list { max-height: calc(48vh - 68px); }
+.location-button {
+  bottom: calc(48dvh + 16px);
 }
 
-.slide-up-enter-active,
-.slide-up-leave-active {
-  transition: opacity 0.2s ease, transform 0.2s ease;
+.custom-provider-marker,
+.custom-user-marker {
+  background: transparent !important;
+  border: none !important;
 }
-.slide-up-enter-from,
-.slide-up-leave-to {
+
+.provider-marker-icon,
+.user-marker-icon {
+  position: relative;
+  width: 46px;
+  height: 54px;
+}
+
+.provider-marker-avatar,
+.user-marker-dot {
+  width: 42px;
+  height: 42px;
+  border-radius: 9999px;
+  border: 3px solid #fff;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.provider-marker-icon.is-available .provider-marker-avatar {
+  background: #16a34a;
+  outline: 2px solid #15803d;
+}
+
+.provider-marker-icon.is-unavailable .provider-marker-avatar {
+  background: #9ca3af;
+  outline: 2px solid #6b7280;
+}
+
+.provider-marker-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.provider-marker-tail,
+.user-marker-tail {
+  position: absolute;
+  left: 21px;
+  bottom: 2px;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+}
+
+.provider-marker-icon.is-available .provider-marker-tail {
+  border-top: 11px solid #16a34a;
+}
+
+.provider-marker-icon.is-unavailable .provider-marker-tail {
+  border-top: 11px solid #9ca3af;
+}
+
+.user-marker-dot {
+  background: #ef4444;
+  outline: 2px solid #dc2626;
+}
+
+.user-marker-tail {
+  border-top: 11px solid #ef4444;
+}
+
+.user-marker-svg {
+  width: 20px;
+  height: 20px;
+}
+
+.leaflet-bottom.leaflet-right {
+  bottom: calc(48dvh + 76px);
+  right: 12px;
+}
+
+.leaflet-control-zoom {
+  border: none !important;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.16) !important;
+}
+
+.leaflet-control-zoom a {
+  color: #263238 !important;
+  border-bottom-color: #e5e7eb !important;
+}
+
+@media (min-width: 1024px) {
+  .location-button {
+    bottom: 24px;
+  }
+
+  .leaflet-bottom.leaflet-right {
+    bottom: 24px;
+    right: 76px;
+  }
+}
+
+@supports not (height: 100dvh) {
+  .map-container {
+    height: 100vh;
+  }
+  .sidebar-desktop {
+    max-height: calc(100vh - 96px);
+  }
+  .mobile-sheet {
+    max-height: 48vh;
+  }
+  .mobile-list {
+    max-height: calc(48vh - 68px);
+  }
+  .location-button {
+    bottom: calc(48vh + 16px);
+  }
+  .leaflet-bottom.leaflet-right {
+    bottom: calc(48vh + 76px);
+  }
+
+  @media (min-width: 1024px) {
+    .location-button {
+      bottom: 24px;
+    }
+    .leaflet-bottom.leaflet-right {
+      bottom: 24px;
+    }
+  }
+}
+
+.fade-enter-active,
+.fade-leave-active,
+.drawer-enter-active,
+.drawer-leave-active,
+.modal-enter-active,
+.modal-leave-active {
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to,
+.modal-enter-from,
+.modal-leave-to {
   opacity: 0;
-  transform: translateY(10px);
+}
+
+.modal-enter-from > .relative,
+.modal-leave-to > .relative {
+  transform: translateY(10px) scale(0.98);
+}
+
+.drawer-enter-from,
+.drawer-leave-to {
+  opacity: 0;
+  transform: translateX(24px);
 }
 </style>

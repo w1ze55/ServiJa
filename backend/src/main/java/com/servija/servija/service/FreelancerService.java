@@ -19,6 +19,7 @@ import com.servija.servija.model.User;
 import com.servija.servija.repository.AddressRepository;
 import com.servija.servija.repository.FreelancerRepository;
 import com.servija.servija.repository.ReviewRepository;
+import com.servija.servija.repository.ServiceRepository;
 import com.servija.servija.repository.ServiceRequestRepository;
 import com.servija.servija.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -46,6 +47,7 @@ import java.util.stream.Collectors;
 public class FreelancerService {
 
     private final FreelancerRepository freelancerRepository;
+    private final ServiceRepository serviceRepository;
     private final UserRepository userRepository;
     private final AddressRepository addressRepository;
     private final ServiceRequestRepository serviceRequestRepository;
@@ -331,19 +333,30 @@ public class FreelancerService {
             BigDecimal latitude,
             BigDecimal longitude,
             Double radiusKm,
-            String category) {
+            String category,
+            String query,
+            Long categoryId,
+            String categorySlug,
+            Long subcategoryId,
+            String subcategorySlug,
+            BigDecimal minRating,
+            Boolean available) {
 
-        boolean hasCategory = category != null && !category.isEmpty();
+        NearbyFreelancerFilters filters = new NearbyFreelancerFilters(
+                normalizeSearchToken(query),
+                normalizeSearchToken(category),
+                categoryId,
+                normalizeSearchToken(categorySlug),
+                subcategoryId,
+                normalizeSearchToken(subcategorySlug),
+                minRating,
+                available);
 
         // Freelancers com coordenadas em service_cities (novo modelo)
-        List<Freelancer> withServiceCities = hasCategory
-                ? freelancerRepository.findByCategoryWithServiceCityCoordinates(category)
-                : freelancerRepository.findAllWithServiceCityCoordinates();
+        List<Freelancer> withServiceCities = freelancerRepository.findAllWithServiceCityCoordinates();
 
         // Freelancers com coordenadas diretas na tabela freelancers (legado)
-        List<Freelancer> withDirectCoords = hasCategory
-                ? freelancerRepository.findByCategoryWithLocation(category)
-                : freelancerRepository.findAllWithLocation();
+        List<Freelancer> withDirectCoords = freelancerRepository.findAllWithLocation();
 
         double userLat = latitude.doubleValue();
         double userLon = longitude.doubleValue();
@@ -381,7 +394,14 @@ public class FreelancerService {
                     }
                 });
 
+        Map<Long, List<com.servija.servija.model.Service>> activeServicesByFreelancerId = loadActiveServicesByFreelancerId(
+                new ArrayList<>(results.keySet()));
+
         return results.values().stream()
+                .map(response -> enrichNearbyResponseFromServices(
+                        response,
+                        activeServicesByFreelancerId.getOrDefault(response.getId(), List.of())))
+                .filter(response -> matchesNearbyFilters(response, activeServicesByFreelancerId, filters))
                 .sorted(Comparator.comparingDouble(NearbyFreelancerResponse::getDistance))
                 .collect(Collectors.toList());
     }
@@ -500,6 +520,10 @@ public class FreelancerService {
     private NearbyFreelancerResponse mapToNearbyResponse(Freelancer freelancer, BigDecimal latitude, BigDecimal longitude, Double distance) {
         Double averageRating = reviewRepository.findAverageRatingByReviewedId(freelancer.getId());
         long totalReviewsCount = reviewRepository.countByReviewedId(freelancer.getId());
+        List<ServiceSubcategory> freelancerSubcategories = getResolvedFreelancerSubcategories(freelancer);
+        ServiceSubcategory primarySubcategory = freelancer.getServiceSubcategory() != null
+                ? freelancer.getServiceSubcategory()
+                : (!freelancerSubcategories.isEmpty() ? freelancerSubcategories.get(0) : null);
 
         return NearbyFreelancerResponse.builder()
                 .id(freelancer.getId())
@@ -514,7 +538,221 @@ public class FreelancerService {
                 .distance(Math.round(distance * 100.0) / 100.0)
                 .available(freelancer.getAvailable())
                 .category(freelancer.getCategory())
+                .completedJobs(freelancer.getCompletedJobs())
+                .categoryId(freelancer.getServiceCategory() != null ? freelancer.getServiceCategory().getId() : null)
+                .categorySlug(freelancer.getServiceCategory() != null ? freelancer.getServiceCategory().getSlug() : null)
+                .categoryLabel(freelancer.getServiceCategory() != null ? freelancer.getServiceCategory().getName()
+                        : freelancer.getCategory())
+                .subcategoryId(primarySubcategory != null ? primarySubcategory.getId() : null)
+                .subcategorySlug(primarySubcategory != null ? primarySubcategory.getSlug() : null)
+                .subcategoryLabel(primarySubcategory != null ? primarySubcategory.getName() : null)
+                .subcategoryIds(freelancerSubcategories.stream().map(ServiceSubcategory::getId).toList())
+                .subcategoryLabels(freelancerSubcategories.stream().map(ServiceSubcategory::getName).toList())
                 .build();
+    }
+
+    private Map<Long, List<com.servija.servija.model.Service>> loadActiveServicesByFreelancerId(List<Long> freelancerIds) {
+        if (freelancerIds == null || freelancerIds.isEmpty()) {
+            return Map.of();
+        }
+
+        return serviceRepository.findByFreelancerIdInAndIsActiveOrderByCreatedAtDesc(freelancerIds, true)
+                .stream()
+                .filter(service -> service.getFreelancer() != null && service.getFreelancer().getId() != null)
+                .collect(Collectors.groupingBy(service -> service.getFreelancer().getId()));
+    }
+
+    private NearbyFreelancerResponse enrichNearbyResponseFromServices(
+            NearbyFreelancerResponse response,
+            List<com.servija.servija.model.Service> services) {
+
+        if (services == null || services.isEmpty()) {
+            return response;
+        }
+
+        com.servija.servija.model.Service service = services.get(0);
+
+        if (response.getCategoryId() == null && service.getServiceCategory() != null) {
+            response.setCategoryId(service.getServiceCategory().getId());
+            response.setCategorySlug(service.getServiceCategory().getSlug());
+            response.setCategoryLabel(service.getServiceCategory().getName());
+        }
+        if (!StringUtils.hasText(response.getCategoryLabel())) {
+            response.setCategoryLabel(StringUtils.hasText(service.getCategory()) ? service.getCategory() : response.getCategory());
+        }
+        if (!StringUtils.hasText(response.getCategory())) {
+            response.setCategory(response.getCategoryLabel());
+        }
+
+        if (response.getSubcategoryId() == null && service.getServiceSubcategory() != null) {
+            response.setSubcategoryId(service.getServiceSubcategory().getId());
+            response.setSubcategorySlug(service.getServiceSubcategory().getSlug());
+            response.setSubcategoryLabel(service.getServiceSubcategory().getName());
+        }
+        if ((response.getSubcategoryIds() == null || response.getSubcategoryIds().isEmpty())
+                && response.getSubcategoryId() != null) {
+            response.setSubcategoryIds(List.of(response.getSubcategoryId()));
+        }
+        if ((response.getSubcategoryLabels() == null || response.getSubcategoryLabels().isEmpty())
+                && StringUtils.hasText(response.getSubcategoryLabel())) {
+            response.setSubcategoryLabels(List.of(response.getSubcategoryLabel()));
+        }
+
+        return response;
+    }
+
+    private boolean matchesNearbyFilters(
+            NearbyFreelancerResponse response,
+            Map<Long, List<com.servija.servija.model.Service>> activeServicesByFreelancerId,
+            NearbyFreelancerFilters filters) {
+
+        if (filters.available() != null && !Objects.equals(response.getAvailable(), filters.available())) {
+            return false;
+        }
+
+        if (filters.minRating() != null) {
+            BigDecimal rating = response.getRating() != null ? response.getRating() : BigDecimal.ZERO;
+            if (rating.compareTo(filters.minRating()) < 0) {
+                return false;
+            }
+        }
+
+        List<com.servija.servija.model.Service> services = activeServicesByFreelancerId.getOrDefault(
+                response.getId(),
+                List.of());
+
+        if (!matchesCategoryFilter(response, services, filters)) {
+            return false;
+        }
+
+        if (!matchesSubcategoryFilter(response, services, filters)) {
+            return false;
+        }
+
+        return !StringUtils.hasText(filters.query()) || matchesSearchQuery(response, services, filters.query());
+    }
+
+    private boolean matchesCategoryFilter(
+            NearbyFreelancerResponse response,
+            List<com.servija.servija.model.Service> services,
+            NearbyFreelancerFilters filters) {
+
+        boolean hasCategoryFilter = filters.categoryId() != null
+                || StringUtils.hasText(filters.categorySlug())
+                || StringUtils.hasText(filters.categoryText());
+
+        if (!hasCategoryFilter) {
+            return true;
+        }
+
+        if (filters.categoryId() != null && Objects.equals(response.getCategoryId(), filters.categoryId())) {
+            return true;
+        }
+
+        if (matchesNormalizedExact(filters.categorySlug(), response.getCategorySlug())
+                || matchesNormalizedExact(filters.categorySlug(), response.getCategoryLabel())
+                || matchesNormalizedExact(filters.categoryText(), response.getCategorySlug())
+                || matchesNormalizedExact(filters.categoryText(), response.getCategoryLabel())
+                || matchesNormalizedExact(filters.categoryText(), response.getCategory())) {
+            return true;
+        }
+
+        return services.stream().anyMatch(service -> {
+            if (filters.categoryId() != null
+                    && service.getServiceCategory() != null
+                    && Objects.equals(service.getServiceCategory().getId(), filters.categoryId())) {
+                return true;
+            }
+            return matchesNormalizedExact(filters.categorySlug(),
+                    service.getServiceCategory() != null ? service.getServiceCategory().getSlug() : null)
+                    || matchesNormalizedExact(filters.categorySlug(),
+                            service.getServiceCategory() != null ? service.getServiceCategory().getName() : null)
+                    || matchesNormalizedExact(filters.categoryText(),
+                            service.getServiceCategory() != null ? service.getServiceCategory().getSlug() : null)
+                    || matchesNormalizedExact(filters.categoryText(),
+                            service.getServiceCategory() != null ? service.getServiceCategory().getName() : null)
+                    || matchesNormalizedExact(filters.categoryText(), service.getCategory());
+        });
+    }
+
+    private boolean matchesSubcategoryFilter(
+            NearbyFreelancerResponse response,
+            List<com.servija.servija.model.Service> services,
+            NearbyFreelancerFilters filters) {
+
+        boolean hasSubcategoryFilter = filters.subcategoryId() != null || StringUtils.hasText(filters.subcategorySlug());
+
+        if (!hasSubcategoryFilter) {
+            return true;
+        }
+
+        if (filters.subcategoryId() != null
+                && (Objects.equals(response.getSubcategoryId(), filters.subcategoryId())
+                        || (response.getSubcategoryIds() != null
+                                && response.getSubcategoryIds().contains(filters.subcategoryId())))) {
+            return true;
+        }
+
+        if (matchesNormalizedExact(filters.subcategorySlug(), response.getSubcategorySlug())
+                || matchesNormalizedExact(filters.subcategorySlug(), response.getSubcategoryLabel())
+                || (response.getSubcategoryLabels() != null
+                        && response.getSubcategoryLabels().stream()
+                                .anyMatch(label -> matchesNormalizedExact(filters.subcategorySlug(), label)))) {
+            return true;
+        }
+
+        return services.stream().anyMatch(service -> {
+            if (filters.subcategoryId() != null
+                    && service.getServiceSubcategory() != null
+                    && Objects.equals(service.getServiceSubcategory().getId(), filters.subcategoryId())) {
+                return true;
+            }
+            return matchesNormalizedExact(filters.subcategorySlug(),
+                    service.getServiceSubcategory() != null ? service.getServiceSubcategory().getSlug() : null)
+                    || matchesNormalizedExact(filters.subcategorySlug(),
+                            service.getServiceSubcategory() != null ? service.getServiceSubcategory().getName() : null);
+        });
+    }
+
+    private boolean matchesSearchQuery(
+            NearbyFreelancerResponse response,
+            List<com.servija.servija.model.Service> services,
+            String query) {
+
+        if (containsNormalized(response.getName(), query)
+                || containsNormalized(response.getProfessionalTitle(), query)
+                || containsNormalized(response.getCategory(), query)
+                || containsNormalized(response.getCategoryLabel(), query)
+                || containsNormalized(response.getCategorySlug(), query)
+                || containsNormalized(response.getSubcategoryLabel(), query)
+                || containsNormalized(response.getSubcategorySlug(), query)
+                || (response.getSubcategoryLabels() != null
+                        && response.getSubcategoryLabels().stream().anyMatch(label -> containsNormalized(label, query)))) {
+            return true;
+        }
+
+        return services.stream().anyMatch(service -> containsNormalized(service.getTitle(), query)
+                || containsNormalized(service.getDescription(), query)
+                || containsNormalized(service.getCategory(), query)
+                || containsNormalized(service.getTags(), query)
+                || containsNormalized(service.getServiceCategory() != null ? service.getServiceCategory().getName() : null, query)
+                || containsNormalized(service.getServiceCategory() != null ? service.getServiceCategory().getSlug() : null, query)
+                || containsNormalized(service.getServiceSubcategory() != null ? service.getServiceSubcategory().getName() : null, query)
+                || containsNormalized(service.getServiceSubcategory() != null ? service.getServiceSubcategory().getSlug() : null, query));
+    }
+
+    private String normalizeSearchToken(String value) {
+        return StringUtils.hasText(value) ? normalizeLocationValue(value) : "";
+    }
+
+    private boolean containsNormalized(String value, String query) {
+        return StringUtils.hasText(value) && normalizeLocationValue(value).contains(query);
+    }
+
+    private boolean matchesNormalizedExact(String filter, String value) {
+        return StringUtils.hasText(filter)
+                && StringUtils.hasText(value)
+                && normalizeLocationValue(value).equals(filter);
     }
 
     private boolean hasCategorySelection(FreelancerProfileRequest request) {
@@ -644,5 +882,16 @@ public class FreelancerService {
         public BigDecimal getLongitude() {
             return longitude;
         }
+    }
+
+    private record NearbyFreelancerFilters(
+            String query,
+            String categoryText,
+            Long categoryId,
+            String categorySlug,
+            Long subcategoryId,
+            String subcategorySlug,
+            BigDecimal minRating,
+            Boolean available) {
     }
 }
