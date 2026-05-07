@@ -249,6 +249,8 @@ class FreelancerServiceTest {
                 .thenReturn(List.of(service));
         when(reviewRepository.findAverageRatingByReviewedId(anyLong())).thenReturn(4.8);
         when(reviewRepository.countByReviewedId(anyLong())).thenReturn(12L);
+        when(serviceRequestRepository.countCompletedJobsByFreelancerIds(any(), eq(ServiceRequest.Status.COMPLETED)))
+                .thenReturn(List.of(completedJobsCount(1L, 7L)));
 
         List<NearbyFreelancerResponse> result = freelancerService.findNearbyFreelancers(
                 BigDecimal.valueOf(-23.5505),
@@ -265,6 +267,7 @@ class FreelancerServiceTest {
                 null,
                 null);
 
+        assertThat(result.get(0).getCompletedJobs()).isEqualTo(7);
         assertThat(result).singleElement().satisfies(response -> {
             assertThat(response.getId()).isEqualTo(1L);
             assertThat(response.getCategoryId()).isEqualTo(10L);
@@ -388,5 +391,19 @@ class FreelancerServiceTest {
                 .zipCode("88000000")
                 .isDefault(true)
                 .build();
+    }
+
+    private ServiceRequestRepository.CompletedJobsCountProjection completedJobsCount(Long freelancerId, long completedJobs) {
+        return new ServiceRequestRepository.CompletedJobsCountProjection() {
+            @Override
+            public Long getFreelancerId() {
+                return freelancerId;
+            }
+
+            @Override
+            public long getCompletedJobs() {
+                return completedJobs;
+            }
+        };
     }
 }

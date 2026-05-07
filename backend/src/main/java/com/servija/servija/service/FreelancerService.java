@@ -368,11 +368,14 @@ public class FreelancerService {
 
         Map<Long, Address> defaultAddressesByFreelancerId = loadDefaultAddressesByFreelancerId(
                 serviceableFreelancers.stream().map(Freelancer::getId).toList());
+        Map<Long, Integer> completedJobsByFreelancerId = loadCompletedJobsByFreelancerId(
+                serviceableFreelancers.stream().map(Freelancer::getId).toList());
 
         java.util.Map<Long, NearbyFreelancerResponse> results = serviceableFreelancers.stream()
                 .map(freelancer -> mapToNearbyResponseFromDefaultAddress(
                         freelancer,
                         defaultAddressesByFreelancerId.get(freelancer.getId()),
+                        completedJobsByFreelancerId.getOrDefault(freelancer.getId(), 0),
                         userLat,
                         userLon,
                         radiusKm))
@@ -531,6 +534,7 @@ public class FreelancerService {
     private NearbyFreelancerResponse mapToNearbyResponseFromDefaultAddress(
             Freelancer freelancer,
             Address defaultAddress,
+            Integer completedJobs,
             double userLat,
             double userLon,
             Double radiusKm) {
@@ -560,7 +564,8 @@ public class FreelancerService {
                 defaultAddress,
                 coordinates.get().latitude(),
                 coordinates.get().longitude(),
-                distance);
+                distance,
+                completedJobs);
     }
 
     private Optional<GeocodingService.Coordinates> resolveAddressCoordinates(Address address) {
@@ -584,8 +589,18 @@ public class FreelancerService {
         return coordinates;
     }
 
-    private NearbyFreelancerResponse mapToNearbyResponse(Freelancer freelancer, BigDecimal latitude, BigDecimal longitude, Double distance) {
-        return mapToNearbyResponse(freelancer, null, latitude, longitude, distance);
+    private NearbyFreelancerResponse mapToNearbyResponse(
+            Freelancer freelancer,
+            BigDecimal latitude,
+            BigDecimal longitude,
+            Double distance) {
+        return mapToNearbyResponse(
+                freelancer,
+                null,
+                latitude,
+                longitude,
+                distance,
+                freelancer.getCompletedJobs() != null ? freelancer.getCompletedJobs() : 0);
     }
 
     private NearbyFreelancerResponse mapToNearbyResponse(
@@ -593,7 +608,8 @@ public class FreelancerService {
             Address address,
             BigDecimal latitude,
             BigDecimal longitude,
-            Double distance) {
+            Double distance,
+            Integer completedJobs) {
         Double averageRating = reviewRepository.findAverageRatingByReviewedId(freelancer.getId());
         long totalReviewsCount = reviewRepository.countByReviewedId(freelancer.getId());
         List<ServiceSubcategory> freelancerSubcategories = getResolvedFreelancerSubcategories(freelancer);
@@ -617,7 +633,7 @@ public class FreelancerService {
                 .distance(Math.round(distance * 100.0) / 100.0)
                 .available(freelancer.getAvailable())
                 .category(freelancer.getCategory())
-                .completedJobs(freelancer.getCompletedJobs())
+                .completedJobs(completedJobs != null ? completedJobs : 0)
                 .categoryId(freelancer.getServiceCategory() != null ? freelancer.getServiceCategory().getId() : null)
                 .categorySlug(freelancer.getServiceCategory() != null ? freelancer.getServiceCategory().getSlug() : null)
                 .categoryLabel(freelancer.getServiceCategory() != null ? freelancer.getServiceCategory().getName()
@@ -628,6 +644,21 @@ public class FreelancerService {
                 .subcategoryIds(freelancerSubcategories.stream().map(ServiceSubcategory::getId).toList())
                 .subcategoryLabels(freelancerSubcategories.stream().map(ServiceSubcategory::getName).toList())
                 .build();
+    }
+
+    private Map<Long, Integer> loadCompletedJobsByFreelancerId(List<Long> freelancerIds) {
+        if (freelancerIds == null || freelancerIds.isEmpty()) {
+            return Map.of();
+        }
+
+        return Optional.ofNullable(serviceRequestRepository.countCompletedJobsByFreelancerIds(
+                freelancerIds,
+                ServiceRequest.Status.COMPLETED))
+                .orElseGet(List::of)
+                .stream()
+                .collect(Collectors.toMap(
+                        ServiceRequestRepository.CompletedJobsCountProjection::getFreelancerId,
+                        projection -> Math.toIntExact(projection.getCompletedJobs())));
     }
 
     private Map<Long, List<com.servija.servija.model.Service>> loadActiveServicesByFreelancerId(List<Long> freelancerIds) {
