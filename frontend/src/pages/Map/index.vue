@@ -25,6 +25,7 @@ import SelectContent from "@/components/ui/select-content.vue";
 import SelectItem from "@/components/ui/select-item.vue";
 import SelectTrigger from "@/components/ui/select-trigger.vue";
 import SelectValue from "@/components/ui/select-value.vue";
+import locationPinSvg from "@/assets/location-pin-svgrepo-com (2).svg?raw";
 import api from "@/api/config/axios";
 import { toast } from "@/utils/toast";
 import { useUserStore } from "@/stores/userStore";
@@ -258,6 +259,10 @@ const getInitials = (name: string) => {
     .toUpperCase();
 };
 
+const markerPinSvg = locationPinSvg
+  .replace(/fill="[^"]*"/gi, 'fill="currentColor"')
+  .replace(/#231F20/gi, "currentColor");
+
 const stringToColor = (str: string) => {
   let hash = 0;
   for (let i = 0; i < str.length; i += 1) {
@@ -335,17 +340,13 @@ const createUserIcon = () => {
     className: "custom-user-marker",
     html: `
       <div class="user-marker-icon" aria-label="Sua localizacao">
-        <div class="user-marker-dot">
-          <svg xmlns="http://www.w3.org/2000/svg" class="user-marker-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="10"></circle>
-            <circle cx="12" cy="12" r="3"></circle>
-          </svg>
+        <div class="marker-pin-shape user-marker-pin" aria-hidden="true">
+          ${markerPinSvg}
         </div>
-        <div class="user-marker-tail"></div>
       </div>
     `,
-    iconSize: [44, 52],
-    iconAnchor: [22, 52],
+    iconSize: [58, 82],
+    iconAnchor: [29, 82],
   });
 };
 
@@ -359,14 +360,18 @@ const createProviderIcon = (provider: Provider) => {
     className: "custom-provider-marker",
     html: `
       <div class="provider-marker-icon ${provider.available ? "is-available" : "is-unavailable"}" aria-label="${escapeHtml(provider.name)}">
-        <div class="provider-marker-avatar">
-          ${avatar}
+        <div class="marker-pin-shape provider-marker-pin" aria-hidden="true">
+          ${markerPinSvg}
         </div>
-        <div class="provider-marker-tail"></div>
+        <div class="provider-marker-content">
+          <div class="provider-marker-avatar">
+            ${avatar}
+          </div>
+        </div>
       </div>
     `,
-    iconSize: [46, 54],
-    iconAnchor: [23, 54],
+    iconSize: [58, 82],
+    iconAnchor: [29, 82],
   });
 };
 
@@ -1493,35 +1498,68 @@ onUnmounted(() => {
 .provider-marker-icon,
 .user-marker-icon {
   position: relative;
-  width: 46px;
-  height: 54px;
+  width: 58px;
+  height: 82px;
 }
 
-.provider-marker-avatar,
-.user-marker-dot {
-  width: 42px;
-  height: 42px;
+.marker-pin-shape {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  color: inherit;
+  filter: drop-shadow(0 12px 22px rgba(15, 23, 42, 0.24));
+}
+
+.marker-pin-shape svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.provider-marker-content {
+  position: absolute;
+  top: 15px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 31px;
+  height: 31px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.provider-marker-avatar {
+  width: 31px;
+  height: 31px;
   border-radius: 9999px;
-  border: 3px solid #fff;
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.2);
+  border: 2px solid #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
   color: #fff;
-  font-size: 13px;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.18);
+  font-size: 10px;
   font-weight: 800;
   line-height: 1;
 }
 
+.provider-marker-icon.is-available {
+  color: #22c55e;
+}
+
 .provider-marker-icon.is-available .provider-marker-avatar {
-  background: #16a34a;
-  outline: 2px solid #15803d;
+  background: #166534;
+}
+
+.provider-marker-icon.is-unavailable {
+  color: #94a3b8;
 }
 
 .provider-marker-icon.is-unavailable .provider-marker-avatar {
-  background: #9ca3af;
-  outline: 2px solid #6b7280;
+  background: #475569;
 }
 
 .provider-marker-image {
@@ -1530,38 +1568,8 @@ onUnmounted(() => {
   object-fit: cover;
 }
 
-.provider-marker-tail,
-.user-marker-tail {
-  position: absolute;
-  left: 21px;
-  bottom: 2px;
-  transform: translateX(-50%);
-  width: 0;
-  height: 0;
-  border-left: 6px solid transparent;
-  border-right: 6px solid transparent;
-}
-
-.provider-marker-icon.is-available .provider-marker-tail {
-  border-top: 11px solid #16a34a;
-}
-
-.provider-marker-icon.is-unavailable .provider-marker-tail {
-  border-top: 11px solid #9ca3af;
-}
-
-.user-marker-dot {
-  background: #ef4444;
-  outline: 2px solid #dc2626;
-}
-
-.user-marker-tail {
-  border-top: 11px solid #ef4444;
-}
-
-.user-marker-svg {
-  width: 20px;
-  height: 20px;
+.user-marker-icon {
+  color: #ef4444;
 }
 
 .leaflet-bottom.leaflet-right {
