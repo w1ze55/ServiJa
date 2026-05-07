@@ -7,6 +7,7 @@ import {
   Check,
   ChevronRight,
   Filter,
+  LoaderCircle,
   MapPin,
   Navigation,
   RotateCcw,
@@ -839,10 +840,11 @@ onUnmounted(() => {
               class="h-7 w-7 rounded-lg hover:bg-gray-100 flex items-center justify-center text-[#286AD8] transition disabled:opacity-40"
               aria-label="Atualizar profissionais"
             >
-              <Navigation
-                class="h-3.5 w-3.5"
-                :class="{ 'animate-spin': isLoading }"
+              <LoaderCircle
+                v-if="isLoading"
+                class="h-3.5 w-3.5 animate-spin"
               />
+              <Navigation v-else class="h-3.5 w-3.5" />
             </button>
           </div>
         </div>
