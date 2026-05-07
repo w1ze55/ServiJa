@@ -328,7 +328,7 @@ public class FreelancerService {
      * @param category  Categoria opcional para filtrar
      * @return Lista de profissionais próximos ordenados por distância
      */
-    @Transactional(readOnly = true)
+    @Transactional
     public List<NearbyFreelancerResponse> findNearbyFreelancers(
             BigDecimal latitude,
             BigDecimal longitude,
@@ -340,7 +340,9 @@ public class FreelancerService {
             Long subcategoryId,
             String subcategorySlug,
             BigDecimal minRating,
-            Boolean available) {
+            Boolean available,
+            String city,
+            String state) {
 
         NearbyFreelancerFilters filters = new NearbyFreelancerFilters(
                 normalizeSearchToken(query),
@@ -350,49 +352,35 @@ public class FreelancerService {
                 subcategoryId,
                 normalizeSearchToken(subcategorySlug),
                 minRating,
-                available);
+                available,
+                normalizeSearchToken(city),
+                normalizeState(state));
 
-        // Freelancers com coordenadas em service_cities (novo modelo)
-        List<Freelancer> withServiceCities = freelancerRepository.findAllWithServiceCityCoordinates();
-
-        // Freelancers com coordenadas diretas na tabela freelancers (legado)
-        List<Freelancer> withDirectCoords = freelancerRepository.findAllWithLocation();
+        // serviceCities define a area atendida; endereco padrao define a posicao real no mapa.
+        List<Freelancer> withServiceCities = freelancerRepository.findAllWithServiceCities();
 
         double userLat = latitude.doubleValue();
         double userLon = longitude.doubleValue();
 
-        // IDs já cobertos via service_cities
-        java.util.Set<Long> coveredIds = withServiceCities.stream()
-                .map(Freelancer::getId)
-                .collect(Collectors.toSet());
+        List<Freelancer> serviceableFreelancers = withServiceCities.stream()
+                .filter(freelancer -> servesSearchRegion(freelancer, filters))
+                .toList();
 
-        // Candidatos via service_cities
-        java.util.Map<Long, NearbyFreelancerResponse> results = withServiceCities.stream()
-                .flatMap(f -> f.getServiceCities().stream()
-                        .filter(sc -> sc.getLatitude() != null && sc.getLongitude() != null)
-                        .map(sc -> {
-                            double distance = calculateDistance(userLat, userLon,
-                                    sc.getLatitude().doubleValue(), sc.getLongitude().doubleValue());
-                            return mapToNearbyResponse(f, sc.getLatitude(), sc.getLongitude(), distance);
-                        }))
-                .filter(r -> r.getDistance() <= radiusKm)
+        Map<Long, Address> defaultAddressesByFreelancerId = loadDefaultAddressesByFreelancerId(
+                serviceableFreelancers.stream().map(Freelancer::getId).toList());
+
+        java.util.Map<Long, NearbyFreelancerResponse> results = serviceableFreelancers.stream()
+                .map(freelancer -> mapToNearbyResponseFromDefaultAddress(
+                        freelancer,
+                        defaultAddressesByFreelancerId.get(freelancer.getId()),
+                        userLat,
+                        userLon,
+                        radiusKm))
+                .filter(Objects::nonNull)
                 .collect(Collectors.toMap(
                         NearbyFreelancerResponse::getId,
-                        r -> r,
+                        response -> response,
                         (r1, r2) -> r1.getDistance() <= r2.getDistance() ? r1 : r2));
-
-        // Candidatos via coordenadas diretas (apenas os não cobertos pelo modelo novo)
-        withDirectCoords.stream()
-                .filter(f -> !coveredIds.contains(f.getId()))
-                .forEach(f -> {
-                    double distance = calculateDistance(userLat, userLon,
-                            f.getLatitude().doubleValue(), f.getLongitude().doubleValue());
-                    if (distance <= radiusKm) {
-                        results.merge(f.getId(),
-                                mapToNearbyResponse(f, f.getLatitude(), f.getLongitude(), distance),
-                                (r1, r2) -> r1.getDistance() <= r2.getDistance() ? r1 : r2);
-                    }
-                });
 
         Map<Long, List<com.servija.servija.model.Service>> activeServicesByFreelancerId = loadActiveServicesByFreelancerId(
                 new ArrayList<>(results.keySet()));
@@ -517,13 +505,104 @@ public class FreelancerService {
         return R * c;
     }
 
+    private boolean servesSearchRegion(Freelancer freelancer, NearbyFreelancerFilters filters) {
+        if (!StringUtils.hasText(filters.city()) || !StringUtils.hasText(filters.state())) {
+            return true;
+        }
+
+        return freelancer.getServiceCities().stream()
+                .anyMatch(serviceCity -> filters.city().equals(normalizeSearchToken(serviceCity.getCity()))
+                        && filters.state().equals(normalizeState(serviceCity.getState())));
+    }
+
+    private Map<Long, Address> loadDefaultAddressesByFreelancerId(List<Long> freelancerIds) {
+        if (freelancerIds == null || freelancerIds.isEmpty()) {
+            return Map.of();
+        }
+
+        return addressRepository.findByUserIdInOrderByUserIdAscIsDefaultDescCreatedAtDesc(freelancerIds)
+                .stream()
+                .collect(Collectors.toMap(
+                        address -> address.getUser().getId(),
+                        address -> address,
+                        (existing, ignored) -> existing));
+    }
+
+    private NearbyFreelancerResponse mapToNearbyResponseFromDefaultAddress(
+            Freelancer freelancer,
+            Address defaultAddress,
+            double userLat,
+            double userLon,
+            Double radiusKm) {
+
+        if (defaultAddress == null) {
+            return null;
+        }
+
+        Optional<GeocodingService.Coordinates> coordinates = resolveAddressCoordinates(defaultAddress);
+
+        if (coordinates.isEmpty()) {
+            return null;
+        }
+
+        double distance = calculateDistance(
+                userLat,
+                userLon,
+                coordinates.get().latitude().doubleValue(),
+                coordinates.get().longitude().doubleValue());
+
+        if (distance > radiusKm) {
+            return null;
+        }
+
+        return mapToNearbyResponse(
+                freelancer,
+                defaultAddress,
+                coordinates.get().latitude(),
+                coordinates.get().longitude(),
+                distance);
+    }
+
+    private Optional<GeocodingService.Coordinates> resolveAddressCoordinates(Address address) {
+        if (address.getLatitude() != null && address.getLongitude() != null) {
+            return Optional.of(new GeocodingService.Coordinates(address.getLatitude(), address.getLongitude()));
+        }
+
+        Optional<GeocodingService.Coordinates> coordinates = geocodingService.geocodeAddress(
+                address.getStreet(),
+                address.getNumber(),
+                address.getNeighborhood(),
+                address.getCity(),
+                address.getState());
+
+        coordinates.ifPresent(value -> {
+            address.setLatitude(value.latitude());
+            address.setLongitude(value.longitude());
+            addressRepository.save(address);
+        });
+
+        return coordinates;
+    }
+
     private NearbyFreelancerResponse mapToNearbyResponse(Freelancer freelancer, BigDecimal latitude, BigDecimal longitude, Double distance) {
+        return mapToNearbyResponse(freelancer, null, latitude, longitude, distance);
+    }
+
+    private NearbyFreelancerResponse mapToNearbyResponse(
+            Freelancer freelancer,
+            Address address,
+            BigDecimal latitude,
+            BigDecimal longitude,
+            Double distance) {
         Double averageRating = reviewRepository.findAverageRatingByReviewedId(freelancer.getId());
         long totalReviewsCount = reviewRepository.countByReviewedId(freelancer.getId());
         List<ServiceSubcategory> freelancerSubcategories = getResolvedFreelancerSubcategories(freelancer);
         ServiceSubcategory primarySubcategory = freelancer.getServiceSubcategory() != null
                 ? freelancer.getServiceSubcategory()
                 : (!freelancerSubcategories.isEmpty() ? freelancerSubcategories.get(0) : null);
+        String location = address != null
+                ? address.getCity() + ", " + address.getState()
+                : freelancer.getLocation();
 
         return NearbyFreelancerResponse.builder()
                 .id(freelancer.getId())
@@ -532,7 +611,7 @@ public class FreelancerService {
                 .professionalTitle(freelancer.getProfessionalTitle())
                 .rating(averageRating != null ? BigDecimal.valueOf(averageRating) : null)
                 .totalReviews((int) totalReviewsCount)
-                .location(freelancer.getLocation())
+                .location(location)
                 .latitude(latitude)
                 .longitude(longitude)
                 .distance(Math.round(distance * 100.0) / 100.0)
@@ -892,6 +971,8 @@ public class FreelancerService {
             Long subcategoryId,
             String subcategorySlug,
             BigDecimal minRating,
-            Boolean available) {
+            Boolean available,
+            String city,
+            String state) {
     }
 }

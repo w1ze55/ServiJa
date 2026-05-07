@@ -157,12 +157,14 @@ public class FreelancerController {
             @RequestParam(required = false) Long subcategoryId,
             @RequestParam(required = false) String subcategorySlug,
             @RequestParam(required = false) BigDecimal minRating,
-            @RequestParam(required = false) Boolean available
+            @RequestParam(required = false) Boolean available,
+            @RequestParam(required = false) String city,
+            @RequestParam(required = false) String state
     ) {
         try {
             List<NearbyFreelancerResponse> nearbyFreelancers = freelancerService.findNearbyFreelancers(
                     latitude, longitude, radius, category, query, categoryId, categorySlug,
-                    subcategoryId, subcategorySlug, minRating, available
+                    subcategoryId, subcategorySlug, minRating, available, city, state
             );
             return ResponseEntity.ok(nearbyFreelancers);
         } catch (Exception e) {

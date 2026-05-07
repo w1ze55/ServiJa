@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.servija.servija.dto.FreelancerProfileRequest;
 import com.servija.servija.dto.NearbyFreelancerResponse;
 import com.servija.servija.dto.ServiceCityRequest;
+import com.servija.servija.model.Address;
 import com.servija.servija.model.Freelancer;
 import com.servija.servija.model.Service;
 import com.servija.servija.model.ServiceCategory;
@@ -235,8 +236,15 @@ class FreelancerServiceTest {
                 .isActive(true)
                 .build();
 
-        when(freelancerRepository.findAllWithServiceCityCoordinates()).thenReturn(List.of(matching, other));
-        when(freelancerRepository.findAllWithLocation()).thenReturn(List.of());
+        when(freelancerRepository.findAllWithServiceCities()).thenReturn(List.of(matching, other));
+        when(addressRepository.findByUserIdInOrderByUserIdAscIsDefaultDescCreatedAtDesc(List.of(1L, 2L)))
+                .thenReturn(List.of(
+                        buildAddress(matching, "Sao Paulo", "SP"),
+                        buildAddress(other, "Sao Paulo", "SP")));
+        when(geocodingService.geocodeAddress(anyString(), anyString(), anyString(), anyString(), anyString()))
+                .thenReturn(Optional.of(new GeocodingService.Coordinates(
+                        BigDecimal.valueOf(-23.5505),
+                        BigDecimal.valueOf(-46.6333))));
         when(serviceRepository.findByFreelancerIdInAndIsActiveOrderByCreatedAtDesc(any(), eq(true)))
                 .thenReturn(List.of(service));
         when(reviewRepository.findAverageRatingByReviewedId(anyLong())).thenReturn(4.8);
@@ -253,12 +261,78 @@ class FreelancerServiceTest {
                 null,
                 "instalacao",
                 BigDecimal.valueOf(4),
-                true);
+                true,
+                null,
+                null);
 
         assertThat(result).singleElement().satisfies(response -> {
             assertThat(response.getId()).isEqualTo(1L);
             assertThat(response.getCategoryId()).isEqualTo(10L);
             assertThat(response.getSubcategoryLabel()).isEqualTo("InstalaÃ§Ã£o");
+        });
+    }
+
+    @Test
+    @DisplayName("Deve usar cidade atendida para elegibilidade e endereco padrao para marker")
+    void findNearbyFreelancers_usesDefaultAddressForMarkerAndServiceCityForCoverage() {
+        Freelancer servesPalhoca = buildNearbyFreelancer(1L, "Ana Costa", -27.6455, -48.6697);
+        Freelancer servesOnlyFlorianopolis = buildNearbyFreelancer(2L, "Bruno Lima", -27.5949, -48.5482);
+        servesPalhoca.getServiceCities().clear();
+        servesPalhoca.getServiceCities().add(ServiceCity.builder()
+                .freelancer(servesPalhoca)
+                .city("Palhoca")
+                .state("SC")
+                .latitude(BigDecimal.valueOf(-27.6455))
+                .longitude(BigDecimal.valueOf(-48.6697))
+                .build());
+        servesOnlyFlorianopolis.getServiceCities().clear();
+        servesOnlyFlorianopolis.getServiceCities().add(ServiceCity.builder()
+                .freelancer(servesOnlyFlorianopolis)
+                .city("Florianopolis")
+                .state("SC")
+                .latitude(BigDecimal.valueOf(-27.5949))
+                .longitude(BigDecimal.valueOf(-48.5482))
+                .build());
+
+        Address anaAddress = buildAddress(servesPalhoca, "Florianopolis", "SC");
+
+        when(freelancerRepository.findAllWithServiceCities()).thenReturn(List.of(servesPalhoca, servesOnlyFlorianopolis));
+        when(addressRepository.findByUserIdInOrderByUserIdAscIsDefaultDescCreatedAtDesc(List.of(1L)))
+                .thenReturn(List.of(anaAddress));
+        when(geocodingService.geocodeAddress(
+                eq(anaAddress.getStreet()),
+                eq(anaAddress.getNumber()),
+                eq(anaAddress.getNeighborhood()),
+                eq(anaAddress.getCity()),
+                eq(anaAddress.getState())))
+                .thenReturn(Optional.of(new GeocodingService.Coordinates(
+                        BigDecimal.valueOf(-27.5949),
+                        BigDecimal.valueOf(-48.5482))));
+        when(serviceRepository.findByFreelancerIdInAndIsActiveOrderByCreatedAtDesc(any(), eq(true)))
+                .thenReturn(List.of());
+        when(reviewRepository.findAverageRatingByReviewedId(anyLong())).thenReturn(null);
+        when(reviewRepository.countByReviewedId(anyLong())).thenReturn(0L);
+
+        List<NearbyFreelancerResponse> result = freelancerService.findNearbyFreelancers(
+                BigDecimal.valueOf(-27.6455),
+                BigDecimal.valueOf(-48.6697),
+                30.0,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                "Palhoca",
+                "SC");
+
+        assertThat(result).singleElement().satisfies(response -> {
+            assertThat(response.getId()).isEqualTo(1L);
+            assertThat(response.getLatitude()).isEqualByComparingTo("-27.5949");
+            assertThat(response.getLongitude()).isEqualByComparingTo("-48.5482");
+            assertThat(response.getLocation()).isEqualTo("Florianopolis, SC");
         });
     }
 
@@ -300,5 +374,19 @@ class FreelancerServiceTest {
                 .longitude(BigDecimal.valueOf(longitude))
                 .build());
         return freelancer;
+    }
+
+    private Address buildAddress(Freelancer freelancer, String city, String state) {
+        return Address.builder()
+                .user(freelancer)
+                .label("Principal")
+                .street("Rua Teste")
+                .number("123")
+                .neighborhood("Centro")
+                .city(city)
+                .state(state)
+                .zipCode("88000000")
+                .isDefault(true)
+                .build();
     }
 }

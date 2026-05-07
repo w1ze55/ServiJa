@@ -28,7 +28,6 @@ import SelectValue from "@/components/ui/select-value.vue";
 import locationPinSvg from "@/assets/location-pin-svgrepo-com (2).svg?raw";
 import api from "@/api/config/axios";
 import { toast } from "@/utils/toast";
-import { useUserStore } from "@/stores/userStore";
 import { useCategoryCatalogStore } from "@/stores/categoryCatalogStore";
 
 interface Provider {
@@ -75,7 +74,6 @@ interface MapFilters {
 }
 
 const router = useRouter();
-const userStore = useUserStore();
 const categoryCatalogStore = useCategoryCatalogStore();
 
 const mapContainer = ref<HTMLElement | null>(null);
@@ -112,7 +110,6 @@ const appliedFilters = ref<MapFilters>(createDefaultFilters());
 const draftFilters = ref<MapFilters>(createDefaultFilters());
 let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
-const isProviderView = computed(() => userStore.user?.type === "provider");
 const categories = computed(() => categoryCatalogStore.activePublicCategories);
 const draftCategory = computed(
   () =>
@@ -144,48 +141,7 @@ const hasActiveFilters = computed(() => {
 const searchTerm = computed(() => debouncedSearchQuery.value.trim());
 
 const displayedProviders = computed(() => {
-  if (!isProviderView.value) {
-    return nearbyProviders.value;
-  }
-
-  const query = normalizeText(searchTerm.value);
-  return nearbyProviders.value.filter((provider) => {
-    if (query && !matchesProviderLocally(provider, query)) return false;
-    if (
-      appliedFilters.value.minRating > 0 &&
-      provider.rating < appliedFilters.value.minRating
-    )
-      return false;
-    if (appliedFilters.value.onlyAvailable && !provider.available) return false;
-    if (
-      appliedFilters.value.categoryId &&
-      provider.categoryId !== appliedFilters.value.categoryId
-    )
-      return false;
-    if (
-      appliedFilters.value.categorySlug &&
-      normalizeText(provider.categorySlug) !==
-        normalizeText(appliedFilters.value.categorySlug)
-    )
-      return false;
-    if (appliedFilters.value.subcategoryId) {
-      const ids = provider.subcategoryIds || [];
-      if (
-        provider.subcategoryId !== appliedFilters.value.subcategoryId &&
-        !ids.includes(appliedFilters.value.subcategoryId)
-      ) {
-        return false;
-      }
-    }
-    if (
-      appliedFilters.value.subcategorySlug &&
-      normalizeText(provider.subcategorySlug) !==
-        normalizeText(appliedFilters.value.subcategorySlug)
-    ) {
-      return false;
-    }
-    return true;
-  });
+  return nearbyProviders.value;
 });
 
 const selectedCategoryLabel = computed(() => {
@@ -213,20 +169,6 @@ const normalizeText = (value?: string | null) =>
     .trim()
     .toLowerCase();
 
-const matchesProviderLocally = (provider: Provider, query: string) => {
-  const haystack = [
-    provider.name,
-    provider.professionalTitle,
-    provider.category,
-    provider.categoryLabel,
-    provider.categorySlug,
-    provider.subcategoryLabel,
-    provider.subcategorySlug,
-    ...(provider.subcategoryLabels || []),
-  ];
-  return haystack.some((value) => normalizeText(value).includes(query));
-};
-
 const isValidCoordinate = (latitude: unknown, longitude: unknown) => {
   const lat = Number(latitude);
   const lng = Number(longitude);
@@ -239,6 +181,34 @@ const isValidCoordinate = (latitude: unknown, longitude: unknown) => {
     lng <= 180 &&
     !(lat === 0 && lng === 0)
   );
+};
+
+const resolveAddressCoordinates = async (address: any) => {
+  if (isValidCoordinate(address?.latitude, address?.longitude)) {
+    return {
+      latitude: Number(address.latitude),
+      longitude: Number(address.longitude),
+    };
+  }
+
+  const fullAddress = `${address.street}, ${address.number}, ${address.neighborhood}, ${address.city}, ${address.state}, Brasil`;
+  const geoResponse = await fetch(
+    `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(fullAddress)}&limit=1`,
+  );
+  const geoData = await geoResponse.json();
+
+  if (
+    !geoData ||
+    geoData.length === 0 ||
+    !isValidCoordinate(geoData[0].lat, geoData[0].lon)
+  ) {
+    return null;
+  }
+
+  return {
+    latitude: Number(geoData[0].lat),
+    longitude: Number(geoData[0].lon),
+  };
 };
 
 const escapeHtml = (value: string) =>
@@ -394,89 +364,9 @@ const loadUserAddressFromProfile = async () => {
   isLocating.value = true;
 
   try {
-    if (isProviderView.value) {
-      await loadLocationFromServiceCities();
-    } else {
-      await loadLocationFromAddress();
-    }
+    await loadLocationFromAddress();
   } finally {
     isLocating.value = false;
-  }
-};
-
-const loadLocationFromServiceCities = async () => {
-  isLoading.value = true;
-
-  try {
-    const response = await api.get("/freelancer/profile");
-    const profile = response.data;
-    const serviceCities: any[] = profile?.serviceCities || [];
-    const citiesWithCoords = serviceCities.filter((city: any) =>
-      isValidCoordinate(city.latitude, city.longitude),
-    );
-
-    if (citiesWithCoords.length === 0) {
-      nearbyProviders.value = [];
-      clearProviderMarkers();
-      toast.info(
-        "Cadastre uma cidade de atendimento no seu perfil para visualiza-la no mapa.",
-      );
-      return;
-    }
-
-    const firstCity = citiesWithCoords[0];
-    userLocation.value = {
-      latitude: Number(firstCity.latitude),
-      longitude: Number(firstCity.longitude),
-      address: "",
-      city: firstCity.city,
-      state: firstCity.state,
-    };
-
-    map.value?.setView(
-      [userLocation.value.latitude, userLocation.value.longitude],
-      10,
-    );
-    updateUserMarker();
-
-    nearbyProviders.value = citiesWithCoords
-      .map((city: any, index: number) =>
-        normalizeProvider(
-          {
-            id: profile.id,
-            markerId: `${profile.id}-${city.id || index}`,
-            name: profile.name,
-            avatar: profile.profilePhoto || "",
-            professionalTitle: profile.profession || "Profissional",
-            rating: profile.rating ? Number(profile.rating) : 0,
-            totalReviews: profile.totalReviews || 0,
-            completedJobs: profile.completedJobs,
-            location: `${city.city}, ${city.state}`,
-            latitude: city.latitude,
-            longitude: city.longitude,
-            distance: 0,
-            available: profile.available ?? true,
-            category: profile.category,
-            categoryId: profile.categoryId,
-            categorySlug: profile.categorySlug,
-            categoryLabel: profile.categoryLabel,
-            subcategoryId: profile.subcategoryId,
-            subcategorySlug: profile.subcategorySlug,
-            subcategoryLabel: profile.subcategoryLabel,
-            subcategoryIds: profile.subcategoryIds,
-            subcategoryLabels: profile.subcategoryLabels,
-          },
-          index,
-        ),
-      )
-      .filter((provider): provider is Provider => provider !== null);
-  } catch (error) {
-    console.error("Erro ao carregar cidades de atendimento:", error);
-    nearbyProviders.value = [];
-    clearProviderMarkers();
-    toast.error("Nao foi possivel carregar suas cidades de atendimento.");
-  } finally {
-    isLoading.value = false;
   }
 };
 
@@ -496,17 +386,9 @@ const loadLocationFromAddress = async () => {
       return;
     }
 
-    const fullAddress = `${defaultAddress.street}, ${defaultAddress.number}, ${defaultAddress.neighborhood}, ${defaultAddress.city}, ${defaultAddress.state}, Brasil`;
-    const geoResponse = await fetch(
-      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(fullAddress)}&limit=1`,
-    );
-    const geoData = await geoResponse.json();
+    const coordinates = await resolveAddressCoordinates(defaultAddress);
 
-    if (
-      !geoData ||
-      geoData.length === 0 ||
-      !isValidCoordinate(geoData[0].lat, geoData[0].lon)
-    ) {
+    if (!coordinates) {
       nearbyProviders.value = [];
       clearProviderMarkers();
       toast.error(
@@ -516,8 +398,8 @@ const loadLocationFromAddress = async () => {
     }
 
     userLocation.value = {
-      latitude: Number(geoData[0].lat),
-      longitude: Number(geoData[0].lon),
+      latitude: coordinates.latitude,
+      longitude: coordinates.longitude,
       address: defaultAddress.street,
       city: defaultAddress.city,
       state: defaultAddress.state,
@@ -556,6 +438,8 @@ const buildNearbyParams = () => {
   if (appliedFilters.value.minRating > 0)
     params.minRating = appliedFilters.value.minRating;
   if (appliedFilters.value.onlyAvailable) params.available = true;
+  if (userLocation.value.city) params.city = userLocation.value.city;
+  if (userLocation.value.state) params.state = userLocation.value.state;
 
   return params;
 };
@@ -597,12 +481,6 @@ const loadNearbyProviders = async () => {
 };
 
 const refreshMapData = async () => {
-  if (isProviderView.value) {
-    updateProviderMarkers();
-    fitMapToBounds();
-    return;
-  }
-
   await loadNearbyProviders();
 };
 

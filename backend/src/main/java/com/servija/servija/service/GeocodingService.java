@@ -26,9 +26,29 @@ public class GeocodingService {
 
     public record Coordinates(BigDecimal latitude, BigDecimal longitude) {}
 
+    public Optional<Coordinates> geocodeAddress(
+            String street,
+            String number,
+            String neighborhood,
+            String city,
+            String state) {
+        String query = String.join(", ",
+                street,
+                number,
+                neighborhood,
+                city,
+                state,
+                "Brasil");
+        return geocode(query);
+    }
+
     public Optional<Coordinates> geocodeCity(String city, String state) {
+        return geocode(city + ", " + state + ", Brasil");
+    }
+
+    private Optional<Coordinates> geocode(String queryValue) {
         try {
-            String query = URLEncoder.encode(city + ", " + state + ", Brasil", StandardCharsets.UTF_8);
+            String query = URLEncoder.encode(queryValue, StandardCharsets.UTF_8);
             String url = NOMINATIM_URL + "?format=json&q=" + query + "&limit=1";
 
             HttpClient client = HttpClient.newBuilder()
@@ -52,7 +72,7 @@ public class GeocodingService {
                 return Optional.of(new Coordinates(lat, lon));
             }
         } catch (Exception e) {
-            log.warn("Falha ao geocodificar cidade '{}'/'{}'': {}", city, state, e.getMessage());
+            log.warn("Falha ao geocodificar '{}': {}", queryValue, e.getMessage());
         }
         return Optional.empty();
     }

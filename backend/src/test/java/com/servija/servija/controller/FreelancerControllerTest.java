@@ -48,7 +48,7 @@ class FreelancerControllerTest {
     @DisplayName("Deve repassar filtros opcionais na busca de freelancers prÃ³ximos")
     void getNearbyFreelancers_forwardsSearchFilters() throws Exception {
         when(freelancerService.findNearbyFreelancers(
-                any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
+                any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(List.of());
 
         mockMvc.perform(get("/api/freelancer/nearby")
@@ -59,7 +59,9 @@ class FreelancerControllerTest {
                         .param("categoryId", "10")
                         .param("subcategorySlug", "instalacao")
                         .param("minRating", "4")
-                        .param("available", "true"))
+                        .param("available", "true")
+                        .param("city", "Palhoca")
+                        .param("state", "SC"))
                 .andExpect(status().isOk());
 
         verify(freelancerService).findNearbyFreelancers(
@@ -73,7 +75,9 @@ class FreelancerControllerTest {
                 eq(null),
                 eq("instalacao"),
                 eq(new BigDecimal("4")),
-                eq(true));
+                eq(true),
+                eq("Palhoca"),
+                eq("SC"));
     }
 
     @Test
