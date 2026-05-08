@@ -1,3 +1,3 @@
 ALTER TABLE addresses
-    ADD COLUMN IF NOT EXISTS latitude DECIMAL(10,8) NULL AFTER zip_code,
-    ADD COLUMN IF NOT EXISTS longitude DECIMAL(11,8) NULL AFTER latitude;
+    ADD COLUMN latitude DECIMAL(10,8) NULL AFTER zip_code,
+    ADD COLUMN longitude DECIMAL(11,8) NULL AFTER latitude;
