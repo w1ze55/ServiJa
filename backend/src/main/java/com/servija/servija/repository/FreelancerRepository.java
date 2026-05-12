@@ -27,6 +27,9 @@ public interface FreelancerRepository extends JpaRepository<Freelancer, Long> {
     @Query("SELECT DISTINCT f FROM Freelancer f JOIN FETCH f.serviceCities sc WHERE sc.latitude IS NOT NULL AND sc.longitude IS NOT NULL")
     List<Freelancer> findAllWithServiceCityCoordinates();
 
+    @Query("SELECT DISTINCT f FROM Freelancer f JOIN FETCH f.serviceCities")
+    List<Freelancer> findAllWithServiceCities();
+
     // Buscar freelancers por categoria que possuem service_cities com coordenadas (com fetch das cidades)
     @Query("SELECT DISTINCT f FROM Freelancer f JOIN FETCH f.serviceCities sc WHERE sc.latitude IS NOT NULL AND sc.longitude IS NOT NULL AND f.category = :category")
     List<Freelancer> findByCategoryWithServiceCityCoordinates(@Param("category") String category);

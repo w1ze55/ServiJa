@@ -11,7 +11,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -20,13 +23,16 @@ public class AddressService {
 
     private final AddressRepository addressRepository;
     private final UserRepository userRepository;
+    private final GeocodingService geocodingService;
 
+    @Transactional
     public List<AddressResponse> getUserAddresses(String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
 
         return addressRepository.findByUserIdOrderByIsDefaultDescCreatedAtDesc(user.getId())
                 .stream()
+                .map(this::ensureCoordinates)
                 .map(AddressResponse::fromEntity)
                 .collect(Collectors.toList());
     }
@@ -54,6 +60,7 @@ public class AddressService {
                 .zipCode(request.getZipCode())
                 .isDefault(isDefault)
                 .build();
+        populateCoordinates(address, true);
 
         address = addressRepository.save(address);
 
@@ -81,6 +88,7 @@ public class AddressService {
         address.setCity(request.getCity());
         address.setState(request.getState().toUpperCase());
         address.setZipCode(request.getZipCode());
+        populateCoordinates(address, true);
 
         // Atualizar padrão se solicitado
         if (request.getIsDefault() != null && request.getIsDefault() && !address.getIsDefault()) {
@@ -124,8 +132,55 @@ public class AddressService {
 
         addressRepository.clearDefaultForUser(user.getId(), address.getId());
         address.setIsDefault(true);
+        address = ensureCoordinates(address);
         address = addressRepository.save(address);
 
         return AddressResponse.fromEntity(address);
+    }
+    private Address ensureCoordinates(Address address) {
+        if (hasCoordinates(address)) {
+            return address;
+        }
+
+        if (!populateCoordinates(address, false)) {
+            return address;
+        }
+
+        return addressRepository.save(address);
+    }
+
+    private boolean populateCoordinates(Address address, boolean required) {
+        Optional<GeocodingService.Coordinates> coordinates = geocodingService.geocodeAddress(
+                        address.getStreet(),
+                        address.getNumber(),
+                        address.getNeighborhood(),
+                        address.getCity(),
+                        address.getState());
+
+        if (coordinates.isEmpty()) {
+            if (required) {
+                throw new IllegalArgumentException(
+                        "Nao foi possivel localizar o endereco informado no mapa.");
+            }
+            return false;
+        }
+
+        address.setLatitude(coordinates.get().latitude());
+        address.setLongitude(coordinates.get().longitude());
+        return true;
+    }
+
+    private boolean hasCoordinates(Address address) {
+        return address.getLatitude() != null
+                && address.getLongitude() != null
+                && isCoordinateInRange(address.getLatitude(), -90, 90)
+                && isCoordinateInRange(address.getLongitude(), -180, 180);
+    }
+
+    private boolean isCoordinateInRange(BigDecimal value, int min, int max) {
+        return Objects.nonNull(value)
+                && value.compareTo(BigDecimal.valueOf(min)) >= 0
+                && value.compareTo(BigDecimal.valueOf(max)) <= 0
+                && value.compareTo(BigDecimal.ZERO) != 0;
     }
 }

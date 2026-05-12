@@ -6,6 +6,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Data
@@ -23,6 +24,8 @@ public class AddressResponse {
     private String city;
     private String state;
     private String zipCode;
+    private BigDecimal latitude;
+    private BigDecimal longitude;
     private Boolean isDefault;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
@@ -38,6 +41,8 @@ public class AddressResponse {
                 .city(address.getCity())
                 .state(address.getState())
                 .zipCode(address.getZipCode())
+                .latitude(address.getLatitude())
+                .longitude(address.getLongitude())
                 .isDefault(address.getIsDefault())
                 .createdAt(address.getCreatedAt())
                 .updatedAt(address.getUpdatedAt())

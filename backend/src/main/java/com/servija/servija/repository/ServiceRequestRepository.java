@@ -13,6 +13,11 @@ import java.util.List;
 @Repository
 public interface ServiceRequestRepository extends JpaRepository<ServiceRequest, Long> {
 
+    interface CompletedJobsCountProjection {
+        Long getFreelancerId();
+        long getCompletedJobs();
+    }
+
     List<ServiceRequest> findByContractorIdOrderByCreatedAtDesc(Long contractorId);
 
     List<ServiceRequest> findByFreelancerIdOrderByCreatedAtDesc(Long freelancerId);
@@ -22,6 +27,17 @@ public interface ServiceRequestRepository extends JpaRepository<ServiceRequest, 
     List<ServiceRequest> findByFreelancerIdAndStatus(Long freelancerId, ServiceRequest.Status status);
 
     long countByFreelancerIdAndStatus(Long freelancerId, ServiceRequest.Status status);
+
+    @Query("""
+            SELECT sr.freelancer.id AS freelancerId, COUNT(sr) AS completedJobs
+            FROM ServiceRequest sr
+            WHERE sr.freelancer.id IN :freelancerIds
+              AND sr.status = :status
+            GROUP BY sr.freelancer.id
+            """)
+    List<CompletedJobsCountProjection> countCompletedJobsByFreelancerIds(
+            @Param("freelancerIds") List<Long> freelancerIds,
+            @Param("status") ServiceRequest.Status status);
 
     long countByFreelancerIdAndStatusIn(Long freelancerId, List<ServiceRequest.Status> statuses);
 

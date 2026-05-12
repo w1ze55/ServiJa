@@ -262,6 +262,10 @@ const goBack = () => {
   router.push({ name: 'provider-profile', params: { providerId: props.providerId } });
 };
 
+const goToProviderProfile = () => {
+  router.push(`/provider-profile/${props.providerId}`);
+};
+
 const handleShare = () => {
   const url = window.location.href;
   if (navigator.share) {
@@ -660,7 +664,7 @@ onMounted(() => {
                   <Badge v-else variant="secondary">Indisponível</Badge>
                 </div>
 
-                <Button variant="outline" class="w-full text-primary border-primary/30" @click="goBack">
+                <Button variant="outline" class="w-full text-primary border-primary/30" @click="goToProviderProfile">
                   Ver perfil completo
                 </Button>
               </Card>

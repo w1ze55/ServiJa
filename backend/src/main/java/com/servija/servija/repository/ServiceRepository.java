@@ -17,6 +17,8 @@ public interface ServiceRepository extends JpaRepository<Service, Long> {
     // Buscar serviços ativos por freelancer
     List<Service> findByFreelancerIdAndIsActiveOrderByCreatedAtDesc(Long freelancerId, Boolean isActive);
 
+    List<Service> findByFreelancerIdInAndIsActiveOrderByCreatedAtDesc(List<Long> freelancerIds, Boolean isActive);
+
     // Buscar serviços por categoria
     List<Service> findByCategoryAndIsActiveOrderByCreatedAtDesc(String category, Boolean isActive);
 

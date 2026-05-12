@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
@@ -49,6 +50,12 @@ public class Address {
 
     @Column(nullable = false, length = 10)
     private String zipCode;
+
+    @Column(precision = 10, scale = 8)
+    private BigDecimal latitude;
+
+    @Column(precision = 11, scale = 8)
+    private BigDecimal longitude;
 
     @Column(nullable = false)
     @Builder.Default
