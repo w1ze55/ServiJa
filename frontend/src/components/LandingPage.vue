@@ -402,8 +402,8 @@ const faqItems = [
             <h4 class="footer-links-title">Institucional</h4>
             <ul class="footer-links-list">
               <li><a href="#" class="footer-link">Sobre nós</a></li>
-              <li><a href="#" class="footer-link">Termos de uso</a></li>
-              <li><a href="#" class="footer-link">Privacidade</a></li>
+              <li><router-link to="/politicas?tab=termos" class="footer-link">Termos de uso</router-link></li>
+              <li><router-link to="/politicas" class="footer-link">Privacidade</router-link></li>
             </ul>
           </div>
         </div>

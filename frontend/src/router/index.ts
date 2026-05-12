@@ -2,6 +2,7 @@ import { createRouter, createWebHistory, RouteRecordRaw } from "vue-router";
 
 // Importar as páginas
 import LandingPage from "@/pages/LandingPage/index.vue";
+import PoliticasTermosPage from "@/pages/PoliticasTermos/index.vue";
 import Login from "@/pages/Login/index.vue";
 import Perfil from "@/pages/Perfil/index.vue";
 import Dashboard from "@/pages/Dashboard/index.vue";
@@ -58,6 +59,12 @@ const routes: RouteRecordRaw[] = [
     path: "/cadastro",
     name: "cadastro",
     component: RegisterPage,
+    meta: { requiresAuth: false },
+  },
+  {
+    path: "/politicas",
+    name: "politicas",
+    component: PoliticasTermosPage,
     meta: { requiresAuth: false },
   },
 
