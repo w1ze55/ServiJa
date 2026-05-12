@@ -8,7 +8,6 @@ import com.servija.servija.dto.RegisterRequest;
 import com.servija.servija.dto.ResetPasswordRequest;
 import com.servija.servija.dto.VerifyEmailRequest;
 import com.servija.servija.dto.VerifyResetPasswordCodeRequest;
-import com.servija.servija.repository.UserRepository;
 import com.servija.servija.service.AuthService;
 import com.servija.servija.service.EmailService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -36,7 +35,6 @@ public class AuthController {
 
     private final AuthService authService;
     private final EmailService emailService;
-    private final UserRepository userRepository;
 
     @PostMapping("/register")
     @Operation(summary = "Registrar novo usuario", description = "Cria uma nova conta de usuario no sistema. Apos o registro, um codigo de verificacao e enviado para o e-mail fornecido.")
@@ -47,18 +45,6 @@ public class AuthController {
     public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
         AuthResponse response = authService.register(request);
         return new ResponseEntity<>(response, HttpStatus.CREATED);
-    }
-
-    @GetMapping("/check-cpf")
-    @Operation(summary = "Verificar disponibilidade de CPF", description = "Verifica se um CPF ja esta cadastrado no sistema. Endpoint publico para validacao em tempo real.")
-    public ResponseEntity<MessageResponse> checkCpf(@RequestParam String cpf) {
-        String cleanCpf = cpf.replaceAll("\\D", "");
-        boolean exists = userRepository.existsByCpf(cleanCpf);
-        if (exists) {
-            return ResponseEntity.status(HttpStatus.CONFLICT)
-                    .body(new MessageResponse("CPF ja cadastrado"));
-        }
-        return ResponseEntity.ok(new MessageResponse("CPF disponivel"));
     }
 
     @PostMapping("/login")
