@@ -18,6 +18,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -81,6 +82,7 @@ public class FreelancerWalletController {
     }
 
     @PostMapping("/withdraw")
+    @PreAuthorize("!hasAuthority('IMPERSONATION_SESSION')")
     @Operation(summary = "Solicitar saque")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<WithdrawalResponse> requestWithdrawal(
@@ -117,6 +119,7 @@ public class FreelancerWalletController {
     }
 
     @DeleteMapping("/withdrawals/{id}")
+    @PreAuthorize("!hasAuthority('IMPERSONATION_SESSION')")
     @Operation(summary = "Cancelar saque")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<Void> cancelWithdrawal(
@@ -137,6 +140,7 @@ public class FreelancerWalletController {
     }
 
     @PostMapping("/bank-accounts")
+    @PreAuthorize("!hasAuthority('IMPERSONATION_SESSION')")
     @Operation(summary = "Cadastrar conta bancaria ou chave PIX")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<BankAccountResponse> addBankAccount(
@@ -149,6 +153,7 @@ public class FreelancerWalletController {
     }
 
     @DeleteMapping("/bank-accounts/{id}")
+    @PreAuthorize("!hasAuthority('IMPERSONATION_SESSION')")
     @Operation(summary = "Remover conta bancaria")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<Void> deleteBankAccount(
@@ -161,6 +166,7 @@ public class FreelancerWalletController {
     }
 
     @PutMapping("/bank-accounts/{id}/default")
+    @PreAuthorize("!hasAuthority('IMPERSONATION_SESSION')")
     @Operation(summary = "Definir conta padrao")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<BankAccountResponse> setDefaultAccount(

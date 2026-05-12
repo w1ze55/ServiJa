@@ -151,19 +151,4 @@ public class AuthController {
         return ResponseEntity.ok(new MessageResponse("Codigo de recuperacao reenviado"));
     }
 
-    @PostMapping("/test-email")
-    @Operation(summary = "Testar envio de e-mail", description = "Endpoint de teste para verificar a configuracao de envio de e-mails")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "E-mail de teste enviado", content = @Content(schema = @Schema(implementation = MessageResponse.class))),
-            @ApiResponse(responseCode = "500", description = "Erro ao enviar e-mail", content = @Content(schema = @Schema(implementation = MessageResponse.class)))
-    })
-    public ResponseEntity<MessageResponse> testEmail(@RequestParam String email) {
-        try {
-            emailService.sendVerificationEmail(email, "Usuario Teste", "TEST123");
-            return ResponseEntity.ok(new MessageResponse("Email de teste enviado! Verifique o console/logs para detalhes."));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(new MessageResponse("Erro ao enviar email: " + e.getMessage()));
-        }
-    }
 }

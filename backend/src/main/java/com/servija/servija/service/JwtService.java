@@ -69,6 +69,10 @@ public class JwtService {
         return (username.equals(userDetails.getUsername())) && !isTokenExpired(token);
     }
 
+    public boolean isImpersonationToken(String token) {
+        return extractAllClaims(token).get("impersonatedBy") != null;
+    }
+
     private boolean isTokenExpired(String token) {
         return extractExpiration(token).before(new Date());
     }
