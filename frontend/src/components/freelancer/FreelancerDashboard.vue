@@ -319,20 +319,32 @@ const barChartOptions = {
   },
 };
 
-// ── Chart: Doughnut (services by category) ────────────────────────
+// ── Chart: Doughnut (revenue per service) ─────────────────────────
 
 const doughnutChartData = computed(() => {
   const palette = ['#286AD8', '#435574', '#2B2E33', '#323842'];
-  const counts = new Map<string, number>();
+  const revenue = new Map<string, number>();
 
-  periodProposals.value.forEach((p) => {
-    const cat = p.categoryLabel || p.category || 'Sem categoria';
-    counts.set(cat, (counts.get(cat) || 0) + 1);
-  });
+  // Priority: wallet transactions with serviceName (real payments)
+  const earningTxs = walletTransactions.value.filter((tx) => tx.type === 'EARNING' && tx.serviceName);
+  if (earningTxs.length > 0) {
+    earningTxs.forEach((tx) => {
+      const name = tx.serviceName!;
+      revenue.set(name, (revenue.get(name) || 0) + tx.amount);
+    });
+  } else {
+    // Fallback: proposal amounts grouped by service name
+    proposalStore.proposals
+      .filter((p) => ['accepted', 'in_progress', 'delivered', 'completed'].includes(p.status))
+      .forEach((p) => {
+        const name = p.service || 'Sem serviço';
+        revenue.set(name, (revenue.get(name) || 0) + getProposalAmount(p));
+      });
+  }
 
-  const entries = Array.from(counts.entries())
+  const entries = Array.from(revenue.entries())
     .sort((a, b) => b[1] - a[1])
-    .slice(0, 4);
+    .slice(0, 5);
 
   if (entries.length === 0) {
     return {
@@ -344,7 +356,7 @@ const doughnutChartData = computed(() => {
   return {
     labels: entries.map(([name]) => name),
     datasets: [{
-      data: entries.map(([, count]) => count),
+      data: entries.map(([, amount]) => amount),
       backgroundColor: palette.slice(0, entries.length),
       hoverOffset: 6,
       borderWidth: 2,
@@ -363,7 +375,7 @@ const doughnutOptions = {
     },
     tooltip: {
       callbacks: {
-        label: (ctx: any) => ` ${ctx.label}: ${ctx.parsed} proposta${ctx.parsed !== 1 ? 's' : ''}`,
+        label: (ctx: any) => ` ${ctx.label}: ${formatCurrency(ctx.parsed)}`,
       },
     },
   },
@@ -667,8 +679,8 @@ onUnmounted(() => {
         <!-- Doughnut Chart: Services by Category -->
         <Card class="p-6">
           <div class="mb-6">
-            <h3 class="text-[#263238] mb-1">Serviços por Categoria</h3>
-            <p class="text-sm text-[#435574]">Distribuição no período</p>
+            <h3 class="text-[#263238] mb-1">Faturamento por Serviço</h3>
+            <p class="text-sm text-[#435574]">Receita gerada por cada serviço</p>
           </div>
           <div class="h-[260px] flex items-center justify-center">
             <Doughnut :data="doughnutChartData" :options="doughnutOptions" />

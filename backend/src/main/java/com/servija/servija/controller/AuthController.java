@@ -8,7 +8,6 @@ import com.servija.servija.dto.RegisterRequest;
 import com.servija.servija.dto.ResetPasswordRequest;
 import com.servija.servija.dto.VerifyEmailRequest;
 import com.servija.servija.dto.VerifyResetPasswordCodeRequest;
-import com.servija.servija.repository.UserRepository;
 import com.servija.servija.service.AuthService;
 import com.servija.servija.service.EmailService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -36,7 +35,6 @@ public class AuthController {
 
     private final AuthService authService;
     private final EmailService emailService;
-    private final UserRepository userRepository;
 
     @PostMapping("/register")
     @Operation(summary = "Registrar novo usuario", description = "Cria uma nova conta de usuario no sistema. Apos o registro, um codigo de verificacao e enviado para o e-mail fornecido.")
@@ -47,18 +45,6 @@ public class AuthController {
     public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
         AuthResponse response = authService.register(request);
         return new ResponseEntity<>(response, HttpStatus.CREATED);
-    }
-
-    @GetMapping("/check-cpf")
-    @Operation(summary = "Verificar disponibilidade de CPF", description = "Verifica se um CPF ja esta cadastrado no sistema. Endpoint publico para validacao em tempo real.")
-    public ResponseEntity<MessageResponse> checkCpf(@RequestParam String cpf) {
-        String cleanCpf = cpf.replaceAll("\\D", "");
-        boolean exists = userRepository.existsByCpf(cleanCpf);
-        if (exists) {
-            return ResponseEntity.status(HttpStatus.CONFLICT)
-                    .body(new MessageResponse("CPF ja cadastrado"));
-        }
-        return ResponseEntity.ok(new MessageResponse("CPF disponivel"));
     }
 
     @PostMapping("/login")
@@ -151,19 +137,4 @@ public class AuthController {
         return ResponseEntity.ok(new MessageResponse("Codigo de recuperacao reenviado"));
     }
 
-    @PostMapping("/test-email")
-    @Operation(summary = "Testar envio de e-mail", description = "Endpoint de teste para verificar a configuracao de envio de e-mails")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "E-mail de teste enviado", content = @Content(schema = @Schema(implementation = MessageResponse.class))),
-            @ApiResponse(responseCode = "500", description = "Erro ao enviar e-mail", content = @Content(schema = @Schema(implementation = MessageResponse.class)))
-    })
-    public ResponseEntity<MessageResponse> testEmail(@RequestParam String email) {
-        try {
-            emailService.sendVerificationEmail(email, "Usuario Teste", "TEST123");
-            return ResponseEntity.ok(new MessageResponse("Email de teste enviado! Verifique o console/logs para detalhes."));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(new MessageResponse("Erro ao enviar email: " + e.getMessage()));
-        }
-    }
 }

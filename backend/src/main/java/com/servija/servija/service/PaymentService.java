@@ -14,6 +14,7 @@ import com.servija.servija.repository.ServiceRequestRepository;
 import com.servija.servija.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -269,19 +270,21 @@ public class PaymentService {
         log.info("Pagamento com carteira digital em processamento");
     }
 
-    public PaymentResponse getPaymentById(Long id) {
+    public PaymentResponse getPaymentById(Long id, String email) {
         Payment payment = paymentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Pagamento não encontrado"));
+        verifyPaymentAccess(payment, email);
         return mapToResponse(payment);
     }
 
-    public PaymentResponse getPaymentByServiceRequestId(Long serviceRequestId) {
+    public PaymentResponse getPaymentByServiceRequestId(Long serviceRequestId, String email) {
         List<Payment> payments = paymentRepository.findByServiceRequestId(serviceRequestId);
         if (payments.isEmpty()) {
             throw new ResourceNotFoundException("Nenhum pagamento encontrado para esta solicitação");
         }
-        // Retornar o pagamento mais recente
-        return mapToResponse(payments.get(0));
+        Payment payment = payments.get(0);
+        verifyPaymentAccess(payment, email);
+        return mapToResponse(payment);
     }
 
     public List<PaymentResponse> getMyPayments(String email) {
@@ -307,8 +310,9 @@ public class PaymentService {
 
         payment.setStatus(Payment.PaymentStatus.valueOf(status.toUpperCase()));
 
-        if (status.equalsIgnoreCase("COMPLETED")) {
+        if (status.equalsIgnoreCase("COMPLETED") && payment.getCompletedAt() == null) {
             payment.setCompletedAt(LocalDateTime.now());
+            walletService.addPendingBalance(payment.getFreelancer(), payment.getAmount());
         }
 
         payment = paymentRepository.save(payment);
@@ -319,9 +323,10 @@ public class PaymentService {
      * Verifica status do pagamento no Asaas e atualiza localmente
      */
     @Transactional
-    public PaymentResponse checkAsaasPaymentStatus(Long id) {
+    public PaymentResponse checkAsaasPaymentStatus(Long id, String email) {
         Payment payment = paymentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Pagamento não encontrado"));
+        verifyPaymentAccess(payment, email);
 
         if (payment.getAsaasPaymentId() != null) {
             try {
@@ -372,9 +377,10 @@ public class PaymentService {
         }
     }
 
-    public Map<String, Object> getPixQrCode(Long paymentId) {
+    public Map<String, Object> getPixQrCode(Long paymentId, String email) {
         Payment payment = paymentRepository.findById(paymentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Pagamento não encontrado"));
+        verifyPaymentAccess(payment, email);
 
         // Se o pagamento já foi confirmado, retornar dados salvos ao invés de buscar no
         // Asaas
@@ -414,6 +420,17 @@ public class PaymentService {
         }
     }
 
+    private void verifyPaymentAccess(Payment payment, String email) {
+        User caller = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
+        if (caller.getUserType() == User.UserType.ADMIN) return;
+        boolean isParty = payment.getContractor().getId().equals(caller.getId())
+                || payment.getFreelancer().getId().equals(caller.getId());
+        if (!isParty) {
+            throw new AccessDeniedException("Acesso negado a este pagamento");
+        }
+    }
+
     private PaymentResponse mapToResponse(Payment payment) {
         return PaymentResponse.builder()
                 .id(payment.getId())
@@ -436,9 +453,10 @@ public class PaymentService {
     /**
      * Buscar histórico de status de um pagamento
      */
-    public List<Map<String, Object>> getPaymentHistory(Long paymentId) {
+    public List<Map<String, Object>> getPaymentHistory(Long paymentId, String email) {
         Payment payment = paymentRepository.findById(paymentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Pagamento não encontrado"));
+        verifyPaymentAccess(payment, email);
 
         List<PaymentStatusHistory> history = paymentStatusHistoryRepository
                 .findByPaymentOrderByCreatedAtAsc(payment);
@@ -459,9 +477,10 @@ public class PaymentService {
     /**
      * Obtém URL do recibo/comprovante de pagamento via Asaas
      */
-    public Map<String, String> getReceiptUrl(Long paymentId) {
+    public Map<String, String> getReceiptUrl(Long paymentId, String email) {
         Payment payment = paymentRepository.findById(paymentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Pagamento não encontrado"));
+        verifyPaymentAccess(payment, email);
 
         if (payment.getAsaasPaymentId() == null) {
             throw new IllegalStateException("Pagamento não possui integração com Asaas");
