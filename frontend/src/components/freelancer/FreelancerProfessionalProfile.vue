@@ -1041,7 +1041,7 @@ const getLinkLabel = (link: ProfessionalLink) => {
         <div v-if="isEditingServiceSettings" class="space-y-4">
           <!-- Tipo de Serviço -->
           <div class="space-y-2">
-            <Label for="serviceType">Tipo de Serviço *</Label>
+            <Label for="serviceType">Categoria *</Label>
             <Select
               :model-value="editedData.categoryId ? String(editedData.categoryId) : ''"
               @update:model-value="(val: string) => editedData.categoryId = val ? Number(val) : null"
