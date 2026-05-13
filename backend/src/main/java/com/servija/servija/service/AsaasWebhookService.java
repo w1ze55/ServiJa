@@ -900,23 +900,7 @@ public class AsaasWebhookService {
             }
         }
 
-        // 2. Buscar por valor e status PROCESSING/PENDING (pagamento PIX aguardando confirmação)
-        BigDecimal value = pixTransaction.getValue();
-        if (value != null) {
-            List<Payment> pendingPixPayments = paymentRepository.findByPaymentMethodAndStatusInAndTotalAmount(
-                    "pix",
-                    List.of(Payment.PaymentStatus.PROCESSING, Payment.PaymentStatus.PENDING),
-                    value);
-
-            if (pendingPixPayments.size() == 1) {
-                return pendingPixPayments.get(0);
-            } else if (pendingPixPayments.size() > 1) {
-                log.warn("Múltiplos pagamentos PIX pendentes com valor R$ {} encontrados. Não foi possível vincular automaticamente.",
-                        value);
-            }
-        }
-
-        // 3. Se tiver externalReference, tentar buscar por ela
+        // 2. Se tiver externalReference, tentar buscar por ela
         String externalRef = pixTransaction.getExternalReference();
         if (externalRef != null && !externalRef.isEmpty()) {
             try {

@@ -310,8 +310,9 @@ public class PaymentService {
 
         payment.setStatus(Payment.PaymentStatus.valueOf(status.toUpperCase()));
 
-        if (status.equalsIgnoreCase("COMPLETED")) {
+        if (status.equalsIgnoreCase("COMPLETED") && payment.getCompletedAt() == null) {
             payment.setCompletedAt(LocalDateTime.now());
+            walletService.addPendingBalance(payment.getFreelancer(), payment.getAmount());
         }
 
         payment = paymentRepository.save(payment);
