@@ -19,17 +19,17 @@ const privacidadeSections = [
   {
     id: 'sobre',
     title: 'Quem somos e abrangência',
-    body: `<p>A <strong>Servi Já</strong> é uma plataforma digital que conecta contratantes a prestadores de serviço autônomos. Esta Política de Privacidade descreve como coletamos, usamos, armazenamos e protegemos seus dados pessoais quando você utiliza nosso site, aplicativo móvel e serviços relacionados.</p><p>Esta política se aplica a todos os usuários cadastrados — contratantes e prestadores — e está alinhada à <strong>Lei Geral de Proteção de Dados (Lei nº 13.709/2018 — LGPD)</strong>.</p>`,
+    body: `<p>A <strong>Servi Já</strong> é uma plataforma digital que conecta contratantes a prestadores de serviço autônomos. Esta Política de Privacidade descreve como coletamos, usamos, armazenamos e protegemos seus dados pessoais quando você utiliza nosso site, aplicativo móvel e serviços relacionados.</p><p>Esta política se aplica a todos os usuários cadastrados, incluindo contratantes e prestadores, e está alinhada à <strong>Lei Geral de Proteção de Dados (Lei nº 13.709/2018, LGPD)</strong>.</p>`,
   },
   {
     id: 'dados-coletados',
     title: 'Dados que coletamos',
-    body: `<p>Coletamos apenas o necessário para oferecer um serviço seguro, personalizado e funcional. Os dados são organizados nas seguintes categorias:</p><table class="pol-table"><thead><tr><th>Categoria</th><th>Exemplos</th></tr></thead><tbody><tr><td>Cadastro</td><td>Nome completo, CPF, e-mail, telefone, data de nascimento, foto de perfil.</td></tr><tr><td>Profissional</td><td>Categorias de serviço, portfólio, certificações, área de atuação, faixa de preços.</td></tr><tr><td>Localização</td><td>Endereço informado e localização aproximada (quando autorizada) para sugerir profissionais próximos.</td></tr><tr><td>Pagamento</td><td>Dados financeiros tokenizados — não armazenamos o número completo do cartão.</td></tr><tr><td>Uso da plataforma</td><td>Histórico de buscas, contratações, avaliações, mensagens trocadas e dispositivo utilizado.</td></tr></tbody></table>`,
+    body: `<p>Coletamos apenas o necessário para oferecer um serviço seguro, personalizado e funcional. Os dados são organizados nas seguintes categorias:</p><table class="pol-table"><thead><tr><th>Categoria</th><th>Exemplos</th></tr></thead><tbody><tr><td>Cadastro</td><td>Nome completo, CPF, e-mail, telefone, data de nascimento, foto de perfil.</td></tr><tr><td>Profissional</td><td>Categorias de serviço, portfólio, área de atuação, faixa de preços.</td></tr><tr><td>Localização</td><td>Endereço informado e localização aproximada (quando autorizada) para sugerir profissionais próximos.</td></tr><tr><td>Pagamento</td><td>Dados financeiros tokenizados, e não armazenamos o número completo do cartão.</td></tr><tr><td>Uso da plataforma</td><td>Histórico de buscas, contratações, avaliações, mensagens trocadas e dispositivo utilizado.</td></tr></tbody></table>`,
   },
   {
     id: 'finalidades',
     title: 'Como usamos seus dados',
-    body: `<p>Utilizamos suas informações para:</p><ul class="pol-list"><li><strong>Operar a plataforma:</strong> intermediar contatos, orçamentos e contratações entre as partes.</li><li><strong>Personalizar a experiência:</strong> sugerir profissionais e categorias relevantes para você.</li><li><strong>Garantir a segurança:</strong> verificar identidade, prevenir fraudes e moderar conteúdo.</li><li><strong>Processar pagamentos:</strong> conduzir transações através de provedores autorizados.</li><li><strong>Melhorar o produto:</strong> analisar uso agregado e anônimo para evoluir funcionalidades.</li><li><strong>Comunicar:</strong> enviar notificações transacionais, atualizações e — mediante consentimento — comunicações de marketing.</li></ul>`,
+    body: `<p>Utilizamos suas informações para:</p><ul class="pol-list"><li><strong>Operar a plataforma:</strong> intermediar contatos, orçamentos e contratações entre as partes.</li><li><strong>Personalizar a experiência:</strong> sugerir profissionais e categorias relevantes para você.</li><li><strong>Garantir a segurança:</strong> verificar identidade, prevenir fraudes e moderar conteúdo.</li><li><strong>Processar pagamentos:</strong> conduzir transações através de provedores autorizados.</li><li><strong>Melhorar o produto:</strong> analisar uso agregado e anônimo para evoluir funcionalidades.</li><li><strong>Comunicar:</strong> enviar notificações transacionais, atualizações e comunicações de marketing, mediante consentimento.</li></ul>`,
   },
   {
     id: 'compartilhamento',
@@ -44,7 +44,7 @@ const privacidadeSections = [
   {
     id: 'direitos',
     title: 'Seus direitos como titular',
-    body: `<p>De acordo com a LGPD, você pode exercer os seguintes direitos sobre seus dados pessoais a qualquer momento — sem custo:</p><ul class="pol-list"><li><strong>Confirmar</strong> a existência de tratamento dos seus dados.</li><li><strong>Acessar</strong> os dados que mantemos sobre você.</li><li><strong>Corrigir</strong> dados incompletos, inexatos ou desatualizados.</li><li><strong>Solicitar a anonimização, bloqueio ou eliminação</strong> de dados desnecessários ou excessivos.</li><li><strong>Portar</strong> seus dados a outro fornecedor de serviço.</li><li><strong>Revogar o consentimento</strong> previamente fornecido.</li><li><strong>Ser informado</strong> sobre com quem compartilhamos seus dados.</li></ul><div class="pol-callout"><div class="pol-callout-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/><path d="m9 12 2 2 4-4"/></svg></div><div class="pol-callout-body"><div class="pol-callout-title">Como exercer seus direitos</div><div class="pol-callout-text">Envie uma solicitação para <a href="mailto:privacidade@servija.com.br">privacidade@servija.com.br</a> — respondemos em até 15 dias úteis. Nossa Encarregada de Proteção de Dados (DPO) é a Sra. Ana Ribeiro.</div></div></div>`,
+    body: `<p>De acordo com a LGPD, você pode exercer os seguintes direitos sobre seus dados pessoais a qualquer momento, sem custo:</p><ul class="pol-list"><li><strong>Confirmar</strong> a existência de tratamento dos seus dados.</li><li><strong>Acessar</strong> os dados que mantemos sobre você.</li><li><strong>Corrigir</strong> dados incompletos, inexatos ou desatualizados.</li><li><strong>Solicitar a anonimização, bloqueio ou eliminação</strong> de dados desnecessários ou excessivos.</li><li><strong>Portar</strong> seus dados a outro fornecedor de serviço.</li><li><strong>Revogar o consentimento</strong> previamente fornecido.</li><li><strong>Ser informado</strong> sobre com quem compartilhamos seus dados.</li></ul><div class="pol-callout"><div class="pol-callout-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/><path d="m9 12 2 2 4-4"/></svg></div><div class="pol-callout-body"><div class="pol-callout-title">Como exercer seus direitos</div><div class="pol-callout-text">Envie uma solicitação para <a href="mailto:privacidade@servija.com.br">privacidade@servija.com.br</a>; respondemos em até 15 dias úteis. Nossa Encarregada de Proteção de Dados (DPO) é a Sra. Ana Ribeiro.</div></div></div>`,
   },
   {
     id: 'seguranca',
@@ -54,7 +54,7 @@ const privacidadeSections = [
   {
     id: 'retencao',
     title: 'Retenção dos dados',
-    body: `<p>Mantemos seus dados pelo tempo necessário para cumprir as finalidades descritas nesta política ou conforme exigido por lei. Quando você encerra sua conta, eliminamos ou anonimizamos seus dados em até 90 dias — exceto:</p><ul class="pol-list"><li>Registros financeiros, mantidos por 5 anos por exigência fiscal.</li><li>Histórico de transações e mensagens, retidos por 5 anos para fins de auditoria e prevenção a fraudes.</li><li>Dados sob investigação ou disputa, retidos até a conclusão do caso.</li></ul>`,
+    body: `<p>Mantemos seus dados pelo tempo necessário para cumprir as finalidades descritas nesta política ou conforme exigido por lei. Quando você encerra sua conta, eliminamos ou anonimizamos seus dados em até 90 dias, exceto:</p><ul class="pol-list"><li>Registros financeiros, mantidos por 5 anos por exigência fiscal.</li><li>Histórico de transações e mensagens, retidos por 5 anos para fins de auditoria e prevenção a fraudes.</li><li>Dados sob investigação ou disputa, retidos até a conclusão do caso.</li></ul>`,
   },
   {
     id: 'alteracoes',
@@ -64,7 +64,7 @@ const privacidadeSections = [
   {
     id: 'contato',
     title: 'Contato',
-    body: `<p>Dúvidas, sugestões ou solicitações relacionadas a esta Política de Privacidade podem ser enviadas para:</p><ul class="pol-list"><li><strong>E-mail:</strong> <a href="mailto:privacidade@servija.com.br">privacidade@servija.com.br</a></li><li><strong>DPO (Encarregada):</strong> Ana Ribeiro</li><li><strong>Endereço:</strong> Av. Paulista, 1000 — 10º andar, Bela Vista, São Paulo/SP, 01310-100</li></ul>`,
+    body: `<p>Dúvidas, sugestões ou solicitações relacionadas a esta Política de Privacidade podem ser enviadas para:</p><ul class="pol-list"><li><strong>E-mail:</strong> <a href="mailto:privacidade@servija.com.br">privacidade@servija.com.br</a></li><li><strong>DPO (Encarregada):</strong> Ana Ribeiro</li><li><strong>Endereço:</strong> Av. Paulista, 1000, 10º andar, Bela Vista, São Paulo/SP, 01310-100</li></ul>`,
   },
 ];
 
@@ -77,7 +77,7 @@ const termosSections = [
   {
     id: 'sobre-plataforma',
     title: 'Sobre a plataforma',
-    body: `<p>A Servi Já é uma plataforma de intermediação que conecta <strong>contratantes</strong> — pessoas que buscam serviços — a <strong>prestadores</strong> — profissionais autônomos que oferecem serviços nas categorias disponíveis.</p><div class="pol-callout"><div class="pol-callout-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div><div class="pol-callout-body"><div class="pol-callout-title">Nosso papel é de intermediação</div><div class="pol-callout-text">A Servi Já não é prestadora dos serviços contratados — não executa, supervisiona ou garante o resultado dos trabalhos. A relação contratual e a responsabilidade pela execução são estabelecidas diretamente entre contratante e prestador.</div></div></div>`,
+    body: `<p>A Servi Já é uma plataforma de intermediação que conecta <strong>contratantes</strong>, pessoas que buscam serviços, a <strong>prestadores</strong>, profissionais autônomos que oferecem serviços nas categorias disponíveis.</p><div class="pol-callout"><div class="pol-callout-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div><div class="pol-callout-body"><div class="pol-callout-title">Nosso papel é de intermediação</div><div class="pol-callout-text">A Servi Já não é prestadora dos serviços contratados e não executa, supervisiona ou garante o resultado dos trabalhos. A relação contratual e a responsabilidade pela execução são estabelecidas diretamente entre contratante e prestador.</div></div></div>`,
   },
   {
     id: 'cadastro',
@@ -97,7 +97,7 @@ const termosSections = [
   {
     id: 'pagamentos',
     title: 'Pagamentos e taxas',
-    body: `<p>Os valores dos serviços são negociados livremente entre contratante e prestador. A plataforma oferece pagamento integrado via cartão, Pix e carteira digital — com retenção dos valores até a confirmação da conclusão do serviço.</p><h3>Taxas da plataforma</h3><ul class="pol-list"><li><strong>Contratantes:</strong> uso da plataforma, busca e contratação são gratuitos.</li><li><strong>Prestadores:</strong> a Servi Já cobra uma taxa de serviço sobre cada contratação concluída, com percentual informado de forma clara antes do aceite do orçamento.</li><li><strong>Plano Pro (opcional):</strong> prestadores podem assinar planos com benefícios adicionais — destaque na busca, selos e relatórios — sob termos específicos do plano contratado.</li></ul>`,
+    body: `<p>Os valores dos serviços são negociados livremente entre contratante e prestador. A plataforma oferece pagamento integrado via cartão, Pix e carteira digital com retenção dos valores até a confirmação da conclusão do serviço.</p><h3>Taxas da plataforma</h3><ul class="pol-list"><li><strong>Contratantes:</strong> uso da plataforma, busca e contratação são gratuitos.</li><li><strong>Prestadores:</strong> a Servi Já cobra uma taxa de serviço sobre cada contratação concluída, com percentual informado de forma clara antes do aceite do orçamento.</li><li><strong>Plano Pro (opcional):</strong> prestadores podem assinar planos com benefícios adicionais, como destaque na busca, selos e relatórios, sob termos específicos do plano contratado.</li></ul>`,
   },
   {
     id: 'cancelamento',
@@ -107,12 +107,12 @@ const termosSections = [
   {
     id: 'propriedade-intelectual',
     title: 'Propriedade intelectual',
-    body: `<p>Marca, logotipo, layout, código-fonte, textos, design e demais elementos da plataforma são de propriedade exclusiva da Servi Já e protegidos pela legislação aplicável. Conteúdos publicados pelos usuários — fotos, descrições e avaliações — permanecem de propriedade dos próprios usuários, que concedem à Servi Já licença não-exclusiva para exibi-los na plataforma.</p>`,
+    body: `<p>Marca, logotipo, layout, código-fonte, textos, design e demais elementos da plataforma são de propriedade exclusiva da Servi Já e protegidos pela legislação aplicável. Conteúdos publicados pelos usuários como fotos, descrições e avaliações permanecem de propriedade dos próprios usuários, que concedem à Servi Já licença não-exclusiva para exibi-los na plataforma.</p>`,
   },
   {
     id: 'limitacao',
     title: 'Limitação de responsabilidade',
-    body: `<p>Por atuar como intermediadora, a Servi Já <strong>não se responsabiliza</strong> por:</p><ul class="pol-list"><li>Qualidade, segurança, legalidade ou conformidade dos serviços prestados pelos profissionais.</li><li>Condutas, declarações ou descumprimentos de qualquer das partes envolvidas em uma contratação.</li><li>Danos diretos ou indiretos decorrentes da execução ou não execução do serviço contratado.</li><li>Indisponibilidades pontuais da plataforma por motivos de força maior ou manutenção programada.</li></ul><p>Empenhamo-nos para verificar identidades e moderar conteúdo — mas a contratação é uma decisão final do contratante, baseada nas informações públicas de cada perfil.</p>`,
+    body: `<p>Por atuar como intermediadora, a Servi Já <strong>não se responsabiliza</strong> por:</p><ul class="pol-list"><li>Qualidade, segurança, legalidade ou conformidade dos serviços prestados pelos profissionais.</li><li>Condutas, declarações ou descumprimentos de qualquer das partes envolvidas em uma contratação.</li><li>Danos diretos ou indiretos decorrentes da execução ou não execução do serviço contratado.</li><li>Indisponibilidades pontuais da plataforma por motivos de força maior ou manutenção programada.</li></ul><p>Empenhamo-nos para verificar identidades e moderar conteúdo, mas a contratação é uma decisão final do contratante, baseada nas informações públicas de cada perfil.</p>`,
   },
   {
     id: 'foro',
@@ -131,8 +131,8 @@ const heroTitle = computed(() =>
 
 const heroDesc = computed(() =>
   tab.value === 'privacidade'
-    ? 'Transparência sobre quais dados coletamos, como os utilizamos e quais são os seus direitos como titular — em linguagem clara, sem juridiquês desnecessário.'
-    : 'Regras que organizam a relação entre a Servi Já, contratantes e prestadores — para que todos saibam o que esperar da plataforma e uns dos outros.'
+    ? 'Transparência sobre quais dados coletamos, como os utilizamos e quais são os seus direitos como titular em linguagem clara, sem juridiquês desnecessário.'
+    : 'Regras que organizam a relação entre a Servi Já, contratantes e prestadores para que todos saibam o que esperar da plataforma e uns dos outros.'
 );
 
 const introText = computed(() =>
@@ -297,7 +297,7 @@ onUnmounted(() => {
           <p class="pol-end-desc">
             Nossa equipe está pronta para esclarecer qualquer ponto sobre
             {{ tab === 'privacidade' ? 'esta Política de Privacidade' : 'estes Termos de Uso' }}.
-            Entre em contato — costumamos responder em até 24 horas úteis.
+            Entre em contato, costumamos responder em até 24 horas úteis.
           </p>
           <div class="pol-end-actions">
             <a :href="'mailto:' + endEmail" class="pol-end-btn primary">
