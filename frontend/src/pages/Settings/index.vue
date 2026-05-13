@@ -12,16 +12,22 @@ import AlertDialogDescription from '@/components/ui/alert-dialog-description.vue
 import AlertDialogFooter from '@/components/ui/alert-dialog-footer.vue';
 import AlertDialogHeader from '@/components/ui/alert-dialog-header.vue';
 import AlertDialogTitle from '@/components/ui/alert-dialog-title.vue';
+import SupportRequestModal from '@/components/support/SupportRequestModal.vue';
 
 const router = useRouter();
 const { navigate, logout } = useNavigation();
 
 const showDevelopmentModal = ref(false);
 const developmentFeatureTitle = ref('');
+const showSupportModal = ref(false);
 
 const openDevelopmentModal = (title: string) => {
   developmentFeatureTitle.value = title;
   showDevelopmentModal.value = true;
+};
+
+const openSupportModal = () => {
+  showSupportModal.value = true;
 };
 
 // Obter usuário do localStorage
@@ -65,7 +71,7 @@ const settingsOptions = computed<SettingsOption[]>(() => {
         icon: HelpCircle,
         title: 'Ajuda e Suporte',
         description: 'Central de ajuda e contato',
-        onClick: () => openDevelopmentModal('Ajuda e Suporte'),
+        onClick: openSupportModal,
       },
     ];
   } else {
@@ -96,7 +102,7 @@ const settingsOptions = computed<SettingsOption[]>(() => {
         icon: HelpCircle,
         title: 'Ajuda e Suporte',
         description: 'Central de ajuda e contato',
-        onClick: () => openDevelopmentModal('Ajuda e Suporte'),
+        onClick: openSupportModal,
       },
     ];
   }
@@ -190,6 +196,11 @@ const handleLogout = () => {
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+
+    <SupportRequestModal
+      :open="showSupportModal"
+      :on-close="() => { showSupportModal = false; }"
+    />
   </MainLayout>
 </template>
 

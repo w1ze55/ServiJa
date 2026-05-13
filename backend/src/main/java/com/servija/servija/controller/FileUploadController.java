@@ -7,7 +7,11 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.ArrayList;
@@ -32,32 +36,25 @@ public class FileUploadController {
             Map<String, String> response = new HashMap<>();
             response.put("url", url);
             return ResponseEntity.ok(response);
-        } catch (Exception e) {
+        } catch (Exception ex) {
             Map<String, String> error = new HashMap<>();
-            error.put("error", e.getMessage());
+            error.put("error", ex.getMessage());
             return ResponseEntity.badRequest().body(error);
         }
     }
 
     @PostMapping(value = "/images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @Operation(summary = "Upload de múltiplas imagens")
+    @Operation(summary = "Upload de multiplas imagens")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<Map<String, Object>> uploadImages(@RequestParam("files") MultipartFile[] files) {
-        try {
-            List<String> urls = new ArrayList<>();
-            for (MultipartFile file : files) {
-                String url = fileStorageService.storeFile(file);
-                urls.add(url);
-            }
-            Map<String, Object> response = new HashMap<>();
-            response.put("urls", urls);
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            Map<String, Object> error = new HashMap<>();
-            error.put("error", e.getMessage());
-            error.put("type", e.getClass().getName());
-            return ResponseEntity.badRequest().body(error);
-        }
+        return uploadMultipleFiles(files);
+    }
+
+    @PostMapping(value = "/files", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Upload de multiplos arquivos")
+    @SecurityRequirement(name = "bearerAuth")
+    public ResponseEntity<Map<String, Object>> uploadFiles(@RequestParam("files") MultipartFile[] files) {
+        return uploadMultipleFiles(files);
     }
 
     @DeleteMapping("/image")
@@ -69,9 +66,28 @@ public class FileUploadController {
             Map<String, String> response = new HashMap<>();
             response.put("message", "Imagem deletada com sucesso");
             return ResponseEntity.ok(response);
-        } catch (Exception e) {
+        } catch (Exception ex) {
             Map<String, String> error = new HashMap<>();
-            error.put("error", e.getMessage());
+            error.put("error", ex.getMessage());
+            return ResponseEntity.badRequest().body(error);
+        }
+    }
+
+    private ResponseEntity<Map<String, Object>> uploadMultipleFiles(MultipartFile[] files) {
+        try {
+            List<String> urls = new ArrayList<>();
+            for (MultipartFile file : files) {
+                String url = fileStorageService.storeFile(file);
+                urls.add(url);
+            }
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("urls", urls);
+            return ResponseEntity.ok(response);
+        } catch (Exception ex) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("error", ex.getMessage());
+            error.put("type", ex.getClass().getName());
             return ResponseEntity.badRequest().body(error);
         }
     }
