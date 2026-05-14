@@ -597,7 +597,7 @@ onMounted(() => {
             </div>
 
             <!-- ── Reviews Section ──────────────────────────── -->
-            <ReviewList :reviews="reviews" :is-loading="isLoadingReviews" />
+            <ReviewList :reviews="reviews" :is-loading="isLoadingReviews" :freelancer-id="props.providerId" />
           </div>
 
           <!-- ── Right sidebar (sticky) ───────────────────────── -->
