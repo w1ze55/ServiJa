@@ -65,7 +65,7 @@ const getWindowDays = () => {
   switch (selectedPeriod.value) {
     case 'week': return 7;
     case 'year': return 365;
-    default: return 30;
+    default: return 180;
   }
 };
 
@@ -236,7 +236,7 @@ const periodLabel = computed(() => {
   switch (selectedPeriod.value) {
     case 'week': return 'últimos 7 dias';
     case 'year': return 'último ano';
-    default: return 'últimos 30 dias';
+    default: return 'últimos 6 meses';
   }
 });
 
@@ -680,22 +680,6 @@ onUnmounted(() => {
       <div>
         <h1 class="text-2xl font-bold text-[#263238] mb-2">Dashboard</h1>
         <p class="text-[#435574]">Olá, {{ userFirstName }}! Aqui está um resumo do seu desempenho.</p>
-      </div>
-      <div class="flex items-center gap-3 flex-shrink-0">
-        <button
-          v-if="pendingReviews.length > 0"
-          class="flex items-center gap-2 bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-2 hover:bg-yellow-100 transition-colors cursor-pointer"
-          @click="props.onNavigate('freelancer-proposals')"
-        >
-          <Star class="h-4 w-4 text-yellow-600" />
-          <span class="text-sm text-yellow-700 whitespace-nowrap">
-            {{ pendingReviews.length }} avaliação{{ pendingReviews.length !== 1 ? 'ões' : '' }} pendente{{ pendingReviews.length !== 1 ? 's' : '' }}
-          </span>
-        </button>
-        <Avatar class="h-10 w-10">
-          <AvatarImage v-if="userStore.user?.avatar" :src="userStore.user.avatar" :alt="userStore.user.name" />
-          <AvatarFallback class="bg-[#286AD8] text-white text-sm">{{ getInitials(userStore.user?.name || 'F') }}</AvatarFallback>
-        </Avatar>
       </div>
     </div>
 
