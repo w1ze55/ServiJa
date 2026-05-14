@@ -76,7 +76,7 @@ export const uploadFiles = async (files: File[]): Promise<string[]> => {
     formData.append('files', file);
   });
 
-  const response = await api.post<MultipleUploadResponse>('/upload/images', formData, {
+  const response = await api.post<MultipleUploadResponse>('/upload/files', formData, {
     headers: {
       'Content-Type': 'multipart/form-data',
     },
@@ -85,10 +85,15 @@ export const uploadFiles = async (files: File[]): Promise<string[]> => {
   return response.data.urls;
 };
 
+export const deleteFile = async (url: string): Promise<void> => {
+  await deleteImage(url);
+};
+
 export default {
   uploadImage,
   uploadImages,
   uploadFiles,
+  deleteFile,
   deleteImage,
   uploadAvatar,
 };

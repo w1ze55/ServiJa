@@ -28,8 +28,9 @@ import {
   Wallet,
 } from 'lucide-vue-next';
 import { useProposalStore, type Proposal } from '@/stores/proposalStore';
-import reviewService, { type ReviewResponse } from '@/api/services/reviewService';
+import reviewService, { type ReviewResponse, type PendingReview } from '@/api/services/reviewService';
 import walletService, { type WalletBalance, type WalletTransaction } from '@/api/services/walletService';
+import { useUserStore } from '@/stores/userStore';
 import { formatTimeAgoFromApiDate, getApiDateTimestamp } from '@/utils/apiDate';
 import Card from '../ui/card.vue';
 import Badge from '../ui/badge.vue';
@@ -49,8 +50,10 @@ interface Props {
 const props = defineProps<Props>();
 
 let wsConnection: ReturnType<typeof useServiceRequestWebSocket> | null = null;
+const userStore = useUserStore();
 const proposalStore = useProposalStore();
 const reviews = ref<ReviewResponse[]>([]);
+const pendingReviews = ref<PendingReview[]>([]);
 const walletBalance = ref<WalletBalance | null>(null);
 const walletTransactions = ref<WalletTransaction[]>([]);
 const isLoadingReviews = ref(false);
@@ -62,7 +65,7 @@ const getWindowDays = () => {
   switch (selectedPeriod.value) {
     case 'week': return 7;
     case 'year': return 365;
-    default: return 30;
+    default: return 180;
   }
 };
 
@@ -221,12 +224,104 @@ const stats = computed(() => {
   };
 });
 
-// ── Chart: Bar (earnings + proposals per month) ───────────────────
+// ── Period helpers ────────────────────────────────────────────────
+
+const periodWindowStart = computed(() => {
+  const start = new Date();
+  start.setDate(start.getDate() - getWindowDays());
+  return start;
+});
+
+const periodLabel = computed(() => {
+  switch (selectedPeriod.value) {
+    case 'week': return 'últimos 7 dias';
+    case 'year': return 'último ano';
+    default: return 'últimos 6 meses';
+  }
+});
+
+const barChartLabel = computed(() => {
+  switch (selectedPeriod.value) {
+    case 'week': return 'Últimos 7 dias';
+    case 'year': return 'Últimos 12 meses';
+    default: return 'Últimos 6 meses';
+  }
+});
+
+// Proposals filtered by ACTIVITY date (updatedAt) — for active jobs and activities
+const periodProposalsByActivity = computed(() => {
+  const start = periodWindowStart.value;
+  const now = new Date();
+  return proposalStore.proposals.filter((p) => {
+    const date = parseDate(p.updatedAt || p.receivedAt);
+    return date !== null && date >= start && date <= now;
+  });
+});
+
+// Wallet transactions filtered by current period
+const periodTransactions = computed(() => {
+  const start = periodWindowStart.value;
+  const now = new Date();
+  return walletTransactions.value.filter((tx) => {
+    const date = parseDate(tx.date);
+    return date !== null && date >= start && date <= now;
+  });
+});
+
+// ── Chart: Bar (earnings + proposals — adapts to period) ──────────
 
 const barChartData = computed(() => {
   const now = new Date();
-  const months = Array.from({ length: 6 }, (_, i) => {
-    const date = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
+  const hasEarnings = walletTransactions.value.some((t) => t.type === 'EARNING');
+
+  if (selectedPeriod.value === 'week') {
+    const days = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(now);
+      d.setDate(now.getDate() - (6 - i));
+      return {
+        key: d.toISOString().split('T')[0],
+        label: d.toLocaleDateString('pt-BR', { weekday: 'short' }),
+        earnings: 0,
+        proposals: 0,
+      };
+    });
+    const dayMap = new Map(days.map((d) => [d.key, d]));
+
+    walletTransactions.value.forEach((tx) => {
+      if (tx.type !== 'EARNING') return;
+      const date = parseDate(tx.date);
+      if (!date) return;
+      const entry = dayMap.get(date.toISOString().split('T')[0]);
+      if (entry) entry.earnings += tx.amount;
+    });
+    if (!hasEarnings) {
+      proposalStore.proposals.forEach((p) => {
+        if (!['accepted', 'in_progress', 'delivered', 'completed'].includes(p.status)) return;
+        const date = parseDate(p.receivedAt);
+        if (!date) return;
+        const entry = dayMap.get(date.toISOString().split('T')[0]);
+        if (entry) entry.earnings += getProposalAmount(p);
+      });
+    }
+    proposalStore.proposals.forEach((p) => {
+      const date = parseDate(p.receivedAt);
+      if (!date) return;
+      const entry = dayMap.get(date.toISOString().split('T')[0]);
+      if (entry) entry.proposals += 1;
+    });
+
+    return {
+      labels: days.map((d) => d.label),
+      datasets: [
+        { label: 'Receita (R$)', data: days.map((d) => d.earnings), backgroundColor: '#286AD8', borderRadius: 6, borderSkipped: false },
+        { label: 'Propostas', data: days.map((d) => d.proposals), backgroundColor: '#43557466', borderRadius: 6, borderSkipped: false },
+      ],
+    };
+  }
+
+  const monthCount = selectedPeriod.value === 'year' ? 12 : 6;
+  const months = Array.from({ length: monthCount }, (_, i) => {
+    const date = new Date(now.getFullYear(), now.getMonth() - (monthCount - 1 - i), 1);
     return {
       key: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`,
       label: date.toLocaleDateString('pt-BR', { month: 'short' }),
@@ -234,7 +329,6 @@ const barChartData = computed(() => {
       proposals: 0,
     };
   });
-
   const monthMap = new Map(months.map((m) => [m.key, m]));
 
   walletTransactions.value.forEach((tx) => {
@@ -245,19 +339,16 @@ const barChartData = computed(() => {
     const entry = monthMap.get(key);
     if (entry) entry.earnings += tx.amount;
   });
-
-  // Fallback: use proposal budgets when wallet has no transactions
-  if (walletTransactions.value.filter((t) => t.type === 'EARNING').length === 0) {
+  if (!hasEarnings) {
     proposalStore.proposals.forEach((p) => {
+      if (!['accepted', 'in_progress', 'delivered', 'completed'].includes(p.status)) return;
       const date = parseDate(p.receivedAt);
       if (!date) return;
-      if (!['accepted', 'in_progress', 'delivered', 'completed'].includes(p.status)) return;
       const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
       const entry = monthMap.get(key);
       if (entry) entry.earnings += getProposalAmount(p);
     });
   }
-
   proposalStore.proposals.forEach((p) => {
     const date = parseDate(p.receivedAt);
     if (!date) return;
@@ -269,20 +360,8 @@ const barChartData = computed(() => {
   return {
     labels: months.map((m) => m.label),
     datasets: [
-      {
-        label: 'Receita (R$)',
-        data: months.map((m) => m.earnings),
-        backgroundColor: '#286AD8',
-        borderRadius: 6,
-        borderSkipped: false,
-      },
-      {
-        label: 'Propostas',
-        data: months.map((m) => m.proposals),
-        backgroundColor: '#43557466',
-        borderRadius: 6,
-        borderSkipped: false,
-      },
+      { label: 'Receita (R$)', data: months.map((m) => m.earnings), backgroundColor: '#286AD8', borderRadius: 6, borderSkipped: false },
+      { label: 'Propostas', data: months.map((m) => m.proposals), backgroundColor: '#43557466', borderRadius: 6, borderSkipped: false },
     ],
   };
 });
@@ -325,16 +404,16 @@ const doughnutChartData = computed(() => {
   const palette = ['#286AD8', '#435574', '#2B2E33', '#323842'];
   const revenue = new Map<string, number>();
 
-  // Priority: wallet transactions with serviceName (real payments)
-  const earningTxs = walletTransactions.value.filter((tx) => tx.type === 'EARNING' && tx.serviceName);
+  // Priority: period-filtered wallet transactions with serviceName
+  const earningTxs = periodEarnings.value.filter((tx) => tx.serviceName);
   if (earningTxs.length > 0) {
     earningTxs.forEach((tx) => {
       const name = tx.serviceName!;
       revenue.set(name, (revenue.get(name) || 0) + tx.amount);
     });
   } else {
-    // Fallback: proposal amounts grouped by service name
-    proposalStore.proposals
+    // Fallback: proposal amounts within period grouped by service name
+    periodProposals.value
       .filter((p) => ['accepted', 'in_progress', 'delivered', 'completed'].includes(p.status))
       .forEach((p) => {
         const name = p.service || 'Sem serviço';
@@ -343,6 +422,7 @@ const doughnutChartData = computed(() => {
   }
 
   const entries = Array.from(revenue.entries())
+    .filter(([, amount]) => amount > 0)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 5);
 
@@ -384,7 +464,7 @@ const doughnutOptions = {
 // ── Lists ──────────────────────────────────────────────────────────
 
 const recentProposals = computed(() =>
-  proposalStore.proposals
+  periodProposals.value
     .filter((p) => ['pending', 'negotiating'].includes(p.status))
     .sort((a, b) =>
       getApiDateTimestamp(b.updatedAt || b.receivedAt) -
@@ -404,7 +484,7 @@ const recentProposals = computed(() =>
 );
 
 const activeJobs = computed(() =>
-  proposalStore.proposals
+  periodProposalsByActivity.value
     .filter((p) => ['accepted', 'in_progress', 'delivered'].includes(p.status))
     .sort((a, b) =>
       getApiDateTimestamp(b.updatedAt || b.receivedAt) -
@@ -422,33 +502,55 @@ const activeJobs = computed(() =>
     })),
 );
 
-const recentActivities = computed(() =>
-  proposalStore.proposals
+const recentActivities = computed(() => {
+  const proposalItems = periodProposalsByActivity.value
     .slice()
     .sort((a, b) =>
       getApiDateTimestamp(b.updatedAt || b.receivedAt) -
       getApiDateTimestamp(a.updatedAt || a.receivedAt),
     )
-    .slice(0, 6)
+    .slice(0, 5)
     .map((p) => {
       const time = formatTimeAgoFromApiDate(p.updatedAt || p.receivedAt).replace('Atualizado ', '');
+      const sortKey = getApiDateTimestamp(p.updatedAt || p.receivedAt);
       if (p.status === 'completed') {
-        return { id: `${p.id}-c`, icon: CheckCircle, title: 'Serviço concluído', description: `${p.service} foi concluído com sucesso`, time, color: 'text-green-600', bgColor: 'bg-green-100' };
+        return { id: `${p.id}-c`, icon: CheckCircle, title: 'Serviço concluído', description: `${p.service} foi concluído com sucesso`, time, color: 'text-green-600', bgColor: 'bg-green-100', sortKey };
       }
       if (p.status === 'rejected' || p.status === 'archived') {
-        return { id: `${p.id}-a`, icon: AlertCircle, title: 'Solicitação finalizada', description: `${p.service} foi encerrada`, time, color: 'text-red-600', bgColor: 'bg-red-100' };
+        return { id: `${p.id}-a`, icon: AlertCircle, title: 'Solicitação finalizada', description: `${p.service} foi encerrada`, time, color: 'text-red-600', bgColor: 'bg-red-100', sortKey };
       }
       if (['in_progress', 'accepted', 'delivered'].includes(p.status)) {
-        return { id: `${p.id}-p`, icon: MessageSquare, title: 'Serviço em andamento', description: `${p.clientName} - ${p.service}`, time, color: 'text-blue-600', bgColor: 'bg-blue-100' };
+        return { id: `${p.id}-p`, icon: MessageSquare, title: 'Serviço em andamento', description: `${p.clientName} — ${p.service}`, time, color: 'text-blue-600', bgColor: 'bg-blue-100', sortKey };
       }
-      return { id: `${p.id}-n`, icon: FileText, title: 'Nova proposta recebida', description: `${p.clientName} solicitou ${p.service}`, time, color: 'text-purple-600', bgColor: 'bg-purple-100' };
-    }),
-);
+      return { id: `${p.id}-n`, icon: FileText, title: 'Nova proposta recebida', description: `${p.clientName} solicitou ${p.service}`, time, color: 'text-purple-600', bgColor: 'bg-purple-100', sortKey };
+    });
+
+  const start = periodWindowStart.value;
+  const now = new Date();
+  const reviewItems = reviews.value
+    .filter((r) => { const d = parseDate(r.createdAt); return d !== null && d >= start && d <= now; })
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, 3)
+    .map((r) => ({
+      id: `review-${r.id}`,
+      icon: Star,
+      title: 'Nova avaliação recebida',
+      description: `${r.reviewerName} avaliou "${r.serviceName}" com ${r.rating} estrela${r.rating !== 1 ? 's' : ''}`,
+      time: formatTimeAgoFromApiDate(r.createdAt).replace('Atualizado ', ''),
+      color: 'text-yellow-600',
+      bgColor: 'bg-yellow-100',
+      sortKey: new Date(r.createdAt).getTime(),
+    }));
+
+  return [...proposalItems, ...reviewItems]
+    .sort((a, b) => b.sortKey - a.sortKey)
+    .slice(0, 6);
+});
 
 // ── Recent wallet transactions ────────────────────────────────────
 
 const recentTransactions = computed(() =>
-  walletTransactions.value
+  periodTransactions.value
     .slice()
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     .slice(0, 5),
@@ -466,16 +568,10 @@ const formatCurrency = (value: number) =>
 const getInitials = (name: string) =>
   name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2);
 
-const getUserId = () => {
-  try {
-    const user = JSON.parse(localStorage.getItem('user') || '');
-    return user.id ? String(user.id) : null;
-  } catch {
-    return null;
-  }
-};
+const getUserId = () => userStore.user?.id ?? null;
 
 const getUserEmail = () => {
+  if (userStore.user?.email) return userStore.user.email;
   try {
     const payload = JSON.parse(atob(localStorage.getItem('token')!.split('.')[1]));
     return payload.sub || payload.email;
@@ -483,6 +579,11 @@ const getUserEmail = () => {
     return null;
   }
 };
+
+const userFirstName = computed(() => {
+  const name = userStore.user?.name || '';
+  return name.split(' ')[0] || 'Freelancer';
+});
 
 // ── Data loading ──────────────────────────────────────────────────
 
@@ -496,6 +597,14 @@ const loadReviews = async () => {
     reviews.value = [];
   } finally {
     isLoadingReviews.value = false;
+  }
+};
+
+const loadPendingReviews = async () => {
+  try {
+    pendingReviews.value = await reviewService.getPendingReviews();
+  } catch {
+    pendingReviews.value = [];
   }
 };
 
@@ -516,7 +625,7 @@ const loadWalletData = async () => {
 };
 
 const refreshDashboardData = async () => {
-  await Promise.all([proposalStore.loadProposals(), loadReviews(), loadWalletData()]);
+  await Promise.all([proposalStore.loadProposals(), loadReviews(), loadWalletData(), loadPendingReviews()]);
 };
 
 const handleNotification = (event: any) => {
@@ -567,15 +676,17 @@ onUnmounted(() => {
 <template>
   <div class="max-w-7xl mx-auto space-y-6">
     <!-- Header -->
-    <div>
-      <h1 class="text-2xl font-bold text-[#263238] mb-2">Dashboard</h1>
-      <p class="text-[#435574]">Bem-vindo de volta! Aqui está um resumo do seu desempenho.</p>
+    <div class="flex items-start justify-between gap-4">
+      <div>
+        <h1 class="text-2xl font-bold text-[#263238] mb-2">Dashboard</h1>
+        <p class="text-[#435574]">Olá, {{ userFirstName }}! Aqui está um resumo do seu desempenho.</p>
+      </div>
     </div>
 
     <!-- Period Selector -->
     <div class="flex gap-2">
       <Button @click="selectedPeriod = 'week'" :variant="selectedPeriod === 'week' ? 'default' : 'outline'" size="sm">Semana</Button>
-      <Button @click="selectedPeriod = 'month'" :variant="selectedPeriod === 'month' ? 'default' : 'outline'" size="sm">Mês</Button>
+      <Button @click="selectedPeriod = 'month'" :variant="selectedPeriod === 'month' ? 'default' : 'outline'" size="sm">6 Mês</Button>
       <Button @click="selectedPeriod = 'year'" :variant="selectedPeriod === 'year' ? 'default' : 'outline'" size="sm">Ano</Button>
     </div>
 
@@ -667,7 +778,7 @@ onUnmounted(() => {
           <div class="flex items-center justify-between mb-6">
             <div>
               <h3 class="text-[#263238] mb-1">Receita e Propostas</h3>
-              <p class="text-sm text-[#435574]">Últimos 6 meses</p>
+              <p class="text-sm text-[#435574]">{{ barChartLabel }}</p>
             </div>
             <TrendingUp class="h-5 w-5 text-green-600" />
           </div>
@@ -680,9 +791,9 @@ onUnmounted(() => {
         <Card class="p-6">
           <div class="mb-6">
             <h3 class="text-[#263238] mb-1">Faturamento por Serviço</h3>
-            <p class="text-sm text-[#435574]">Receita gerada por cada serviço</p>
+            <p class="text-sm text-[#435574]">Nos {{ periodLabel }}</p>
           </div>
-          <div class="h-[260px] flex items-center justify-center">
+          <div class="relative h-[260px]">
             <Doughnut :data="doughnutChartData" :options="doughnutOptions" />
           </div>
         </Card>
@@ -695,12 +806,12 @@ onUnmounted(() => {
           <div class="flex items-center justify-between mb-6">
             <div>
               <h3 class="text-[#263238] mb-1">Propostas Recentes</h3>
-              <p class="text-sm text-[#435574]">{{ recentProposals.length }} aguardando resposta</p>
+              <p class="text-sm text-[#435574]">{{ recentProposals.length }} aguardando nos {{ periodLabel }}</p>
             </div>
             <Button @click="props.onNavigate('freelancer-proposals')" variant="outline" size="sm">Ver Todas</Button>
           </div>
           <div class="space-y-4">
-            <p v-if="recentProposals.length === 0" class="text-sm text-[#435574]">Nenhuma proposta pendente no momento.</p>
+            <p v-if="recentProposals.length === 0" class="text-sm text-[#435574]">Nenhuma proposta pendente nos {{ periodLabel }}.</p>
             <div
               v-for="proposal in recentProposals"
               :key="proposal.id"
@@ -746,12 +857,12 @@ onUnmounted(() => {
           <div class="flex items-center justify-between mb-6">
             <div>
               <h3 class="text-[#263238] mb-1">Serviços em Andamento</h3>
-              <p class="text-sm text-[#435574]">{{ activeJobs.length }} projeto{{ activeJobs.length !== 1 ? 's' : '' }} ativo{{ activeJobs.length !== 1 ? 's' : '' }}</p>
+              <p class="text-sm text-[#435574]">{{ activeJobs.length }} ativo{{ activeJobs.length !== 1 ? 's' : '' }} nos {{ periodLabel }}</p>
             </div>
             <Button @click="props.onNavigate('freelancer-proposals')" variant="outline" size="sm">Ver Todos</Button>
           </div>
           <div class="space-y-4">
-            <p v-if="activeJobs.length === 0" class="text-sm text-[#435574]">Nenhum serviço ativo encontrado.</p>
+            <p v-if="activeJobs.length === 0" class="text-sm text-[#435574]">Nenhum serviço ativo nos {{ periodLabel }}.</p>
             <div
               v-for="job in activeJobs"
               :key="job.id"
@@ -793,12 +904,12 @@ onUnmounted(() => {
           <div class="flex items-center justify-between mb-6">
             <div>
               <h3 class="text-[#263238] mb-1">Últimas Transações</h3>
-              <p class="text-sm text-[#435574]">Histórico da carteira</p>
+              <p class="text-sm text-[#435574]">Nos {{ periodLabel }}</p>
             </div>
             <Button @click="props.onNavigate('freelancer-wallet')" variant="outline" size="sm">Ver Carteira</Button>
           </div>
           <div class="space-y-3">
-            <p v-if="recentTransactions.length === 0" class="text-sm text-[#435574]">Nenhuma transação registrada ainda.</p>
+            <p v-if="recentTransactions.length === 0" class="text-sm text-[#435574]">Nenhuma transação nos {{ periodLabel }}.</p>
             <div
               v-for="tx in recentTransactions"
               :key="tx.id"
@@ -831,10 +942,10 @@ onUnmounted(() => {
         <Card class="p-6">
           <div class="mb-6">
             <h3 class="text-[#263238] mb-1">Atividades Recentes</h3>
-            <p class="text-sm text-[#435574]">Últimas atualizações das propostas</p>
+            <p class="text-sm text-[#435574]">Nos {{ periodLabel }}</p>
           </div>
           <div class="space-y-4">
-            <p v-if="recentActivities.length === 0" class="text-sm text-[#435574]">Nenhuma atividade recente para exibir.</p>
+            <p v-if="recentActivities.length === 0" class="text-sm text-[#435574]">Nenhuma atividade nos {{ periodLabel }}.</p>
             <div v-for="activity in recentActivities" :key="activity.id" class="flex items-start gap-4">
               <div :class="`w-10 h-10 rounded-full ${activity.bgColor} flex items-center justify-center flex-shrink-0`">
                 <component :is="activity.icon" :class="`h-5 w-5 ${activity.color}`" />

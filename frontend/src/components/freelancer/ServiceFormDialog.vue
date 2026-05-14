@@ -16,6 +16,7 @@ import SelectTrigger from '../ui/select-trigger.vue';
 import SelectValue from '../ui/select-value.vue';
 import Badge from '../ui/badge.vue';
 import ImageUploadField from '../shared/ImageUploadField.vue';
+import SupportRequestModal from '@/components/support/SupportRequestModal.vue';
 import { toast } from '../../utils/toast';
 import { uploadImages, deleteImage } from '../../api/uploadService';
 import { useCategoryCatalogStore } from '@/stores/categoryCatalogStore';
@@ -75,6 +76,7 @@ const errors = ref<Record<string, string>>({});
 const isUploading = ref(false);
 const isDragOver = ref(false);
 const dragCounter = ref(0);
+const showSupportRequestModal = ref(false);
 
 const categories = computed(() => categoryCatalogStore.activePublicCategories);
 const selectedSubcategories = computed(() =>
@@ -338,6 +340,10 @@ const handleClose = () => {
   props.onClose();
 };
 
+const handleOpenSupportModal = () => {
+  showSupportRequestModal.value = true;
+};
+
 const uploadSelectedImages = async (files: File[]) => {
   if (files.length === 0 || isUploading.value) {
     return;
@@ -475,6 +481,13 @@ const handleRemovedImage = async (imageUrl: string) => {
             </SelectContent>
           </Select>
           <p v-if="errors.subcategory" class="text-sm text-red-500">{{ errors.subcategory }}</p>
+          <button
+            type="button"
+            class="text-sm font-medium text-[#286AD8] transition hover:text-[#1f57b3] hover:underline"
+            @click="handleOpenSupportModal"
+          >
+            Não encontrou a categoria desejada? Abra uma solicitação para criação
+          </button>
         </div>
 
         <!-- Descrição -->
@@ -638,4 +651,10 @@ const handleRemovedImage = async (imageUrl: string) => {
       </form>
     </DialogContent>
   </Dialog>
+
+  <SupportRequestModal
+    :open="showSupportRequestModal"
+    :on-close="() => { showSupportRequestModal = false; }"
+    default-category="CATEGORY_SUBCATEGORY_REQUEST"
+  />
 </template>
