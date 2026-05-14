@@ -8,6 +8,10 @@ import {
 } from 'lucide-vue-next';
 import Button from './ui/button.vue';
 import logo from '@/assets/favicon-32x32.png';
+import dashboardSlide1 from '@/assets/dashboard-cliente.png';
+import dashboardSlide2 from '@/assets/explore-freelancer.png';
+import dashboardSlide3 from '@/assets/solicitacao-cliente.png';
+import freelancerSlide1 from '@/assets/my-services.png';
 
 interface Props {
   onLogin: () => void;
@@ -18,6 +22,32 @@ defineProps<Props>();
 
 const isScrolled = ref(false);
 const openFaq = ref(0);
+
+const carouselSlides = [dashboardSlide1, dashboardSlide2, dashboardSlide3];
+const carouselIndex = ref(0);
+let carouselTimer: ReturnType<typeof setInterval> | null = null;
+
+function goToSlide(i: number) {
+  carouselIndex.value = i;
+  if (carouselTimer) clearInterval(carouselTimer);
+  carouselTimer = setInterval(nextSlide, 3500);
+}
+function nextSlide() {
+  carouselIndex.value = (carouselIndex.value + 1) % carouselSlides.length;
+}
+
+const freelancerSlides = [freelancerSlide1];
+const freelancerIndex = ref(0);
+let freelancerTimer: ReturnType<typeof setInterval> | null = null;
+
+function goToFreelancerSlide(i: number) {
+  freelancerIndex.value = i;
+  if (freelancerTimer) clearInterval(freelancerTimer);
+  freelancerTimer = setInterval(nextFreelancerSlide, 3500);
+}
+function nextFreelancerSlide() {
+  freelancerIndex.value = (freelancerIndex.value + 1) % freelancerSlides.length;
+}
 
 const DESKTOP_BREAKPOINT = 836;
 const COLLAPSE_SCROLL_Y = 80;
@@ -46,11 +76,15 @@ onMounted(() => {
   handleScroll();
   window.addEventListener('scroll', handleScroll, { passive: true });
   window.addEventListener('resize', handleScroll, { passive: true });
+  carouselTimer = setInterval(nextSlide, 3500);
+  freelancerTimer = setInterval(nextFreelancerSlide, 4200);
 });
 
 onUnmounted(() => {
   window.removeEventListener('scroll', handleScroll);
   window.removeEventListener('resize', handleScroll);
+  if (carouselTimer) clearInterval(carouselTimer);
+  if (freelancerTimer) clearInterval(freelancerTimer);
 });
 
 const categorias = [
@@ -255,10 +289,20 @@ const faqItems = [
             Quem contrata, contrata <em>com confiança.</em>
           </h3>
           <div class="b-panel-img">
-            <div class="b-placeholder">
-              <div class="b-placeholder-grid"></div>
-              <span>screenshot · tela de busca</span>
+            <div class="b-carousel-track">
+              <Transition name="carousel-fade" mode="out-in">
+                <img :key="carouselIndex" :src="carouselSlides[carouselIndex]" alt="Dashboard do Contratante" class="b-panel-screenshot" />
+              </Transition>
             </div>
+          </div>
+          <div class="b-carousel-dots">
+            <button
+              v-for="(_, i) in carouselSlides"
+              :key="i"
+              class="b-dot"
+              :class="{ active: carouselIndex === i }"
+              @click="goToSlide(i)"
+            />
           </div>
           <ul class="b-panel-list">
             <li v-for="b in beneficiosContratantes" :key="b.title">
@@ -283,10 +327,20 @@ const faqItems = [
             Quem presta, prospera <em>com reputação.</em>
           </h3>
           <div class="b-panel-img">
-            <div class="b-placeholder dark">
-              <div class="b-placeholder-grid"></div>
-              <span>screenshot · perfil do prestador</span>
+            <div class="b-carousel-track">
+              <Transition name="carousel-fade" mode="out-in">
+                <img :key="freelancerIndex" :src="freelancerSlides[freelancerIndex]" alt="Dashboard do Prestador" class="b-panel-screenshot" />
+              </Transition>
             </div>
+          </div>
+          <div class="b-carousel-dots dark">
+            <button
+              v-for="(_, i) in freelancerSlides"
+              :key="i"
+              class="b-dot"
+              :class="{ active: freelancerIndex === i }"
+              @click="goToFreelancerSlide(i)"
+            />
           </div>
           <ul class="b-panel-list">
             <li v-for="b in beneficiosPrestadores" :key="b.title">
@@ -297,7 +351,7 @@ const faqItems = [
               </div>
             </li>
           </ul>
-          <Button variant="secondary" class="b-panel-btn invert" @click="$props.onSignup">
+          <Button variant="ghost" class="b-panel-btn b-panel-btn--freelancer" @click="$props.onSignup">
             Cadastre-se como Prestador <ArrowRight :size="18" />
           </Button>
         </article>
@@ -740,7 +794,8 @@ const faqItems = [
   margin-bottom: 2rem; position: relative;
 }
 .b-panel-dark .b-panel-title em { color: #92b6f0; }
-.b-panel-img { margin-bottom: 2rem; position: relative; border-radius: 1.25rem; overflow: hidden; }
+.b-panel-img { margin-bottom: 2rem; position: relative; border-radius: 1.25rem; overflow: visible; }
+.b-panel-screenshot { width: 100%; height: auto; display: block; border-radius: 1.25rem; box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15); }
 .b-placeholder {
   aspect-ratio: 16/10; position: relative;
   background: #e8eaf0;
@@ -782,14 +837,31 @@ const faqItems = [
 .b-panel-dark  .b-panel-list span { color: rgba(255,255,255,0.65); }
 .b-panel-btn {
   align-self: flex-start;
-  background: #0f172a !important; color: #ffffff !important;
-  font-weight: 600; padding: 0.95rem 1.5rem; border-radius: 0.75rem;
-  display: inline-flex; align-items: center; gap: 0.5rem;
-  transition: all .2s; position: relative;
+  background: #286ad8 !important; color: #ffffff !important;
+  font-weight: 700; padding: 1rem 2rem; border-radius: 0.85rem;
+  font-size: 1rem;
+  display: inline-flex; align-items: center; gap: 0.6rem;
+  transition: all .25s cubic-bezier(0.175, 0.885, 0.32, 1.275); position: relative;
   border: 0; cursor: pointer;
+  box-shadow: 0 6px 20px rgba(40, 106, 216, 0.35);
 }
-.b-panel-btn:hover { transform: translateX(3px); }
-.b-panel-btn.invert { background: #ffffff !important; color: #0a0f1c !important; }
+.b-panel-btn:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 28px rgba(40, 106, 216, 0.45);
+  background: #1e58bc !important;
+}
+.b-panel-btn--freelancer {
+  background: #92b6f0 !important;
+  color: #0a0f1c !important;
+  box-shadow: 0 6px 20px rgba(146, 182, 240, 0.35) !important;
+  border: 0 !important;
+  filter: none !important;
+}
+.b-panel-btn--freelancer:hover {
+  background: #7aa8ec !important;
+  color: #0a0f1c !important;
+  box-shadow: 0 10px 28px rgba(146, 182, 240, 0.5) !important;
+}
 
 /* ===== FAQ ===== */
 .b-faq {
@@ -955,4 +1027,55 @@ const faqItems = [
   .b-final { padding: 5rem 1.5rem; }
   .footer-grid { grid-template-columns: 1fr 1fr; }
 }
+
+/* ===== Carousel track ===== */
+.b-carousel-track {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: 1.25rem;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15);
+}
+.b-carousel-track .b-panel-screenshot {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top;
+}
+
+.carousel-fade-enter-active,
+.carousel-fade-leave-active {
+  transition: opacity 0.45s ease, transform 0.45s ease;
+}
+.carousel-fade-enter-from {
+  opacity: 0;
+  transform: scale(1.03);
+}
+.carousel-fade-leave-to {
+  opacity: 0;
+  transform: scale(0.97);
+}
+
+/* ===== Carousel dots ===== */
+.b-carousel-dots {
+  display: flex; justify-content: center; align-items: center;
+  gap: 0.5rem; margin-bottom: 3rem;
+}
+.b-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: rgba(0, 0, 0, 0.18);
+  border: 0; padding: 0; cursor: pointer;
+  transition: background 0.25s, transform 0.25s;
+}
+.b-dot.active {
+  background: #286ad8;
+  transform: scale(1.35);
+}
+.b-dot:hover:not(.active) { background: rgba(0, 0, 0, 0.35); }
+.b-carousel-dots.dark .b-dot { background: rgba(255, 255, 255, 0.25); }
+.b-carousel-dots.dark .b-dot.active { background: #92b6f0; }
+.b-carousel-dots.dark .b-dot:hover:not(.active) { background: rgba(255, 255, 255, 0.45); }
 </style>
