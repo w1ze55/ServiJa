@@ -31,6 +31,7 @@ public class SupportRequestService {
     private final SupportRequestRepository supportRequestRepository;
     private final UserRepository userRepository;
     private final ObjectMapper objectMapper;
+    private final EmailService emailService;
 
     @Transactional
     public SupportRequestResponse create(String requesterEmail, SupportRequestCreateRequest request) {
@@ -44,7 +45,14 @@ public class SupportRequestService {
                 .status(SupportRequest.Status.PENDING)
                 .build();
 
-        return toResponse(supportRequestRepository.save(supportRequest));
+        SupportRequest savedRequest = supportRequestRepository.save(supportRequest);
+        emailService.sendSupportRequestCreatedEmail(
+                requester.getEmail(),
+                requester.getName(),
+                savedRequest.getId(),
+                savedRequest.getCategory());
+
+        return toResponse(savedRequest);
     }
 
     @Transactional(readOnly = true)
@@ -87,34 +95,28 @@ public class SupportRequestService {
 
     @Transactional
     public SupportRequestResponse approve(Long id, String adminEmail, String responseMessage) {
-        return applyAdminAction(id, adminEmail, SupportRequest.Status.APPROVED, responseMessage, false);
+        return applyAdminAction(id, adminEmail, SupportRequest.Status.APPROVED, responseMessage);
     }
 
     @Transactional
     public SupportRequestResponse reject(Long id, String adminEmail, String responseMessage) {
-        return applyAdminAction(id, adminEmail, SupportRequest.Status.REJECTED, responseMessage, true);
-    }
-
-    @Transactional
-    public SupportRequestResponse reply(Long id, String adminEmail, String responseMessage) {
-        return applyAdminAction(id, adminEmail, SupportRequest.Status.ANSWERED, responseMessage, true);
+        return applyAdminAction(id, adminEmail, SupportRequest.Status.REJECTED, responseMessage);
     }
 
     private SupportRequestResponse applyAdminAction(
             Long id,
             String adminEmail,
             SupportRequest.Status status,
-            String responseMessage,
-            boolean messageRequired) {
+            String responseMessage) {
 
         String normalizedMessage = normalizeResponseMessage(responseMessage);
-        if (messageRequired && normalizedMessage == null) {
+        if (normalizedMessage == null) {
             throw new IllegalArgumentException("A mensagem de resposta e obrigatoria para esta acao");
         }
 
         User admin = getUserByEmail(adminEmail);
         if (admin.getUserType() != User.UserType.ADMIN) {
-            throw new AccessDeniedException("Apenas administradores podem responder solicitacoes de suporte");
+            throw new AccessDeniedException("Apenas administradores podem tratar solicitacoes de suporte");
         }
 
         SupportRequest supportRequest = getSupportRequestById(id);
@@ -123,7 +125,18 @@ public class SupportRequestService {
         supportRequest.setAdminResponse(normalizedMessage);
         supportRequest.setAnsweredAt(LocalDateTime.now());
 
-        return toResponse(supportRequestRepository.save(supportRequest));
+        SupportRequest savedRequest = supportRequestRepository.save(supportRequest);
+        User requester = savedRequest.getRequester();
+        if (requester != null) {
+            emailService.sendSupportRequestDecisionEmail(
+                    requester.getEmail(),
+                    requester.getName(),
+                    savedRequest.getId(),
+                    savedRequest.getStatus(),
+                    normalizedMessage);
+        }
+
+        return toResponse(savedRequest);
     }
 
     private User getUserByEmail(String email) {

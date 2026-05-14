@@ -18,7 +18,6 @@ defineProps<{
 const emit = defineEmits<{
   (e: 'close'): void;
   (e: 'approve'): void;
-  (e: 'reply'): void;
   (e: 'reject'): void;
 }>();
 
@@ -227,13 +226,6 @@ const formatDate = (value?: string | null) => {
           @click="emit('approve')"
         >
           Aprovar
-        </button>
-        <button
-          type="button"
-          class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700"
-          @click="emit('reply')"
-        >
-          Responder
         </button>
         <button
           type="button"

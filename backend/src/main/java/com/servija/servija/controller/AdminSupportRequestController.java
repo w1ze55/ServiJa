@@ -38,10 +38,10 @@ public class AdminSupportRequestController {
     @PatchMapping("/{id}/approve")
     public ResponseEntity<SupportRequestResponse> approve(
             @PathVariable Long id,
-            @Valid @RequestBody(required = false) SupportRequestActionRequest request,
+            @Valid @RequestBody SupportRequestActionRequest request,
             Authentication authentication) {
-        String responseMessage = request != null ? request.getResponseMessage() : null;
-        return ResponseEntity.ok(supportRequestService.approve(id, authentication.getName(), responseMessage));
+        return ResponseEntity.ok(
+                supportRequestService.approve(id, authentication.getName(), request.getResponseMessage()));
     }
 
     @PatchMapping("/{id}/reject")
@@ -51,14 +51,5 @@ public class AdminSupportRequestController {
             Authentication authentication) {
         return ResponseEntity.ok(
                 supportRequestService.reject(id, authentication.getName(), request.getResponseMessage()));
-    }
-
-    @PatchMapping("/{id}/reply")
-    public ResponseEntity<SupportRequestResponse> reply(
-            @PathVariable Long id,
-            @Valid @RequestBody SupportRequestActionRequest request,
-            Authentication authentication) {
-        return ResponseEntity.ok(
-                supportRequestService.reply(id, authentication.getName(), request.getResponseMessage()));
     }
 }

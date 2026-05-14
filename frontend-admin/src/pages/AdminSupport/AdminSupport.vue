@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import {
-  CircleSlash,
+  CheckCircle,
+  Clock,
   Eye,
   Inbox,
-  MessageSquareText,
-  RefreshCw,
   Search,
   ShieldCheck,
+  X,
+  XCircle,
 } from 'lucide-vue-next';
 import AdminLayout from '@/layouts/AdminLayout.vue';
 import { supportService, type SupportRequest } from '@/api/services/supportService';
@@ -18,11 +19,27 @@ import {
   getSupportStatusBadgeClass,
   getSupportStatusLabel,
 } from '@/constants/support';
+import Select from '@/components/ui/select.vue';
+import SelectContent from '@/components/ui/select-content.vue';
+import SelectItem from '@/components/ui/select-item.vue';
+import SelectTrigger from '@/components/ui/select-trigger.vue';
+import SelectValue from '@/components/ui/select-value.vue';
 import { toast } from '@/utils/toast';
 import SupportAdminResponseModal from './SupportAdminResponseModal.vue';
 import SupportRequestDetailsModal from './SupportRequestDetailsModal.vue';
 
-type SupportAdminActionMode = 'approve' | 'reply' | 'reject' | null;
+type SupportAdminActionMode = 'approve' | 'reject' | null;
+type SupportStatusCardKey = 'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED';
+
+const TIME_FILTER_OPTIONS = [
+  { value: 'Hoje', label: 'Hoje' },
+  { value: 'Ontem', label: 'Ontem' },
+  { value: 'Ultimos 7 dias', label: 'Últimos 7 dias' },
+  { value: 'Ultimos 30 dias', label: 'Últimos 30 dias' },
+  { value: 'Mes atual', label: 'Mês atual' },
+  { value: 'Ultimo mes', label: 'Último mês' },
+  { value: 'Intervalo personalizado', label: 'Intervalo personalizado' },
+] as const;
 
 const isLoading = ref(false);
 const isLoadingDetails = ref(false);
@@ -31,6 +48,9 @@ const requests = ref<SupportRequest[]>([]);
 const searchTerm = ref('');
 const statusFilter = ref<'ALL' | (typeof SUPPORT_STATUS_OPTIONS)[number]['value']>('ALL');
 const categoryFilter = ref<'ALL' | (typeof SUPPORT_CATEGORY_OPTIONS)[number]['value']>('ALL');
+const timeFilter = ref('Ultimos 30 dias');
+const customDateFrom = ref('');
+const customDateTo = ref('');
 const isDetailsOpen = ref(false);
 const isResponseModalOpen = ref(false);
 const selectedRequest = ref<SupportRequest | null>(null);
@@ -38,6 +58,7 @@ const currentAction = ref<SupportAdminActionMode>(null);
 
 const loadRequests = async () => {
   isLoading.value = true;
+
   try {
     requests.value = await supportService.getSupportRequests();
   } catch (error) {
@@ -51,17 +72,130 @@ const loadRequests = async () => {
 const summary = computed(() => {
   const pending = requests.value.filter((request) => request.status === 'PENDING').length;
   const approved = requests.value.filter((request) => request.status === 'APPROVED').length;
-  const answered = requests.value.filter((request) => request.status === 'ANSWERED').length;
   const rejected = requests.value.filter((request) => request.status === 'REJECTED').length;
 
   return {
     total: requests.value.length,
     pending,
     approved,
-    answered,
     rejected,
   };
 });
+
+const supportStatusCards = computed(() => [
+  {
+    key: 'ALL' as const,
+    cardLabel: 'Total',
+    count: summary.value.total,
+    cardIconContainerClass: 'bg-slate-100',
+    cardIconClass: 'text-slate-600',
+    icon: Inbox,
+  },
+  {
+    key: 'PENDING' as const,
+    cardLabel: 'Pendentes',
+    count: summary.value.pending,
+    cardIconContainerClass: 'bg-amber-100',
+    cardIconClass: 'text-amber-600',
+    icon: Clock,
+  },
+  {
+    key: 'APPROVED' as const,
+    cardLabel: 'Aprovadas',
+    count: summary.value.approved,
+    cardIconContainerClass: 'bg-emerald-100',
+    cardIconClass: 'text-emerald-600',
+    icon: CheckCircle,
+  },
+  {
+    key: 'REJECTED' as const,
+    cardLabel: 'Recusadas',
+    count: summary.value.rejected,
+    cardIconContainerClass: 'bg-red-100',
+    cardIconClass: 'text-red-600',
+    icon: XCircle,
+  },
+]);
+
+const selectedStatusLabel = computed(() =>
+  statusFilter.value === 'ALL'
+    ? 'Todos os status'
+    : SUPPORT_STATUS_OPTIONS.find((option) => option.value === statusFilter.value)?.label || 'Todos os status'
+);
+
+const selectedCategoryLabel = computed(() =>
+  categoryFilter.value === 'ALL'
+    ? 'Todas as categorias'
+    : SUPPORT_CATEGORY_OPTIONS.find((option) => option.value === categoryFilter.value)?.label || 'Todas as categorias'
+);
+
+const selectedTimeFilterLabel = computed(() =>
+  TIME_FILTER_OPTIONS.find((option) => option.value === timeFilter.value)?.label || 'Últimos 30 dias'
+);
+
+const matchesSelectedTimeFilter = (dateValue: string) => {
+  const requestDate = new Date(dateValue);
+  if (Number.isNaN(requestDate.getTime())) {
+    return false;
+  }
+
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  switch (timeFilter.value) {
+    case 'Hoje':
+      return requestDate >= startOfToday;
+    case 'Ontem': {
+      const startOfYesterday = new Date(startOfToday);
+      startOfYesterday.setDate(startOfYesterday.getDate() - 1);
+      return requestDate >= startOfYesterday && requestDate < startOfToday;
+    }
+    case 'Ultimos 7 dias': {
+      const sevenDaysAgo = new Date(startOfToday);
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      return requestDate >= sevenDaysAgo;
+    }
+    case 'Ultimos 30 dias': {
+      const thirtyDaysAgo = new Date(startOfToday);
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      return requestDate >= thirtyDaysAgo;
+    }
+    case 'Mes atual':
+      return requestDate.getMonth() === now.getMonth() && requestDate.getFullYear() === now.getFullYear();
+    case 'Ultimo mes': {
+      const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+      return requestDate >= lastMonth && requestDate <= endOfLastMonth;
+    }
+    case 'Intervalo personalizado': {
+      const from = customDateFrom.value ? new Date(`${customDateFrom.value}T00:00:00`) : null;
+      const to = customDateTo.value ? new Date(`${customDateTo.value}T23:59:59`) : null;
+
+      if (from && to) return requestDate >= from && requestDate <= to;
+      if (from) return requestDate >= from;
+      if (to) return requestDate <= to;
+      return true;
+    }
+    default:
+      return true;
+  }
+};
+
+const handleStatusFilterChange = (value: string) => {
+  statusFilter.value = value as typeof statusFilter.value;
+};
+
+const handleCategoryFilterChange = (value: string) => {
+  categoryFilter.value = value as typeof categoryFilter.value;
+};
+
+const handleTimeFilterChange = (value: string) => {
+  timeFilter.value = value;
+};
+
+const handleStatusCardClick = (status: SupportStatusCardKey) => {
+  statusFilter.value = status;
+};
 
 const filteredRequests = computed(() => {
   const normalizedSearch = searchTerm.value.trim().toLowerCase();
@@ -69,8 +203,9 @@ const filteredRequests = computed(() => {
   return requests.value.filter((request) => {
     const matchesStatus = statusFilter.value === 'ALL' || request.status === statusFilter.value;
     const matchesCategory = categoryFilter.value === 'ALL' || request.category === categoryFilter.value;
+    const matchesTime = matchesSelectedTimeFilter(request.createdAt);
 
-    if (!matchesStatus || !matchesCategory) {
+    if (!matchesStatus || !matchesCategory || !matchesTime) {
       return false;
     }
 
@@ -109,7 +244,6 @@ const upsertRequest = (updatedRequest: SupportRequest) => {
 const openDetails = async (requestId: number) => {
   isDetailsOpen.value = true;
   isLoadingDetails.value = true;
-
   selectedRequest.value = requests.value.find((request) => request.id === requestId) || null;
 
   try {
@@ -130,14 +264,17 @@ const openActionModal = (mode: SupportAdminActionMode, request: SupportRequest) 
   isResponseModalOpen.value = true;
 };
 
-const closeResponseModal = () => {
-  if (isSubmittingAction.value) return;
-  forceCloseResponseModal();
-};
-
 const forceCloseResponseModal = () => {
   isResponseModalOpen.value = false;
   currentAction.value = null;
+};
+
+const closeResponseModal = () => {
+  if (isSubmittingAction.value) {
+    return;
+  }
+
+  forceCloseResponseModal();
 };
 
 const handleActionSubmit = async (message: string) => {
@@ -151,14 +288,11 @@ const handleActionSubmit = async (message: string) => {
     let updatedRequest: SupportRequest;
 
     if (currentAction.value === 'approve') {
-      updatedRequest = await supportService.approveSupportRequest(selectedRequest.value.id, message || undefined);
+      updatedRequest = await supportService.approveSupportRequest(selectedRequest.value.id, message);
       toast.success('Solicitação aprovada com sucesso.');
-    } else if (currentAction.value === 'reject') {
+    } else {
       updatedRequest = await supportService.rejectSupportRequest(selectedRequest.value.id, message);
       toast.success('Solicitação recusada com sucesso.');
-    } else {
-      updatedRequest = await supportService.replySupportRequest(selectedRequest.value.id, message);
-      toast.success('Resposta enviada com sucesso.');
     }
 
     upsertRequest(updatedRequest);
@@ -176,6 +310,9 @@ const clearFilters = () => {
   searchTerm.value = '';
   statusFilter.value = 'ALL';
   categoryFilter.value = 'ALL';
+  timeFilter.value = 'Ultimos 30 dias';
+  customDateFrom.value = '';
+  customDateTo.value = '';
 };
 
 onMounted(() => {
@@ -190,39 +327,40 @@ onMounted(() => {
         <div>
           <h1 class="text-2xl font-bold text-slate-900">Suporte</h1>
           <p class="mt-1 text-sm text-slate-500">
-            Acompanhe, responda, aprove ou recuse chamados enviados pelos usuários.
+            Acompanhe, visualize, aprove ou recuse chamados enviados pelos usuários.
           </p>
         </div>
-        <button
-          type="button"
-          class="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-          @click="loadRequests"
-        >
-          <RefreshCw class="h-4 w-4" />
-          Atualizar
-        </button>
       </div>
 
-      <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-        <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <p class="text-sm text-slate-500">Total</p>
-          <p class="mt-2 text-2xl font-semibold text-slate-900">{{ summary.total }}</p>
-        </div>
-        <div class="rounded-xl border border-amber-100 bg-amber-50/70 p-4 shadow-sm">
-          <p class="text-sm text-amber-700">Pendentes</p>
-          <p class="mt-2 text-2xl font-semibold text-amber-800">{{ summary.pending }}</p>
-        </div>
-        <div class="rounded-xl border border-emerald-100 bg-emerald-50/70 p-4 shadow-sm">
-          <p class="text-sm text-emerald-700">Aprovadas</p>
-          <p class="mt-2 text-2xl font-semibold text-emerald-800">{{ summary.approved }}</p>
-        </div>
-        <div class="rounded-xl border border-blue-100 bg-blue-50/70 p-4 shadow-sm">
-          <p class="text-sm text-blue-700">Respondidas</p>
-          <p class="mt-2 text-2xl font-semibold text-blue-800">{{ summary.answered }}</p>
-        </div>
-        <div class="rounded-xl border border-red-100 bg-red-50/70 p-4 shadow-sm">
-          <p class="text-sm text-red-700">Recusadas</p>
-          <p class="mt-2 text-2xl font-semibold text-red-800">{{ summary.rejected }}</p>
+      <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div
+          v-for="statusCard in supportStatusCards"
+          :key="statusCard.key"
+          :class="[
+            'cursor-pointer rounded-xl border bg-white p-4 shadow-sm transition-shadow hover:shadow-md',
+            statusFilter === statusCard.key
+              ? 'border-blue-200 ring-2 ring-blue-100'
+              : 'border-slate-200',
+          ]"
+          @click="handleStatusCardClick(statusCard.key)"
+        >
+          <div class="flex items-center gap-3">
+            <div
+              :class="[
+                'flex h-10 w-10 items-center justify-center rounded-full',
+                statusCard.cardIconContainerClass,
+              ]"
+            >
+              <component
+                :is="statusCard.icon"
+                :class="['h-5 w-5', statusCard.cardIconClass]"
+              />
+            </div>
+            <div>
+              <p class="text-sm text-[#435574]">{{ statusCard.cardLabel }}</p>
+              <p class="text-xl font-bold text-[#263238]">{{ statusCard.count }}</p>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -238,37 +376,102 @@ onMounted(() => {
             />
           </div>
 
-          <select
-            v-model="statusFilter"
-            class="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+          <Select
+            :model-value="statusFilter"
+            @update:model-value="handleStatusFilterChange"
           >
-            <option value="ALL">Todos os status</option>
-            <option v-for="status in SUPPORT_STATUS_OPTIONS" :key="status.value" :value="status.value">
-              {{ status.label }}
-            </option>
-          </select>
+            <SelectTrigger class="min-w-[180px]">
+              <SelectValue
+                :label="selectedStatusLabel"
+                placeholder="Todos os status"
+              />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">Todos os status</SelectItem>
+              <SelectItem
+                v-for="status in SUPPORT_STATUS_OPTIONS"
+                :key="status.value"
+                :value="status.value"
+              >
+                {{ status.label }}
+              </SelectItem>
+            </SelectContent>
+          </Select>
 
-          <select
-            v-model="categoryFilter"
-            class="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+          <Select
+            :model-value="categoryFilter"
+            @update:model-value="handleCategoryFilterChange"
           >
-            <option value="ALL">Todas as categorias</option>
-            <option
-              v-for="category in SUPPORT_CATEGORY_OPTIONS"
-              :key="category.value"
-              :value="category.value"
-            >
-              {{ category.label }}
-            </option>
-          </select>
+            <SelectTrigger class="min-w-[220px]">
+              <SelectValue
+                :label="selectedCategoryLabel"
+                placeholder="Todas as categorias"
+              />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">Todas as categorias</SelectItem>
+              <SelectItem
+                v-for="category in SUPPORT_CATEGORY_OPTIONS"
+                :key="category.value"
+                :value="category.value"
+              >
+                {{ category.label }}
+              </SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select
+            :model-value="timeFilter"
+            @update:model-value="handleTimeFilterChange"
+          >
+            <SelectTrigger class="min-w-[220px]">
+              <SelectValue
+                :label="selectedTimeFilterLabel"
+                placeholder="Últimos 30 dias"
+              />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem
+                v-for="timeOption in TIME_FILTER_OPTIONS"
+                :key="timeOption.value"
+                :value="timeOption.value"
+              >
+                {{ timeOption.label }}
+              </SelectItem>
+            </SelectContent>
+          </Select>
 
           <button
             type="button"
-            class="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+            class="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-600 transition hover:bg-slate-50"
             @click="clearFilters"
           >
+            <X class="h-4 w-4" />
             Limpar filtros
           </button>
+        </div>
+
+        <div
+          v-if="timeFilter === 'Intervalo personalizado'"
+          class="mt-4 grid grid-cols-1 gap-4 border-t border-slate-200 pt-4 md:grid-cols-2"
+        >
+          <div class="space-y-1">
+            <label class="text-sm font-medium text-slate-700">De</label>
+            <input
+              v-model="customDateFrom"
+              type="date"
+              class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+            />
+          </div>
+
+          <div class="space-y-1">
+            <label class="text-sm font-medium text-slate-700">Até</label>
+            <input
+              v-model="customDateTo"
+              type="date"
+              class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+            />
+          </div>
         </div>
       </div>
 
@@ -297,7 +500,6 @@ onMounted(() => {
           <table class="min-w-full divide-y divide-slate-100">
             <thead class="bg-slate-50">
               <tr>
-                <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Solicitação</th>
                 <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Usuário</th>
                 <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Categoria</th>
                 <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Status</th>
@@ -311,10 +513,6 @@ onMounted(() => {
                 :key="request.id"
                 class="transition hover:bg-slate-50"
               >
-                <td class="px-6 py-4">
-                  <p class="text-sm font-medium text-slate-900">#{{ request.id }}</p>
-                  <p class="text-xs text-slate-500">Usuário #{{ request.userId }}</p>
-                </td>
                 <td class="px-4 py-4">
                   <p class="text-sm font-medium text-slate-900">{{ request.userName }}</p>
                   <p class="text-xs text-slate-500">{{ request.userEmail }}</p>
@@ -354,18 +552,10 @@ onMounted(() => {
                     </button>
                     <button
                       type="button"
-                      class="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 px-3 py-1.5 text-xs font-medium text-blue-700 transition hover:bg-blue-50"
-                      @click="openActionModal('reply', request)"
-                    >
-                      <MessageSquareText class="h-3.5 w-3.5" />
-                      Responder
-                    </button>
-                    <button
-                      type="button"
                       class="inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-700 transition hover:bg-red-50"
                       @click="openActionModal('reject', request)"
                     >
-                      <CircleSlash class="h-3.5 w-3.5" />
+                      <XCircle class="h-3.5 w-3.5" />
                       Recusar
                     </button>
                   </div>
@@ -419,18 +609,10 @@ onMounted(() => {
               </button>
               <button
                 type="button"
-                class="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 px-3 py-1.5 text-xs font-medium text-blue-700 transition hover:bg-blue-50"
-                @click="openActionModal('reply', request)"
-              >
-                <MessageSquareText class="h-3.5 w-3.5" />
-                Responder
-              </button>
-              <button
-                type="button"
                 class="inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-700 transition hover:bg-red-50"
                 @click="openActionModal('reject', request)"
               >
-                <CircleSlash class="h-3.5 w-3.5" />
+                <XCircle class="h-3.5 w-3.5" />
                 Recusar
               </button>
             </div>
@@ -445,7 +627,6 @@ onMounted(() => {
       :is-loading="isLoadingDetails"
       @close="isDetailsOpen = false"
       @approve="selectedRequest && openActionModal('approve', selectedRequest)"
-      @reply="selectedRequest && openActionModal('reply', selectedRequest)"
       @reject="selectedRequest && openActionModal('reject', selectedRequest)"
     />
 
