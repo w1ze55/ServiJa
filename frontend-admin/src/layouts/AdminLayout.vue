@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { FolderTree, LogOut, Shield, Users } from 'lucide-vue-next'
+import { FolderTree, LifeBuoy, LogOut, Shield, Users } from 'lucide-vue-next'
 import { useUserStore } from '@/stores/userStore'
 
 const router = useRouter()
@@ -12,6 +12,7 @@ const currentUser = computed(() => userStore.user)
 
 const isCategoriesActive = computed(() => route.path.startsWith('/categories'))
 const isUsersActive = computed(() => route.path.startsWith('/users'))
+const isSupportActive = computed(() => route.path.startsWith('/support'))
 
 const logout = () => {
   userStore.clearUser()
@@ -62,6 +63,19 @@ const logout = () => {
         >
           <Users class="h-4 w-4" />
           Usuários
+        </button>
+        <button
+          :class="[
+            'flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-medium transition-colors',
+            isSupportActive
+              ? 'bg-white/20 text-white'
+              : 'text-white/70 hover:bg-white/10 hover:text-white',
+          ]"
+          type="button"
+          @click="router.push('/support')"
+        >
+          <LifeBuoy class="h-4 w-4" />
+          Suporte
         </button>
       </nav>
 

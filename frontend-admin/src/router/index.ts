@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import AdminLoginPage from '@/pages/AdminLogin/index.vue'
 import AdminUsersPage from '@/pages/AdminUsers/index.vue'
 import AdminCategoriesPage from '@/pages/AdminCategories/index.vue'
+import AdminSupportPage from '@/pages/AdminSupport/index.vue'
 import NotFoundPage from '@/pages/NotFound/index.vue'
 
 const routes = [
@@ -25,6 +26,12 @@ const routes = [
     path: '/categories',
     name: 'admin-categories',
     component: AdminCategoriesPage,
+    meta: { requiresAuth: true, userType: 'admin' },
+  },
+  {
+    path: '/support',
+    name: 'admin-support',
+    component: AdminSupportPage,
     meta: { requiresAuth: true, userType: 'admin' },
   },
   {
