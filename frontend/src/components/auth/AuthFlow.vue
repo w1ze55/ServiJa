@@ -45,12 +45,6 @@ import { useUserStore } from '@/stores/userStore'
 
 const userStore = useUserStore()
 
-function clearImpersonationStorage() {
-  localStorage.removeItem('adminToken')
-  localStorage.removeItem('adminUser')
-  localStorage.removeItem('impersonatedUserName')
-}
-
 async function handleLogin(email: string, password: string) {
   try {
     const response = await api.post('/auth/login', { email, password })
@@ -78,11 +72,9 @@ async function handleLogin(email: string, password: string) {
       avatar: userData.user?.avatarUrl || undefined,
     }
 
-    clearImpersonationStorage()
-
     // Atualizar store global
     userStore.setUser(user)
-    
+
     props.onLogin(user)
   } catch (error: any) {
     const errorMessage = error.response?.data?.message || 
@@ -130,11 +122,9 @@ function handleEmailVerified(token: string, userData: any) {
     avatar: userData.avatarUrl || undefined,
   }
 
-  clearImpersonationStorage()
-
   // Atualizar store global
   userStore.setUser(user)
-  
+
   props.onLogin(user)
 }
 

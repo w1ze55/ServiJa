@@ -6,7 +6,6 @@ import com.servija.servija.dto.AdminUserKycRequest;
 import com.servija.servija.dto.AdminUserPageResponse;
 import com.servija.servija.dto.AdminUserStatusRequest;
 import com.servija.servija.dto.AdminUserSummaryDto;
-import com.servija.servija.dto.ImpersonateResponse;
 import com.servija.servija.model.User;
 import com.servija.servija.service.AdminUserService;
 import lombok.RequiredArgsConstructor;
@@ -98,12 +97,4 @@ public class AdminUserController {
         return ResponseEntity.ok(adminUserService.updateKycStatus(id, request));
     }
 
-    @PostMapping("/users/{id}/impersonate")
-    public ResponseEntity<ImpersonateResponse> impersonate(
-            @PathVariable Long id,
-            Authentication authentication) {
-
-        String adminEmail = authentication.getName();
-        return ResponseEntity.ok(adminUserService.impersonate(id, adminEmail));
-    }
 }

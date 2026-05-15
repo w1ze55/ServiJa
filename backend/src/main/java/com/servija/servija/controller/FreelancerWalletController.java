@@ -50,7 +50,6 @@ public class FreelancerWalletController {
     private final WalletReportService reportService;
 
     @GetMapping
-    @PreAuthorize("!hasAuthority('IMPERSONATION_SESSION')")
     @Operation(summary = "Obter saldo da carteira")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<FreelancerWalletResponse> getWallet(Authentication authentication) {
@@ -71,7 +70,6 @@ public class FreelancerWalletController {
     }
 
     @GetMapping("/transactions")
-    @PreAuthorize("!hasAuthority('IMPERSONATION_SESSION')")
     @Operation(summary = "Listar transacoes", description = "Lista historico de recebimentos e saques")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<List<WalletTransactionResponse>> getTransactions(
@@ -84,7 +82,6 @@ public class FreelancerWalletController {
     }
 
     @PostMapping("/withdraw")
-    @PreAuthorize("!hasAuthority('IMPERSONATION_SESSION')")
     @Operation(summary = "Solicitar saque")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<WithdrawalResponse> requestWithdrawal(
@@ -107,7 +104,6 @@ public class FreelancerWalletController {
     }
 
     @GetMapping("/withdrawals")
-    @PreAuthorize("!hasAuthority('IMPERSONATION_SESSION')")
     @Operation(summary = "Listar saques")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<List<WithdrawalResponse>> getMyWithdrawals(Authentication authentication) {
@@ -122,7 +118,6 @@ public class FreelancerWalletController {
     }
 
     @DeleteMapping("/withdrawals/{id}")
-    @PreAuthorize("!hasAuthority('IMPERSONATION_SESSION')")
     @Operation(summary = "Cancelar saque")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<Void> cancelWithdrawal(
@@ -135,7 +130,6 @@ public class FreelancerWalletController {
     }
 
     @GetMapping("/bank-accounts")
-    @PreAuthorize("!hasAuthority('IMPERSONATION_SESSION')")
     @Operation(summary = "Listar contas bancarias")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<List<BankAccountResponse>> getBankAccounts(Authentication authentication) {
@@ -144,7 +138,6 @@ public class FreelancerWalletController {
     }
 
     @PostMapping("/bank-accounts")
-    @PreAuthorize("!hasAuthority('IMPERSONATION_SESSION')")
     @Operation(summary = "Cadastrar conta bancaria ou chave PIX")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<BankAccountResponse> addBankAccount(
@@ -157,7 +150,6 @@ public class FreelancerWalletController {
     }
 
     @DeleteMapping("/bank-accounts/{id}")
-    @PreAuthorize("!hasAuthority('IMPERSONATION_SESSION')")
     @Operation(summary = "Remover conta bancaria")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<Void> deleteBankAccount(
@@ -170,7 +162,6 @@ public class FreelancerWalletController {
     }
 
     @PutMapping("/bank-accounts/{id}/default")
-    @PreAuthorize("!hasAuthority('IMPERSONATION_SESSION')")
     @Operation(summary = "Definir conta padrao")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<BankAccountResponse> setDefaultAccount(
@@ -182,7 +173,6 @@ public class FreelancerWalletController {
     }
 
     @GetMapping("/report")
-    @PreAuthorize("!hasAuthority('IMPERSONATION_SESSION')")
     @Operation(summary = "Baixar relatorio da carteira em PDF ou Excel")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<byte[]> downloadReport(

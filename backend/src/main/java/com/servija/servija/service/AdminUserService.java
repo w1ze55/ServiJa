@@ -7,7 +7,6 @@ import com.servija.servija.dto.AdminUserKycRequest;
 import com.servija.servija.dto.AdminUserPageResponse;
 import com.servija.servija.dto.AdminUserStatusRequest;
 import com.servija.servija.dto.AdminUserSummaryDto;
-import com.servija.servija.dto.ImpersonateResponse;
 import com.servija.servija.exception.ResourceNotFoundException;
 import com.servija.servija.model.Contractor;
 import com.servija.servija.model.Freelancer;
@@ -186,28 +185,6 @@ public class AdminUserService {
         freelancer.setKycCompleted(request.getApproved());
         Freelancer saved = freelancerRepository.save(freelancer);
         return toDetailDto(saved);
-    }
-
-    public ImpersonateResponse impersonate(Long id, String adminEmail) {
-        User target = userRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
-
-        if (target.getUserType() == User.UserType.ADMIN) {
-            throw new org.springframework.security.access.AccessDeniedException(
-                    "Não é possível impersonar um administrador");
-        }
-
-        User admin = userRepository.findByEmail(adminEmail)
-                .orElseThrow(() -> new ResourceNotFoundException("Admin não encontrado"));
-
-        UserDetails targetDetails = userDetailsService.loadUserByUsername(target.getEmail());
-        String token = jwtService.generateImpersonationToken(targetDetails, admin.getId());
-        LocalDateTime expiresAt = LocalDateTime.now().plusMinutes(30);
-
-        return ImpersonateResponse.builder()
-                .token(token)
-                .expiresAt(expiresAt)
-                .build();
     }
 
     private void validateEditRequest(AdminUserEditRequest request, User existing) {

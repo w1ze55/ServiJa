@@ -2,7 +2,7 @@
 import { ref, computed } from 'vue';
 import {
   X, Star, Lock, Unlock, Edit2, KeyRound, CheckCircle,
-  XCircle, Trash2, UserCheck, AlertTriangle, Phone, Mail,
+  XCircle, Trash2, AlertTriangle, Phone, Mail,
   CreditCard, Calendar, Briefcase, ShieldCheck, ShieldX,
   Package,
 } from 'lucide-vue-next';
@@ -10,9 +10,6 @@ import { adminUserService, type AdminUserDetail } from '@/api/services/adminUser
 import { toast } from '@/utils/toast';
 import EditUserModal from './EditUserModal.vue';
 import DeleteUserModal from './DeleteUserModal.vue';
-import { useRouter } from 'vue-router';
-import { useUserStore } from '@/stores/userStore';
-
 const props = defineProps<{
   user: AdminUserDetail | null;
   open: boolean;
@@ -23,22 +20,10 @@ const emit = defineEmits<{
   (e: 'refresh'): void;
 }>();
 
-const router = useRouter();
-const userStore = useUserStore();
-
-const userTypeToStoreType = (userType: string): 'provider' | 'contractor' => {
-  return userType === 'FREELANCER' ? 'provider' : 'contractor';
-};
-
-const userTypeToDashboard = (userType: string): string => {
-  return userType === 'FREELANCER' ? '/freelancer-dashboard' : '/cliente-dashboard';
-};
-
 // Dialog states
 const showBlockConfirm = ref(false);
 const showResetPasswordConfirm = ref(false);
 const showKycConfirm = ref(false);
-const showImpersonateConfirm = ref(false);
 const showEditModal = ref(false);
 const showDeleteModal = ref(false);
 
@@ -140,44 +125,6 @@ const handleKycToggle = async () => {
   }
 };
 
-const handleImpersonate = async () => {
-  if (!props.user) return;
-  isSubmitting.value = true;
-  try {
-    const result = await adminUserService.impersonateUser(props.user.id);
-
-    // Salva token e dados do admin para restaurar ao sair
-    const currentToken = localStorage.getItem('token');
-    const currentUser = localStorage.getItem('user');
-    if (currentToken) localStorage.setItem('adminToken', currentToken);
-    if (currentUser) localStorage.setItem('adminUser', currentUser);
-
-    // Troca token pelo token de impersonação
-    localStorage.setItem('token', result.token);
-    localStorage.setItem('impersonatedUserName', props.user.name);
-
-    // Atualiza localStorage.user e o store com os dados do usuário impersonado
-    const impersonatedUser = {
-      id: String(props.user.id),
-      name: props.user.name,
-      email: props.user.email,
-      type: userTypeToStoreType(props.user.userType),
-      avatar: props.user.avatarUrl ?? undefined,
-    };
-    userStore.setUser(impersonatedUser);
-
-    showImpersonateConfirm.value = false;
-    toast.success(`Acessando plataforma como ${props.user.name}`);
-    emit('close');
-
-    // Redireciona direto para o dashboard correto, sem passar pelo /dashboard
-    router.push(userTypeToDashboard(props.user.userType));
-  } catch {
-    toast.error('Erro ao iniciar impersonação.');
-  } finally {
-    isSubmitting.value = false;
-  }
-};
 </script>
 
 <template>
@@ -450,15 +397,6 @@ const handleImpersonate = async () => {
                 {{ user.kycCompleted ? 'Revogar KYC' : 'Aprovar KYC' }}
               </button>
 
-              <!-- Impersonate -->
-              <button
-                class="flex items-center justify-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-100"
-                @click="showImpersonateConfirm = true"
-              >
-                <UserCheck class="h-4 w-4" />
-                Acessar como
-              </button>
-
               <!-- Delete -->
               <button
                 class="flex items-center justify-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700 transition hover:bg-red-100"
@@ -583,48 +521,6 @@ const handleImpersonate = async () => {
             @click="handleKycToggle"
           >
             {{ isSubmitting ? 'Aguarde...' : (user?.kycCompleted ? 'Revogar' : 'Aprovar') }}
-          </button>
-        </div>
-      </div>
-    </div>
-  </Transition>
-
-  <!-- Impersonate Confirmation -->
-  <Transition name="modal">
-    <div v-if="showImpersonateConfirm" class="fixed inset-0 z-[60] flex items-center justify-center p-4">
-      <div class="absolute inset-0 bg-black/40" @click="showImpersonateConfirm = false" />
-      <div class="relative w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
-        <div class="mb-4 flex items-center gap-3">
-          <div class="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100">
-            <UserCheck class="h-5 w-5 text-blue-600" />
-          </div>
-          <h3 class="text-base font-semibold text-slate-900">Acessar como usuário</h3>
-        </div>
-        <div class="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3">
-          <div class="flex items-start gap-2">
-            <AlertTriangle class="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-            <p class="text-xs text-amber-700">
-              Esta ação será registrada nos logs de auditoria do sistema.
-            </p>
-          </div>
-        </div>
-        <p class="mb-6 text-sm text-slate-600">
-          Você está prestes a acessar a plataforma como <strong>{{ user?.name }}</strong>.
-        </p>
-        <div class="flex gap-3">
-          <button
-            class="flex-1 rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-            :disabled="isSubmitting"
-            @click="showImpersonateConfirm = false"
-          >
-            Cancelar
-          </button>
-          <button
-            class="flex-1 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700 disabled:opacity-60"
-            :disabled="isSubmitting"
-            @click="handleImpersonate"
-          >
-            {{ isSubmitting ? 'Aguarde...' : 'Continuar' }}
           </button>
         </div>
       </div>

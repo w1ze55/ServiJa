@@ -119,8 +119,4 @@ export const adminUserService = {
     return response.data;
   },
 
-  async impersonateUser(id: number): Promise<{ token: string; expiresAt: string }> {
-    const response = await api.post<{ token: string; expiresAt: string }>(`/admin/users/${id}/impersonate`);
-    return response.data;
-  },
 };
