@@ -23,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -41,6 +42,7 @@ public class AuthService {
     private final AuthenticationManager authenticationManager;
     private final CustomUserDetailsService userDetailsService;
     private final EmailService emailService;
+    private final AuditLogger auditLogger;
 
     @Transactional
     public AuthResponse register(RegisterRequest request) {
@@ -75,28 +77,70 @@ public class AuthService {
         UserDetails userDetails = userDetailsService.loadUserByUsername(user.getEmail());
         String token = jwtService.generateToken(userDetails);
 
+        auditLogger.recordFor(
+                user,
+                "USER_REGISTERED",
+                "USER",
+                "#USR-" + user.getId(),
+                user.getName(),
+                com.servija.servija.model.AuditLog.Result.SUCCESS,
+                Map.of("userType", user.getUserType()));
+
         return buildAuthResponse(user, token);
     }
 
     public AuthResponse login(LoginRequest request) {
-        authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword()));
+        try {
+            authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword()));
 
-        User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new ResourceNotFoundException("Usuario nao encontrado"));
+            User user = userRepository.findByEmail(request.getEmail())
+                    .orElseThrow(() -> new ResourceNotFoundException("Usuario nao encontrado"));
 
-        if (user.getUserType() == User.UserType.ADMIN) {
-            throw new InvalidCredentialsException("Credenciais invalidas");
+            if (user.getUserType() == User.UserType.ADMIN) {
+                throw new InvalidCredentialsException("Credenciais invalidas");
+            }
+
+            if (!user.getActive()) {
+                throw new InvalidCredentialsException("Conta suspensa");
+            }
+
+            UserDetails userDetails = userDetailsService.loadUserByUsername(user.getEmail());
+            String token = jwtService.generateToken(userDetails);
+
+            auditLogger.recordFor(
+                    user,
+                    "LOGIN",
+                    "AUTH",
+                    null,
+                    user.getEmail(),
+                    com.servija.servija.model.AuditLog.Result.SUCCESS,
+                    Map.of("method", "password"));
+
+            return buildAuthResponse(user, token);
+        } catch (Exception e) {
+            User attempted = userRepository.findByEmail(request.getEmail()).orElse(null);
+            if (attempted != null && attempted.getUserType() != User.UserType.ADMIN) {
+                auditLogger.recordFor(
+                        attempted,
+                        "LOGIN_FAILED",
+                        "AUTH",
+                        null,
+                        attempted.getEmail(),
+                        com.servija.servija.model.AuditLog.Result.FAILURE,
+                        Map.of("reason", e.getClass().getSimpleName()));
+            } else if (attempted == null) {
+                auditLogger.recordGuest(
+                        request.getEmail(),
+                        "LOGIN_FAILED",
+                        "AUTH",
+                        null,
+                        request.getEmail(),
+                        com.servija.servija.model.AuditLog.Result.FAILURE,
+                        Map.of("reason", "USER_NOT_FOUND"));
+            }
+            throw e;
         }
-
-        if (!user.getActive()) {
-            throw new InvalidCredentialsException("Conta suspensa");
-        }
-
-        UserDetails userDetails = userDetailsService.loadUserByUsername(user.getEmail());
-        String token = jwtService.generateToken(userDetails);
-
-        return buildAuthResponse(user, token);
     }
 
     public AuthResponse loginAdmin(LoginRequest request) {

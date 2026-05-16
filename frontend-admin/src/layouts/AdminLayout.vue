@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { FolderTree, Headset, LogOut, Shield, Users } from 'lucide-vue-next'
+import { FolderTree, Headset, LogOut, ScrollText, Shield, Users } from 'lucide-vue-next'
 import { useUserStore } from '@/stores/userStore'
 
 const router = useRouter()
@@ -13,6 +13,7 @@ const currentUser = computed(() => userStore.user)
 const isCategoriesActive = computed(() => route.path.startsWith('/categories'))
 const isUsersActive = computed(() => route.path.startsWith('/users'))
 const isSupportActive = computed(() => route.path.startsWith('/support'))
+const isAuditLogsActive = computed(() => route.path.startsWith('/audit-logs'))
 
 const logout = () => {
   userStore.clearUser()
@@ -76,6 +77,19 @@ const logout = () => {
         >
           <Headset class="h-5 w-5" />
           Suporte
+        </button>
+        <button
+          :class="[
+            'flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-base font-medium transition-colors',
+            isAuditLogsActive
+              ? 'bg-white/20 text-white'
+              : 'text-white/70 hover:bg-white/10 hover:text-white',
+          ]"
+          type="button"
+          @click="router.push('/audit-logs')"
+        >
+          <ScrollText class="h-5 w-5" />
+          Logs de auditoria
         </button>
       </nav>
 
