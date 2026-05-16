@@ -52,6 +52,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                 UserDetails userDetails = this.userDetailsService.loadUserByUsername(userEmail);
 
+                if (!userDetails.isEnabled()) {
+                    handleBlockedAccount(response);
+                    return;
+                }
+
                 if (jwtService.isTokenValid(jwt, userDetails)) {
                     UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
                             userDetails,
@@ -75,6 +80,23 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    private void handleBlockedAccount(HttpServletResponse response) throws IOException {
+        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        response.setContentType("application/json");
+        response.setCharacterEncoding("UTF-8");
+
+        Map<String, Object> errorDetails = new HashMap<>();
+        errorDetails.put("timestamp", LocalDateTime.now().toString());
+        errorDetails.put("status", 401);
+        errorDetails.put("error", "Unauthorized");
+        errorDetails.put("message", "Sua conta foi bloqueada. Caso tenha dúvidas, entre em contato com o suporte.");
+        errorDetails.put("expired", false);
+        errorDetails.put("blocked", true);
+        errorDetails.put("path", "");
+
+        response.getWriter().write(objectMapper.writeValueAsString(errorDetails));
     }
 
     private void handleExpiredToken(HttpServletResponse response) throws IOException {
