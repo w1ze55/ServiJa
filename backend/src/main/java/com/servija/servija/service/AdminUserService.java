@@ -11,9 +11,11 @@ import com.servija.servija.exception.ResourceNotFoundException;
 import com.servija.servija.model.Contractor;
 import com.servija.servija.model.Freelancer;
 import com.servija.servija.model.User;
+import com.servija.servija.model.ServiceRequest;
 import com.servija.servija.repository.FreelancerRepository;
 import com.servija.servija.repository.ReviewRepository;
 import com.servija.servija.repository.ServiceRepository;
+import com.servija.servija.repository.ServiceRequestRepository;
 import com.servija.servija.repository.UserRepository;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
@@ -45,6 +47,7 @@ public class AdminUserService {
     private final UserRepository userRepository;
     private final FreelancerRepository freelancerRepository;
     private final ServiceRepository serviceRepository;
+    private final ServiceRequestRepository serviceRequestRepository;
     private final ReviewRepository reviewRepository;
     private final EmailService emailService;
     private final JwtService jwtService;
@@ -321,12 +324,17 @@ public class AdminUserService {
                 .deletedAt(user.getDeletedAt());
 
         if (user instanceof Freelancer f) {
+            Double freelancerAvgRating = reviewRepository.findAverageRatingByReviewedId(f.getId());
+            long freelancerReviewCount = reviewRepository.countByReviewedId(f.getId());
+            long completedCount = serviceRequestRepository.countByFreelancerIdAndStatus(f.getId(), ServiceRequest.Status.COMPLETED);
+            long activeCount = serviceRequestRepository.countByFreelancerIdAndStatusIn(f.getId(),
+                    List.of(ServiceRequest.Status.ACCEPTED, ServiceRequest.Status.IN_PROGRESS, ServiceRequest.Status.DELIVERED));
             builder.bio(f.getBio())
                     .professionalTitle(f.getProfessionalTitle())
-                    .rating(f.getRating())
-                    .totalReviews(f.getTotalReviews())
-                    .completedJobs(f.getCompletedJobs())
-                    .activeJobs(f.getActiveJobs())
+                    .rating(freelancerAvgRating != null ? java.math.BigDecimal.valueOf(freelancerAvgRating) : null)
+                    .totalReviews((int) freelancerReviewCount)
+                    .completedJobs((int) completedCount)
+                    .activeJobs((int) activeCount)
                     .kycCompleted(f.getKycCompleted())
                     .profileCompleted(f.getProfileCompleted())
                     .category(f.getCategory())
