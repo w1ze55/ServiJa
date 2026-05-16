@@ -11,9 +11,12 @@ import com.servija.servija.exception.ResourceNotFoundException;
 import com.servija.servija.model.Contractor;
 import com.servija.servija.model.Freelancer;
 import com.servija.servija.model.User;
+import com.servija.servija.model.ServiceRequest;
+import java.util.List;
 import com.servija.servija.repository.ContractorRepository;
 import com.servija.servija.repository.FreelancerRepository;
 import com.servija.servija.repository.ReviewRepository;
+import com.servija.servija.repository.ServiceRequestRepository;
 import com.servija.servija.repository.UserRepository;
 
 import java.math.BigDecimal;
@@ -33,6 +36,7 @@ public class UserService {
     private final ContractorRepository contractorRepository;
     private final FreelancerRepository freelancerRepository;
     private final ReviewRepository reviewRepository;
+    private final ServiceRequestRepository serviceRequestRepository;
     private final PasswordEncoder passwordEncoder;
     private final EntityManager entityManager;
     private final FileStorageService fileStorageService;
@@ -229,11 +233,19 @@ public class UserService {
         // Adicionar dados específicos baseado no tipo
         if (user instanceof Contractor) {
             Contractor contractor = (Contractor) user;
+            Double contractorAvg = reviewRepository.findAverageRatingByReviewedId(contractor.getId());
+            long contractorReviewCount = reviewRepository.countByReviewedId(contractor.getId());
+            long completed = serviceRequestRepository.countByContractorIdAndStatus(contractor.getId(), ServiceRequest.Status.COMPLETED);
+            long active = serviceRequestRepository.countByContractorIdAndStatusIn(contractor.getId(),
+                    List.of(ServiceRequest.Status.ACCEPTED, ServiceRequest.Status.IN_PROGRESS, ServiceRequest.Status.DELIVERED));
+            long total = active + completed;
             builder.contractorProfile(ProfileResponse.ContractorProfile.builder()
                     .preferredLocation(contractor.getPreferredLocation())
-                    .totalContracts(contractor.getTotalContracts())
-                    .activeContracts(contractor.getActiveContracts())
-                    .completedContracts(contractor.getCompletedContracts())
+                    .totalContracts((int) total)
+                    .activeContracts((int) active)
+                    .completedContracts((int) completed)
+                    .contractorRating(contractorAvg != null ? BigDecimal.valueOf(contractorAvg) : null)
+                    .contractorTotalReviews(contractorReviewCount)
                     .build());
         } else if (user instanceof Freelancer) {
             Freelancer freelancer = (Freelancer) user;

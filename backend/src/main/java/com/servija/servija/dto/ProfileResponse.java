@@ -39,6 +39,8 @@ public class ProfileResponse {
         private Integer totalContracts;
         private Integer activeContracts;
         private Integer completedContracts;
+        private BigDecimal contractorRating;
+        private Long contractorTotalReviews;
     }
     
     @Data

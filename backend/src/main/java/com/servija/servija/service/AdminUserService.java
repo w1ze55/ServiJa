@@ -351,14 +351,20 @@ public class AdminUserService {
                                     .createdAt(s.getCreatedAt())
                                     .build())
                             .toList());
-        } else if (user instanceof Contractor c) {
+        } else if (user instanceof Contractor) {
             Double avg = reviewRepository.findAverageRatingByReviewedId(user.getId());
-            long count = reviewRepository.countByReviewedId(user.getId());
-            builder.totalContracts(c.getTotalContracts())
-                    .activeContracts(c.getActiveContracts())
-                    .completedContracts(c.getCompletedContracts())
+            long reviewCount = reviewRepository.countByReviewedId(user.getId());
+            long completed = serviceRequestRepository.countByContractorIdAndStatus(user.getId(), ServiceRequest.Status.COMPLETED);
+            long active = serviceRequestRepository.countByContractorIdAndStatusIn(user.getId(),
+                    List.of(ServiceRequest.Status.ACCEPTED, ServiceRequest.Status.IN_PROGRESS, ServiceRequest.Status.DELIVERED));
+            long total = serviceRequestRepository.countByContractorIdAndStatusIn(user.getId(),
+                    List.of(ServiceRequest.Status.ACCEPTED, ServiceRequest.Status.IN_PROGRESS,
+                            ServiceRequest.Status.DELIVERED, ServiceRequest.Status.COMPLETED));
+            builder.totalContracts((int) total)
+                    .activeContracts((int) active)
+                    .completedContracts((int) completed)
                     .contractorRating(avg != null ? java.math.BigDecimal.valueOf(avg) : null)
-                    .contractorTotalReviews(count);
+                    .contractorTotalReviews(reviewCount);
         }
 
         return builder.build();

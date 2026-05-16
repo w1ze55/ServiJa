@@ -28,6 +28,10 @@ public interface ServiceRequestRepository extends JpaRepository<ServiceRequest, 
 
     long countByFreelancerIdAndStatus(Long freelancerId, ServiceRequest.Status status);
 
+    long countByContractorIdAndStatus(Long contractorId, ServiceRequest.Status status);
+
+    long countByContractorIdAndStatusIn(Long contractorId, List<ServiceRequest.Status> statuses);
+
     @Query("""
             SELECT sr.freelancer.id AS freelancerId, COUNT(sr) AS completedJobs
             FROM ServiceRequest sr
