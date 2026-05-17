@@ -18,6 +18,13 @@ const api = axios.create({
 // Interceptor para adicionar token de autenticação
 api.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
+    const url = config.url || '';
+    const isAuthEndpoint = url.startsWith('/auth/') || url.includes('/api/auth/');
+
+    if (isAuthEndpoint) {
+      return config;
+    }
+
     // Primeiro tenta pegar o token direto
     let token = localStorage.getItem('token');
 
