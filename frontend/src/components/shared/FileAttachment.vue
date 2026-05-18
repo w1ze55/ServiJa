@@ -3,6 +3,7 @@ import {
   FileText, 
   Eye, 
   Download,
+  Upload,
   Image as ImageIcon,
   Film,
   FileArchive,
@@ -13,19 +14,31 @@ import Button from '../ui/button.vue';
 
 interface Props {
   name: string;
-  url: string;
+  url?: string;
   size?: string;
   type?: string;
   description?: string;
   senderInfo?: string;
   variant?: 'default' | 'amber' | 'blue' | 'compact';
+  mode?: 'display' | 'picker';
+  actionLabel?: string;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   variant: 'default',
+  mode: 'display',
+  actionLabel: 'Selecionar',
 });
 
+const emit = defineEmits<{
+  (e: 'action'): void;
+}>();
+
 const getFileIcon = (fileName: string, mimeType?: string) => {
+  if (props.mode === 'picker') {
+    return Upload;
+  }
+
   const extension = fileName.split('.').pop()?.toLowerCase();
   
   if (mimeType?.startsWith('image/') || ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(extension || '')) {
@@ -48,10 +61,13 @@ const getFileIcon = (fileName: string, mimeType?: string) => {
 };
 
 const handleView = () => {
+  if (!props.url) return;
   window.open(props.url, '_blank');
 };
 
 const handleDownload = async () => {
+  if (!props.url) return;
+
   try {
     const response = await fetch(props.url);
     const blob = await response.blob();
@@ -81,14 +97,25 @@ const iconClasses = {
   blue: 'bg-blue-100 text-blue-600',
   compact: 'bg-gray-100 text-gray-500',
 };
+
+const rootClasses = {
+  display: 'shadow-sm',
+  picker: 'cursor-pointer shadow-none hover:border-[#286AD8] hover:bg-blue-50/40',
+};
+
+const handleAction = () => {
+  emit('action');
+};
 </script>
 
 <template>
   <div 
     :class="[
       'flex items-center justify-between p-3 rounded-xl border transition-all group shadow-sm',
-      variantClasses[variant]
+      variantClasses[variant],
+      rootClasses[mode]
     ]"
+    @click="mode === 'picker' && handleAction()"
   >
     <div class="flex items-center gap-3 overflow-hidden">
       <div 
@@ -114,7 +141,7 @@ const iconClasses = {
       </div>
     </div>
     
-    <div class="flex items-center gap-1 shrink-0">
+    <div v-if="mode === 'display'" class="flex items-center gap-1 shrink-0">
       <Button 
         variant="ghost" 
         size="icon" 
@@ -132,6 +159,16 @@ const iconClasses = {
         @click="handleDownload"
       >
         <Download class="h-4 w-4" />
+      </Button>
+    </div>
+    <div v-else class="shrink-0">
+      <Button
+        type="button"
+        variant="outline"
+        class="pointer-events-none"
+        @click="handleAction"
+      >
+        {{ actionLabel }}
       </Button>
     </div>
   </div>

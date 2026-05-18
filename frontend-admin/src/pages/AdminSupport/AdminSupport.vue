@@ -56,6 +56,11 @@ const isResponseModalOpen = ref(false);
 const selectedRequest = ref<SupportRequest | null>(null);
 const currentAction = ref<SupportAdminActionMode>(null);
 
+const canModerateRequest = (request?: SupportRequest | null) => request?.status === 'PENDING';
+const supportStatusFilterOptions = computed(() =>
+  SUPPORT_STATUS_OPTIONS.filter((option) => option.value !== 'ANSWERED')
+);
+
 const loadRequests = async () => {
   isLoading.value = true;
 
@@ -259,6 +264,11 @@ const openDetails = async (requestId: number) => {
 };
 
 const openActionModal = (mode: SupportAdminActionMode, request: SupportRequest) => {
+  if (!canModerateRequest(request)) {
+    toast.info('Esta solicitacao ja foi respondida e agora pode apenas ser visualizada.');
+    return;
+  }
+
   selectedRequest.value = request;
   currentAction.value = mode;
   isResponseModalOpen.value = true;
@@ -279,6 +289,12 @@ const closeResponseModal = () => {
 
 const handleActionSubmit = async (message: string) => {
   if (!selectedRequest.value || !currentAction.value) {
+    return;
+  }
+
+  if (!canModerateRequest(selectedRequest.value)) {
+    toast.info('Esta solicitacao ja foi respondida e agora pode apenas ser visualizada.');
+    forceCloseResponseModal();
     return;
   }
 
@@ -389,7 +405,7 @@ onMounted(() => {
             <SelectContent>
               <SelectItem value="ALL">Todos os status</SelectItem>
               <SelectItem
-                v-for="status in SUPPORT_STATUS_OPTIONS"
+                v-for="status in supportStatusFilterOptions"
                 :key="status.value"
                 :value="status.value"
               >
@@ -542,22 +558,30 @@ onMounted(() => {
                       <Eye class="h-3.5 w-3.5" />
                       Visualizar
                     </button>
-                    <button
-                      type="button"
-                      class="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 px-3 py-1.5 text-xs font-medium text-emerald-700 transition hover:bg-emerald-50"
-                      @click="openActionModal('approve', request)"
+                    <template v-if="canModerateRequest(request)">
+                      <button
+                        type="button"
+                        class="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 px-3 py-1.5 text-xs font-medium text-emerald-700 transition hover:bg-emerald-50"
+                        @click="openActionModal('approve', request)"
+                      >
+                        <ShieldCheck class="h-3.5 w-3.5" />
+                        Aprovar
+                      </button>
+                      <button
+                        type="button"
+                        class="inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-700 transition hover:bg-red-50"
+                        @click="openActionModal('reject', request)"
+                      >
+                        <XCircle class="h-3.5 w-3.5" />
+                        Recusar
+                      </button>
+                    </template>
+                    <span
+                      v-else
+                      class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600"
                     >
-                      <ShieldCheck class="h-3.5 w-3.5" />
-                      Aprovar
-                    </button>
-                    <button
-                      type="button"
-                      class="inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-700 transition hover:bg-red-50"
-                      @click="openActionModal('reject', request)"
-                    >
-                      <XCircle class="h-3.5 w-3.5" />
-                      Recusar
-                    </button>
+                      Somente visualizacao
+                    </span>
                   </div>
                 </td>
               </tr>
@@ -599,22 +623,30 @@ onMounted(() => {
                 <Eye class="h-3.5 w-3.5" />
                 Visualizar
               </button>
-              <button
-                type="button"
-                class="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 px-3 py-1.5 text-xs font-medium text-emerald-700 transition hover:bg-emerald-50"
-                @click="openActionModal('approve', request)"
+              <template v-if="canModerateRequest(request)">
+                <button
+                  type="button"
+                  class="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 px-3 py-1.5 text-xs font-medium text-emerald-700 transition hover:bg-emerald-50"
+                  @click="openActionModal('approve', request)"
+                >
+                  <ShieldCheck class="h-3.5 w-3.5" />
+                  Aprovar
+                </button>
+                <button
+                  type="button"
+                  class="inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-700 transition hover:bg-red-50"
+                  @click="openActionModal('reject', request)"
+                >
+                  <XCircle class="h-3.5 w-3.5" />
+                  Recusar
+                </button>
+              </template>
+              <span
+                v-else
+                class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600"
               >
-                <ShieldCheck class="h-3.5 w-3.5" />
-                Aprovar
-              </button>
-              <button
-                type="button"
-                class="inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-700 transition hover:bg-red-50"
-                @click="openActionModal('reject', request)"
-              >
-                <XCircle class="h-3.5 w-3.5" />
-                Recusar
-              </button>
+                Somente visualizacao
+              </span>
             </div>
           </div>
         </div>
@@ -625,6 +657,7 @@ onMounted(() => {
       :open="isDetailsOpen"
       :request="selectedRequest"
       :is-loading="isLoadingDetails"
+      :can-moderate="canModerateRequest(selectedRequest)"
       @close="isDetailsOpen = false"
       @approve="selectedRequest && openActionModal('approve', selectedRequest)"
       @reject="selectedRequest && openActionModal('reject', selectedRequest)"

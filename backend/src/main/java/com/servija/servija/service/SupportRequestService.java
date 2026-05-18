@@ -120,6 +120,12 @@ public class SupportRequestService {
         }
 
         SupportRequest supportRequest = getSupportRequestById(id);
+        if (supportRequest.getStatus() != SupportRequest.Status.PENDING) {
+            throw new IllegalStateException(
+                    "Esta solicitacao ja foi respondida e agora esta disponivel apenas para visualizacao. "
+                            + "Se necessario, oriente o usuario a abrir uma nova solicitacao.");
+        }
+
         supportRequest.setAdminUser(admin);
         supportRequest.setStatus(status);
         supportRequest.setAdminResponse(normalizedMessage);
