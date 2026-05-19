@@ -316,7 +316,8 @@ async function openConversation(serviceRequestId: number, opts: { pushRoute?: bo
       }
     };
     connect(conv.id);
-    await scrollToBottom();
+    loadingChat.value = false;
+    await scrollToBottom({ instant: true });
   } catch (e: any) {
     const msg = e?.response?.data?.message || e?.message || '';
     if (msg.toLowerCase().includes('habilitado')) {
@@ -325,15 +326,22 @@ async function openConversation(serviceRequestId: number, opts: { pushRoute?: bo
       error.value = 'Erro ao carregar o chat.';
     }
     activeConversation.value = null;
-  } finally {
     loadingChat.value = false;
   }
 }
 
-async function scrollToBottom() {
+async function scrollToBottom(opts: { instant?: boolean } = {}) {
   await nextTick();
   const el = messagesContainer.value;
-  if (el) el.scrollTop = el.scrollHeight;
+  if (!el) return;
+  el.scrollTop = el.scrollHeight;
+  if (opts.instant) {
+    // Garante após carregamento de imagens (que mudam a altura do scroll)
+    requestAnimationFrame(() => {
+      const elNow = messagesContainer.value;
+      if (elNow) elNow.scrollTop = elNow.scrollHeight;
+    });
+  }
 }
 
 watch(
@@ -819,7 +827,7 @@ const handleSearch = (query: string) => router.push({ path: '/search', query: { 
                     v-model="newMessage"
                     placeholder="Digite sua mensagem..."
                     :rows="1"
-                    class="flex-1 resize-none max-h-32"
+                    class="flex-1 resize-none min-h-9 max-h-32 py-1.5 leading-6"
                     @keydown="onComposerKeydown"
                   />
                   <Button
@@ -828,6 +836,7 @@ const handleSearch = (query: string) => router.push({ path: '/search', query: { 
                       (!newMessage.trim() && messageAttachments.length === 0) || isSending
                     "
                     variant="default"
+                    size="icon"
                     title="Enviar"
                   >
                     <Send class="h-4 w-4" />
