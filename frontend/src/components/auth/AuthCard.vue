@@ -316,6 +316,7 @@ export interface PersonalData {
   name: string;
   email: string;
   phone: string;
+  birthDate: string;
   cpf: string;
   password: string;
   acceptTerms: boolean;
@@ -351,6 +352,7 @@ const formData = reactive<PersonalData>({
   name: "",
   email: "",
   phone: "",
+  birthDate: "",
   cpf: "",
   password: "",
   acceptTerms: false,

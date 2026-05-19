@@ -46,17 +46,7 @@ public class AuthService {
 
     @Transactional
     public AuthResponse register(RegisterRequest request) {
-        if (request.getUserType() == User.UserType.ADMIN) {
-            throw new IllegalArgumentException("Cadastro publico de admin nao e permitido");
-        }
-
-        if (userRepository.existsByEmail(request.getEmail())) {
-            throw new DuplicateResourceException("E-mail ja cadastrado");
-        }
-
-        if (userRepository.existsByCpf(request.getCpf())) {
-            throw new DuplicateResourceException("CPF ja cadastrado");
-        }
+        validateRegistrationData(request);
 
         User user = request.getUserType() == User.UserType.CONTRACTOR
                 ? createContractor(request)
@@ -87,6 +77,20 @@ public class AuthService {
                 Map.of("userType", user.getUserType()));
 
         return buildAuthResponse(user, token);
+    }
+
+    public void validateRegistrationData(RegisterRequest request) {
+        if (request.getUserType() == User.UserType.ADMIN) {
+            throw new IllegalArgumentException("Cadastro publico de admin nao e permitido");
+        }
+
+        if (userRepository.existsByEmail(request.getEmail())) {
+            throw new DuplicateResourceException("E-mail ja cadastrado");
+        }
+
+        if (userRepository.existsByCpf(request.getCpf())) {
+            throw new DuplicateResourceException("CPF ja cadastrado");
+        }
     }
 
     public AuthResponse login(LoginRequest request) {
@@ -375,6 +379,7 @@ public class AuthService {
                 .email(request.getEmail())
                 .cpf(request.getCpf())
                 .phone(request.getPhone())
+                .birthDate(request.getBirthDate())
                 .password(passwordEncoder.encode(request.getPassword()))
                 .userType(User.UserType.CONTRACTOR)
                 .emailVerified(false)
@@ -391,6 +396,7 @@ public class AuthService {
                 .email(request.getEmail())
                 .cpf(request.getCpf())
                 .phone(request.getPhone())
+                .birthDate(request.getBirthDate())
                 .password(passwordEncoder.encode(request.getPassword()))
                 .userType(User.UserType.FREELANCER)
                 .emailVerified(false)
@@ -417,6 +423,7 @@ public class AuthService {
                 .email(user.getEmail())
                 .cpf(user.getCpf())
                 .phone(user.getPhone())
+                .birthDate(user.getBirthDate())
                 .userType(user.getUserType())
                 .emailVerified(user.getEmailVerified())
                 .avatarUrl(user.getAvatarUrl())

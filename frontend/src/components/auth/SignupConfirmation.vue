@@ -124,6 +124,7 @@ import api from '@/api/config/axios'
 import {
   AlertCircle,
   ArrowLeft,
+  Calendar,
   Check,
   CreditCard,
   Mail,
@@ -136,6 +137,7 @@ interface PersonalData {
   name: string
   email: string
   phone: string
+  birthDate: string
   cpf: string
   password: string
 }
@@ -186,6 +188,13 @@ const summaryItems = computed(() => [
     layoutClass: '',
   },
   {
+    label: 'Data de nascimento',
+    value: formatBirthDate(props.personalData.birthDate),
+    icon: Calendar,
+    accentClass: 'bg-blue-100 text-blue-600',
+    layoutClass: '',
+  },
+  {
     label: 'CPF',
     value: maskCPF(props.personalData.cpf),
     icon: CreditCard,
@@ -230,6 +239,7 @@ const handleConfirm = async () => {
       email: props.personalData.email,
       cpf: cpfClean,
       phone: phoneClean,
+      birthDate: props.personalData.birthDate,
       password: props.personalData.password,
       userType,
       acceptTerms: true,
@@ -256,5 +266,16 @@ const maskEmail = (email: string) => {
   const [username, domain] = email.split('@')
   if (username.length <= 3) return email
   return `${username.slice(0, 3)}***@${domain}`
+}
+
+const formatBirthDate = (birthDate: string) => {
+  if (!birthDate) {
+    return '-'
+  }
+
+  const [year, month, day] = birthDate.split('-').map(Number)
+  const date = new Date(Date.UTC(year, month - 1, day))
+
+  return new Intl.DateTimeFormat('pt-BR', { timeZone: 'UTC' }).format(date)
 }
 </script>

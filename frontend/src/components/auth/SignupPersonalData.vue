@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { computed, ref } from 'vue';
 import Button from '../ui/button.vue';
 import Input from '../ui/input.vue';
 import Label from '../ui/label.vue';
@@ -9,11 +9,13 @@ import AlertDescription from '../ui/alert-description.vue';
 import Progress from '../ui/progress.vue';
 import { AlertCircle, Eye, EyeOff, Check, X, ArrowLeft } from 'lucide-vue-next';
 import { formatCPF, formatPhone, validateCPF, validatePhone } from '@/utils/masks';
+import api from '@/api/config/axios';
 
 export interface PersonalData {
   name: string;
   email: string;
   phone: string;
+  birthDate: string;
   cpf: string;
   password: string;
   acceptTerms: boolean;
@@ -29,6 +31,11 @@ interface Emits {
   (e: 'back'): void;
 }
 
+interface ValidationErrorResponse {
+  errors?: Record<string, string>;
+  message?: string;
+}
+
 const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 
@@ -36,6 +43,7 @@ const formData = ref<PersonalData>({
   name: '',
   email: '',
   phone: '',
+  birthDate: '',
   cpf: '',
   password: '',
   acceptTerms: false,
@@ -44,9 +52,35 @@ const formData = ref<PersonalData>({
 const showPassword = ref(false);
 const touched = ref<Record<string, boolean>>({});
 const errors = ref<Record<string, string>>({});
+const serverError = ref('');
 const isLoading = ref(false);
 
-// Validação de senha em tempo real
+const formatDateForInput = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
+};
+
+const maxBirthDate = computed(() => {
+  return formatDateForInput(new Date());
+});
+
+const isAtLeast18YearsOld = (value: string) => {
+  const birthDate = new Date(`${value}T00:00:00`);
+
+  if (Number.isNaN(birthDate.getTime())) {
+    return false;
+  }
+
+  const minimumBirthDate = new Date();
+  minimumBirthDate.setHours(0, 0, 0, 0);
+  minimumBirthDate.setFullYear(minimumBirthDate.getFullYear() - 18);
+
+  return birthDate <= minimumBirthDate;
+};
+
 const passwordRequirements = computed(() => ({
   minLength: formData.value.password.length >= 8,
   hasUpperCase: /[A-Z]/.test(formData.value.password),
@@ -69,13 +103,18 @@ const validateField = (name: string, value: string): string | null => {
     case 'email':
       if (!value) return 'E-mail é obrigatório';
       if (value.length > 256) return 'E-mail deve ter no máximo 256 caracteres';
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(value)) return 'E-mail inválido';
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return 'E-mail inválido';
       return null;
 
     case 'phone':
       if (!value) return 'Telefone é obrigatório';
       if (!validatePhone(value)) return 'Telefone inválido';
+      return null;
+
+    case 'birthDate':
+      if (!value) return 'Data de nascimento é obrigatória';
+      if (Number.isNaN(new Date(`${value}T00:00:00`).getTime())) return 'Data de nascimento inválida';
+      if (!isAtLeast18YearsOld(value)) return 'Você precisa ter pelo menos 18 anos';
       return null;
 
     case 'cpf':
@@ -94,20 +133,28 @@ const validateField = (name: string, value: string): string | null => {
   }
 };
 
+const clearFieldError = (field: string) => {
+  const newErrors = { ...errors.value };
+  delete newErrors[field];
+  errors.value = newErrors;
+};
+
 const handleBlur = (field: string) => {
   touched.value = { ...touched.value, [field]: true };
   const error = validateField(field, formData.value[field as keyof PersonalData] as string);
+
   if (error) {
     errors.value = { ...errors.value, [field]: error };
-  } else {
-    const newErrors = { ...errors.value };
-    delete newErrors[field];
-    errors.value = newErrors;
+    return;
   }
+
+  clearFieldError(field);
 };
 
 const handleChange = (field: keyof PersonalData, value: string | boolean) => {
   let processedValue = value;
+
+  serverError.value = '';
 
   if (field === 'cpf' && typeof value === 'string') {
     processedValue = formatCPF(value);
@@ -117,32 +164,35 @@ const handleChange = (field: keyof PersonalData, value: string | boolean) => {
 
   formData.value = { ...formData.value, [field]: processedValue };
 
-  // Revalidar se o campo já foi tocado
+  if (field === 'acceptTerms') {
+    if (processedValue) {
+      clearFieldError('acceptTerms');
+    }
+    return;
+  }
+
   if (touched.value[field] && typeof processedValue === 'string') {
     const error = validateField(field, processedValue);
     if (error) {
       errors.value = { ...errors.value, [field]: error };
-    } else {
-      const newErrors = { ...errors.value };
-      delete newErrors[field];
-      errors.value = newErrors;
+      return;
     }
+
+    clearFieldError(field);
   }
 };
 
-const handleSubmit = (e: Event) => {
-  e.preventDefault();
-
-  // Marcar todos os campos como tocados
-  const allTouched = Object.keys(formData.value).reduce((acc, key) => ({ ...acc, [key]: true }), {});
-  touched.value = allTouched;
-
-  // Validar todos os campos
+const buildValidationErrors = () => {
   const newErrors: Record<string, string> = {};
+
   Object.keys(formData.value).forEach((key) => {
-    if (key !== 'acceptTerms') {
-      const error = validateField(key, formData.value[key as keyof PersonalData] as string);
-      if (error) newErrors[key] = error;
+    if (key === 'acceptTerms') {
+      return;
+    }
+
+    const error = validateField(key, formData.value[key as keyof PersonalData] as string);
+    if (error) {
+      newErrors[key] = error;
     }
   });
 
@@ -150,18 +200,77 @@ const handleSubmit = (e: Event) => {
     newErrors.acceptTerms = 'Você deve aceitar os termos e condições';
   }
 
+  return newErrors;
+};
+
+const applyServerValidationErrors = (responseData: ValidationErrorResponse) => {
+  const apiErrors = responseData.errors;
+
+  if (apiErrors && Object.keys(apiErrors).length > 0) {
+    errors.value = { ...errors.value, ...apiErrors };
+    touched.value = {
+      ...touched.value,
+      ...Object.keys(apiErrors).reduce((acc, key) => ({ ...acc, [key]: true }), {}),
+    };
+    return;
+  }
+
+  const message = responseData.message || 'Não foi possível validar os dados do cadastro.';
+
+  if (message.toLowerCase().includes('e-mail')) {
+    errors.value = { ...errors.value, email: message };
+    touched.value = { ...touched.value, email: true };
+    return;
+  }
+
+  if (message.toLowerCase().includes('cpf')) {
+    errors.value = { ...errors.value, cpf: message };
+    touched.value = { ...touched.value, cpf: true };
+    return;
+  }
+
+  serverError.value = message;
+};
+
+const handleSubmit = async (e: Event) => {
+  e.preventDefault();
+
+  serverError.value = '';
+  touched.value = Object.keys(formData.value).reduce(
+    (acc, key) => ({ ...acc, [key]: true }),
+    {}
+  );
+
+  const newErrors = buildValidationErrors();
+
   if (Object.keys(newErrors).length > 0) {
     errors.value = newErrors;
     return;
   }
 
+  errors.value = {};
   isLoading.value = true;
 
-  // Simula validação de duplicidade
-  setTimeout(() => {
-    isLoading.value = false;
+  try {
+    const userType = props.accountType === 'provider' ? 'FREELANCER' : 'CONTRACTOR';
+
+    await api.post('/auth/validate-registration', {
+      name: formData.value.name.trim(),
+      email: formData.value.email.trim(),
+      cpf: formData.value.cpf.replace(/\D/g, ''),
+      phone: formData.value.phone.replace(/\D/g, ''),
+      birthDate: formData.value.birthDate,
+      password: formData.value.password,
+      userType,
+      acceptTerms: formData.value.acceptTerms,
+    });
+
     emit('next', formData.value);
-  }, 1000);
+  } catch (err: any) {
+    applyServerValidationErrors(err.response?.data || {});
+  } finally {
+    isLoading.value = false;
+  }
 };
 </script>
 
@@ -195,6 +304,11 @@ const handleSubmit = (e: Event) => {
       </div>
 
       <form @submit="handleSubmit" class="signup-personal-data-form">
+        <Alert v-if="serverError" variant="destructive">
+          <AlertCircle class="h-4 w-4" />
+          <AlertDescription>{{ serverError }}</AlertDescription>
+        </Alert>
+
         <div class="signup-personal-data-field">
           <Label for="name">Nome completo *</Label>
           <Input
@@ -253,23 +367,46 @@ const handleSubmit = (e: Event) => {
           </div>
         </div>
 
-        <div class="signup-personal-data-field">
-          <Label for="cpf">CPF *</Label>
-          <Input
-            id="cpf"
-            type="text"
-            placeholder="000.000.000-00"
-            :value="formData.cpf"
-            @input="(e: Event) => handleChange('cpf', (e.target as HTMLInputElement).value)"
-            @blur="handleBlur('cpf')"
-            :class="errors.cpf && touched.cpf ? 'signup-personal-data-input-error' : ''"
-            maxlength="14"
-            :disabled="isLoading"
-          />
-          <p v-if="errors.cpf && touched.cpf" class="signup-personal-data-error-message">
-            <AlertCircle class="h-3 w-3" />
-            {{ errors.cpf }}
-          </p>
+        <div class="signup-personal-data-grid">
+          <div class="signup-personal-data-field">
+            <Label for="birthDate">Data de nascimento *</Label>
+            <Input
+              id="birthDate"
+              type="date"
+              :value="formData.birthDate"
+              :max="maxBirthDate"
+              @input="(e: Event) => handleChange('birthDate', (e.target as HTMLInputElement).value)"
+              @blur="handleBlur('birthDate')"
+              :class="[
+                'signup-personal-data-date-input',
+                errors.birthDate && touched.birthDate ? 'signup-personal-data-input-error' : '',
+              ]"
+              :disabled="isLoading"
+            />
+            <p v-if="errors.birthDate && touched.birthDate" class="signup-personal-data-error-message">
+              <AlertCircle class="h-3 w-3" />
+              {{ errors.birthDate }}
+            </p>
+          </div>
+
+          <div class="signup-personal-data-field">
+            <Label for="cpf">CPF *</Label>
+            <Input
+              id="cpf"
+              type="text"
+              placeholder="000.000.000-00"
+              :value="formData.cpf"
+              @input="(e: Event) => handleChange('cpf', (e.target as HTMLInputElement).value)"
+              @blur="handleBlur('cpf')"
+              :class="errors.cpf && touched.cpf ? 'signup-personal-data-input-error' : ''"
+              maxlength="14"
+              :disabled="isLoading"
+            />
+            <p v-if="errors.cpf && touched.cpf" class="signup-personal-data-error-message">
+              <AlertCircle class="h-3 w-3" />
+              {{ errors.cpf }}
+            </p>
+          </div>
         </div>
 
         <div class="signup-personal-data-field">
@@ -299,7 +436,7 @@ const handleSubmit = (e: Event) => {
 
           <div v-if="formData.password" class="signup-personal-data-password-requirements">
             <p class="signup-personal-data-requirements-title">A senha deve conter:</p>
-            <div 
+            <div
               class="signup-personal-data-requirement"
               :class="passwordRequirements.minLength ? 'met' : 'unmet'"
             >
@@ -307,7 +444,7 @@ const handleSubmit = (e: Event) => {
               <X v-else class="h-3 w-3" />
               <span>Mínimo 8 caracteres</span>
             </div>
-            <div 
+            <div
               class="signup-personal-data-requirement"
               :class="passwordRequirements.hasUpperCase ? 'met' : 'unmet'"
             >
@@ -315,7 +452,7 @@ const handleSubmit = (e: Event) => {
               <X v-else class="h-3 w-3" />
               <span>1 letra maiúscula</span>
             </div>
-            <div 
+            <div
               class="signup-personal-data-requirement"
               :class="passwordRequirements.hasLowerCase ? 'met' : 'unmet'"
             >
@@ -323,7 +460,7 @@ const handleSubmit = (e: Event) => {
               <X v-else class="h-3 w-3" />
               <span>1 letra minúscula</span>
             </div>
-            <div 
+            <div
               class="signup-personal-data-requirement"
               :class="passwordRequirements.hasNumber ? 'met' : 'unmet'"
             >
@@ -331,7 +468,7 @@ const handleSubmit = (e: Event) => {
               <X v-else class="h-3 w-3" />
               <span>1 número</span>
             </div>
-            <div 
+            <div
               class="signup-personal-data-requirement"
               :class="passwordRequirements.hasSpecial ? 'met' : 'unmet'"
             >
@@ -353,11 +490,11 @@ const handleSubmit = (e: Event) => {
           <div class="signup-personal-data-terms-content">
             <Label for="terms" class="signup-personal-data-terms-label">
               Li e concordo com os
-              <a href="#" class="signup-personal-data-terms-link">
+              <a href="/politicas?tab=termos" class="signup-personal-data-terms-link" @click.stop>
                 Termos de Uso
               </a>
               e a
-              <a href="#" class="signup-personal-data-terms-link">
+              <a href="/politicas" class="signup-personal-data-terms-link" @click.stop>
                 Política de Privacidade
               </a>
               *
@@ -378,8 +515,6 @@ const handleSubmit = (e: Event) => {
 </template>
 
 <style scoped>
-/* SignupPersonalData.vue Styles */
-
 .signup-personal-data-container {
   min-height: 100vh;
   background: linear-gradient(to bottom right, rgb(239, 246, 255), rgb(238, 242, 255));
@@ -460,6 +595,19 @@ const handleSubmit = (e: Event) => {
 
 .signup-personal-data-input-error {
   border-color: rgb(239, 68, 68);
+}
+
+.signup-personal-data-date-input {
+  padding-right: 2.75rem;
+}
+
+.signup-personal-data-date-input::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  margin-left: auto;
+}
+
+.signup-personal-data-date-input::-webkit-date-and-time-value {
+  text-align: left;
 }
 
 .signup-personal-data-error-message {
@@ -558,6 +706,4 @@ const handleSubmit = (e: Event) => {
 .signup-personal-data-terms-link:hover {
   text-decoration: underline;
 }
-
 </style>
-

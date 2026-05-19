@@ -47,6 +47,18 @@ public class AuthController {
         return new ResponseEntity<>(response, HttpStatus.CREATED);
     }
 
+    @PostMapping("/validate-registration")
+    @Operation(summary = "Validar dados de cadastro", description = "Valida os dados do cadastro antes de prosseguir para a confirmacao da conta.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Dados validados com sucesso", content = @Content(schema = @Schema(implementation = MessageResponse.class))),
+            @ApiResponse(responseCode = "400", description = "Dados invalidos", content = @Content(schema = @Schema(implementation = MessageResponse.class))),
+            @ApiResponse(responseCode = "409", description = "E-mail ou CPF ja cadastrado", content = @Content(schema = @Schema(implementation = MessageResponse.class)))
+    })
+    public ResponseEntity<MessageResponse> validateRegistration(@Valid @RequestBody RegisterRequest request) {
+        authService.validateRegistrationData(request);
+        return ResponseEntity.ok(new MessageResponse("Dados validados com sucesso"));
+    }
+
     @PostMapping("/login")
     @Operation(summary = "Fazer login", description = "Autentica um usuario e retorna um token JWT para acesso as rotas protegidas")
     @ApiResponses(value = {
