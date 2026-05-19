@@ -16,7 +16,7 @@ import {
 } from 'lucide-vue-next';
 import AttachmentUploadField from '../shared/AttachmentUploadField.vue';
 import FileAttachment from '../shared/FileAttachment.vue';
-import ChatBox from '../shared/ChatBox.vue';
+import ProjectChatPanel from '../shared/ProjectChatPanel.vue';
 import ServiceRequestTimeline from '../service/ServiceRequestTimeline.vue';
 import Button from '../ui/button.vue';
 import Card from '../ui/card.vue';
@@ -73,7 +73,6 @@ const showUploadDialog = ref(false);
 const isCompleting = ref(false);
 const isCompletingAdjustment = ref(false);
 const isUploading = ref(false);
-const isSendingMessage = ref(false);
 const uploadProgress = ref(0);
 const uploadFiles = ref<File[]>([]);
 const uploadDescription = ref('');
@@ -291,21 +290,6 @@ const goBack = () => {
 
 const openMessagesTab = () => {
   activeTab.value = 'messages';
-};
-
-const handleSendMessage = async (message: string, attachments: File[]) => {
-  if (!project.value) return;
-
-  isSendingMessage.value = true;
-  const success = await proposalStore.sendMessage(project.value.id, message, attachments);
-  isSendingMessage.value = false;
-
-  if (success) {
-    toast.success('Mensagem enviada');
-    return;
-  }
-
-  toast.error('Erro ao enviar mensagem');
 };
 
 const handleMilestoneComplete = async (milestone: Milestone) => {
@@ -592,17 +576,12 @@ const handleUploadFiles = async () => {
             </TabsContent>
 
             <TabsContent value="messages" class="mt-4">
-              <Card class="p-6 min-h-[500px] flex flex-col">
-                <div class="mb-4 border-b pb-4">
-                  <h3 class="font-bold text-[#263238]">Conversa com {{ project.clientName }}</h3>
-                </div>
-                <ChatBox
-                  :messages="project.messages || []"
+              <Card class="p-4">
+                <h3 class="font-bold text-[#263238] mb-4">Conversa com {{ project.clientName }}</h3>
+                <ProjectChatPanel
+                  :service-request-id="Number(project.id)"
                   current-user-role="freelancer"
-                  :is-locked="project.status === 'completed'"
-                  :is-sending="isSendingMessage"
                   :service-status="project.status"
-                  @send-message="handleSendMessage"
                 />
               </Card>
             </TabsContent>

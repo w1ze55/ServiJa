@@ -24,6 +24,7 @@ import FreelancerWalletPage from "@/pages/FreelancerWallet/index.vue";
 
 
 import MessagesPage from "@/pages/Messages/index.vue";
+import ChatPage from "@/pages/Chat/index.vue";
 import NotificationsPage from "@/pages/Notifications/index.vue";
 import ExplorePage from "@/pages/Explore/index.vue";
 import SearchPage from "@/pages/Search/index.vue";
@@ -214,6 +215,13 @@ const routes: RouteRecordRaw[] = [
     name: "messages",
     component: MessagesPage,
     meta: { requiresAuth: true },
+  },
+  {
+    path: "/chat/:serviceRequestId",
+    name: "chat",
+    component: ChatPage,
+    meta: { requiresAuth: true },
+    props: true,
   },
 
   // ============ CONFIGURAÇÕES ============

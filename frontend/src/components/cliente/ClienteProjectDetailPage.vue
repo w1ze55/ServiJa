@@ -9,13 +9,11 @@ import {
   AlertCircle,
   Lock,
   Sparkles,
-  Send,
   FileText,
   Upload,
   Loader2,
 } from 'lucide-vue-next';
 import Button from '../ui/button.vue';
-import Input from '../ui/input.vue';
 import Card from '../ui/card.vue';
 import Badge from '../ui/badge.vue';
 import DeliveryAdjustmentModal from './DeliveryAdjustmentModal.vue';
@@ -28,6 +26,7 @@ import TabsContent from '../ui/tabs-content.vue';
 import TabsList from '../ui/tabs-list.vue';
 import TabsTrigger from '../ui/tabs-trigger.vue';
 import FileAttachment from '../shared/FileAttachment.vue';
+import ProjectChatPanel from '../shared/ProjectChatPanel.vue';
 import { useClientRequestStore, type ServiceRequest } from '@/stores/clientRequestStore';
 import { useDeliveryAdjustmentStore } from '@/stores/deliveryAdjustmentStore';
 import ServiceRequestTimeline from '../service/ServiceRequestTimeline.vue';
@@ -51,8 +50,6 @@ const freelancerRating = ref<number | null>(null);
 const freelancerTotalReviews = ref(0);
 const activeTab = ref('details');
 const activeFileTab = ref<'client' | 'freelancer'>('client');
-const newMessage = ref('');
-const isSendingMessage = ref(false);
 const showAdjustmentModal = ref(false);
 const isUploadingFiles = ref(false);
 const projectFileInput = ref<HTMLInputElement | null>(null);
@@ -186,21 +183,6 @@ const getInitials = (name: string) => {
 
 const goBack = () => {
   props.onNavigate('cliente-projects');
-};
-
-const handleSendMessage = async () => {
-  if (!request.value || !newMessage.value.trim()) return;
-
-  isSendingMessage.value = true;
-  const success = await store.sendMessage(request.value.id, newMessage.value.trim());
-  isSendingMessage.value = false;
-
-  if (success) {
-    newMessage.value = '';
-    toast.success('Mensagem enviada');
-  } else {
-    toast.error('Erro ao enviar mensagem');
-  }
 };
 
 const handleApproveDelivery = () => {
@@ -408,34 +390,13 @@ const getStatusColor = (status: string) => {
           </TabsContent>
 
           <TabsContent value="messages" class="mt-4">
-            <Card class="p-0 overflow-hidden flex flex-col min-h-[500px]">
-              <div class="p-4 border-b bg-gray-50 flex items-center justify-between">
-                <h3 class="font-bold text-[#263238]">Conversa com {{ request.freelancerName }}</h3>
-              </div>
-
-              <div class="flex-1 p-6 space-y-4 overflow-y-auto max-h-[400px]">
-                <div v-if="!request.messages || request.messages.length === 0" class="text-center py-12">
-                  <MessageSquare class="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                  <p class="text-[#435574]">Nenhuma mensagem trocada ainda.</p>
-                </div>
-
-                <div v-for="msg in request.messages" :key="msg.id" :class="`flex ${msg.sender === 'client' ? 'justify-end' : 'justify-start'}`">
-                  <div :class="`max-w-[80%] rounded-2xl px-4 py-2 ${msg.sender === 'client' ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-gray-100 text-[#263238] rounded-tl-none border'}`">
-                    <p class="text-xs mb-1 opacity-70 font-semibold">{{ msg.senderName }}</p>
-                    <p class="text-sm">{{ msg.message }}</p>
-                    <p class="text-[10px] text-right mt-1 opacity-60">{{ formatDate(msg.timestamp) }}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div class="p-4 border-t bg-white">
-                <div class="flex items-center gap-2">
-                  <Input v-model="newMessage" placeholder="Digite sua mensagem..." @keyup.enter="handleSendMessage" class="h-12 flex-1 rounded-full px-6" />
-                  <Button @click="handleSendMessage" :disabled="!newMessage.trim() || isSendingMessage" variant="default" class="h-12 w-12 shrink-0 rounded-full p-0 flex items-center justify-center">
-                    <Send class="h-5 w-5 text-white" />
-                  </Button>
-                </div>
-              </div>
+            <Card class="p-4">
+              <h3 class="font-bold text-[#263238] mb-4">Conversa com {{ request.freelancerName }}</h3>
+              <ProjectChatPanel
+                :service-request-id="Number(request.id)"
+                current-user-role="client"
+                :service-status="request.status"
+              />
             </Card>
           </TabsContent>
 
