@@ -19,6 +19,21 @@ services:
       timeout: 5s
       retries: 5
 
+  mongo:
+    image: mongo:7
+    container_name: servija_mongo
+    ports:
+      - "37017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - frontend_network
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   backend:
     build:
       context: ./backend
@@ -26,6 +41,8 @@ services:
     container_name: servija_backend
     depends_on:
       mysql:
+        condition: service_healthy
+      mongo:
         condition: service_healthy
     environment:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-local}
@@ -60,6 +77,10 @@ services:
       GOOGLE_PROJECT_NAME: ${GOOGLE_PROJECT_NAME:-Servija}
       GOOGLE_PROJECT_ID: ${GOOGLE_PROJECT_ID}
       GOOGLE_PROJECT_NUMBER: ${GOOGLE_PROJECT_NUMBER}
+      # Perfil local lê MONGODB_URI_LOCAL (default = container "mongo"). Perfis prod/default leem MONGODB_URI (Atlas).
+      # NÃO definir SPRING_MONGODB_URI aqui: env vars desse formato sobrescrevem o property file e quebram o perfil local.
+      MONGODB_URI_LOCAL: ${MONGODB_URI_LOCAL:-mongodb://mongo:27017/servija_chat}
+      MONGODB_URI: ${MONGODB_URI:-mongodb://mongo:27017/servija_chat}
     ports:
       - "8080:8080"
     networks:
@@ -104,3 +125,4 @@ networks:
 
 volumes:
   mysql_data:
+  mongo_data:
