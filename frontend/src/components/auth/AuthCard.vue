@@ -1,5 +1,5 @@
 <template>
-  <div class="auth-card-container" >
+  <div class="auth-card-container">
     <div class="auth-card-wrapper">
       <Button
         v-if="onBackToLanding"
@@ -13,7 +13,6 @@
 
       <div class="auth-card-main">
         <div class="auth-card-grid">
-          <!-- Login Form -->
           <div
             class="auth-card-form-section"
             :class="[isSignUp ? 'hidden-mobile' : 'visible']"
@@ -95,7 +94,6 @@
             </div>
           </div>
 
-          <!-- Signup Form -->
           <div
             class="auth-card-signup-section"
             :class="[!isSignUp ? 'hidden-mobile' : 'visible']"
@@ -117,14 +115,13 @@
                       Criar conta
                     </h2>
                   </div>
-                  <span class="auth-card-progress-step"
-                    >Passo {{ getSignupStepNumber() }} de 3</span
-                  >
+                  <span class="auth-card-progress-step">
+                    Passo {{ getSignupStepNumber() }} de 4
+                  </span>
                 </div>
                 <Progress :value="getSignupProgress()" class="h-2" />
               </div>
 
-              <!-- Signup Steps -->
               <template v-if="signupStep === 'type'">
                 <p class="text-gray-600 mb-6 text-center md:text-left">
                   Escolha como deseja usar o Servi Já
@@ -139,11 +136,7 @@
                       v-for="account in accountTypes"
                       :key="account.type"
                       type="button"
-                      @click="
-                        selectedAccountType = account.type as
-                          | 'contractor'
-                          | 'provider'
-                      "
+                      @click="selectedAccountType = account.type"
                       class="w-full p-4 rounded-lg border-2 transition-all text-left flex items-center gap-4"
                       :class="
                         selectedAccountType === account.type
@@ -153,16 +146,12 @@
                     >
                       <div
                         class="auth-card-account-icon"
-                        :class="{
-                          selected: selectedAccountType === account.type,
-                        }"
+                        :class="{ selected: selectedAccountType === account.type }"
                       >
                         <component
                           :is="account.icon"
                           class="h-6 w-6"
-                          :class="{
-                            selected: selectedAccountType === account.type,
-                          }"
+                          :class="{ selected: selectedAccountType === account.type }"
                         />
                       </div>
                       <div class="flex-1">
@@ -181,8 +170,9 @@
                     class="w-full"
                     size="lg"
                     :disabled="!selectedAccountType"
-                    >Continuar</Button
                   >
+                    Continuar
+                  </Button>
 
                   <div class="md:hidden text-center mt-6">
                     <p class="text-gray-600">
@@ -199,10 +189,7 @@
                 </form>
               </template>
 
-              <!-- Signup Step 2: Personal Data -->
-              <template
-                v-else-if="signupStep === 'data' && selectedAccountType"
-              >
+              <template v-else-if="signupStep === 'data' && selectedAccountType">
                 <div class="w-full">
                   <div class="mb-6">
                     <h3 class="text-gray-900 mb-2">Dados pessoais</h3>
@@ -219,13 +206,31 @@
                   <SignupPersonalData
                     :account-type="selectedAccountType"
                     :inline="true"
+                    :initial-data="formData"
                     @next="handlePersonalDataSubmit"
                     @back="signupStep = 'type'"
                   />
                 </div>
               </template>
 
-              <!-- Signup Step 3: Confirmation -->
+              <template v-else-if="signupStep === 'address'">
+                <div class="w-full">
+                  <div class="mb-6">
+                    <h3 class="text-gray-900 mb-2">Endereço</h3>
+                    <p class="text-gray-600">
+                      Informe o endereço principal que ficará salvo na sua conta.
+                    </p>
+                  </div>
+
+                  <SignupAddress
+                    :inline="true"
+                    :initial-data="addressData"
+                    @next="handleAddressSubmit"
+                    @back="signupStep = 'data'"
+                  />
+                </div>
+              </template>
+
               <template
                 v-else-if="
                   signupStep === 'confirmation' &&
@@ -237,16 +242,16 @@
                   <SignupConfirmation
                     :account-type="selectedAccountType"
                     :personal-data="formData"
+                    :address-data="addressData"
                     :inline="true"
                     @confirm="handleSignupConfirm"
-                    @back="signupStep = 'data'"
+                    @back="signupStep = 'address'"
                   />
                 </div>
               </template>
             </div>
           </div>
 
-          <!-- Animated Overlay Panel -->
           <div
             class="auth-card-overlay"
             :class="[isSignUp ? 'signup' : 'login']"
@@ -293,15 +298,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from "vue";
+import { reactive, ref } from "vue";
 import Alert from "../ui/alert.vue";
 import AlertDescription from "../ui/alert-description.vue";
 import Input from "../ui/input.vue";
 import Button from "../ui/button.vue";
 import Label from "../ui/label.vue";
 import Progress from "../ui/progress.vue";
-import Checkbox from "../ui/checkbox.vue";
 import SignupPersonalData from "./SignupPersonalData.vue";
+import SignupAddress from "./SignupAddress.vue";
 import SignupConfirmation from "./SignupConfirmation.vue";
 import {
   AlertCircle,
@@ -322,6 +327,18 @@ export interface PersonalData {
   acceptTerms: boolean;
 }
 
+export interface AddressData {
+  label: string;
+  zipCode: string;
+  street: string;
+  number: string;
+  complement: string;
+  neighborhood: string;
+  city: string;
+  state: string;
+  isDefault: boolean;
+}
+
 const props = defineProps<{
   onLogin: (
     email: string,
@@ -338,7 +355,7 @@ const props = defineProps<{
 }>();
 
 const isSignUp = ref(props.initialPage === "signup");
-const signupStep = ref<"type" | "data" | "confirmation">("type");
+const signupStep = ref<"type" | "data" | "address" | "confirmation">("type");
 const showPassword = ref(false);
 
 const loginEmail = ref("");
@@ -358,6 +375,18 @@ const formData = reactive<PersonalData>({
   acceptTerms: false,
 });
 
+const addressData = reactive<AddressData>({
+  label: "Principal",
+  zipCode: "",
+  street: "",
+  number: "",
+  complement: "",
+  neighborhood: "",
+  city: "",
+  state: "",
+  isDefault: true,
+});
+
 function handleLoginSubmit() {
   const email = loginEmail.value?.trim() || "";
   const password = loginPassword.value?.trim() || "";
@@ -375,7 +404,6 @@ function handleLoginSubmit() {
     isLoggingIn.value = false;
   });
 
-  // Se não houver erro após um tempo, limpa o loading
   setTimeout(() => {
     if (!loginError.value) {
       isLoggingIn.value = false;
@@ -396,6 +424,11 @@ function handleSwitchToLogin() {
 
 function handlePreviousSignupStep() {
   if (signupStep.value === "confirmation") {
+    signupStep.value = "address";
+    return;
+  }
+
+  if (signupStep.value === "address") {
     signupStep.value = "data";
     return;
   }
@@ -406,11 +439,18 @@ function handlePreviousSignupStep() {
 }
 
 function handleAccountTypeSelect() {
-  if (selectedAccountType.value) signupStep.value = "data";
+  if (selectedAccountType.value) {
+    signupStep.value = "data";
+  }
 }
 
 function handlePersonalDataSubmit(data: PersonalData) {
   Object.assign(formData, data);
+  signupStep.value = "address";
+}
+
+function handleAddressSubmit(data: AddressData) {
+  Object.assign(addressData, data);
   signupStep.value = "confirmation";
 }
 
@@ -422,10 +462,12 @@ function handleSignupConfirm() {
 
 function getSignupProgress() {
   return signupStep.value === "type"
-    ? 33
+    ? 25
     : signupStep.value === "data"
-      ? 66
-      : 100;
+      ? 50
+      : signupStep.value === "address"
+        ? 75
+        : 100;
 }
 
 function getSignupStepNumber() {
@@ -433,7 +475,9 @@ function getSignupStepNumber() {
     ? "1"
     : signupStep.value === "data"
       ? "2"
-      : "3";
+      : signupStep.value === "address"
+        ? "3"
+        : "4";
 }
 
 const accountTypes: Array<{
@@ -443,13 +487,13 @@ const accountTypes: Array<{
   description: string;
 }> = [
   {
-    type: "contractor" as const,
+    type: "contractor",
     title: "Contratante",
     icon: UserCircle,
     description: "Preciso contratar serviços",
   },
   {
-    type: "provider" as const,
+    type: "provider",
     title: "Prestador",
     icon: Briefcase,
     description: "Quero oferecer meus serviços",

@@ -50,7 +50,7 @@ public class GlobalExceptionHandler {
                 .timestamp(LocalDateTime.now())
                 .status(HttpStatus.UNAUTHORIZED.value())
                 .error("Unauthorized")
-                .message("Sua conta está bloqueada.Caso tenha dúvidas, entre em contato com o suporte.")
+                .message("Sua conta está bloqueada. Caso tenha dúvidas, entre em contato com o suporte.")
                 .build();
         return new ResponseEntity<>(error, HttpStatus.UNAUTHORIZED);
     }

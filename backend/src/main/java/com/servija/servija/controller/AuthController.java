@@ -1,9 +1,11 @@
 package com.servija.servija.controller;
 
 import com.servija.servija.dto.AuthResponse;
+import com.servija.servija.dto.AddressRequest;
 import com.servija.servija.dto.ForgotPasswordRequest;
 import com.servija.servija.dto.LoginRequest;
 import com.servija.servija.dto.MessageResponse;
+import com.servija.servija.dto.RegistrationValidationRequest;
 import com.servija.servija.dto.RegisterRequest;
 import com.servija.servija.dto.ResetPasswordRequest;
 import com.servija.servija.dto.VerifyEmailRequest;
@@ -54,9 +56,20 @@ public class AuthController {
             @ApiResponse(responseCode = "400", description = "Dados invalidos", content = @Content(schema = @Schema(implementation = MessageResponse.class))),
             @ApiResponse(responseCode = "409", description = "E-mail ou CPF ja cadastrado", content = @Content(schema = @Schema(implementation = MessageResponse.class)))
     })
-    public ResponseEntity<MessageResponse> validateRegistration(@Valid @RequestBody RegisterRequest request) {
+    public ResponseEntity<MessageResponse> validateRegistration(@Valid @RequestBody RegistrationValidationRequest request) {
         authService.validateRegistrationData(request);
         return ResponseEntity.ok(new MessageResponse("Dados validados com sucesso"));
+    }
+
+    @PostMapping("/validate-address")
+    @Operation(summary = "Validar endereço do cadastro", description = "Valida os dados do endereço informados na etapa de cadastro antes da confirmação.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Endereço validado com sucesso", content = @Content(schema = @Schema(implementation = MessageResponse.class))),
+            @ApiResponse(responseCode = "400", description = "Endereço inválido", content = @Content(schema = @Schema(implementation = MessageResponse.class)))
+    })
+    public ResponseEntity<MessageResponse> validateAddress(@Valid @RequestBody AddressRequest request) {
+        authService.validateAddressData(request);
+        return ResponseEntity.ok(new MessageResponse("Endereço validado com sucesso"));
     }
 
     @PostMapping("/login")

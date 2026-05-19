@@ -42,10 +42,17 @@ public class AddressService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
 
-        // Se for o primeiro endereço ou marcado como padrão, garantir que é o único padrão
+        Address address = createAddressForUser(user, request);
+        return AddressResponse.fromEntity(address);
+    }
+
+    @Transactional
+    public Address createAddressForUser(User user, AddressRequest request) {
+        validateAddressData(request);
+
         boolean isDefault = request.getIsDefault() != null && request.getIsDefault();
         if (addressRepository.countByUserId(user.getId()) == 0) {
-            isDefault = true; // Primeiro endereço é sempre o padrão
+            isDefault = true;
         }
 
         Address address = Address.builder()
@@ -64,12 +71,27 @@ public class AddressService {
 
         address = addressRepository.save(address);
 
-        // Se marcado como padrão, remover padrão dos outros
         if (isDefault) {
             addressRepository.clearDefaultForUser(user.getId(), address.getId());
         }
 
-        return AddressResponse.fromEntity(address);
+        return address;
+    }
+
+    public void validateAddressData(AddressRequest request) {
+        Address address = Address.builder()
+                .label(request.getLabel())
+                .street(request.getStreet())
+                .number(request.getNumber())
+                .complement(request.getComplement())
+                .neighborhood(request.getNeighborhood())
+                .city(request.getCity())
+                .state(request.getState().toUpperCase())
+                .zipCode(request.getZipCode())
+                .isDefault(Boolean.TRUE.equals(request.getIsDefault()))
+                .build();
+
+        populateCoordinates(address, true);
     }
 
     @Transactional
@@ -90,7 +112,6 @@ public class AddressService {
         address.setZipCode(request.getZipCode());
         populateCoordinates(address, true);
 
-        // Atualizar padrão se solicitado
         if (request.getIsDefault() != null && request.getIsDefault() && !address.getIsDefault()) {
             addressRepository.clearDefaultForUser(user.getId(), address.getId());
             address.setIsDefault(true);
@@ -111,7 +132,6 @@ public class AddressService {
         boolean wasDefault = address.getIsDefault();
         addressRepository.delete(address);
 
-        // Se era o padrão, definir outro como padrão
         if (wasDefault) {
             List<Address> remaining = addressRepository.findByUserIdOrderByIsDefaultDescCreatedAtDesc(user.getId());
             if (!remaining.isEmpty()) {
@@ -137,6 +157,7 @@ public class AddressService {
 
         return AddressResponse.fromEntity(address);
     }
+
     private Address ensureCoordinates(Address address) {
         if (hasCoordinates(address)) {
             return address;
@@ -151,11 +172,11 @@ public class AddressService {
 
     private boolean populateCoordinates(Address address, boolean required) {
         Optional<GeocodingService.Coordinates> coordinates = geocodingService.geocodeAddress(
-                        address.getStreet(),
-                        address.getNumber(),
-                        address.getNeighborhood(),
-                        address.getCity(),
-                        address.getState());
+                address.getStreet(),
+                address.getNumber(),
+                address.getNeighborhood(),
+                address.getCity(),
+                address.getState());
 
         if (coordinates.isEmpty()) {
             if (required) {

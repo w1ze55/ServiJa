@@ -1,6 +1,7 @@
 package com.servija.servija.dto;
 
 import com.servija.servija.model.User;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -52,6 +53,10 @@ public class RegisterRequest {
 
     @NotNull(message = "Tipo de usuário é obrigatório")
     private User.UserType userType;
+
+    @Valid
+    @NotNull(message = "Endereço é obrigatório")
+    private AddressRequest address;
 
     @AssertTrue(message = "Você deve ter pelo menos 18 anos para se cadastrar")
     public boolean isMinimumAgeValid() {

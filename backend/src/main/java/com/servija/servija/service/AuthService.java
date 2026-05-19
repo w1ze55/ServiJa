@@ -1,7 +1,9 @@
 package com.servija.servija.service;
 
 import com.servija.servija.dto.AuthResponse;
+import com.servija.servija.dto.AddressRequest;
 import com.servija.servija.dto.LoginRequest;
+import com.servija.servija.dto.RegistrationValidationRequest;
 import com.servija.servija.dto.RegisterRequest;
 import com.servija.servija.exception.DuplicateResourceException;
 import com.servija.servija.exception.InvalidCredentialsException;
@@ -43,6 +45,7 @@ public class AuthService {
     private final CustomUserDetailsService userDetailsService;
     private final EmailService emailService;
     private final AuditLogger auditLogger;
+    private final AddressService addressService;
 
     @Transactional
     public AuthResponse register(RegisterRequest request) {
@@ -62,6 +65,8 @@ public class AuthService {
             user = freelancerRepository.save((Freelancer) user);
         }
 
+        addressService.createAddressForUser(user, request.getAddress());
+
         emailService.sendVerificationEmail(user.getEmail(), user.getName(), verificationCode);
 
         UserDetails userDetails = userDetailsService.loadUserByUsername(user.getEmail());
@@ -80,17 +85,29 @@ public class AuthService {
     }
 
     public void validateRegistrationData(RegisterRequest request) {
-        if (request.getUserType() == User.UserType.ADMIN) {
+        validateRegistrationData(request.getUserType(), request.getEmail(), request.getCpf());
+    }
+
+    public void validateRegistrationData(RegistrationValidationRequest request) {
+        validateRegistrationData(request.getUserType(), request.getEmail(), request.getCpf());
+    }
+
+    private void validateRegistrationData(User.UserType userType, String email, String cpf) {
+        if (userType == User.UserType.ADMIN) {
             throw new IllegalArgumentException("Cadastro publico de admin nao e permitido");
         }
 
-        if (userRepository.existsByEmail(request.getEmail())) {
+        if (userRepository.existsByEmail(email)) {
             throw new DuplicateResourceException("E-mail ja cadastrado");
         }
 
-        if (userRepository.existsByCpf(request.getCpf())) {
+        if (userRepository.existsByCpf(cpf)) {
             throw new DuplicateResourceException("CPF ja cadastrado");
         }
+    }
+
+    public void validateAddressData(AddressRequest request) {
+        addressService.validateAddressData(request);
     }
 
     public AuthResponse login(LoginRequest request) {

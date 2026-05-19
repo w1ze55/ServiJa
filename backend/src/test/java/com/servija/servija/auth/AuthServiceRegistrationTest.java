@@ -1,6 +1,7 @@
 package com.servija.servija.auth;
 
 import com.servija.servija.dto.AuthResponse;
+import com.servija.servija.dto.AddressRequest;
 import com.servija.servija.dto.RegisterRequest;
 import com.servija.servija.exception.DuplicateResourceException;
 import com.servija.servija.model.Contractor;
@@ -11,6 +12,7 @@ import com.servija.servija.repository.FreelancerRepository;
 import com.servija.servija.repository.UserRepository;
 import com.servija.servija.service.AuthService;
 import com.servija.servija.service.AuditLogger;
+import com.servija.servija.service.AddressService;
 import com.servija.servija.service.CustomUserDetailsService;
 import com.servija.servija.service.EmailService;
 import com.servija.servija.service.JwtService;
@@ -59,6 +61,8 @@ class AuthServiceRegistrationTest {
     private EmailService emailService;
     @Mock
     private AuditLogger auditLogger;
+    @Mock
+    private AddressService addressService;
 
     @InjectMocks
     private AuthService authService;
@@ -76,6 +80,16 @@ class AuthServiceRegistrationTest {
                 .birthDate(LocalDate.of(1995, 5, 10))
                 .password("Senha@123")
                 .userType(User.UserType.CONTRACTOR)
+                .address(AddressRequest.builder()
+                        .label("Principal")
+                        .street("Rua das Flores")
+                        .number("123")
+                        .neighborhood("Centro")
+                        .city("Sao Paulo")
+                        .state("SP")
+                        .zipCode("01001-000")
+                        .isDefault(true)
+                        .build())
                 .acceptTerms(true)
                 .build();
 
@@ -87,6 +101,16 @@ class AuthServiceRegistrationTest {
                 .birthDate(LocalDate.of(1998, 8, 20))
                 .password("Senha@456")
                 .userType(User.UserType.FREELANCER)
+                .address(AddressRequest.builder()
+                        .label("Principal")
+                        .street("Avenida Brasil")
+                        .number("456")
+                        .neighborhood("Jardins")
+                        .city("Sao Paulo")
+                        .state("SP")
+                        .zipCode("01311-000")
+                        .isDefault(true)
+                        .build())
                 .acceptTerms(true)
                 .build();
     }

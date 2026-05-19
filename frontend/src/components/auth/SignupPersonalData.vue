@@ -24,6 +24,7 @@ export interface PersonalData {
 interface Props {
   accountType: 'contractor' | 'provider';
   inline?: boolean;
+  initialData?: Partial<PersonalData>;
 }
 
 interface Emits {
@@ -47,6 +48,7 @@ const formData = ref<PersonalData>({
   cpf: '',
   password: '',
   acceptTerms: false,
+  ...props.initialData,
 });
 
 const showPassword = ref(false);
