@@ -24,11 +24,9 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.security.SecureRandom;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -42,16 +40,13 @@ public class AdminUserService {
     private static final Pattern EMAIL_PATTERN =
             Pattern.compile("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
     private static final Pattern PHONE_PATTERN = Pattern.compile("^\\d{10,11}$");
-    private static final int RESET_CODE_EXPIRY_MINUTES = 30;
 
     private final UserRepository userRepository;
     private final FreelancerRepository freelancerRepository;
     private final ServiceRepository serviceRepository;
     private final ServiceRequestRepository serviceRequestRepository;
     private final ReviewRepository reviewRepository;
-    private final EmailService emailService;
-    private final JwtService jwtService;
-    private final CustomUserDetailsService userDetailsService;
+    private final AdminResetPasswordLinkService adminResetPasswordLinkService;
 
     public AdminUserPageResponse listUsers(
             String search,
@@ -166,14 +161,7 @@ public class AdminUserService {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
 
-        String resetCode = generateCode();
-        user.setResetPasswordToken(resetCode);
-        user.setResetPasswordTokenExpiry(LocalDateTime.now().plusMinutes(RESET_CODE_EXPIRY_MINUTES));
-        user.setResetPasswordAttempts(0);
-        user.setResetPasswordLockUntil(null);
-        userRepository.save(user);
-
-        emailService.sendPasswordResetEmail(user.getEmail(), user.getName(), resetCode);
+        adminResetPasswordLinkService.sendResetLink(user);
     }
 
     @Transactional
@@ -368,11 +356,5 @@ public class AdminUserService {
         }
 
         return builder.build();
-    }
-
-    private String generateCode() {
-        SecureRandom random = new SecureRandom();
-        int code = 100000 + random.nextInt(900000);
-        return String.valueOf(code);
     }
 }

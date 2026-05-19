@@ -23,6 +23,8 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
 
     Optional<User> findByEmailAndEmailVerifiedTrue(String email);
 
+    Optional<User> findByAdminResetPasswordTokenHash(String adminResetPasswordTokenHash);
+
     @Query("SELECT COUNT(u) > 0 FROM User u WHERE u.email = :email AND u.id <> :excludeId")
     boolean existsByEmailAndIdNot(@Param("email") String email, @Param("excludeId") Long excludeId);
 

@@ -26,20 +26,27 @@ public class EmailService {
     public void sendVerificationEmail(String toEmail, String userName, String verificationCode) {
         sendHtmlEmail(
                 toEmail,
-                "Verificacao de Email - ServiJa",
+                "Verificação de E-mail - ServiJa",
                 buildVerificationEmailTemplate(userName, verificationCode),
-                "codigo de verificacao",
-                verificationCode);
+                "email de verificação");
     }
 
     @Async
-    public void sendPasswordResetEmail(String toEmail, String userName, String resetToken) {
+    public void sendPasswordResetCodeEmail(String toEmail, String userName, String resetCode) {
         sendHtmlEmail(
                 toEmail,
-                "Recuperacao de Senha - ServiJa",
-                buildPasswordResetEmailTemplate(userName, resetToken),
-                "token de recuperacao",
-                resetToken);
+                "Recuperação de Senha - ServiJa",
+                buildPasswordResetCodeEmailTemplate(userName, resetCode),
+                "email de recuperação de senha");
+    }
+
+    @Async
+    public void sendAdminPasswordResetLinkEmail(String toEmail, String userName, String resetLink) {
+        sendHtmlEmail(
+                toEmail,
+                "Redefinição de Senha - ServiJa",
+                buildAdminPasswordResetLinkEmailTemplate(userName, resetLink),
+                "email de redefinição de senha por link");
     }
 
     @Async
@@ -50,10 +57,9 @@ public class EmailService {
             SupportRequest.Category category) {
         sendHtmlEmail(
                 toEmail,
-                "Solicitacao de suporte criada - Protocolo #" + protocolId,
+                "Solicitação de suporte criada - Protocolo #" + protocolId,
                 buildSupportRequestCreatedTemplate(userName, protocolId, category),
-                "protocolo de suporte",
-                String.valueOf(protocolId));
+                "email de suporte");
     }
 
     @Async
@@ -66,18 +72,16 @@ public class EmailService {
         String statusLabel = status == SupportRequest.Status.APPROVED ? "Aprovada" : "Recusada";
         sendHtmlEmail(
                 toEmail,
-                "Atualizacao do chamado #" + protocolId + " - " + statusLabel,
+                "Atualização do chamado #" + protocolId + " - " + statusLabel,
                 buildSupportRequestDecisionTemplate(userName, protocolId, status, adminMessage),
-                "resposta do suporte",
-                adminMessage);
+                "email de retorno do suporte");
     }
 
     private void sendHtmlEmail(
             String toEmail,
             String subject,
             String htmlContent,
-            String fallbackLabel,
-            String fallbackValue) {
+            String fallbackLabel) {
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
@@ -91,18 +95,18 @@ public class EmailService {
             log.info("Email enviado com sucesso para {} com assunto {}", toEmail, subject);
         } catch (MessagingException e) {
             log.error("Erro de formatacao ao enviar email para {}: {}", toEmail, e.getMessage(), e);
-            logFallback(toEmail, fallbackLabel, fallbackValue);
+            logFallback(toEmail, fallbackLabel);
         } catch (MailException e) {
             log.error("Erro de SMTP ao enviar email para {}: {}", toEmail, e.getMessage(), e);
-            logFallback(toEmail, fallbackLabel, fallbackValue);
+            logFallback(toEmail, fallbackLabel);
         } catch (Exception e) {
             log.error("Erro generico ao enviar email para {}: {}", toEmail, e.getMessage(), e);
-            logFallback(toEmail, fallbackLabel, fallbackValue);
+            logFallback(toEmail, fallbackLabel);
         }
     }
 
-    private void logFallback(String toEmail, String fallbackLabel, String fallbackValue) {
-        log.warn("Fallback de email para {} com {}: {}", toEmail, fallbackLabel, fallbackValue);
+    private void logFallback(String toEmail, String fallbackLabel) {
+        log.warn("Fallback de email para {} com {}", toEmail, fallbackLabel);
     }
 
     private String buildVerificationEmailTemplate(String userName, String verificationCode) {
@@ -129,18 +133,18 @@ public class EmailService {
                             <div class="logo">ServiJa</div>
                         </div>
                         <div class="message">
-                            <h2>Ola, %s!</h2>
+                            <h2>Olá, %s!</h2>
                             <p>Obrigado por se cadastrar no ServiJa.</p>
-                            <p>Para confirmar seu endereco de e-mail, utilize o codigo abaixo:</p>
+                            <p>Para confirmar seu endereço de e-mail, utilize o código abaixo:</p>
                         </div>
                         <div class="code-box">%s</div>
                         <div class="message">
-                            <p>Este codigo e valido por <strong>24 horas</strong>.</p>
-                            <p>Se voce nao solicitou este codigo, ignore este e-mail.</p>
+                            <p>Este código é válido por <strong>24 horas</strong>.</p>
+                            <p>Se você não solicitou este código, ignore este e-mail.</p>
                         </div>
-                        <div class="warning">Nunca compartilhe este codigo com ninguem.</div>
+                        <div class="warning">Nunca compartilhe este código com ninguém.</div>
                         <div class="footer">
-                            <p>Este e um e-mail automatico, por favor nao responda.</p>
+                            <p>Este é um e-mail automático, por favor não responda.</p>
                             <p>&copy; 2026 ServiJa. Todos os direitos reservados.</p>
                         </div>
                     </div>
@@ -149,7 +153,7 @@ public class EmailService {
                 """.formatted(userName, verificationCode);
     }
 
-    private String buildPasswordResetEmailTemplate(String userName, String resetCode) {
+    private String buildPasswordResetCodeEmailTemplate(String userName, String resetCode) {
         return """
                 <!DOCTYPE html>
                 <html>
@@ -173,24 +177,73 @@ public class EmailService {
                             <div class="logo">ServiJa</div>
                         </div>
                         <div class="message">
-                            <h2>Ola, %s!</h2>
-                            <p>Recebemos uma solicitacao para redefinir sua senha.</p>
-                            <p>Utilize o codigo abaixo para criar uma nova senha:</p>
+                            <h2>Olá, %s!</h2>
+                            <p>Recebemos uma solicitação para redefinir sua senha.</p>
+                            <p>Utilize o código abaixo para criar uma nova senha:</p>
                         </div>
                         <div class="code-box">%s</div>
                         <div class="message">
-                            <p>Este codigo e valido por <strong>1 hora</strong>.</p>
-                            <p>Se voce nao solicitou a redefinicao de senha, ignore este e-mail.</p>
+                            <p>Este código é válido por <strong>30 minutos</strong>.</p>
+                            <p>Se você não solicitou a redefinição de senha, ignore este e-mail.</p>
                         </div>
-                        <div class="warning">Por seguranca, nunca compartilhe este codigo com ninguem.</div>
+                        <div class="warning">Por segurança, nunca compartilhe este código com ninguém.</div>
                         <div class="footer">
-                            <p>Este e um e-mail automatico, por favor nao responda.</p>
+                            <p>Este é um e-mail automático, por favor não responda.</p>
                             <p>&copy; 2026 ServiJa. Todos os direitos reservados.</p>
                         </div>
                     </div>
                 </body>
                 </html>
                 """.formatted(userName, resetCode);
+    }
+
+    private String buildAdminPasswordResetLinkEmailTemplate(String userName, String resetLink) {
+        return """
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <style>
+                        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
+                        .container { background-color: #f9f9f9; border-radius: 10px; padding: 30px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+                        .header { text-align: center; margin-bottom: 30px; }
+                        .logo { font-size: 32px; font-weight: bold; color: #286AD8; }
+                        .message { text-align: center; margin-bottom: 20px; }
+                        .cta-wrapper { text-align: center; margin: 30px 0; }
+                        .cta-button { display: inline-block; background-color: #2563eb; color: white !important; text-decoration: none; font-size: 16px; font-weight: bold; padding: 14px 28px; border-radius: 8px; }
+                        .helper-box { background-color: white; border: 1px solid #dbeafe; border-radius: 8px; padding: 16px; margin-top: 24px; font-size: 14px; color: #1e3a8a; }
+                        .footer { text-align: center; font-size: 12px; color: #666; margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; }
+                        .warning { background-color: #fee2e2; border: 1px solid #ef4444; border-radius: 5px; padding: 15px; margin-top: 20px; text-align: center; font-size: 14px; color: #991b1b; }
+                    </style>
+                </head>
+                <body>
+                    <div class="container">
+                        <div class="header">
+                            <div class="logo">ServiJa</div>
+                        </div>
+                        <div class="message">
+                            <h2>Olá, %s!</h2>
+                            <p>Um administrador solicitou a redefinição da sua senha.</p>
+                            <p>Clique no botão abaixo para criar uma nova senha.</p>
+                        </div>
+                        <div class="cta-wrapper">
+                            <a class="cta-button" href="%s">Redefinir senha</a>
+                        </div>
+                        <div class="helper-box">
+                            <p>Este link é de <strong>uso único</strong> e expira em <strong>30 minutos</strong>.</p>
+                            <p>Se o botão não funcionar, copie e cole este endereço no navegador:</p>
+                            <p style="word-break: break-word; margin-top: 12px;">%s</p>
+                        </div>
+                        <div class="warning">Se você não esperava este e-mail, ignore-o. O link se tornará inválido após o uso.</div>
+                        <div class="footer">
+                            <p>Este é um e-mail automático, por favor não responda.</p>
+                            <p>&copy; 2026 ServiJa. Todos os direitos reservados.</p>
+                        </div>
+                    </div>
+                </body>
+                </html>
+                """.formatted(userName, resetLink, resetLink);
     }
 
     private String buildSupportRequestCreatedTemplate(
@@ -218,16 +271,16 @@ public class EmailService {
                         <div class="header">
                             <div class="logo">ServiJa</div>
                         </div>
-                        <h2>Ola, %s!</h2>
-                        <p>Sua solicitacao de suporte foi criada com sucesso.</p>
-                        <p>Nossa equipe tem ate <strong>7 dias uteis</strong> para analisar e retornar sua solicitacao.</p>
+                        <h2>Olá, %s!</h2>
+                        <p>Sua solicitação de suporte foi criada com sucesso.</p>
+                        <p>Nossa equipe tem até <strong>7 dias úteis</strong> para analisar e retornar sua solicitação.</p>
                         <div class="protocol-box">Protocolo #%s</div>
                         <div class="card">
                             <p><strong>Categoria:</strong> %s</p>
                             <p>Guarde este protocolo para acompanhar o chamado quando precisar.</p>
                         </div>
                         <div class="footer">
-                            <p>Este e um e-mail automatico, por favor nao responda.</p>
+                            <p>Este é um e-mail automático, por favor não responda.</p>
                             <p>&copy; 2026 ServiJa. Todos os direitos reservados.</p>
                         </div>
                     </div>
@@ -266,15 +319,15 @@ public class EmailService {
                         <div class="header">
                             <div class="logo">ServiJa</div>
                         </div>
-                        <h2>Ola, %s!</h2>
-                        <p>Seu chamado de suporte com protocolo <strong>#%s</strong> recebeu uma atualizacao.</p>
+                        <h2>Olá, %s!</h2>
+                        <p>Seu chamado de suporte com protocolo <strong>#%s</strong> recebeu uma atualização.</p>
                         <div class="status-box">%s</div>
                         <div class="response-box">
                             <strong>Mensagem da equipe:</strong>
                             <p>%s</p>
                         </div>
                         <div class="footer">
-                            <p>Este e um e-mail automatico, por favor nao responda.</p>
+                            <p>Este é um e-mail automático, por favor não responda.</p>
                             <p>&copy; 2026 ServiJa. Todos os direitos reservados.</p>
                         </div>
                     </div>
@@ -294,9 +347,9 @@ public class EmailService {
             case BUG -> "Erro ou bug";
             case CATEGORY_SUBCATEGORY_REQUEST -> "Cadastro de nova categoria ou subcategoria";
             case PAYMENT_ISSUE -> "Problemas com pagamento";
-            case SERVICE_ISSUE -> "Problemas com servico";
+            case SERVICE_ISSUE -> "Problemas com serviço";
             case FRAUD -> "Fraude";
-            case USER_REPORT -> "Denuncia de usuario";
+            case USER_REPORT -> "Denúncia de usuário";
         };
     }
 

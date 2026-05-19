@@ -74,6 +74,12 @@ public class User implements UserDetails {
     @Column
     private LocalDateTime resetPasswordTokenExpiry;
 
+    @Column(length = 64)
+    private String adminResetPasswordTokenHash;
+
+    @Column
+    private LocalDateTime adminResetPasswordTokenExpiry;
+
     @Column(nullable = false)
     @lombok.Builder.Default
     private Integer resetPasswordAttempts = 0;

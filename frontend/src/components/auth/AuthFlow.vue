@@ -29,10 +29,11 @@ interface AuthFlowProps {
 }
 
 const props = defineProps<AuthFlowProps>()
+const hasResetToken = computed(() => Boolean(props.resetToken?.trim()))
 
 // estado principal
 const currentPage = ref<AuthPage>(
-  props.resetToken ? 'reset-password' : 'auth-card'
+  hasResetToken.value ? 'reset-password' : 'auth-card'
 )
 const accountType = ref<'contractor' | 'provider' | null>(null)
 const personalData = ref<PersonalData | null>(null)
@@ -139,7 +140,7 @@ function handleResetPasswordSuccess() {
 }
 
 function handleResetPasswordBack() {
-  currentPage.value = 'forgot-password'
+  currentPage.value = hasResetToken.value ? 'auth-card' : 'forgot-password'
 }
 
 // --- renderização dinâmica ---
@@ -184,6 +185,7 @@ const currentProps = computed(() => {
     case 'reset-password':
       return {
         email: recoveryEmail.value,
+        resetToken: props.resetToken,
         onSuccess: handleResetPasswordSuccess,
         onBack: handleResetPasswordBack,
       }

@@ -100,10 +100,10 @@ const handleResetPassword = async () => {
   isSubmitting.value = true;
   try {
     await adminUserService.resetPassword(props.user.id);
-    toast.success(`Email de redefinição enviado para ${props.user.email}`);
+    toast.success(`Link de redefinição enviado para ${props.user.email}`);
     showResetPasswordConfirm.value = false;
   } catch {
-    toast.error('Erro ao enviar email de redefinição de senha.');
+    toast.error('Erro ao enviar link de redefinição de senha.');
   } finally {
     isSubmitting.value = false;
   }
@@ -463,7 +463,7 @@ const handleKycToggle = async () => {
           <h3 class="text-base font-semibold text-slate-900">Resetar senha</h3>
         </div>
         <p class="mb-6 text-sm text-slate-600">
-          Deseja enviar um email de redefinição de senha para <strong>{{ user?.email }}</strong>?
+          Deseja enviar um link de redefinição de senha para <strong>{{ user?.email }}</strong>?
         </p>
         <div class="flex gap-3">
           <button
@@ -478,7 +478,7 @@ const handleKycToggle = async () => {
             :disabled="isSubmitting"
             @click="handleResetPassword"
           >
-            {{ isSubmitting ? 'Enviando...' : 'Enviar email' }}
+            {{ isSubmitting ? 'Enviando...' : 'Enviar link' }}
           </button>
         </div>
       </div>

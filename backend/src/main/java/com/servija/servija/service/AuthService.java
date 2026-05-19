@@ -46,6 +46,8 @@ public class AuthService {
     private final EmailService emailService;
     private final AuditLogger auditLogger;
     private final AddressService addressService;
+    private final PasswordPolicyService passwordPolicyService;
+    private final AdminResetPasswordLinkService adminResetPasswordLinkService;
 
     @Transactional
     public AuthResponse register(RegisterRequest request) {
@@ -94,7 +96,7 @@ public class AuthService {
 
     private void validateRegistrationData(User.UserType userType, String email, String cpf) {
         if (userType == User.UserType.ADMIN) {
-            throw new IllegalArgumentException("Cadastro publico de admin nao e permitido");
+            throw new IllegalArgumentException("Cadastro público de admin não é permitido");
         }
 
         if (userRepository.existsByEmail(email)) {
@@ -116,7 +118,7 @@ public class AuthService {
                     new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword()));
 
             User user = userRepository.findByEmail(request.getEmail())
-                    .orElseThrow(() -> new ResourceNotFoundException("Usuario nao encontrado"));
+                    .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
 
             if (user.getUserType() == User.UserType.ADMIN) {
                 throw new InvalidCredentialsException("Credenciais invalidas");
@@ -169,7 +171,7 @@ public class AuthService {
                 new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword()));
 
         User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new ResourceNotFoundException("Usuario nao encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
 
         if (user.getUserType() != User.UserType.ADMIN) {
             throw new InvalidCredentialsException("Credenciais invalidas");
@@ -188,7 +190,7 @@ public class AuthService {
     @Transactional(noRollbackFor = { IllegalArgumentException.class, TooManyAttemptsException.class })
     public AuthResponse verifyEmail(String email, String code) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("Usuario nao encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
 
         if (Boolean.TRUE.equals(user.getEmailVerified())) {
             throw new IllegalStateException("E-mail ja verificado");
@@ -226,7 +228,7 @@ public class AuthService {
         }
 
         if (user.getVerificationCodeExpiry() == null || user.getVerificationCodeExpiry().isBefore(LocalDateTime.now())) {
-            throw new IllegalArgumentException("Codigo de verificacao expirado, solicite um novo");
+            throw new IllegalArgumentException("Código de verificação expirado, solicite um novo");
         }
 
         user.setEmailVerified(true);
@@ -245,10 +247,10 @@ public class AuthService {
     @Transactional
     public void resendVerificationCode(String email) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("Usuario nao encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
 
         if (Boolean.TRUE.equals(user.getEmailVerified())) {
-            throw new IllegalStateException("E-mail ja verificado");
+            throw new IllegalStateException("E-mail já verificado");
         }
 
         String verificationCode = generateVerificationCode();
@@ -276,13 +278,13 @@ public class AuthService {
         user.setResetPasswordLockUntil(null);
         userRepository.save(user);
 
-        emailService.sendPasswordResetEmail(user.getEmail(), user.getName(), resetCode);
+        emailService.sendPasswordResetCodeEmail(user.getEmail(), user.getName(), resetCode);
     }
 
     @Transactional(noRollbackFor = { IllegalArgumentException.class, TooManyAttemptsException.class })
     public void verifyResetPasswordCode(String email, String code) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("Usuario nao encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
 
         validateResetPasswordCode(user, code, true);
         user.setResetPasswordAttempts(0);
@@ -293,21 +295,14 @@ public class AuthService {
     @Transactional(noRollbackFor = { IllegalArgumentException.class, TooManyAttemptsException.class })
     public void resetPassword(String email, String code, String newPassword, String confirmPassword) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("Usuario nao encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
 
         validateResetPasswordCode(user, code, false);
 
-        if (!newPassword.equals(confirmPassword)) {
-            throw new IllegalArgumentException("As senhas nao coincidem");
-        }
-
-        if (!isValidPassword(newPassword)) {
-            throw new IllegalArgumentException(
-                    "A senha deve ter no minimo 8 caracteres e conter pelo menos: "
-                            + "1 letra maiuscula, 1 letra minuscula, 1 numero e 1 caractere especial");
-        }
+        passwordPolicyService.validateNewPassword(newPassword, confirmPassword);
 
         user.setPassword(passwordEncoder.encode(newPassword));
+        adminResetPasswordLinkService.clearAdminResetLink(user);
         clearResetPasswordChallenge(user);
         saveUser(user);
     }
@@ -330,7 +325,7 @@ public class AuthService {
 
         if (user.getResetPasswordToken() == null || !user.getResetPasswordToken().equals(code)) {
             if (!consumeAttemptsOnFailure) {
-                throw new IllegalArgumentException("Codigo de recuperacao invalido");
+                throw new IllegalArgumentException("Código de recuperação inválido");
             }
 
             int attempts = safeAttempts(user.getResetPasswordAttempts()) + 1;
@@ -352,7 +347,7 @@ public class AuthService {
         }
 
         if (user.getResetPasswordTokenExpiry() == null || user.getResetPasswordTokenExpiry().isBefore(now)) {
-            throw new IllegalArgumentException("Codigo de recuperacao expirado. Solicite um novo.");
+            throw new IllegalArgumentException("Código de recuperação expirado. Solicite um novo.");
         }
     }
 
@@ -375,19 +370,6 @@ public class AuthService {
             return freelancerRepository.save(freelancer);
         }
         return userRepository.save(user);
-    }
-
-    private boolean isValidPassword(String password) {
-        if (password == null || password.length() < 8 || password.length() > 256) {
-            return false;
-        }
-
-        boolean hasUpperCase = password.chars().anyMatch(Character::isUpperCase);
-        boolean hasLowerCase = password.chars().anyMatch(Character::isLowerCase);
-        boolean hasDigit = password.chars().anyMatch(Character::isDigit);
-        boolean hasSpecial = password.chars().anyMatch(ch -> "!@#$%^&*(),.?\":{}|<>".indexOf(ch) >= 0);
-
-        return hasUpperCase && hasLowerCase && hasDigit && hasSpecial;
     }
 
     private Contractor createContractor(RegisterRequest request) {

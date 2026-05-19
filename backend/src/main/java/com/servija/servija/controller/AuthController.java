@@ -1,6 +1,9 @@
 package com.servija.servija.controller;
 
 import com.servija.servija.dto.AuthResponse;
+import com.servija.servija.dto.AdminResetPasswordLinkResetRequest;
+import com.servija.servija.dto.AdminResetPasswordLinkValidateRequest;
+import com.servija.servija.dto.AdminResetPasswordLinkValidationResponse;
 import com.servija.servija.dto.AddressRequest;
 import com.servija.servija.dto.ForgotPasswordRequest;
 import com.servija.servija.dto.LoginRequest;
@@ -10,8 +13,8 @@ import com.servija.servija.dto.RegisterRequest;
 import com.servija.servija.dto.ResetPasswordRequest;
 import com.servija.servija.dto.VerifyEmailRequest;
 import com.servija.servija.dto.VerifyResetPasswordCodeRequest;
+import com.servija.servija.service.AdminResetPasswordLinkService;
 import com.servija.servija.service.AuthService;
-import com.servija.servija.service.EmailService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -22,7 +25,6 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -36,7 +38,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
     private final AuthService authService;
-    private final EmailService emailService;
+    private final AdminResetPasswordLinkService adminResetPasswordLinkService;
 
     @PostMapping("/register")
     @Operation(summary = "Registrar novo usuario", description = "Cria uma nova conta de usuario no sistema. Apos o registro, um codigo de verificacao e enviado para o e-mail fornecido.")
@@ -160,6 +162,32 @@ public class AuthController {
     public ResponseEntity<MessageResponse> resendResetCode(@RequestParam String email) {
         authService.forgotPassword(email);
         return ResponseEntity.ok(new MessageResponse("Codigo de recuperacao reenviado"));
+    }
+
+    @PostMapping("/admin-reset-link/validate")
+    @Operation(summary = "Validar link de reset do admin", description = "Valida um link unico de redefinicao de senha enviado pelo painel administrativo")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Link valido", content = @Content(schema = @Schema(implementation = AdminResetPasswordLinkValidationResponse.class))),
+            @ApiResponse(responseCode = "400", description = "Link invalido, expirado ou ja utilizado", content = @Content(schema = @Schema(implementation = MessageResponse.class)))
+    })
+    public ResponseEntity<AdminResetPasswordLinkValidationResponse> validateAdminResetLink(
+            @Valid @RequestBody AdminResetPasswordLinkValidateRequest request) {
+        return ResponseEntity.ok(adminResetPasswordLinkService.validateToken(request.getToken()));
+    }
+
+    @PostMapping("/admin-reset-link/reset-password")
+    @Operation(summary = "Redefinir senha por link do admin", description = "Redefine a senha usando um link unico enviado por um administrador")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Senha redefinida com sucesso", content = @Content(schema = @Schema(implementation = MessageResponse.class))),
+            @ApiResponse(responseCode = "400", description = "Link invalido, expirado, ja utilizado ou senha invalida", content = @Content(schema = @Schema(implementation = MessageResponse.class)))
+    })
+    public ResponseEntity<MessageResponse> resetPasswordByAdminLink(
+            @Valid @RequestBody AdminResetPasswordLinkResetRequest request) {
+        adminResetPasswordLinkService.resetPassword(
+                request.getToken(),
+                request.getNewPassword(),
+                request.getConfirmPassword());
+        return ResponseEntity.ok(new MessageResponse("Senha redefinida com sucesso"));
     }
 
 }
