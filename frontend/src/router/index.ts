@@ -23,7 +23,6 @@ import FreelancerProjectDetailPage from "@/pages/FreelancerProjectDetail/index.v
 import FreelancerWalletPage from "@/pages/FreelancerWallet/index.vue";
 
 
-import MessagesPage from "@/pages/Messages/index.vue";
 import ChatPage from "@/pages/Chat/index.vue";
 import NotificationsPage from "@/pages/Notifications/index.vue";
 import ExplorePage from "@/pages/Explore/index.vue";
@@ -213,11 +212,11 @@ const routes: RouteRecordRaw[] = [
   {
     path: "/messages",
     name: "messages",
-    component: MessagesPage,
+    redirect: "/chat",
     meta: { requiresAuth: true },
   },
   {
-    path: "/chat/:serviceRequestId",
+    path: "/chat/:serviceRequestId?",
     name: "chat",
     component: ChatPage,
     meta: { requiresAuth: true },
