@@ -453,17 +453,19 @@ const buildNearbyParams = () => {
   };
 
   if (searchTerm.value) params.q = searchTerm.value;
-  if (appliedFilters.value.categoryId)
-    params.categoryId = appliedFilters.value.categoryId;
-  if (appliedFilters.value.categorySlug)
-    params.categorySlug = appliedFilters.value.categorySlug;
-  if (appliedFilters.value.subcategoryId)
-    params.subcategoryId = appliedFilters.value.subcategoryId;
-  if (appliedFilters.value.subcategorySlug)
-    params.subcategorySlug = appliedFilters.value.subcategorySlug;
-  if (appliedFilters.value.minRating > 0)
-    params.minRating = appliedFilters.value.minRating;
-  if (appliedFilters.value.onlyAvailable) params.available = true;
+  if (!searchTerm.value) {
+    if (appliedFilters.value.categoryId)
+      params.categoryId = appliedFilters.value.categoryId;
+    if (appliedFilters.value.categorySlug)
+      params.categorySlug = appliedFilters.value.categorySlug;
+    if (appliedFilters.value.subcategoryId)
+      params.subcategoryId = appliedFilters.value.subcategoryId;
+    if (appliedFilters.value.subcategorySlug)
+      params.subcategorySlug = appliedFilters.value.subcategorySlug;
+    if (appliedFilters.value.minRating > 0)
+      params.minRating = appliedFilters.value.minRating;
+    if (appliedFilters.value.onlyAvailable) params.available = true;
+  }
   if (userLocation.value.city) params.city = userLocation.value.city;
   if (userLocation.value.state) params.state = userLocation.value.state;
 
@@ -1377,9 +1379,9 @@ onUnmounted(() => {
 }
 
 .sidebar-desktop {
-  top: 72px;
+  top: 100px;
   width: 300px;
-  max-height: calc(100dvh - 96px);
+  max-height: calc(100dvh - 144px);
 }
 
 .mobile-sheet {

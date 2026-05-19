@@ -216,16 +216,19 @@ const projects = ref<PortfolioProject[]>([]);
 
 // Filter projects
 const filteredProjects = computed(() => {
+  const normalizedSearchQuery = searchQuery.value.trim().toLowerCase();
+  const hasSearchQuery = normalizedSearchQuery.length > 0;
+
   let filtered = projects.value;
-  if (selectedCategory.value !== 'Todos') {
+  if (!hasSearchQuery && selectedCategory.value !== 'Todos') {
     filtered = filtered.filter((p) => p.category === selectedCategory.value);
   }
-  if (searchQuery.value) {
+  if (hasSearchQuery) {
     filtered = filtered.filter(
       (p) =>
-        p.title.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-        p.description.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-        p.tags.some((tag) => tag.toLowerCase().includes(searchQuery.value.toLowerCase()))
+        p.title.toLowerCase().includes(normalizedSearchQuery) ||
+        p.description.toLowerCase().includes(normalizedSearchQuery) ||
+        p.tags.some((tag) => tag.toLowerCase().includes(normalizedSearchQuery))
     );
   }
   return filtered;

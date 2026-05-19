@@ -201,12 +201,16 @@ const loadStats = async () => {
 
 // Filtrar e ordenar serviços
 const filteredServices = computed(() => {
+  const normalizedSearchQuery = searchQuery.value.trim().toLowerCase();
+  const hasSearchQuery = normalizedSearchQuery.length > 0;
+
   let filtered = services.value.filter((service) => {
     const matchesSearch =
-      service.title.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-      service.description.toLowerCase().includes(searchQuery.value.toLowerCase());
+      !hasSearchQuery ||
+      service.title.toLowerCase().includes(normalizedSearchQuery) ||
+      service.description.toLowerCase().includes(normalizedSearchQuery);
     const matchesCategory = categoryFilter.value === 'Todos' || service.category === categoryFilter.value;
-    return matchesSearch && matchesCategory;
+    return hasSearchQuery ? matchesSearch : matchesSearch && matchesCategory;
   });
 
   // Ordenar
