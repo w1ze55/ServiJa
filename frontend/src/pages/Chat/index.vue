@@ -104,7 +104,7 @@ async function handleSend(messageText: string, attachments: File[]) {
         const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(url);
         const msg = await chatService.sendMessage(
           conversation.value.id,
-          isImage ? '📷 Imagem' : '📎 Arquivo',
+          isImage ? 'Imagem' : 'Arquivo',
           isImage ? 'image' : 'file',
           url
         );
