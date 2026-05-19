@@ -206,6 +206,15 @@ const filteredRequests = computed(() => {
   const normalizedSearch = searchTerm.value.trim().toLowerCase();
 
   return requests.value.filter((request) => {
+    if (normalizedSearch) {
+      return (
+        String(request.id).includes(normalizedSearch) ||
+        String(request.userId).includes(normalizedSearch) ||
+        request.userName.toLowerCase().includes(normalizedSearch) ||
+        request.userEmail.toLowerCase().includes(normalizedSearch)
+      );
+    }
+
     const matchesStatus = statusFilter.value === 'ALL' || request.status === statusFilter.value;
     const matchesCategory = categoryFilter.value === 'ALL' || request.category === categoryFilter.value;
     const matchesTime = matchesSelectedTimeFilter(request.createdAt);
@@ -214,16 +223,7 @@ const filteredRequests = computed(() => {
       return false;
     }
 
-    if (!normalizedSearch) {
-      return true;
-    }
-
-    return (
-      String(request.id).includes(normalizedSearch) ||
-      String(request.userId).includes(normalizedSearch) ||
-      request.userName.toLowerCase().includes(normalizedSearch) ||
-      request.userEmail.toLowerCase().includes(normalizedSearch)
-    );
+    return true;
   });
 });
 

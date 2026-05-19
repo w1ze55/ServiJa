@@ -14,9 +14,31 @@ import AdminLayout from '@/layouts/AdminLayout.vue'
 import AuditLogDrawer from './AuditLogDrawer.vue'
 import { useAuditLogStore } from '@/stores/auditLogStore'
 import type { AuditLogEntry, ActorType } from '@/api/services/auditLogService'
+import Select from '@/components/ui/select.vue'
+import SelectContent from '@/components/ui/select-content.vue'
+import SelectItem from '@/components/ui/select-item.vue'
+import SelectTrigger from '@/components/ui/select-trigger.vue'
+import SelectValue from '@/components/ui/select-value.vue'
 
 const store = useAuditLogStore()
 const drawerOpen = ref(false)
+const actorTypeFilter = ref('')
+const actionFilter = ref('')
+const entityTypeFilter = ref('')
+const resultFilter = ref('')
+const timeFilter = ref('Ultimos 30 dias')
+const customDateFrom = ref('')
+const customDateTo = ref('')
+
+const TIME_FILTER_OPTIONS = [
+  { value: 'Hoje', label: 'Hoje' },
+  { value: 'Ontem', label: 'Ontem' },
+  { value: 'Ultimos 7 dias', label: 'Últimos 7 dias' },
+  { value: 'Ultimos 30 dias', label: 'Últimos 30 dias' },
+  { value: 'Mes atual', label: 'Mês atual' },
+  { value: 'Ultimo mes', label: 'Último mês' },
+  { value: 'Intervalo personalizado', label: 'Intervalo personalizado' },
+] as const
 
 // ---- action metadata ----------------------------------------------------
 type ActionMeta = { label: string; cls: string; icon: unknown }
@@ -146,21 +168,37 @@ let searchTimer: ReturnType<typeof setTimeout>
 const onSearch = () => {
   clearTimeout(searchTimer)
   searchTimer = setTimeout(() => {
-    store.filters.search = searchInput.value
-    store.filters.page = 0
-    store.loadLogs()
+    onFilterChange()
   }, 300)
 }
 
 const onFilterChange = () => {
+  const normalizedSearch = searchInput.value.trim()
+  const { dateFrom, dateTo } = resolveDateRange()
+  const shouldPrioritizeSearch = normalizedSearch.length > 0
+
+  store.filters.search = normalizedSearch
+  store.filters.actorType = shouldPrioritizeSearch ? '' : actorTypeFilter.value
+  store.filters.action = shouldPrioritizeSearch ? '' : actionFilter.value
+  store.filters.entityType = shouldPrioritizeSearch ? '' : entityTypeFilter.value
+  store.filters.result = shouldPrioritizeSearch ? '' : resultFilter.value
+  store.filters.dateFrom = shouldPrioritizeSearch ? '' : dateFrom
+  store.filters.dateTo = shouldPrioritizeSearch ? '' : dateTo
   store.filters.page = 0
   store.loadLogs()
 }
 
 const clearFilters = () => {
   searchInput.value = ''
+  actorTypeFilter.value = ''
+  actionFilter.value = ''
+  entityTypeFilter.value = ''
+  resultFilter.value = ''
+  timeFilter.value = 'Ultimos 30 dias'
+  customDateFrom.value = ''
+  customDateTo.value = ''
   store.filters = { search: '', action: '', entityType: '', actorType: '', result: '', dateFrom: '', dateTo: '', page: 0, size: 20 }
-  store.loadLogs()
+  onFilterChange()
 }
 
 // Distinct actions seen in current page — used to populate dropdown
@@ -170,10 +208,110 @@ const knownActions = computed(() => {
 
 const knownEntityTypes = computed(() => Object.keys(ENTITY_LABEL))
 
+const selectedActorTypeLabel = computed(() => {
+  switch (store.filters.actorType) {
+    case 'CONTRACTOR':
+      return 'Contratante'
+    case 'FREELANCER':
+      return 'Freelancer'
+    case 'GUEST':
+      return 'Anônimo'
+    default:
+      return 'Tipo: Todos'
+  }
+})
+
+const selectedActionLabel = computed(() =>
+  store.filters.action ? ACTION_META[store.filters.action]?.label ?? store.filters.action : 'Todas as ações'
+)
+
+const selectedEntityTypeLabel = computed(() =>
+  store.filters.entityType ? ENTITY_LABEL[store.filters.entityType] ?? store.filters.entityType : 'Todas as entidades'
+)
+
+const selectedResultLabel = computed(() => {
+  switch (store.filters.result) {
+    case 'SUCCESS':
+      return 'Sucesso'
+    case 'FAILURE':
+      return 'Falha'
+    default:
+      return 'Resultado: Todos'
+  }
+})
+
+const handleTimeFilterChange = (value: string) => {
+  timeFilter.value = value
+  onFilterChange()
+}
+
+const selectedTimeFilterLabel = computed(() =>
+  TIME_FILTER_OPTIONS.find((option) => option.value === timeFilter.value)?.label || 'Últimos 30 dias'
+)
+
+const formatDateInput = (date: Date) => {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+const resolveDateRange = () => {
+  const now = new Date()
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+
+  switch (timeFilter.value) {
+    case 'Hoje':
+      return { dateFrom: formatDateInput(startOfToday), dateTo: formatDateInput(startOfToday) }
+    case 'Ontem': {
+      const yesterday = new Date(startOfToday)
+      yesterday.setDate(yesterday.getDate() - 1)
+      return { dateFrom: formatDateInput(yesterday), dateTo: formatDateInput(yesterday) }
+    }
+    case 'Ultimos 7 dias': {
+      const sevenDaysAgo = new Date(startOfToday)
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+      return { dateFrom: formatDateInput(sevenDaysAgo), dateTo: formatDateInput(startOfToday) }
+    }
+    case 'Ultimos 30 dias': {
+      const thirtyDaysAgo = new Date(startOfToday)
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+      return { dateFrom: formatDateInput(thirtyDaysAgo), dateTo: formatDateInput(startOfToday) }
+    }
+    case 'Mes atual': {
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+      return { dateFrom: formatDateInput(startOfMonth), dateTo: formatDateInput(startOfToday) }
+    }
+    case 'Ultimo mes': {
+      const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+      const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0)
+      return { dateFrom: formatDateInput(startOfLastMonth), dateTo: formatDateInput(endOfLastMonth) }
+    }
+    case 'Intervalo personalizado':
+      return { dateFrom: customDateFrom.value, dateTo: customDateTo.value }
+    default:
+      return { dateFrom: '', dateTo: '' }
+  }
+}
+
 // ---- pagination ----------------------------------------------------------
 const goToPage = (p: number) => {
   store.filters.page = p
-  store.loadLogs()
+  const normalizedSearch = searchInput.value.trim()
+  const { dateFrom, dateTo } = resolveDateRange()
+  const shouldPrioritizeSearch = normalizedSearch.length > 0
+
+  store.loadLogs({
+    ...store.filters,
+    search: normalizedSearch,
+    actorType: shouldPrioritizeSearch ? '' : store.filters.actorType,
+    action: shouldPrioritizeSearch ? '' : store.filters.action,
+    entityType: shouldPrioritizeSearch ? '' : store.filters.entityType,
+    result: shouldPrioritizeSearch ? '' : store.filters.result,
+    dateFrom: shouldPrioritizeSearch ? '' : dateFrom,
+    dateTo: shouldPrioritizeSearch ? '' : dateTo,
+    page: p,
+  })
 }
 
 const pageNumbers = () => {
@@ -226,7 +364,7 @@ const exportCsv = () => {
   URL.revokeObjectURL(url)
 }
 
-onMounted(() => store.loadLogs())
+onMounted(() => onFilterChange())
 </script>
 
 <template>
@@ -264,7 +402,7 @@ onMounted(() => store.loadLogs())
             />
           </div>
 
-          <select
+          <select v-if="false"
             v-model="store.filters.actorType"
             class="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
             @change="onFilterChange"
@@ -275,7 +413,27 @@ onMounted(() => store.loadLogs())
             <option value="GUEST">Anônimo</option>
           </select>
 
-          <select
+          <Select
+            :model-value="store.filters.actorType"
+            @update:model-value="
+              (value) => {
+                store.filters.actorType = value as typeof store.filters.actorType
+                onFilterChange()
+              }
+            "
+          >
+            <SelectTrigger class="min-w-[180px]">
+              <SelectValue :label="selectedActorTypeLabel" placeholder="Tipo: Todos" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">Tipo: Todos</SelectItem>
+              <SelectItem value="CONTRACTOR">Contratante</SelectItem>
+              <SelectItem value="FREELANCER">Freelancer</SelectItem>
+              <SelectItem value="GUEST">Anônimo</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <select v-if="false"
             v-model="store.filters.action"
             class="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
             @change="onFilterChange"
@@ -284,7 +442,25 @@ onMounted(() => store.loadLogs())
             <option v-for="a in knownActions" :key="a" :value="a">{{ ACTION_META[a].label }}</option>
           </select>
 
-          <select
+          <Select
+            :model-value="store.filters.action"
+            @update:model-value="
+              (value) => {
+                store.filters.action = value
+                onFilterChange()
+              }
+            "
+          >
+            <SelectTrigger class="min-w-[220px]">
+              <SelectValue :label="selectedActionLabel" placeholder="Todas as ações" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">Todas as ações</SelectItem>
+              <SelectItem v-for="a in knownActions" :key="a" :value="a">{{ ACTION_META[a].label }}</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <select v-if="false"
             v-model="store.filters.entityType"
             class="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
             @change="onFilterChange"
@@ -293,7 +469,25 @@ onMounted(() => store.loadLogs())
             <option v-for="e in knownEntityTypes" :key="e" :value="e">{{ ENTITY_LABEL[e] }}</option>
           </select>
 
-          <select
+          <Select
+            :model-value="store.filters.entityType"
+            @update:model-value="
+              (value) => {
+                store.filters.entityType = value
+                onFilterChange()
+              }
+            "
+          >
+            <SelectTrigger class="min-w-[220px]">
+              <SelectValue :label="selectedEntityTypeLabel" placeholder="Todas as entidades" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">Todas as entidades</SelectItem>
+              <SelectItem v-for="e in knownEntityTypes" :key="e" :value="e">{{ ENTITY_LABEL[e] }}</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <select v-if="false"
             v-model="store.filters.result"
             class="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
             @change="onFilterChange"
@@ -303,7 +497,45 @@ onMounted(() => store.loadLogs())
             <option value="FAILURE">Falha</option>
           </select>
 
+          <Select
+            :model-value="store.filters.result"
+            @update:model-value="
+              (value) => {
+                store.filters.result = value as typeof store.filters.result
+                onFilterChange()
+              }
+            "
+          >
+            <SelectTrigger class="min-w-[180px]">
+              <SelectValue :label="selectedResultLabel" placeholder="Resultado: Todos" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">Resultado: Todos</SelectItem>
+              <SelectItem value="SUCCESS">Sucesso</SelectItem>
+              <SelectItem value="FAILURE">Falha</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select
+            :model-value="timeFilter"
+            @update:model-value="handleTimeFilterChange"
+          >
+            <SelectTrigger class="min-w-[220px]">
+              <SelectValue :label="selectedTimeFilterLabel" placeholder="Últimos 30 dias" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem
+                v-for="timeOption in TIME_FILTER_OPTIONS"
+                :key="timeOption.value"
+                :value="timeOption.value"
+              >
+                {{ timeOption.label }}
+              </SelectItem>
+            </SelectContent>
+          </Select>
+
           <input
+            v-if="false"
             v-model="store.filters.dateFrom"
             type="date"
             title="De"
@@ -311,6 +543,7 @@ onMounted(() => store.loadLogs())
             @change="onFilterChange"
           />
           <input
+            v-if="false"
             v-model="store.filters.dateTo"
             type="date"
             title="Até"
@@ -326,6 +559,31 @@ onMounted(() => store.loadLogs())
             <X class="h-4 w-4" />
             Limpar filtros
           </button>
+        </div>
+
+        <div
+          v-if="timeFilter === 'Intervalo personalizado'"
+          class="mt-4 grid grid-cols-1 gap-4 border-t border-slate-200 pt-4 md:grid-cols-2"
+        >
+          <div class="space-y-1">
+            <label class="text-sm font-medium text-slate-700">De</label>
+            <input
+              v-model="customDateFrom"
+              type="date"
+              class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+              @change="onFilterChange"
+            />
+          </div>
+
+          <div class="space-y-1">
+            <label class="text-sm font-medium text-slate-700">Até</label>
+            <input
+              v-model="customDateTo"
+              type="date"
+              class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+              @change="onFilterChange"
+            />
+          </div>
         </div>
       </div>
 
