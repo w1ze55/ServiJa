@@ -7,17 +7,12 @@ import {
   Unlock,
   Edit2,
   KeyRound,
-  CheckCircle,
-  XCircle,
   Trash2,
   AlertTriangle,
   Phone,
   Mail,
   CreditCard,
   Calendar,
-  Briefcase,
-  ShieldCheck,
-  ShieldX,
   Package,
 } from "lucide-vue-next";
 import {
@@ -40,7 +35,6 @@ const emit = defineEmits<{
 // Dialog states
 const showBlockConfirm = ref(false);
 const showResetPasswordConfirm = ref(false);
-const showKycConfirm = ref(false);
 const showEditModal = ref(false);
 const showDeleteModal = ref(false);
 
@@ -153,23 +147,6 @@ const handleResetPassword = async () => {
   }
 };
 
-const handleKycToggle = async () => {
-  if (!props.user) return;
-  isSubmitting.value = true;
-  const approve = !props.user.kycCompleted;
-  try {
-    await adminUserService.updateKyc(props.user.id, approve);
-    toast.success(
-      approve ? "KYC aprovado com sucesso." : "KYC revogado com sucesso.",
-    );
-    showKycConfirm.value = false;
-    emit("refresh");
-  } catch {
-    toast.error("Erro ao atualizar status de KYC.");
-  } finally {
-    isSubmitting.value = false;
-  }
-};
 </script>
 
 <template>
@@ -368,21 +345,6 @@ const handleKycToggle = async () => {
                 </div>
               </div>
               <div class="flex items-center gap-3">
-                <span class="text-slate-500">KYC:</span>
-                <span
-                  v-if="user.kycCompleted"
-                  class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700"
-                >
-                  <CheckCircle class="h-3 w-3" /> Aprovado
-                </span>
-                <span
-                  v-else
-                  class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700"
-                >
-                  <AlertTriangle class="h-3 w-3" /> Pendente
-                </span>
-              </div>
-              <div class="flex items-center gap-3">
                 <span class="text-slate-500">Perfil completo:</span>
                 <span
                   :class="
@@ -540,22 +502,6 @@ const handleKycToggle = async () => {
                 {{ user.active ? "Bloquear" : "Desbloquear" }}
               </button>
 
-              <!-- KYC (FREELANCER only) -->
-              <button
-                v-if="user.userType === 'FREELANCER'"
-                class="flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition"
-                :class="
-                  user.kycCompleted
-                    ? 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100'
-                    : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                "
-                @click="showKycConfirm = true"
-              >
-                <ShieldCheck v-if="!user.kycCompleted" class="h-4 w-4" />
-                <ShieldX v-else class="h-4 w-4" />
-                {{ user.kycCompleted ? "Revogar KYC" : "Aprovar KYC" }}
-              </button>
-
               <!-- Delete -->
               <button
                 class="flex items-center justify-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700 transition hover:bg-red-100"
@@ -668,72 +614,6 @@ const handleKycToggle = async () => {
             @click="handleResetPassword"
           >
             {{ isSubmitting ? "Enviando..." : "Enviar link" }}
-          </button>
-        </div>
-      </div>
-    </div>
-  </Transition>
-
-  <!-- KYC Confirmation -->
-  <Transition name="modal">
-    <div
-      v-if="showKycConfirm"
-      class="fixed inset-0 z-[60] flex items-center justify-center p-4"
-    >
-      <div
-        class="absolute inset-0 bg-black/40"
-        @click="showKycConfirm = false"
-      />
-      <div class="relative w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
-        <div class="mb-4 flex items-center gap-3">
-          <div
-            :class="[
-              'flex h-10 w-10 items-center justify-center rounded-full',
-              user?.kycCompleted ? 'bg-amber-100' : 'bg-emerald-100',
-            ]"
-          >
-            <ShieldCheck
-              v-if="!user?.kycCompleted"
-              class="h-5 w-5 text-emerald-600"
-            />
-            <ShieldX v-else class="h-5 w-5 text-amber-600" />
-          </div>
-          <h3 class="text-base font-semibold text-slate-900">
-            {{ user?.kycCompleted ? "Revogar KYC" : "Aprovar KYC" }}
-          </h3>
-        </div>
-        <p class="mb-6 text-sm text-slate-600">
-          {{
-            user?.kycCompleted
-              ? `Tem certeza que deseja revogar o KYC de "${user?.name}"?`
-              : `Tem certeza que deseja aprovar o KYC de "${user?.name}"?`
-          }}
-        </p>
-        <div class="flex gap-3">
-          <button
-            class="flex-1 rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-            :disabled="isSubmitting"
-            @click="showKycConfirm = false"
-          >
-            Cancelar
-          </button>
-          <button
-            class="flex-1 rounded-lg px-4 py-2 text-sm font-medium text-white transition disabled:opacity-60"
-            :class="
-              user?.kycCompleted
-                ? 'bg-amber-500 hover:bg-amber-600'
-                : 'bg-emerald-500 hover:bg-emerald-600'
-            "
-            :disabled="isSubmitting"
-            @click="handleKycToggle"
-          >
-            {{
-              isSubmitting
-                ? "Aguarde..."
-                : user?.kycCompleted
-                  ? "Revogar"
-                  : "Aprovar"
-            }}
           </button>
         </div>
       </div>

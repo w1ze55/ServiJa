@@ -3,7 +3,6 @@ package com.servija.servija.service;
 import com.servija.servija.dto.AdminServiceSummaryDto;
 import com.servija.servija.dto.AdminUserDetailDto;
 import com.servija.servija.dto.AdminUserEditRequest;
-import com.servija.servija.dto.AdminUserKycRequest;
 import com.servija.servija.dto.AdminUserPageResponse;
 import com.servija.servija.dto.AdminUserStatusRequest;
 import com.servija.servija.dto.AdminUserSummaryDto;
@@ -18,7 +17,6 @@ import com.servija.servija.repository.ServiceRepository;
 import com.servija.servija.repository.ServiceRequestRepository;
 import com.servija.servija.repository.UserRepository;
 import jakarta.persistence.criteria.Predicate;
-import jakarta.persistence.criteria.Root;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -52,14 +50,13 @@ public class AdminUserService {
             String search,
             User.UserType type,
             String status,
-            String kycStatus,
             LocalDate dateFrom,
             LocalDate dateTo,
             int page,
             int size,
             boolean includeDeleted) {
 
-        Specification<User> spec = buildSpecification(search, type, status, kycStatus, dateFrom, dateTo, includeDeleted);
+        Specification<User> spec = buildSpecification(search, type, status, dateFrom, dateTo, includeDeleted);
         PageRequest pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
         Page<User> result = userRepository.findAll(spec, pageable);
 
@@ -164,20 +161,6 @@ public class AdminUserService {
         adminResetPasswordLinkService.sendResetLink(user);
     }
 
-    @Transactional
-    public AdminUserDetailDto updateKycStatus(Long id, AdminUserKycRequest request) {
-        User user = userRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
-
-        if (!(user instanceof Freelancer freelancer)) {
-            throw new IllegalArgumentException("KYC só pode ser atualizado para freelancers");
-        }
-
-        freelancer.setKycCompleted(request.getApproved());
-        Freelancer saved = freelancerRepository.save(freelancer);
-        return toDetailDto(saved);
-    }
-
     private void validateEditRequest(AdminUserEditRequest request, User existing) {
         if (request.getName() == null || request.getName().trim().length() < 3) {
             throw new IllegalArgumentException("Nome deve ter pelo menos 3 caracteres");
@@ -226,7 +209,6 @@ public class AdminUserService {
             String search,
             User.UserType type,
             String status,
-            String kycStatus,
             LocalDate dateFrom,
             LocalDate dateTo,
             boolean includeDeleted) {
@@ -259,12 +241,6 @@ public class AdminUserService {
                 predicates.add(cb.equal(root.get("active"), false));
             }
 
-            if (kycStatus != null) {
-                Root<Freelancer> freelancerRoot = cb.treat(root, Freelancer.class);
-                boolean approved = "approved".equals(kycStatus);
-                predicates.add(cb.equal(freelancerRoot.get("kycCompleted"), approved));
-            }
-
             if (dateFrom != null) {
                 predicates.add(cb.greaterThanOrEqualTo(root.get("createdAt"), dateFrom.atStartOfDay()));
             }
@@ -278,11 +254,6 @@ public class AdminUserService {
     }
 
     private AdminUserSummaryDto toSummaryDto(User user) {
-        Boolean kycCompleted = null;
-        if (user instanceof Freelancer freelancer) {
-            kycCompleted = freelancer.getKycCompleted();
-        }
-
         return AdminUserSummaryDto.builder()
                 .id(user.getId())
                 .name(user.getName())
@@ -291,7 +262,6 @@ public class AdminUserService {
                 .active(user.getActive())
                 .createdAt(user.getCreatedAt())
                 .avatarUrl(user.getAvatarUrl())
-                .kycCompleted(kycCompleted)
                 .deletedAt(user.getDeletedAt())
                 .build();
     }
@@ -323,7 +293,6 @@ public class AdminUserService {
                     .totalReviews((int) freelancerReviewCount)
                     .completedJobs((int) completedCount)
                     .activeJobs((int) activeCount)
-                    .kycCompleted(f.getKycCompleted())
                     .profileCompleted(f.getProfileCompleted())
                     .category(f.getCategory())
                     .available(f.getAvailable())

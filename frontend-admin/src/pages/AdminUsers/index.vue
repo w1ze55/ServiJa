@@ -26,7 +26,6 @@ const TIME_FILTER_OPTIONS = [
 const searchInput = ref('');
 const typeFilter = ref('');
 const statusFilter = ref('');
-const kycFilter = ref('');
 const timeFilter = ref('Ultimos 30 dias');
 const customDateFrom = ref('');
 const customDateTo = ref('');
@@ -94,9 +93,6 @@ const applyFilters = (page = 0) => {
   store.filters.status = shouldPrioritizeSearch
     ? ''
     : statusFilter.value as '' | 'active' | 'inactive';
-  store.filters.kycStatus = shouldPrioritizeSearch
-    ? ''
-    : kycFilter.value as '' | 'approved' | 'pending';
   store.filters.dateFrom = shouldPrioritizeSearch ? '' : dateFrom;
   store.filters.dateTo = shouldPrioritizeSearch ? '' : dateTo;
   store.filters.includeDeleted = shouldPrioritizeSearch ? false : includeDeleted.value;
@@ -109,7 +105,7 @@ watch(searchInput, () => {
   debounceTimer = setTimeout(() => applyFilters(0), 300);
 });
 
-watch([typeFilter, statusFilter, kycFilter, timeFilter, customDateFrom, customDateTo, includeDeleted], () => {
+watch([typeFilter, statusFilter, timeFilter, customDateFrom, customDateTo, includeDeleted], () => {
   applyFilters(0);
 });
 
@@ -117,7 +113,6 @@ const clearFilters = () => {
   searchInput.value = '';
   typeFilter.value = '';
   statusFilter.value = '';
-  kycFilter.value = '';
   timeFilter.value = 'Ultimos 30 dias';
   customDateFrom.value = '';
   customDateTo.value = '';
@@ -216,17 +211,6 @@ const selectedStatusLabel = computed(() => {
   }
 });
 
-const selectedKycLabel = computed(() => {
-  switch (kycFilter.value) {
-    case 'approved':
-      return 'Aprovado';
-    case 'pending':
-      return 'Pendente';
-    default:
-      return 'KYC: Todos';
-  }
-});
-
 const selectedTimeFilterLabel = computed(() =>
   TIME_FILTER_OPTIONS.find((option) => option.value === timeFilter.value)?.label || 'Últimos 30 dias'
 );
@@ -276,17 +260,6 @@ onMounted(() => applyFilters(0));
               <SelectItem value="">Todos os status</SelectItem>
               <SelectItem value="active">Ativo</SelectItem>
               <SelectItem value="inactive">Bloqueado</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Select v-model="kycFilter">
-            <SelectTrigger class="min-w-[180px]">
-              <SelectValue :label="selectedKycLabel" placeholder="KYC: Todos" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="">KYC: Todos</SelectItem>
-              <SelectItem value="approved">Aprovado</SelectItem>
-              <SelectItem value="pending">Pendente</SelectItem>
             </SelectContent>
           </Select>
 
@@ -376,7 +349,6 @@ onMounted(() => applyFilters(0));
                 <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Usuário</th>
                 <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Tipo</th>
                 <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Status</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">KYC</th>
                 <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Cadastro</th>
               </tr>
             </thead>
@@ -423,17 +395,6 @@ onMounted(() => applyFilters(0));
                   <span v-else class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
                     Bloqueado
                   </span>
-                </td>
-                <td class="px-4 py-4">
-                  <span v-if="user.userType === 'FREELANCER'">
-                    <span v-if="user.kycCompleted" class="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
-                      Aprovado
-                    </span>
-                    <span v-else class="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700">
-                      Pendente
-                    </span>
-                  </span>
-                  <span v-else class="text-xs text-slate-400">—</span>
                 </td>
                 <td class="px-4 py-4 text-xs text-slate-500">
                   {{ formatDate(user.createdAt) }}

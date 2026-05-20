@@ -176,7 +176,6 @@ class AuthServiceRegistrationTest {
                 .totalReviews(0)
                 .completedJobs(0)
                 .activeJobs(0)
-                .kycCompleted(false)
                 .profileCompleted(false)
                 .available(true)
                 .build();

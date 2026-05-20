@@ -57,7 +57,6 @@ public class ProfileResponse {
         private Integer totalReviews;
         private Integer completedJobs;
         private Integer activeJobs;
-        private Boolean kycCompleted;
         private Boolean profileCompleted;
         private Boolean available;
     }

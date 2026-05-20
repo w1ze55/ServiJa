@@ -11,7 +11,6 @@ const store = useAdminUserStore();
 const searchInput = ref('');
 const typeFilter = ref('');
 const statusFilter = ref('');
-const kycFilter = ref('');
 const dateFrom = ref('');
 const dateTo = ref('');
 const includeDeleted = ref(false);
@@ -25,7 +24,6 @@ const applyFilters = (page = 0) => {
   store.filters.search = searchInput.value;
   store.filters.type = typeFilter.value as '' | 'CONTRACTOR' | 'FREELANCER' | 'ADMIN';
   store.filters.status = statusFilter.value as '' | 'active' | 'inactive';
-  store.filters.kycStatus = kycFilter.value as '' | 'approved' | 'pending';
   store.filters.dateFrom = dateFrom.value;
   store.filters.dateTo = dateTo.value;
   store.filters.includeDeleted = includeDeleted.value;
@@ -38,7 +36,7 @@ watch(searchInput, () => {
   debounceTimer = setTimeout(() => applyFilters(0), 300);
 });
 
-watch([typeFilter, statusFilter, kycFilter, dateFrom, dateTo, includeDeleted], () => {
+watch([typeFilter, statusFilter, dateFrom, dateTo, includeDeleted], () => {
   applyFilters(0);
 });
 
@@ -46,7 +44,6 @@ const clearFilters = () => {
   searchInput.value = '';
   typeFilter.value = '';
   statusFilter.value = '';
-  kycFilter.value = '';
   dateFrom.value = '';
   dateTo.value = '';
   includeDeleted.value = false;
@@ -169,16 +166,6 @@ onMounted(() => applyFilters(0));
             <option value="inactive">Bloqueado</option>
           </select>
 
-          <!-- KYC filter -->
-          <select
-            v-model="kycFilter"
-            class="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-          >
-            <option value="">KYC: Todos</option>
-            <option value="approved">Aprovado</option>
-            <option value="pending">Pendente</option>
-          </select>
-
           <!-- Date range -->
           <input
             v-model="dateFrom"
@@ -247,7 +234,6 @@ onMounted(() => applyFilters(0));
                 <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Usuário</th>
                 <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Tipo</th>
                 <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Status</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">KYC</th>
                 <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Cadastro</th>
               </tr>
             </thead>
@@ -294,17 +280,6 @@ onMounted(() => applyFilters(0));
                   <span v-else class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
                     Bloqueado
                   </span>
-                </td>
-                <td class="px-4 py-4">
-                  <span v-if="user.userType === 'FREELANCER'">
-                    <span v-if="user.kycCompleted" class="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
-                      Aprovado
-                    </span>
-                    <span v-else class="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700">
-                      Pendente
-                    </span>
-                  </span>
-                  <span v-else class="text-xs text-slate-400">—</span>
                 </td>
                 <td class="px-4 py-4 text-xs text-slate-500">
                   {{ formatDate(user.createdAt) }}

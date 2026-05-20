@@ -8,7 +8,6 @@ export interface AdminUserSummary {
   active: boolean;
   createdAt: string;
   avatarUrl: string | null;
-  kycCompleted: boolean;
   deletedAt: string | null;
 }
 
@@ -57,7 +56,6 @@ export interface AdminUsersListParams {
   search?: string;
   type?: 'CONTRACTOR' | 'FREELANCER' | 'ADMIN' | '';
   status?: 'active' | 'inactive' | '';
-  kycStatus?: 'approved' | 'pending' | '';
   dateFrom?: string;
   dateTo?: string;
   page?: number;
@@ -79,7 +77,6 @@ export const adminUserService = {
     if (params.search) cleanParams.search = params.search;
     if (params.type) cleanParams.type = params.type;
     if (params.status) cleanParams.status = params.status;
-    if (params.kycStatus) cleanParams.kycStatus = params.kycStatus;
     if (params.dateFrom) cleanParams.dateFrom = params.dateFrom;
     if (params.dateTo) cleanParams.dateTo = params.dateTo;
     if (params.page !== undefined) cleanParams.page = params.page;
@@ -111,11 +108,6 @@ export const adminUserService = {
 
   async resetPassword(id: number): Promise<{ message: string }> {
     const response = await api.post<{ message: string }>(`/admin/users/${id}/reset-password`);
-    return response.data;
-  },
-
-  async updateKyc(id: number, approved: boolean): Promise<AdminUserDetail> {
-    const response = await api.patch<AdminUserDetail>(`/admin/users/${id}/kyc`, { approved });
     return response.data;
   },
 

@@ -2,7 +2,6 @@ package com.servija.servija.controller;
 
 import com.servija.servija.dto.AdminUserDetailDto;
 import com.servija.servija.dto.AdminUserEditRequest;
-import com.servija.servija.dto.AdminUserKycRequest;
 import com.servija.servija.dto.AdminUserPageResponse;
 import com.servija.servija.dto.AdminUserStatusRequest;
 import com.servija.servija.dto.AdminUserSummaryDto;
@@ -40,7 +39,6 @@ public class AdminUserController {
             @RequestParam(required = false) String search,
             @RequestParam(required = false) User.UserType type,
             @RequestParam(required = false) String status,
-            @RequestParam(required = false) String kycStatus,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
             @RequestParam(defaultValue = "0") int page,
@@ -48,7 +46,7 @@ public class AdminUserController {
             @RequestParam(defaultValue = "false") boolean includeDeleted) {
 
         return ResponseEntity.ok(adminUserService.listUsers(
-                search, type, status, kycStatus, dateFrom, dateTo, page, size, includeDeleted));
+                search, type, status, dateFrom, dateTo, page, size, includeDeleted));
     }
 
     @GetMapping("/users/{id}")
@@ -87,14 +85,6 @@ public class AdminUserController {
     public ResponseEntity<Map<String, String>> resetPassword(@PathVariable Long id) {
         adminUserService.resetPasswordByAdmin(id);
         return ResponseEntity.ok(Map.of("message", "Email de redefinição enviado"));
-    }
-
-    @PatchMapping("/users/{id}/kyc")
-    public ResponseEntity<AdminUserDetailDto> updateKycStatus(
-            @PathVariable Long id,
-            @RequestBody AdminUserKycRequest request) {
-
-        return ResponseEntity.ok(adminUserService.updateKycStatus(id, request));
     }
 
 }

@@ -263,7 +263,6 @@ public class UserService {
                     .totalReviews((int) totalReviewsCount)
                     .completedJobs(freelancer.getCompletedJobs())
                     .activeJobs(freelancer.getActiveJobs())
-                    .kycCompleted(freelancer.getKycCompleted())
                     .profileCompleted(freelancer.getProfileCompleted())
                     .available(freelancer.getAvailable())
                     .build());
