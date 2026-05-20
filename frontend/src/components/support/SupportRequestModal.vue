@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import { FileText, ImageIcon, Loader2, Paperclip, Upload, X } from 'lucide-vue-next';
+import { Loader2 } from 'lucide-vue-next';
 import Dialog from '@/components/ui/dialog.vue';
 import DialogContent from '@/components/ui/dialog-content.vue';
 import DialogDescription from '@/components/ui/dialog-description.vue';
@@ -15,6 +15,7 @@ import SelectItem from '@/components/ui/select-item.vue';
 import SelectTrigger from '@/components/ui/select-trigger.vue';
 import SelectValue from '@/components/ui/select-value.vue';
 import Textarea from '@/components/ui/textarea.vue';
+import AttachmentUploadField from '@/components/shared/AttachmentUploadField.vue';
 import { toast } from '@/utils/toast';
 import { deleteFile, uploadFiles } from '@/api/uploadService';
 import { supportService } from '@/api/services/supportService';
@@ -23,8 +24,6 @@ import {
   SUPPORT_CATEGORY_OPTIONS,
   type SupportAttachment,
   type SupportCategoryValue,
-  formatSupportFileSize,
-  isAllowedSupportFile,
 } from '@/constants/support';
 import { useUserStore } from '@/stores/userStore';
 
@@ -43,13 +42,43 @@ interface SupportFormState {
 const props = defineProps<Props>();
 const userStore = useUserStore();
 
+const MAX_SUPPORT_ATTACHMENTS = 5;
+const SUPPORT_ALLOWED_MIME_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'text/plain',
+];
+const SUPPORT_ALLOWED_EXTENSIONS = [
+  'jpg',
+  'jpeg',
+  'png',
+  'gif',
+  'webp',
+  'pdf',
+  'doc',
+  'docx',
+  'xls',
+  'xlsx',
+  'txt',
+  'ppt',
+  'pptx',
+];
+
 const formData = ref<SupportFormState>({
   supportCategory: '',
   description: '',
 });
 
 const selectedFiles = ref<File[]>([]);
-const fileInput = ref<HTMLInputElement | null>(null);
 const errors = ref<Record<string, string>>({});
 const isSubmitting = ref(false);
 
@@ -66,6 +95,10 @@ const currentUser = computed(() => {
     return null;
   }
 });
+
+const selectedCategoryLabel = computed(() =>
+  SUPPORT_CATEGORY_OPTIONS.find((option) => option.value === formData.value.supportCategory)?.label || ''
+);
 
 const resetForm = () => {
   formData.value = {
@@ -99,47 +132,17 @@ watch(
   }
 );
 
-const removeFile = (index: number) => {
-  selectedFiles.value = selectedFiles.value.filter((_, currentIndex) => currentIndex !== index);
+const handleSelectedFilesUpdate = (files: File[]) => {
+  if (files.length > MAX_SUPPORT_ATTACHMENTS) {
+    toast.error('Voce pode enviar no maximo 5 anexos por solicitacao.');
+    return;
+  }
+
+  selectedFiles.value = files;
 };
 
-const openFilePicker = () => {
-  if (isSubmitting.value) return;
-  fileInput.value?.click();
-};
-
-const validateSelectedFiles = (files: File[]) => {
-  if (selectedFiles.value.length + files.length > 5) {
-    toast.error('Você pode enviar no máximo 5 anexos por solicitação.');
-    return false;
-  }
-
-  const invalidFile = files.find((file) => !isAllowedSupportFile(file));
-  if (invalidFile) {
-    toast.error('Envie apenas imagens ou documentos compatíveis.');
-    return false;
-  }
-
-  const oversizedFile = files.find((file) => file.size > 10 * 1024 * 1024);
-  if (oversizedFile) {
-    toast.error('Cada anexo deve ter no máximo 10MB.');
-    return false;
-  }
-
-  return true;
-};
-
-const handleFileChange = (event: Event) => {
-  const target = event.target as HTMLInputElement;
-  const files = target.files ? Array.from(target.files) : [];
-
-  if (files.length > 0 && validateSelectedFiles(files)) {
-    selectedFiles.value = [...selectedFiles.value, ...files];
-  }
-
-  if (fileInput.value) {
-    fileInput.value.value = '';
-  }
+const handleRejectedFile = (message: string) => {
+  toast.error(message);
 };
 
 const validateForm = () => {
@@ -150,7 +153,7 @@ const validateForm = () => {
   }
 
   if (!formData.value.description.trim()) {
-    nextErrors.description = 'Descreva sua solicitação.';
+    nextErrors.description = 'Descreva sua solicitacao.';
   }
 
   errors.value = nextErrors;
@@ -159,7 +162,7 @@ const validateForm = () => {
 
 const extractErrorMessage = (error: unknown) => {
   const apiMessage = (error as { response?: { data?: { message?: string; error?: string } } })?.response?.data;
-  return apiMessage?.message || apiMessage?.error || 'Não foi possível enviar sua solicitação agora.';
+  return apiMessage?.message || apiMessage?.error || 'Nao foi possivel enviar sua Solicitação agora.';
 };
 
 const handleClose = () => {
@@ -174,12 +177,12 @@ const closeModal = () => {
 
 const handleSubmit = async () => {
   if (!validateForm()) {
-    toast.error('Preencha os campos obrigatórios para continuar.');
+    toast.error('Preencha os campos obrigatorios para continuar.');
     return;
   }
 
   if (!currentUser.value?.name || !currentUser.value?.email) {
-    toast.error('Não foi possível identificar o usuário logado.');
+    toast.error('Nao foi possivel identificar o usuario logado.');
     return;
   }
 
@@ -225,8 +228,8 @@ const handleSubmit = async () => {
 
 <template>
   <Dialog :open="open" @update:open="(value) => !value && handleClose()">
-    <DialogContent class="sm:max-w-2xl">
-      <DialogHeader>
+    <DialogContent class="flex max-h-[calc(100vh-2rem)] w-[calc(100vw-2rem)] max-w-2xl flex-col gap-0 overflow-hidden p-0">
+      <DialogHeader class="shrink-0 px-6 pb-4 pt-6">
         <DialogTitle>Solicitação de suporte</DialogTitle>
         <DialogDescription>
           Envie sua dúvida ou pedido para a equipe administrativa. Se houver anexos, eles podem
@@ -234,7 +237,8 @@ const handleSubmit = async () => {
         </DialogDescription>
       </DialogHeader>
 
-      <div class="space-y-5 py-2">
+      <div class="flex-1 overflow-y-auto px-6 py-2">
+        <div class="space-y-5 pb-6">
         <div class="space-y-2">
           <Label for="support-category">
             Categoria de suporte <span class="text-red-500">*</span>
@@ -244,7 +248,10 @@ const handleSubmit = async () => {
             @update:model-value="(value) => formData.supportCategory = value as SupportCategoryValue"
           >
             <SelectTrigger :class="errors.supportCategory ? 'border-red-500' : ''">
-              <SelectValue placeholder="Selecione a categoria do chamado" />
+              <SelectValue
+                :label="selectedCategoryLabel"
+                placeholder="Selecione a categoria do chamado"
+              />
             </SelectTrigger>
             <SelectContent>
               <SelectItem
@@ -263,83 +270,52 @@ const handleSubmit = async () => {
 
         <div class="space-y-2">
           <Label for="support-description">
-            Descrição <span class="text-red-500">*</span>
+            Descricao <span class="text-red-500">*</span>
           </Label>
-          <Textarea
-            id="support-description"
-            v-model="formData.description"
-            :rows="6"
-            maxlength="5000"
-            placeholder="Explique o problema, a categoria desejada ou qualquer contexto que ajude nossa equipe."
-            :class="errors.description ? 'border-red-500' : ''"
-          />
-          <div class="flex items-center justify-between text-xs text-gray-500">
-            <p v-if="errors.description" class="text-sm text-red-500">{{ errors.description }}</p>
-            <span class="ml-auto">{{ formData.description.length }}/5000</span>
+          <div class="relative">
+            <Textarea
+              id="support-description"
+              v-model="formData.description"
+              :rows="6"
+              maxlength="5000"
+              placeholder="Explique o problema, a categoria desejada ou qualquer contexto que ajude nossa equipe."
+              :class="[
+                'pr-20 pb-8',
+                errors.description ? 'border-red-500' : '',
+              ]"
+            />
+            <span class="pointer-events-none absolute bottom-3 right-3 text-xs text-gray-500">
+              {{ formData.description.length }}/5000
+            </span>
           </div>
+          <p v-if="errors.description" class="text-sm text-red-500">{{ errors.description }}</p>
         </div>
 
-        <div class="space-y-2">
-          <Label>Anexos</Label>
-          <div
-            class="rounded-xl border border-dashed border-slate-300 bg-slate-50/70 p-5 text-center transition hover:border-[#286AD8] hover:bg-blue-50/40"
-          >
-            <input
-              ref="fileInput"
-              type="file"
-              multiple
-              :accept="SUPPORT_ATTACHMENT_ACCEPT"
-              class="hidden"
-              @change="handleFileChange"
-            />
-
-            <Upload class="mx-auto mb-3 h-8 w-8 text-slate-400" />
-            <p class="text-sm font-medium text-slate-700">
-              Adicione imagens ou documentos para complementar sua solicitação
-            </p>
-            <p class="mt-1 text-xs text-slate-500">
-              Aceitamos imagens, PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX e TXT. Máximo de 5 arquivos
-              com até 10MB cada.
-            </p>
-            <Button type="button" variant="outline" class="mt-4" @click="openFilePicker">
-              <Paperclip class="mr-2 h-4 w-4" />
-              Selecionar anexos
-            </Button>
-          </div>
-
-          <div v-if="selectedFiles.length > 0" class="space-y-2">
-            <div
-              v-for="(file, index) in selectedFiles"
-              :key="`${file.name}-${index}`"
-              class="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2"
-            >
-              <div class="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-600">
-                <ImageIcon v-if="file.type.startsWith('image/')" class="h-4 w-4" />
-                <FileText v-else class="h-4 w-4" />
-              </div>
-              <div class="min-w-0 flex-1">
-                <p class="truncate text-sm font-medium text-slate-800">{{ file.name }}</p>
-                <p class="text-xs text-slate-500">{{ formatSupportFileSize(file.size) }}</p>
-              </div>
-              <button
-                type="button"
-                class="rounded-full p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
-                @click="removeFile(index)"
-              >
-                <X class="h-4 w-4" />
-              </button>
-            </div>
-          </div>
+        <AttachmentUploadField
+          :files="selectedFiles"
+          label="Anexos"
+          empty-message="Clique para fazer upload ou arraste imagens e documentos"
+          helper-text="Imagens, PDF, DOC, XLS, PPT e TXT. Até 5 arquivos de 10MB."
+          button-label="Selecionar anexos"
+          :accept="SUPPORT_ATTACHMENT_ACCEPT"
+          :multiple="true"
+          :max-size-mb="10"
+          :allowed-mime-types="SUPPORT_ALLOWED_MIME_TYPES"
+          :allowed-extensions="SUPPORT_ALLOWED_EXTENSIONS"
+          :disabled="isSubmitting"
+          @update:files="handleSelectedFilesUpdate"
+          @file-rejected="handleRejectedFile"
+        />
         </div>
       </div>
 
-      <DialogFooter>
+      <DialogFooter class="shrink-0 border-t bg-background px-6 py-4">
         <Button type="button" variant="outline" :disabled="isSubmitting" @click="handleClose">
           Cancelar
         </Button>
         <Button type="button" :disabled="isSubmitting" @click="handleSubmit">
           <Loader2 v-if="isSubmitting" class="mr-2 h-4 w-4 animate-spin" />
-          {{ isSubmitting ? 'Enviando...' : 'Enviar solicitação' }}
+          {{ isSubmitting ? 'Enviando...' : 'Enviar solicitacao' }}
         </Button>
       </DialogFooter>
     </DialogContent>

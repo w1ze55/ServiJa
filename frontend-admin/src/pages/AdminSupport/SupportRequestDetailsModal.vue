@@ -13,12 +13,12 @@ defineProps<{
   open: boolean;
   request: SupportRequest | null;
   isLoading?: boolean;
+  canModerate?: boolean;
 }>();
 
 const emit = defineEmits<{
   (e: 'close'): void;
   (e: 'approve'): void;
-  (e: 'reply'): void;
   (e: 'reject'): void;
 }>();
 
@@ -64,36 +64,38 @@ const formatDate = (value?: string | null) => {
         </div>
 
         <div v-else-if="request" class="space-y-6">
-          <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
-              <div class="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+          <div class="grid gap-4 md:grid-cols-2">
+            <div class="rounded-xl border border-slate-200 bg-slate-50 p-5">
+              <div class="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
                 <Shield class="h-4 w-4" />
-                Usuário
+                <p>Usuário</p>
+                <div class="ml-auto">
+                <p class="text-right text-sm text-slate-500">ID {{ request.userId }}</p>
+                </div>
               </div>
-              <p class="text-sm text-slate-500">ID {{ request.userId }}</p>
-              <p class="mt-1 font-medium text-slate-900">{{ request.userName }}</p>
+              <p class="mt-2 break-words text-sm font-semibold leading-6 text-slate-900">{{ request.userName }}</p>
             </div>
 
-            <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
-              <div class="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+            <div class="rounded-xl border border-slate-200 bg-slate-50 p-5">
+              <div class="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
                 <Mail class="h-4 w-4" />
                 Email
               </div>
-              <p class="break-all text-sm font-medium text-slate-900">{{ request.userEmail }}</p>
+              <p class="break-words text-sm font-semibold leading-6 text-slate-900">{{ request.userEmail }}</p>
             </div>
 
-            <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
-              <div class="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+            <div class="rounded-xl border border-slate-200 bg-slate-50 p-5">
+              <div class="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
                 <Tag class="h-4 w-4" />
                 Categoria
               </div>
-              <p class="text-sm font-medium text-slate-900">
+              <p class="break-words text-sm font-semibold leading-6 text-slate-900">
                 {{ getSupportCategoryLabel(request.category) }}
               </p>
             </div>
 
-            <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
-              <div class="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+            <div class="rounded-xl border border-slate-200 bg-slate-50 p-5">
+              <div class="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
                 <User class="h-4 w-4" />
                 Status
               </div>
@@ -130,17 +132,19 @@ const formatDate = (value?: string | null) => {
                 :key="attachment.id || `${attachment.url}-${index}`"
                 class="overflow-hidden rounded-xl border border-slate-200 bg-slate-50"
               >
-                <img
-                  v-if="isImageAttachment(attachment)"
-                  :src="attachment.url"
-                  :alt="attachment.name"
-                  class="h-40 w-full object-cover"
-                />
-                <div
-                  v-else
-                  class="flex h-40 items-center justify-center bg-white text-slate-400"
-                >
-                  <FileText class="h-10 w-10" />
+                <div class="relative h-40 w-full overflow-hidden bg-white">
+                  <img
+                    v-if="isImageAttachment(attachment)"
+                    :src="attachment.url"
+                    :alt="attachment.name"
+                    class="block h-full w-full object-cover"
+                  />
+                  <div
+                    v-else
+                    class="flex h-full w-full items-center justify-center text-slate-400"
+                  >
+                    <FileText class="h-10 w-10" />
+                  </div>
                 </div>
 
                 <div class="space-y-3 p-4">
@@ -213,35 +217,26 @@ const formatDate = (value?: string | null) => {
         </div>
       </div>
 
-      <div class="flex flex-wrap gap-3 border-t border-slate-200 px-6 py-4">
-        <button
-          type="button"
-          class="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-          @click="emit('close')"
-        >
-          Fechar
-        </button>
-        <button
-          type="button"
-          class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-700"
-          @click="emit('approve')"
-        >
-          Aprovar
-        </button>
-        <button
-          type="button"
-          class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700"
-          @click="emit('reply')"
-        >
-          Responder
-        </button>
-        <button
-          type="button"
-          class="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-700"
-          @click="emit('reject')"
-        >
-          Recusar
-        </button>
+      <div class="flex flex-wrap items-center gap-3 border-t border-slate-200 px-6 py-4">
+        <template v-if="canModerate">
+          <button
+            type="button"
+            class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-700"
+            @click="emit('approve')"
+          >
+            Aprovar
+          </button>
+          <button
+            type="button"
+            class="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-700"
+            @click="emit('reject')"
+          >
+            Recusar
+          </button>
+        </template>
+        <p v-else class="text-sm text-slate-500">
+          Esta solicitação já foi respondida. Se necessário, o usuário deve abrir uma nova solicitação.
+        </p>
       </div>
     </div>
   </div>

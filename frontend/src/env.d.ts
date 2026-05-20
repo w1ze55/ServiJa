@@ -2,7 +2,7 @@
 
 interface ImportMetaEnv {
   readonly VITE_API_URL: string
-  // adicione mais variáveis de ambiente aqui se necessário
+  readonly VITE_ADMIN_APP_URL?: string
 }
 
 interface ImportMeta {
@@ -15,4 +15,3 @@ declare module '*.vue' {
   export default component
   export * from '*.vue'
 }
-

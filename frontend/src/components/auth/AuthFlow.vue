@@ -29,10 +29,11 @@ interface AuthFlowProps {
 }
 
 const props = defineProps<AuthFlowProps>()
+const hasResetToken = computed(() => Boolean(props.resetToken?.trim()))
 
 // estado principal
 const currentPage = ref<AuthPage>(
-  props.resetToken ? 'reset-password' : 'auth-card'
+  hasResetToken.value ? 'reset-password' : 'auth-card'
 )
 const accountType = ref<'contractor' | 'provider' | null>(null)
 const personalData = ref<PersonalData | null>(null)
@@ -44,12 +45,6 @@ let loginErrorCallback: ((error: string) => void) | null = null
 import { useUserStore } from '@/stores/userStore'
 
 const userStore = useUserStore()
-
-function clearImpersonationStorage() {
-  localStorage.removeItem('adminToken')
-  localStorage.removeItem('adminUser')
-  localStorage.removeItem('impersonatedUserName')
-}
 
 async function handleLogin(email: string, password: string) {
   try {
@@ -78,11 +73,9 @@ async function handleLogin(email: string, password: string) {
       avatar: userData.user?.avatarUrl || undefined,
     }
 
-    clearImpersonationStorage()
-
     // Atualizar store global
     userStore.setUser(user)
-    
+
     props.onLogin(user)
   } catch (error: any) {
     const errorMessage = error.response?.data?.message || 
@@ -130,11 +123,9 @@ function handleEmailVerified(token: string, userData: any) {
     avatar: userData.avatarUrl || undefined,
   }
 
-  clearImpersonationStorage()
-
   // Atualizar store global
   userStore.setUser(user)
-  
+
   props.onLogin(user)
 }
 
@@ -149,7 +140,7 @@ function handleResetPasswordSuccess() {
 }
 
 function handleResetPasswordBack() {
-  currentPage.value = 'forgot-password'
+  currentPage.value = hasResetToken.value ? 'auth-card' : 'forgot-password'
 }
 
 // --- renderização dinâmica ---
@@ -194,6 +185,7 @@ const currentProps = computed(() => {
     case 'reset-password':
       return {
         email: recoveryEmail.value,
+        resetToken: props.resetToken,
         onSuccess: handleResetPasswordSuccess,
         onBack: handleResetPasswordBack,
       }

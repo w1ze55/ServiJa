@@ -308,11 +308,15 @@ watch(
 );
 
 const filteredRequests = computed(() => {
+  const normalizedSearchQuery = searchQuery.value.trim().toLowerCase();
+  const hasSearchQuery = normalizedSearchQuery.length > 0;
+
   let filtered = store.requests.filter((request) => {
     const matchesSearch =
-      request.service.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-      request.description.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-      (request.freelancerName || '').toLowerCase().includes(searchQuery.value.toLowerCase());
+      !hasSearchQuery ||
+      request.service.toLowerCase().includes(normalizedSearchQuery) ||
+      request.description.toLowerCase().includes(normalizedSearchQuery) ||
+      (request.freelancerName || '').toLowerCase().includes(normalizedSearchQuery);
     const matchesCategory = categoryFilter.value === 'all' || request.category === categoryFilter.value;
     const matchesTab =
       currentTab.value === 'all' ||
@@ -323,7 +327,9 @@ const filteredRequests = computed(() => {
       (currentTab.value === 'cancelled' && (request.status === 'cancelled' || request.status === 'rejected'));
     const matchesTime = matchesSelectedTimeFilter(getLastActivityAt(request));
 
-    return matchesSearch && matchesCategory && matchesTab && matchesTime;
+    return hasSearchQuery
+      ? matchesSearch
+      : matchesSearch && matchesCategory && matchesTab && matchesTime;
   });
 
   if (sortBy.value === 'recent') {

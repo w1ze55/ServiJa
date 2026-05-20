@@ -33,7 +33,6 @@ public class AdminUserDetailDto {
     private Integer totalReviews;
     private Integer completedJobs;
     private Integer activeJobs;
-    private Boolean kycCompleted;
     private Boolean profileCompleted;
     private String category;
     private Boolean available;

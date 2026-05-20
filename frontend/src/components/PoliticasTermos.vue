@@ -34,7 +34,7 @@ const privacidadeSections = [
   {
     id: 'compartilhamento',
     title: 'Compartilhamento com terceiros',
-    body: `<p>Não vendemos seus dados pessoais. Em algumas situações, compartilhamos dados estritamente necessários com parceiros que nos ajudam a operar a plataforma:</p><ul class="pol-list"><li><strong>Provedores de pagamento</strong> regulamentados pelo Banco Central, para processar transações.</li><li><strong>Serviços de verificação de identidade</strong>, para validar documentos e prevenir fraudes.</li><li><strong>Infraestrutura em nuvem</strong> (hospedagem, e-mail transacional, analytics) sob acordos de confidencialidade.</li><li><strong>Autoridades públicas</strong>, quando exigido por lei, ordem judicial ou regulação aplicável.</li></ul><p>Quando você contrata um profissional, alguns dados essenciais (nome, telefone e endereço do serviço) são compartilhados com a outra parte para a execução do trabalho.</p>`,
+    body: `<p>Não vendemos seus dados pessoais. Em algumas situações, compartilhamos dados estritamente necessários com parceiros que nos ajudam a operar a plataforma:</p><ul class="pol-list"><li><strong>Provedores de pagamento</strong> regulamentados pelo Banco Central, para processar transações.</li><li><strong>Infraestrutura em nuvem</strong> (hospedagem, e-mail transacional, analytics) sob acordos de confidencialidade.</li><li><strong>Autoridades públicas</strong>, quando exigido por lei, ordem judicial ou regulação aplicável.</li></ul><p>Quando você contrata um profissional, alguns dados essenciais (nome, telefone e endereço do serviço) são compartilhados com a outra parte para a execução do trabalho.</p>`,
   },
   {
     id: 'cookies',
@@ -44,7 +44,7 @@ const privacidadeSections = [
   {
     id: 'direitos',
     title: 'Seus direitos como titular',
-    body: `<p>De acordo com a LGPD, você pode exercer os seguintes direitos sobre seus dados pessoais a qualquer momento, sem custo:</p><ul class="pol-list"><li><strong>Confirmar</strong> a existência de tratamento dos seus dados.</li><li><strong>Acessar</strong> os dados que mantemos sobre você.</li><li><strong>Corrigir</strong> dados incompletos, inexatos ou desatualizados.</li><li><strong>Solicitar a anonimização, bloqueio ou eliminação</strong> de dados desnecessários ou excessivos.</li><li><strong>Portar</strong> seus dados a outro fornecedor de serviço.</li><li><strong>Revogar o consentimento</strong> previamente fornecido.</li><li><strong>Ser informado</strong> sobre com quem compartilhamos seus dados.</li></ul><div class="pol-callout"><div class="pol-callout-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/><path d="m9 12 2 2 4-4"/></svg></div><div class="pol-callout-body"><div class="pol-callout-title">Como exercer seus direitos</div><div class="pol-callout-text">Envie uma solicitação para <a href="mailto:privacidade@servija.com.br">privacidade@servija.com.br</a>; respondemos em até 15 dias úteis. Nossa Encarregada de Proteção de Dados (DPO) é a Sra. Ana Ribeiro.</div></div></div>`,
+    body: `<p>De acordo com a LGPD, você pode exercer os seguintes direitos sobre seus dados pessoais a qualquer momento, sem custo:</p><ul class="pol-list"><li><strong>Confirmar</strong> a existência de tratamento dos seus dados.</li><li><strong>Acessar</strong> os dados que mantemos sobre você.</li><li><strong>Corrigir</strong> dados incompletos, inexatos ou desatualizados.</li><li><strong>Solicitar a anonimização, bloqueio ou eliminação</strong> de dados desnecessários ou excessivos.</li><li><strong>Portar</strong> seus dados a outro fornecedor de serviço.</li><li><strong>Revogar o consentimento</strong> previamente fornecido.</li><li><strong>Ser informado</strong> sobre com quem compartilhamos seus dados.</li></ul><div class="pol-callout"><div class="pol-callout-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/><path d="m9 12 2 2 4-4"/></svg></div><div class="pol-callout-body"><div class="pol-callout-title">Como exercer seus direitos</div><div class="pol-callout-text">Envie uma solicitação para <a href="mailto:privacidade@servija.com.br">privacidade@servija.com.br</a>; respondemos em até 15 dias úteis.</div></div></div>`,
   },
   {
     id: 'seguranca',
@@ -54,7 +54,7 @@ const privacidadeSections = [
   {
     id: 'retencao',
     title: 'Retenção dos dados',
-    body: `<p>Mantemos seus dados pelo tempo necessário para cumprir as finalidades descritas nesta política ou conforme exigido por lei. Quando você encerra sua conta, eliminamos ou anonimizamos seus dados em até 90 dias, exceto:</p><ul class="pol-list"><li>Registros financeiros, mantidos por 5 anos por exigência fiscal.</li><li>Histórico de transações e mensagens, retidos por 5 anos para fins de auditoria e prevenção a fraudes.</li><li>Dados sob investigação ou disputa, retidos até a conclusão do caso.</li></ul>`,
+    body: `<p>Mantemos seus dados pelo tempo necessário para cumprir as finalidades descritas nesta política ou conforme exigido por lei. Quando você encerra sua conta, eliminamos ou anonimizamos seus dados em até 1 ano, exceto:</p><ul class="pol-list"><li>Registros financeiros, mantidos por 5 anos por exigência fiscal.</li><li>Histórico de transações e mensagens, retidos por 5 anos para fins de auditoria e prevenção a fraudes.</li><li>Dados sob investigação ou disputa, retidos até a conclusão do caso.</li></ul>`,
   },
   {
     id: 'alteracoes',
@@ -64,7 +64,7 @@ const privacidadeSections = [
   {
     id: 'contato',
     title: 'Contato',
-    body: `<p>Dúvidas, sugestões ou solicitações relacionadas a esta Política de Privacidade podem ser enviadas para:</p><ul class="pol-list"><li><strong>E-mail:</strong> <a href="mailto:privacidade@servija.com.br">privacidade@servija.com.br</a></li><li><strong>DPO (Encarregada):</strong> Ana Ribeiro</li><li><strong>Endereço:</strong> Av. Paulista, 1000, 10º andar, Bela Vista, São Paulo/SP, 01310-100</li></ul>`,
+    body: `<p>Dúvidas, sugestões ou solicitações relacionadas a esta Política de Privacidade podem ser enviadas para:</p><ul class="pol-list"><li><strong>E-mail:</strong> <a href="mailto:privacidade@servija.com.br">privacidade@servija.com.br</a></li><li><strong>Telefone:</strong> (48) 98438-6930</li></ul>`,
   },
 ];
 

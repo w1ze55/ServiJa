@@ -1,10 +1,17 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios'
 
-const API_BASE_URL = import.meta.env.VITE_API_URL as string
-const cleanBaseURL = API_BASE_URL.replace(/\/api\/?$/, '')
+const API_BASE_URL = import.meta.env.VITE_API_URL
+const cleanBaseURL = (API_BASE_URL ?? '').replace(/\/api\/?$/, '')
+const resolvedBaseURL = cleanBaseURL ? `${cleanBaseURL}/api` : '/api'
+
+if (!API_BASE_URL) {
+  console.warn(
+    'VITE_API_URL is not defined for frontend-admin. Falling back to "/api".'
+  )
+}
 
 const api = axios.create({
-  baseURL: `${cleanBaseURL}/api`,
+  baseURL: resolvedBaseURL,
   headers: {
     'Content-Type': 'application/json',
   },

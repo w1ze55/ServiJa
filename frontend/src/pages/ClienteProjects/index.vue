@@ -113,14 +113,18 @@ const getProjectFromRequest = (request: ServiceRequest) => {
 };
 
 const filteredProjects = computed(() => {
+  const normalizedSearchQuery = searchQuery.value.trim().toLowerCase();
+  const hasSearchQuery = normalizedSearchQuery.length > 0;
+
   let filtered = store.requests
     .filter((r) => ['in_progress', 'delivered', 'completed'].includes(r.status))
     .map(getProjectFromRequest);
 
   filtered = filtered.filter((project) => {
     const matchesSearch =
-      project.service.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-      (project.freelancerName || '').toLowerCase().includes(searchQuery.value.toLowerCase());
+      !hasSearchQuery ||
+      project.service.toLowerCase().includes(normalizedSearchQuery) ||
+      (project.freelancerName || '').toLowerCase().includes(normalizedSearchQuery);
 
     const matchesCategory = categoryFilter.value === 'all' || project.category === categoryFilter.value;
 
@@ -131,7 +135,9 @@ const filteredProjects = computed(() => {
         ? project.status === 'delivered'
         : project.status === 'completed';
 
-    return matchesSearch && matchesCategory && matchesTab;
+    return hasSearchQuery
+      ? matchesSearch
+      : matchesSearch && matchesCategory && matchesTab;
   });
 
   return filtered;

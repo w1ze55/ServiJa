@@ -27,7 +27,6 @@ public class PaymentController {
     private final PaymentService paymentService;
 
     @PostMapping
-    @PreAuthorize("!hasAuthority('IMPERSONATION_SESSION')")
     @Operation(summary = "Criar pagamento", description = "Cria um novo pagamento para uma solicitação aceita")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<PaymentResponse> createPayment(

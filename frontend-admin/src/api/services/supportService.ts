@@ -29,7 +29,7 @@ export const supportService = {
     return response.data;
   },
 
-  async approveSupportRequest(id: number | string, responseMessage?: string): Promise<SupportRequest> {
+  async approveSupportRequest(id: number | string, responseMessage: string): Promise<SupportRequest> {
     const response = await api.patch<SupportRequest>(`/admin/support-requests/${id}/approve`, {
       responseMessage,
     });
@@ -38,13 +38,6 @@ export const supportService = {
 
   async rejectSupportRequest(id: number | string, responseMessage: string): Promise<SupportRequest> {
     const response = await api.patch<SupportRequest>(`/admin/support-requests/${id}/reject`, {
-      responseMessage,
-    });
-    return response.data;
-  },
-
-  async replySupportRequest(id: number | string, responseMessage: string): Promise<SupportRequest> {
-    const response = await api.patch<SupportRequest>(`/admin/support-requests/${id}/reply`, {
       responseMessage,
     });
     return response.data;

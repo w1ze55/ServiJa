@@ -18,7 +18,6 @@ export const useAdminUserStore = defineStore('adminUser', () => {
     search: '',
     type: '',
     status: '',
-    kycStatus: '',
     dateFrom: '',
     dateTo: '',
     page: 0,

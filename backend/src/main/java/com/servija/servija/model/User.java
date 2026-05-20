@@ -11,6 +11,7 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.Collections;
@@ -39,6 +40,9 @@ public class User implements UserDetails {
 
     @Column(nullable = false, length = 20)
     private String phone;
+
+    @Column
+    private LocalDate birthDate;
 
     @Column(nullable = false, length = 256)
     private String password;
@@ -69,6 +73,12 @@ public class User implements UserDetails {
 
     @Column
     private LocalDateTime resetPasswordTokenExpiry;
+
+    @Column(length = 64)
+    private String adminResetPasswordTokenHash;
+
+    @Column
+    private LocalDateTime adminResetPasswordTokenExpiry;
 
     @Column(nullable = false)
     @lombok.Builder.Default

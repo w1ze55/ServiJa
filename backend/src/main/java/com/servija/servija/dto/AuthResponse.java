@@ -6,6 +6,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Data
@@ -31,6 +32,7 @@ public class AuthResponse {
         private String email;
         private String cpf;
         private String phone;
+        private LocalDate birthDate;
         private User.UserType userType;
         private Boolean emailVerified;
         private String avatarUrl;

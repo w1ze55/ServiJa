@@ -16,6 +16,5 @@ public class AdminUserSummaryDto {
     private Boolean active;
     private LocalDateTime createdAt;
     private String avatarUrl;
-    private Boolean kycCompleted;
     private LocalDateTime deletedAt;
 }

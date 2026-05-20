@@ -47,10 +47,6 @@ public class Freelancer extends User {
 
     @Column(nullable = false)
     @lombok.Builder.Default
-    private Boolean kycCompleted = false;
-
-    @Column(nullable = false)
-    @lombok.Builder.Default
     private Boolean profileCompleted = false;
 
     @Column(nullable = false)

@@ -23,6 +23,8 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
 
     Optional<User> findByEmailAndEmailVerifiedTrue(String email);
 
+    Optional<User> findByAdminResetPasswordTokenHash(String adminResetPasswordTokenHash);
+
     @Query("SELECT COUNT(u) > 0 FROM User u WHERE u.email = :email AND u.id <> :excludeId")
     boolean existsByEmailAndIdNot(@Param("email") String email, @Param("excludeId") Long excludeId);
 
@@ -31,7 +33,7 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
     void updateUserTypeNative(@Param("id") Long id, @Param("userType") String userType);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query(value = "INSERT IGNORE INTO freelancers (user_id, kyc_completed, profile_completed, available, total_reviews, completed_jobs, active_jobs) VALUES (:userId, false, false, true, 0, 0, 0)", nativeQuery = true)
+    @Query(value = "INSERT IGNORE INTO freelancers (user_id, profile_completed, available, total_reviews, completed_jobs, active_jobs) VALUES (:userId, false, true, 0, 0, 0)", nativeQuery = true)
     void insertFreelancerRecordIfNotExists(@Param("userId") Long userId);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)

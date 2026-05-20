@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import { Loader2, MessageSquareText, ShieldCheck, X, XCircle } from 'lucide-vue-next';
+import { Loader2, ShieldCheck, X, XCircle } from 'lucide-vue-next';
 import type { SupportRequest } from '@/api/services/supportService';
 
 const props = defineProps<{
   open: boolean;
   request: SupportRequest | null;
-  mode: 'approve' | 'reply' | 'reject' | null;
+  mode: 'approve' | 'reject' | null;
   isSubmitting?: boolean;
 }>();
 
@@ -26,65 +26,38 @@ watch(
   }
 );
 
-const isMessageRequired = computed(() => props.mode === 'reply' || props.mode === 'reject');
-
-const title = computed(() => {
-  if (props.mode === 'approve') return 'Aprovar solicitação';
-  if (props.mode === 'reject') return 'Recusar solicitação';
-  return 'Responder solicitação';
-});
+const title = computed(() =>
+  props.mode === 'approve' ? 'Aprovar solicitacao' : 'Recusar solicitacao'
+);
 
 const description = computed(() => {
   if (!props.request) return '';
 
   if (props.mode === 'approve') {
-    return `Você está aprovando a solicitação #${props.request.id}. A mensagem é opcional, mas pode ajudar o usuário a entender os próximos passos.`;
+    return `Escreva a mensagem que sera enviada por e-mail ao usuario para aprovar a solicitacao #${props.request.id}.`;
   }
 
-  if (props.mode === 'reject') {
-    return `Explique o motivo da recusa da solicitação #${props.request.id}.`;
-  }
-
-  return `Envie uma resposta administrativa para a solicitação #${props.request.id}.`;
+  return `Explique por e-mail o motivo da recusa da solicitacao #${props.request.id}.`;
 });
 
-const confirmLabel = computed(() => {
-  if (props.mode === 'approve') return 'Aprovar';
-  if (props.mode === 'reject') return 'Recusar';
-  return 'Responder';
-});
+const confirmLabel = computed(() => (props.mode === 'approve' ? 'Aprovar' : 'Recusar'));
+const iconComponent = computed(() => (props.mode === 'approve' ? ShieldCheck : XCircle));
+const iconClasses = computed(() =>
+  props.mode === 'approve' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'
+);
+const buttonClasses = computed(() =>
+  props.mode === 'approve' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-600 hover:bg-red-700'
+);
 
-const iconComponent = computed(() => {
-  if (props.mode === 'approve') return ShieldCheck;
-  if (props.mode === 'reject') return XCircle;
-  return MessageSquareText;
-});
-
-const iconClasses = computed(() => {
-  if (props.mode === 'approve') return 'bg-emerald-50 text-emerald-600';
-  if (props.mode === 'reject') return 'bg-red-50 text-red-600';
-  return 'bg-blue-50 text-blue-600';
-});
-
-const buttonClasses = computed(() => {
-  if (props.mode === 'approve') return 'bg-emerald-600 hover:bg-emerald-700';
-  if (props.mode === 'reject') return 'bg-red-600 hover:bg-red-700';
-  return 'bg-blue-600 hover:bg-blue-700';
-});
-
-const placeholder = computed(() => {
-  if (props.mode === 'approve') {
-    return 'Ex: Solicitação aprovada. Vamos avaliar a criação da nova categoria.';
-  }
-  if (props.mode === 'reject') {
-    return 'Explique o motivo da recusa para o usuário.';
-  }
-  return 'Digite a resposta que será enviada ao usuário.';
-});
+const placeholder = computed(() =>
+  props.mode === 'approve'
+    ? 'Ex: Solicitacao aprovada. Nossa equipe seguira com a analise do seu pedido.'
+    : 'Explique o motivo da recusa para o usuario.'
+);
 
 const handleSubmit = () => {
-  if (isMessageRequired.value && !message.value.trim()) {
-    error.value = 'Essa mensagem é obrigatória para continuar.';
+  if (!message.value.trim()) {
+    error.value = 'A mensagem e obrigatoria para continuar.';
     return;
   }
 
@@ -114,7 +87,7 @@ const handleSubmit = () => {
           </div>
           <div>
             <p class="text-sm font-medium text-slate-900">
-              {{ request?.userName || 'Solicitação de suporte' }}
+              {{ request?.userName || 'Solicitacao de suporte' }}
             </p>
             <p class="mt-1 text-sm text-slate-600">{{ description }}</p>
           </div>
@@ -122,8 +95,7 @@ const handleSubmit = () => {
 
         <div class="space-y-2">
           <label class="block text-sm font-medium text-slate-700">
-            Mensagem
-            <span v-if="isMessageRequired" class="text-red-500">*</span>
+            Mensagem <span class="text-red-500">*</span>
           </label>
           <textarea
             v-model="message"

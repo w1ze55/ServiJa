@@ -3,31 +3,28 @@ package com.servija.servija.service;
 import com.servija.servija.dto.AdminServiceSummaryDto;
 import com.servija.servija.dto.AdminUserDetailDto;
 import com.servija.servija.dto.AdminUserEditRequest;
-import com.servija.servija.dto.AdminUserKycRequest;
 import com.servija.servija.dto.AdminUserPageResponse;
 import com.servija.servija.dto.AdminUserStatusRequest;
 import com.servija.servija.dto.AdminUserSummaryDto;
-import com.servija.servija.dto.ImpersonateResponse;
 import com.servija.servija.exception.ResourceNotFoundException;
 import com.servija.servija.model.Contractor;
 import com.servija.servija.model.Freelancer;
 import com.servija.servija.model.User;
+import com.servija.servija.model.ServiceRequest;
 import com.servija.servija.repository.FreelancerRepository;
 import com.servija.servija.repository.ReviewRepository;
 import com.servija.servija.repository.ServiceRepository;
+import com.servija.servija.repository.ServiceRequestRepository;
 import com.servija.servija.repository.UserRepository;
 import jakarta.persistence.criteria.Predicate;
-import jakarta.persistence.criteria.Root;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.security.SecureRandom;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -41,28 +38,25 @@ public class AdminUserService {
     private static final Pattern EMAIL_PATTERN =
             Pattern.compile("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
     private static final Pattern PHONE_PATTERN = Pattern.compile("^\\d{10,11}$");
-    private static final int RESET_CODE_EXPIRY_MINUTES = 30;
 
     private final UserRepository userRepository;
     private final FreelancerRepository freelancerRepository;
     private final ServiceRepository serviceRepository;
+    private final ServiceRequestRepository serviceRequestRepository;
     private final ReviewRepository reviewRepository;
-    private final EmailService emailService;
-    private final JwtService jwtService;
-    private final CustomUserDetailsService userDetailsService;
+    private final AdminResetPasswordLinkService adminResetPasswordLinkService;
 
     public AdminUserPageResponse listUsers(
             String search,
             User.UserType type,
             String status,
-            String kycStatus,
             LocalDate dateFrom,
             LocalDate dateTo,
             int page,
             int size,
             boolean includeDeleted) {
 
-        Specification<User> spec = buildSpecification(search, type, status, kycStatus, dateFrom, dateTo, includeDeleted);
+        Specification<User> spec = buildSpecification(search, type, status, dateFrom, dateTo, includeDeleted);
         PageRequest pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
         Page<User> result = userRepository.findAll(spec, pageable);
 
@@ -164,50 +158,7 @@ public class AdminUserService {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
 
-        String resetCode = generateCode();
-        user.setResetPasswordToken(resetCode);
-        user.setResetPasswordTokenExpiry(LocalDateTime.now().plusMinutes(RESET_CODE_EXPIRY_MINUTES));
-        user.setResetPasswordAttempts(0);
-        user.setResetPasswordLockUntil(null);
-        userRepository.save(user);
-
-        emailService.sendPasswordResetEmail(user.getEmail(), user.getName(), resetCode);
-    }
-
-    @Transactional
-    public AdminUserDetailDto updateKycStatus(Long id, AdminUserKycRequest request) {
-        User user = userRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
-
-        if (!(user instanceof Freelancer freelancer)) {
-            throw new IllegalArgumentException("KYC só pode ser atualizado para freelancers");
-        }
-
-        freelancer.setKycCompleted(request.getApproved());
-        Freelancer saved = freelancerRepository.save(freelancer);
-        return toDetailDto(saved);
-    }
-
-    public ImpersonateResponse impersonate(Long id, String adminEmail) {
-        User target = userRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
-
-        if (target.getUserType() == User.UserType.ADMIN) {
-            throw new org.springframework.security.access.AccessDeniedException(
-                    "Não é possível impersonar um administrador");
-        }
-
-        User admin = userRepository.findByEmail(adminEmail)
-                .orElseThrow(() -> new ResourceNotFoundException("Admin não encontrado"));
-
-        UserDetails targetDetails = userDetailsService.loadUserByUsername(target.getEmail());
-        String token = jwtService.generateImpersonationToken(targetDetails, admin.getId());
-        LocalDateTime expiresAt = LocalDateTime.now().plusMinutes(30);
-
-        return ImpersonateResponse.builder()
-                .token(token)
-                .expiresAt(expiresAt)
-                .build();
+        adminResetPasswordLinkService.sendResetLink(user);
     }
 
     private void validateEditRequest(AdminUserEditRequest request, User existing) {
@@ -258,7 +209,6 @@ public class AdminUserService {
             String search,
             User.UserType type,
             String status,
-            String kycStatus,
             LocalDate dateFrom,
             LocalDate dateTo,
             boolean includeDeleted) {
@@ -291,12 +241,6 @@ public class AdminUserService {
                 predicates.add(cb.equal(root.get("active"), false));
             }
 
-            if (kycStatus != null) {
-                Root<Freelancer> freelancerRoot = cb.treat(root, Freelancer.class);
-                boolean approved = "approved".equals(kycStatus);
-                predicates.add(cb.equal(freelancerRoot.get("kycCompleted"), approved));
-            }
-
             if (dateFrom != null) {
                 predicates.add(cb.greaterThanOrEqualTo(root.get("createdAt"), dateFrom.atStartOfDay()));
             }
@@ -310,11 +254,6 @@ public class AdminUserService {
     }
 
     private AdminUserSummaryDto toSummaryDto(User user) {
-        Boolean kycCompleted = null;
-        if (user instanceof Freelancer freelancer) {
-            kycCompleted = freelancer.getKycCompleted();
-        }
-
         return AdminUserSummaryDto.builder()
                 .id(user.getId())
                 .name(user.getName())
@@ -323,7 +262,6 @@ public class AdminUserService {
                 .active(user.getActive())
                 .createdAt(user.getCreatedAt())
                 .avatarUrl(user.getAvatarUrl())
-                .kycCompleted(kycCompleted)
                 .deletedAt(user.getDeletedAt())
                 .build();
     }
@@ -344,13 +282,17 @@ public class AdminUserService {
                 .deletedAt(user.getDeletedAt());
 
         if (user instanceof Freelancer f) {
+            Double freelancerAvgRating = reviewRepository.findAverageRatingByReviewedId(f.getId());
+            long freelancerReviewCount = reviewRepository.countByReviewedId(f.getId());
+            long completedCount = serviceRequestRepository.countByFreelancerIdAndStatus(f.getId(), ServiceRequest.Status.COMPLETED);
+            long activeCount = serviceRequestRepository.countByFreelancerIdAndStatusIn(f.getId(),
+                    List.of(ServiceRequest.Status.ACCEPTED, ServiceRequest.Status.IN_PROGRESS, ServiceRequest.Status.DELIVERED));
             builder.bio(f.getBio())
                     .professionalTitle(f.getProfessionalTitle())
-                    .rating(f.getRating())
-                    .totalReviews(f.getTotalReviews())
-                    .completedJobs(f.getCompletedJobs())
-                    .activeJobs(f.getActiveJobs())
-                    .kycCompleted(f.getKycCompleted())
+                    .rating(freelancerAvgRating != null ? java.math.BigDecimal.valueOf(freelancerAvgRating) : null)
+                    .totalReviews((int) freelancerReviewCount)
+                    .completedJobs((int) completedCount)
+                    .activeJobs((int) activeCount)
                     .profileCompleted(f.getProfileCompleted())
                     .category(f.getCategory())
                     .available(f.getAvailable())
@@ -366,22 +308,22 @@ public class AdminUserService {
                                     .createdAt(s.getCreatedAt())
                                     .build())
                             .toList());
-        } else if (user instanceof Contractor c) {
+        } else if (user instanceof Contractor) {
             Double avg = reviewRepository.findAverageRatingByReviewedId(user.getId());
-            long count = reviewRepository.countByReviewedId(user.getId());
-            builder.totalContracts(c.getTotalContracts())
-                    .activeContracts(c.getActiveContracts())
-                    .completedContracts(c.getCompletedContracts())
+            long reviewCount = reviewRepository.countByReviewedId(user.getId());
+            long completed = serviceRequestRepository.countByContractorIdAndStatus(user.getId(), ServiceRequest.Status.COMPLETED);
+            long active = serviceRequestRepository.countByContractorIdAndStatusIn(user.getId(),
+                    List.of(ServiceRequest.Status.ACCEPTED, ServiceRequest.Status.IN_PROGRESS, ServiceRequest.Status.DELIVERED));
+            long total = serviceRequestRepository.countByContractorIdAndStatusIn(user.getId(),
+                    List.of(ServiceRequest.Status.ACCEPTED, ServiceRequest.Status.IN_PROGRESS,
+                            ServiceRequest.Status.DELIVERED, ServiceRequest.Status.COMPLETED));
+            builder.totalContracts((int) total)
+                    .activeContracts((int) active)
+                    .completedContracts((int) completed)
                     .contractorRating(avg != null ? java.math.BigDecimal.valueOf(avg) : null)
-                    .contractorTotalReviews(count);
+                    .contractorTotalReviews(reviewCount);
         }
 
         return builder.build();
-    }
-
-    private String generateCode() {
-        SecureRandom random = new SecureRandom();
-        int code = 100000 + random.nextInt(900000);
-        return String.valueOf(code);
     }
 }

@@ -2,7 +2,8 @@ import { createRouter, createWebHistory } from 'vue-router'
 import AdminLoginPage from '@/pages/AdminLogin/index.vue'
 import AdminUsersPage from '@/pages/AdminUsers/index.vue'
 import AdminCategoriesPage from '@/pages/AdminCategories/index.vue'
-import AdminSupportPage from '@/pages/AdminSupport/index.vue'
+import AdminSupportPage from '@/pages/AdminSupport/AdminSupport.vue'
+import AdminAuditLogsPage from '@/pages/AdminAuditLogs/index.vue'
 import NotFoundPage from '@/pages/NotFound/index.vue'
 
 const routes = [
@@ -32,6 +33,12 @@ const routes = [
     path: '/support',
     name: 'admin-support',
     component: AdminSupportPage,
+    meta: { requiresAuth: true, userType: 'admin' },
+  },
+  {
+    path: '/audit-logs',
+    name: 'admin-audit-logs',
+    component: AdminAuditLogsPage,
     meta: { requiresAuth: true, userType: 'admin' },
   },
   {

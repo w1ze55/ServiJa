@@ -495,17 +495,15 @@ const handlePaymentNotification = (event: any) => {
 };
 
 const filteredProposals = computed(() => {
+  const normalizedSearchQuery = searchQuery.value.trim().toLowerCase();
+  const hasSearchQuery = normalizedSearchQuery.length > 0;
+
   let filtered = proposalStore.proposals.filter((proposal) => {
     const matchesSearch =
-      proposal.clientName
-        .toLowerCase()
-        .includes(searchQuery.value.toLowerCase()) ||
-      proposal.service
-        .toLowerCase()
-        .includes(searchQuery.value.toLowerCase()) ||
-      proposal.description
-        .toLowerCase()
-        .includes(searchQuery.value.toLowerCase());
+      !hasSearchQuery ||
+      proposal.clientName.toLowerCase().includes(normalizedSearchQuery) ||
+      proposal.service.toLowerCase().includes(normalizedSearchQuery) ||
+      proposal.description.toLowerCase().includes(normalizedSearchQuery);
     const matchesCategory =
       categoryFilter.value === ALL_CATEGORIES_VALUE ||
       getCategoryFilterValue(proposal) === categoryFilter.value;
@@ -589,11 +587,13 @@ const filteredProposals = computed(() => {
     })();
 
     return (
-      matchesSearch &&
-      matchesCategory &&
-      matchesSubcategory &&
-      matchesTab &&
-      matchesTime
+      hasSearchQuery
+        ? matchesSearch
+        : matchesSearch &&
+            matchesCategory &&
+            matchesSubcategory &&
+            matchesTab &&
+            matchesTime
     );
   });
 

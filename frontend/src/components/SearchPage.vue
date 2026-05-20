@@ -155,16 +155,19 @@ const providers: Provider[] = [
 ];
 
 const filteredProviders = computed(() => {
+  const normalizedSearchQuery = searchQuery.value.trim().toLowerCase();
+  const hasSearchQuery = normalizedSearchQuery.length > 0;
+
   const filtered = providers.filter((provider) => {
     const matchesSearch =
-      searchQuery.value === '' ||
-      provider.name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-      provider.category.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-      provider.skills.some((skill) => skill.toLowerCase().includes(searchQuery.value.toLowerCase()));
+      !hasSearchQuery ||
+      provider.name.toLowerCase().includes(normalizedSearchQuery) ||
+      provider.category.toLowerCase().includes(normalizedSearchQuery) ||
+      provider.skills.some((skill) => skill.toLowerCase().includes(normalizedSearchQuery));
 
     const matchesCategory = selectedCategory.value === 'all' || provider.category === selectedCategory.value;
 
-    return matchesSearch && matchesCategory;
+    return hasSearchQuery ? matchesSearch : matchesSearch && matchesCategory;
   });
 
   return filtered.sort((a, b) => {
@@ -348,7 +351,6 @@ const filteredProviders = computed(() => {
     </section>
   </div>
 </template>
-
 
 
 

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { User, Settings, Shield, FileText, Bell, HelpCircle, LogOut, ChevronRight, MessageSquare, CreditCard, Construction } from 'lucide-vue-next';
+import { User, Settings, FileText, Bell, HelpCircle, LogOut, ChevronRight, MessageSquare, CreditCard, Construction } from 'lucide-vue-next';
 import Card from '@/components/ui/card.vue';
 import MainLayout from '@/components/layout/MainLayout.vue';
 import { useNavigation } from '@/utils/navigation';
@@ -82,13 +82,6 @@ const settingsOptions = computed<SettingsOption[]>(() => {
         title: 'Configurações de Conta',
         description: 'Gerencie suas informações pessoais',
         onClick: () => router.push('/freelancer-profile-settings'),
-      },
-      {
-        id: 'kyc',
-        icon: Shield,
-        title: 'Verificação de Identidade',
-        description: 'Gerencie seus documentos KYC',
-        onClick: () => openDevelopmentModal('Verificação de Identidade'),
       },
       {
         id: 'notifications',
