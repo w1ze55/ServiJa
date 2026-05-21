@@ -9,6 +9,7 @@ import com.servija.servija.dto.NearbyFreelancerResponse;
 import com.servija.servija.dto.ProfessionalLinkResponse;
 import com.servija.servija.dto.ServiceCityRequest;
 import com.servija.servija.dto.ServiceCityResponse;
+import com.servija.servija.exception.ResourceNotFoundException;
 import com.servija.servija.model.Address;
 import com.servija.servija.model.Freelancer;
 import com.servija.servija.model.ProfessionalLink;
@@ -22,6 +23,7 @@ import com.servija.servija.repository.ReviewRepository;
 import com.servija.servija.repository.ServiceRepository;
 import com.servija.servija.repository.ServiceRequestRepository;
 import com.servija.servija.repository.UserRepository;
+import com.servija.servija.util.PublicVisibilityRules;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
@@ -363,6 +365,7 @@ public class FreelancerService {
         double userLon = longitude.doubleValue();
 
         List<Freelancer> serviceableFreelancers = withServiceCities.stream()
+                .filter(this::isPubliclyVisible)
                 .filter(freelancer -> servesSearchRegion(freelancer, filters))
                 .toList();
 
@@ -406,6 +409,19 @@ public class FreelancerService {
         freelancer.setLatitude(latitude);
         freelancer.setLongitude(longitude);
         freelancerRepository.save(freelancer);
+    }
+
+    @Transactional(readOnly = true)
+    public FreelancerProfileResponse getVisiblePublicProfile(Long freelancerId) {
+        Freelancer freelancer = freelancerRepository.findByIdWithServiceCities(freelancerId)
+                .orElseThrow(() -> new ResourceNotFoundException("Freelancer nÃ£o encontrado"));
+
+        if (!isPubliclyVisible(freelancer)) {
+            throw new ResourceNotFoundException("Freelancer nÃ£o encontrado");
+        }
+
+        freelancerRepository.findByIdWithProfessionalLinks(freelancerId);
+        return mapToResponse(freelancer);
     }
 
     /**
@@ -668,8 +684,13 @@ public class FreelancerService {
 
         return serviceRepository.findByFreelancerIdInAndIsActiveOrderByCreatedAtDesc(freelancerIds, true)
                 .stream()
+                .filter(PublicVisibilityRules::isServicePublic)
                 .filter(service -> service.getFreelancer() != null && service.getFreelancer().getId() != null)
                 .collect(Collectors.groupingBy(service -> service.getFreelancer().getId()));
+    }
+
+    boolean isPubliclyVisible(Freelancer freelancer) {
+        return PublicVisibilityRules.isFreelancerPublic(freelancer);
     }
 
     private NearbyFreelancerResponse enrichNearbyResponseFromServices(

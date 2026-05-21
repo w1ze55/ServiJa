@@ -14,6 +14,7 @@ import com.servija.servija.repository.AddressRepository;
 import com.servija.servija.repository.FreelancerRepository;
 import com.servija.servija.repository.ReviewRepository;
 import com.servija.servija.repository.UserRepository;
+import com.servija.servija.util.PublicVisibilityRules;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
@@ -234,7 +235,9 @@ public class ClientHomeService {
         }
 
         List<Long> freelancerIdList = new ArrayList<>(freelancerIds);
-        List<Freelancer> freelancers = freelancerRepository.findAllByIdInWithServiceCities(freelancerIdList);
+        List<Freelancer> freelancers = freelancerRepository.findAllByIdInWithServiceCities(freelancerIdList).stream()
+                .filter(PublicVisibilityRules::isFreelancerPublic)
+                .toList();
         Map<Long, Freelancer> freelancersById = freelancers.stream()
                 .collect(Collectors.toMap(Freelancer::getId, freelancer -> freelancer));
 
@@ -432,7 +435,7 @@ public class ClientHomeService {
             Metadata metadata,
             RankingStats rankingStats) {
         Freelancer freelancer = metadata.freelancersById().get(freelancerId);
-        if (freelancer == null) {
+        if (!PublicVisibilityRules.isFreelancerPublic(freelancer)) {
             return null;
         }
 
@@ -586,7 +589,8 @@ public class ClientHomeService {
 
     private boolean isAvailableFreelancer(Long freelancerId, Metadata metadata) {
         Freelancer freelancer = metadata.freelancersById().get(freelancerId);
-        return freelancer != null && Boolean.TRUE.equals(freelancer.getAvailable());
+        return PublicVisibilityRules.isFreelancerPublic(freelancer)
+                && Boolean.TRUE.equals(freelancer.getAvailable());
     }
 
     private String resolveFreelancerLocation(Long freelancerId, Metadata metadata) {

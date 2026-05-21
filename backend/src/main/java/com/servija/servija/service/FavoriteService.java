@@ -3,6 +3,7 @@ package com.servija.servija.service;
 import com.servija.servija.dto.FavoriteRequest;
 import com.servija.servija.dto.FavoriteResponse;
 import com.servija.servija.dto.FreelancerSimpleResponse;
+import com.servija.servija.exception.ResourceNotFoundException;
 import com.servija.servija.model.Favorite;
 import com.servija.servija.model.Freelancer;
 import com.servija.servija.model.User;
@@ -10,10 +11,12 @@ import com.servija.servija.repository.FavoriteRepository;
 import com.servija.servija.repository.FreelancerRepository;
 import com.servija.servija.repository.ServiceRepository;
 import com.servija.servija.repository.UserRepository;
+import com.servija.servija.util.PublicVisibilityRules;
 import lombok.RequiredArgsConstructor;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @org.springframework.stereotype.Service
@@ -33,21 +36,29 @@ public class FavoriteService {
 
         if (request.getServiceId() != null) {
             return favoriteRepository.findByUserIdAndServiceId(userId, request.getServiceId())
-                    .map(this::mapToResponse)
+                    .flatMap(this::mapToVisibleResponse)
                     .orElseGet(() -> {
                         com.servija.servija.model.Service service = serviceRepository.findById(request.getServiceId())
-                                .orElseThrow(() -> new RuntimeException("Service not found"));
-                        return mapToResponse(
-                                favoriteRepository.save(Favorite.builder().user(user).service(service).build()));
+                                .orElseThrow(() -> new ResourceNotFoundException("ServiÃ§o nÃ£o encontrado"));
+                        if (!serviceService.isPubliclyVisible(service)) {
+                            throw new ResourceNotFoundException("ServiÃ§o nÃ£o encontrado");
+                        }
+                        return mapToVisibleResponse(
+                                favoriteRepository.save(Favorite.builder().user(user).service(service).build()))
+                                .orElseThrow(() -> new ResourceNotFoundException("ServiÃ§o nÃ£o encontrado"));
                     });
         } else if (request.getFreelancerId() != null) {
             return favoriteRepository.findByUserIdAndFreelancerId(userId, request.getFreelancerId())
-                    .map(this::mapToResponse)
+                    .flatMap(this::mapToVisibleResponse)
                     .orElseGet(() -> {
                         Freelancer freelancer = freelancerRepository.findById(request.getFreelancerId())
-                                .orElseThrow(() -> new RuntimeException("Freelancer not found"));
-                        return mapToResponse(
-                                favoriteRepository.save(Favorite.builder().user(user).freelancer(freelancer).build()));
+                                .orElseThrow(() -> new ResourceNotFoundException("Freelancer nÃ£o encontrado"));
+                        if (!PublicVisibilityRules.isFreelancerPublic(freelancer)) {
+                            throw new ResourceNotFoundException("Freelancer nÃ£o encontrado");
+                        }
+                        return mapToVisibleResponse(
+                                favoriteRepository.save(Favorite.builder().user(user).freelancer(freelancer).build()))
+                                .orElseThrow(() -> new ResourceNotFoundException("Freelancer nÃ£o encontrado"));
                     });
         } else {
             throw new RuntimeException("Either serviceId or freelancerId must be provided");
@@ -72,31 +83,42 @@ public class FavoriteService {
                 .orElseThrow(() -> new RuntimeException("User not found"));
         return favoriteRepository.findByUser(user)
                 .stream()
-                .map(this::mapToResponse)
+                .map(this::mapToVisibleResponse)
+                .flatMap(Optional::stream)
                 .collect(Collectors.toList());
     }
 
     public boolean isFavorited(Long userId, Long serviceId, Long freelancerId) {
         if (serviceId != null) {
-            return favoriteRepository.existsByUserIdAndServiceId(userId, serviceId);
+            return favoriteRepository.findByUserIdAndServiceId(userId, serviceId)
+                    .flatMap(this::mapToVisibleResponse)
+                    .isPresent();
         }
         if (freelancerId != null) {
-            return favoriteRepository.existsByUserIdAndFreelancerId(userId, freelancerId);
+            return favoriteRepository.findByUserIdAndFreelancerId(userId, freelancerId)
+                    .flatMap(this::mapToVisibleResponse)
+                    .isPresent();
         }
         return false;
     }
 
-    private FavoriteResponse mapToResponse(Favorite favorite) {
+    private Optional<FavoriteResponse> mapToVisibleResponse(Favorite favorite) {
         FavoriteResponse.FavoriteResponseBuilder builder = FavoriteResponse.builder()
                 .id(favorite.getId())
                 .userId(favorite.getUser().getId())
                 .createdAt(favorite.getCreatedAt());
 
         if (favorite.getService() != null) {
+            if (!serviceService.isPubliclyVisible(favorite.getService())) {
+                return Optional.empty();
+            }
             builder.service(serviceService.toResponse(favorite.getService()));
         }
 
         if (favorite.getFreelancer() != null) {
+            if (!PublicVisibilityRules.isFreelancerPublic(favorite.getFreelancer())) {
+                return Optional.empty();
+            }
             builder.freelancer(FreelancerSimpleResponse.builder()
                     .userId(favorite.getFreelancer().getId())
                     .name(favorite.getFreelancer().getName())
@@ -106,6 +128,6 @@ public class FavoriteService {
                     .build());
         }
 
-        return builder.build();
+        return Optional.of(builder.build());
     }
 }

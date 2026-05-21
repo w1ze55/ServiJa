@@ -2,6 +2,7 @@ package com.servija.servija.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.servija.servija.dto.ServiceResponse;
+import com.servija.servija.exception.ResourceNotFoundException;
 import com.servija.servija.model.Freelancer;
 import com.servija.servija.model.Service;
 import com.servija.servija.model.ServiceRequest;
@@ -67,7 +68,7 @@ class ServiceServiceTest {
         when(serviceRequestRepository.findAverageCompletedResponseValueByServiceId(7L, "COMPLETED"))
                 .thenReturn(new BigDecimal("225.00"));
 
-        ServiceResponse response = serviceService.getPublicServiceByIdWithPricing(7L);
+        ServiceResponse response = serviceService.getVisiblePublicServiceByIdWithPricing(7L);
 
         assertThat(response.getPrice()).isEqualByComparingTo("200.00");
         assertThat(response.getServiceRating()).isEqualByComparingTo("4.7");
@@ -90,7 +91,7 @@ class ServiceServiceTest {
                 9L,
                 ServiceRequest.Status.COMPLETED)).thenReturn(0L);
 
-        ServiceResponse response = serviceService.getPublicServiceByIdWithPricing(9L);
+        ServiceResponse response = serviceService.getVisiblePublicServiceByIdWithPricing(9L);
 
         assertThat(response.getPrice()).isEqualByComparingTo("180.00");
         assertThat(response.getServiceRating()).isEqualByComparingTo("4.3");
@@ -153,6 +154,38 @@ class ServiceServiceTest {
         verify(serviceRequestRepository, never()).findAverageCompletedResponseValueByServiceId(12L, "COMPLETED");
     }
 
+    @Test
+    @DisplayName("Deve ocultar serviÃ§o pÃºblico quando o freelancer estÃ¡ bloqueado")
+    void getVisiblePublicServiceByIdWithPricing_hidesBlockedFreelancer() {
+        Service service = buildService(13L, new BigDecimal("120.00"));
+        service.getFreelancer().setActive(false);
+
+        when(serviceRepository.findById(13L)).thenReturn(Optional.of(service));
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                () -> serviceService.getVisiblePublicServiceByIdWithPricing(13L))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessage("ServiÃ§o nÃ£o encontrado");
+    }
+
+    @Test
+    @DisplayName("Deve remover da listagem pÃºblica serviÃ§os de freelancers bloqueados")
+    void getAllActiveServices_filtersBlockedFreelancerServices() {
+        Service visibleService = buildService(14L, new BigDecimal("90.00"));
+        Service hiddenService = buildService(15L, new BigDecimal("110.00"));
+        hiddenService.getFreelancer().setActive(false);
+
+        when(serviceRepository.findByIsActiveOrderByCreatedAtDesc(true)).thenReturn(List.of(visibleService, hiddenService));
+        when(reviewRepository.countByServiceId(14L)).thenReturn(0L);
+        when(serviceRequestRepository.countByService_IdAndStatusAndResponseValueIsNotNull(
+                14L,
+                ServiceRequest.Status.COMPLETED)).thenReturn(0L);
+
+        List<ServiceResponse> responses = serviceService.getAllActiveServices();
+
+        assertThat(responses).extracting(ServiceResponse::getId).containsExactly(14L);
+    }
+
     private Service buildService(Long id, BigDecimal price) {
         return Service.builder()
                 .id(id)
@@ -160,6 +193,7 @@ class ServiceServiceTest {
                         .id(3L)
                         .name("Freelancer")
                         .avatarUrl("https://cdn.servija.com/avatar.png")
+                        .active(true)
                         .build())
                 .title("Deploy AWS")
                 .category("Desenvolvimento Web")

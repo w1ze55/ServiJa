@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.servija.servija.dto.FreelancerProfileRequest;
 import com.servija.servija.dto.NearbyFreelancerResponse;
 import com.servija.servija.dto.ServiceCityRequest;
+import com.servija.servija.exception.ResourceNotFoundException;
 import com.servija.servija.model.Address;
 import com.servija.servija.model.Freelancer;
 import com.servija.servija.model.Service;
@@ -209,6 +210,20 @@ class FreelancerServiceTest {
 
     @Test
     @DisplayName("Deve buscar freelancers prÃ³ximos por serviÃ§o, tag e subcategoria")
+    void getVisiblePublicProfile_hidesBlockedFreelancer() {
+        Freelancer freelancer = buildFreelancer();
+        freelancer.setId(99L);
+        freelancer.setActive(false);
+
+        when(freelancerRepository.findByIdWithServiceCities(99L)).thenReturn(Optional.of(freelancer));
+
+        assertThatThrownBy(() -> freelancerService.getVisiblePublicProfile(99L))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessageContaining("Freelancer");
+    }
+
+    @Test
+    @DisplayName("Deve ocultar perfil pÃºblico de freelancer bloqueado")
     void findNearbyFreelancers_filtersByServiceSearchAndCatalog() {
         ServiceCategory category = ServiceCategory.builder()
                 .id(10L)
@@ -339,6 +354,43 @@ class FreelancerServiceTest {
         });
     }
 
+    @Test
+    @DisplayName("Deve remover do mapa freelancers bloqueados")
+    void findNearbyFreelancers_excludesBlockedFreelancers() {
+        Freelancer visibleFreelancer = buildNearbyFreelancer(1L, "Ana Costa", -23.5505, -46.6333);
+        Freelancer blockedFreelancer = buildNearbyFreelancer(2L, "Bruno Lima", -23.5510, -46.6335);
+        blockedFreelancer.setActive(false);
+
+        when(freelancerRepository.findAllWithServiceCities()).thenReturn(List.of(visibleFreelancer, blockedFreelancer));
+        when(addressRepository.findByUserIdInOrderByUserIdAscIsDefaultDescCreatedAtDesc(List.of(1L)))
+                .thenReturn(List.of(buildAddress(visibleFreelancer, "Sao Paulo", "SP")));
+        when(geocodingService.geocodeAddress(anyString(), anyString(), anyString(), anyString(), anyString()))
+                .thenReturn(Optional.of(new GeocodingService.Coordinates(
+                        BigDecimal.valueOf(-23.5505),
+                        BigDecimal.valueOf(-46.6333))));
+        when(serviceRepository.findByFreelancerIdInAndIsActiveOrderByCreatedAtDesc(any(), eq(true)))
+                .thenReturn(List.of());
+        when(reviewRepository.findAverageRatingByReviewedId(anyLong())).thenReturn(null);
+        when(reviewRepository.countByReviewedId(anyLong())).thenReturn(0L);
+
+        List<NearbyFreelancerResponse> result = freelancerService.findNearbyFreelancers(
+                BigDecimal.valueOf(-23.5505),
+                BigDecimal.valueOf(-46.6333),
+                10.0,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null);
+
+        assertThat(result).extracting(NearbyFreelancerResponse::getId).containsExactly(1L);
+    }
+
     private void mockCurrentFreelancer(Freelancer freelancer) {
         freelancer.setId(1L);
         doReturn(freelancer).when(freelancerService).getCurrentFreelancer();
@@ -368,6 +420,7 @@ class FreelancerServiceTest {
         freelancer.setName(name);
         freelancer.setProfessionalTitle("Profissional");
         freelancer.setAvailable(true);
+        freelancer.setActive(true);
         freelancer.setCompletedJobs(3);
         freelancer.getServiceCities().add(ServiceCity.builder()
                 .freelancer(freelancer)

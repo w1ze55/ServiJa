@@ -2,8 +2,9 @@ package com.servija.servija.controller;
 
 import com.servija.servija.dto.FreelancerProfileRequest;
 import com.servija.servija.dto.FreelancerProfileResponse;
-import com.servija.servija.dto.NearbyFreelancerResponse;
 import com.servija.servija.dto.MessageResponse;
+import com.servija.servija.dto.NearbyFreelancerResponse;
+import com.servija.servija.exception.ResourceNotFoundException;
 import com.servija.servija.service.FreelancerService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -51,8 +52,10 @@ public class FreelancerController {
     })
     public ResponseEntity<FreelancerProfileResponse> getFreelancerPublicProfile(@PathVariable Long id) {
         try {
-            FreelancerProfileResponse profile = freelancerService.getPublicProfile(id);
+            FreelancerProfileResponse profile = freelancerService.getVisiblePublicProfile(id);
             return ResponseEntity.ok(profile);
+        } catch (ResourceNotFoundException e) {
+            return ResponseEntity.notFound().build();
         } catch (Exception e) {
             return ResponseEntity.internalServerError().build();
         }
