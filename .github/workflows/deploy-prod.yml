@@ -13,18 +13,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # ── Backend build ──────────────────────────────────────────
-      - name: Set up JDK 21
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '21'
-
-      - name: Build backend JAR
-        run: mvn package -DskipTests
-        working-directory: backend
-
-      # ── Frontend build ─────────────────────────────────────────
+      # ── Frontend build (CI) ────────────────────────────────────
       - name: Set up Node 20
         uses: actions/setup-node@v4
         with:
@@ -50,13 +39,34 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
 
-      # ── Deploy artifacts ───────────────────────────────────────
-      - name: Copy JAR to server
+      # ── Backend: sync source to EC2 and build there ────────────
+      - name: Ensure backend build dir exists on EC2
         run: |
-          scp -i ~/.ssh/deploy_key \
-            backend/target/servija-0.0.1-SNAPSHOT.jar \
-            ubuntu@${{ secrets.EC2_HOST }}:/app/prod/app.jar
+          ssh -i ~/.ssh/deploy_key ubuntu@${{ secrets.EC2_HOST }} \
+            'mkdir -p /app/prod/build'
 
+      - name: Sync backend source to EC2
+        run: |
+          rsync -az --delete \
+            --exclude '.git/' \
+            --exclude 'target/' \
+            --exclude '.idea/' \
+            --exclude '*.iml' \
+            --exclude 'src/node_modules/' \
+            -e "ssh -i ~/.ssh/deploy_key" \
+            backend/ \
+            ubuntu@${{ secrets.EC2_HOST }}:/app/prod/build/
+
+      - name: Build backend JAR on EC2 (reuses ~/.m2 cache)
+        run: |
+          ssh -i ~/.ssh/deploy_key ubuntu@${{ secrets.EC2_HOST }} \
+            'set -e; \
+             cd /app/prod/build; \
+             chmod +x mvnw; \
+             ./mvnw -B -ntp clean package -DskipTests; \
+             cp target/servija-0.0.1-SNAPSHOT.jar /app/prod/app.jar'
+
+      # ── Deploy frontend artifacts ──────────────────────────────
       - name: Copy Vue dist to server
         run: |
           scp -i ~/.ssh/deploy_key -r \
