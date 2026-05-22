@@ -199,7 +199,7 @@ public class ServiceController {
     public ResponseEntity<ServiceResponse> getPublicServiceById(
             @Parameter(description = "ID do serviço", required = true) @PathVariable Long id) {
         try {
-            ServiceResponse service = serviceService.getPublicServiceByIdWithPricing(id);
+            ServiceResponse service = serviceService.getVisiblePublicServiceByIdWithPricing(id);
             return ResponseEntity.ok(service);
         } catch (Exception e) {
             return ResponseEntity.notFound().build();
