@@ -57,7 +57,8 @@ public class SecurityConfig {
                                 "/swagger-ui.html",
                                 "/ws/**",
                                 "/api/webhooks/**",
-                                "/api/reviews/ai/summary/**")
+                                "/api/reviews/ai/summary/**",
+                                "/api/__sentry-test")
                         .permitAll()
                         .anyRequest().authenticated())
                 .sessionManagement(session -> session
