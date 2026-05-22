@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import AdminDashboardPage from '@/pages/AdminDashboard/index.vue'
 import AdminLoginPage from '@/pages/AdminLogin/index.vue'
 import AdminUsersPage from '@/pages/AdminUsers/index.vue'
 import AdminCategoriesPage from '@/pages/AdminCategories/index.vue'
@@ -9,7 +10,13 @@ import NotFoundPage from '@/pages/NotFound/index.vue'
 const routes = [
   {
     path: '/',
-    redirect: '/users',
+    redirect: '/dashboard',
+  },
+  {
+    path: '/dashboard',
+    name: 'admin-dashboard',
+    component: AdminDashboardPage,
+    meta: { requiresAuth: true, userType: 'admin' },
   },
   {
     path: '/login',
@@ -64,7 +71,7 @@ router.beforeEach((to, from, next) => {
   }
 
   if (to.name === 'admin-login' && user?.type === 'admin') {
-    next('/users')
+    next('/dashboard')
     return
   }
 
