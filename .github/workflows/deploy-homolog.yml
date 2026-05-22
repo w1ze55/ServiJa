@@ -339,40 +339,74 @@ jobs:
              fi'
 
   # ─────────────────────────────────────────────────────────────────
-  # Notify: roda só em caso de falha em qualquer job upstream.
-  # Posta no Discord via webhook (pula silenciosamente se não setado).
+  # Notify: roda sempre. Detecta success/failure/cancelled olhando
+  # needs.*.result e posta no Discord com cor/emoji apropriados.
+  # Pula silenciosamente se DISCORD_WEBHOOK_URL não estiver setado.
   # ─────────────────────────────────────────────────────────────────
   notify:
-    name: Notify on failure
+    name: Notify Discord
     needs: [lint, security, compile, tests, deploy]
-    if: failure()
+    if: always()
     runs-on: ubuntu-latest
     steps:
-      - name: Notify Discord
+      - name: Send Discord notification
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          LINT_RESULT: ${{ needs.lint.result }}
+          SECURITY_RESULT: ${{ needs.security.result }}
+          COMPILE_RESULT: ${{ needs.compile.result }}
+          TESTS_RESULT: ${{ needs.tests.result }}
+          DEPLOY_RESULT: ${{ needs.deploy.result }}
+          ANY_FAILURE: ${{ contains(needs.*.result, 'failure') }}
+          ANY_CANCELLED: ${{ contains(needs.*.result, 'cancelled') }}
         run: |
           if [ -z "$DISCORD_WEBHOOK_URL" ]; then
             echo "DISCORD_WEBHOOK_URL não configurado; pulando notificação."
             exit 0
           fi
+
+          if [ "$ANY_FAILURE" = "true" ]; then
+            STATUS_TITLE="❌ FALHOU"
+            COLOR=15158332
+          elif [ "$ANY_CANCELLED" = "true" ]; then
+            STATUS_TITLE="⚠️ CANCELADO"
+            COLOR=15844367
+          else
+            STATUS_TITLE="✅ SUCESSO"
+            COLOR=3066993
+          fi
+
+          status_emoji() {
+            case "$1" in
+              success)   echo "✅" ;;
+              failure)   echo "❌" ;;
+              cancelled) echo "⚠️" ;;
+              skipped)   echo "⏭️" ;;
+              *)         echo "❓" ;;
+            esac
+          }
+
+          JOBS_LINE="$(status_emoji $LINT_RESULT) Lint · $(status_emoji $SECURITY_RESULT) Security · $(status_emoji $COMPILE_RESULT) Compile · $(status_emoji $TESTS_RESULT) Tests · $(status_emoji $DEPLOY_RESULT) Deploy"
           RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
           curl -X POST "$DISCORD_WEBHOOK_URL" \
             -H 'Content-Type: application/json' \
             -d "$(cat <<EOF
           {
             "username": "ServiJá CI",
             "embeds": [{
-              "title": "❌ Deploy homolog FALHOU",
+              "title": "${STATUS_TITLE} — Deploy homolog",
               "url": "${RUN_URL}",
-              "color": 15158332,
+              "color": ${COLOR},
               "fields": [
-                {"name": "Workflow", "value": "${{ github.workflow }} #${{ github.run_number }}", "inline": true},
                 {"name": "Branch", "value": "${{ github.ref_name }}", "inline": true},
+                {"name": "Autor", "value": "${{ github.actor }}", "inline": true},
+                {"name": "Run", "value": "#${{ github.run_number }}", "inline": true},
                 {"name": "Commit", "value": "\`${{ github.sha }}\`", "inline": false},
-                {"name": "Autor", "value": "${{ github.actor }}", "inline": true}
+                {"name": "Jobs", "value": "${JOBS_LINE}", "inline": false}
               ],
-              "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+              "timestamp": "${TIMESTAMP}"
             }]
           }
           EOF
