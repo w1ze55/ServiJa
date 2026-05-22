@@ -8,6 +8,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -39,4 +41,23 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(value = "INSERT IGNORE INTO contractors (user_id, total_contracts, active_contracts, completed_contracts) VALUES (:userId, 0, 0, 0)", nativeQuery = true)
     void insertContractorRecordIfNotExists(@Param("userId") Long userId);
+
+    @Query("""
+            select count(u)
+            from User u
+            where u.userType in :userTypes
+              and u.createdAt >= :start
+              and u.createdAt < :end
+            """)
+    long countByUserTypeInAndCreatedAtBetween(
+            @Param("userTypes") List<User.UserType> userTypes,
+            @Param("start") LocalDateTime start,
+            @Param("end") LocalDateTime end);
+
+    @Query("""
+            select min(u.createdAt)
+            from User u
+            where u.userType in :userTypes
+            """)
+    LocalDateTime findEarliestCreatedAtByUserTypeIn(@Param("userTypes") List<User.UserType> userTypes);
 }

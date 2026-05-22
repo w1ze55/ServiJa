@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Repository
@@ -46,6 +47,60 @@ public interface ServiceRequestRepository extends JpaRepository<ServiceRequest, 
     long countByFreelancerIdAndStatusIn(Long freelancerId, List<ServiceRequest.Status> statuses);
 
     long countByService_IdAndStatusAndResponseValueIsNotNull(Long serviceId, ServiceRequest.Status status);
+
+    @Query("""
+            select count(sr)
+            from ServiceRequest sr
+            where sr.createdAt >= :start
+              and sr.createdAt < :end
+            """)
+    long countCreatedBetween(
+            @Param("start") LocalDateTime start,
+            @Param("end") LocalDateTime end);
+
+    @Query("""
+            select min(sr.createdAt)
+            from ServiceRequest sr
+            """)
+    LocalDateTime findEarliestCreatedAt();
+
+    @Query(value = """
+            SELECT COUNT(DISTINCT activity.user_id)
+            FROM (
+                SELECT sr.contractor_id AS user_id
+                FROM service_requests sr
+                WHERE sr.created_at >= :start
+                  AND sr.created_at < :end
+                UNION
+                SELECT p.contractor_id AS user_id
+                FROM payments p
+                WHERE (p.created_at >= :start AND p.created_at < :end)
+                   OR (p.completed_at IS NOT NULL AND p.completed_at >= :start AND p.completed_at < :end)
+            ) activity
+            """, nativeQuery = true)
+    long countDistinctActiveContractorsBetween(
+            @Param("start") LocalDateTime start,
+            @Param("end") LocalDateTime end);
+
+    @Query(value = """
+            SELECT COUNT(DISTINCT activity.user_id)
+            FROM (
+                SELECT sr.freelancer_id AS user_id
+                FROM service_requests sr
+                WHERE sr.freelancer_id IS NOT NULL
+                  AND sr.created_at >= :start
+                  AND sr.created_at < :end
+                UNION
+                SELECT p.freelancer_id AS user_id
+                FROM payments p
+                WHERE p.freelancer_id IS NOT NULL
+                  AND ((p.created_at >= :start AND p.created_at < :end)
+                   OR (p.completed_at IS NOT NULL AND p.completed_at >= :start AND p.completed_at < :end))
+            ) activity
+            """, nativeQuery = true)
+    long countDistinctActiveFreelancersBetween(
+            @Param("start") LocalDateTime start,
+            @Param("end") LocalDateTime end);
 
     @Query(value = """
             SELECT AVG(response_value)

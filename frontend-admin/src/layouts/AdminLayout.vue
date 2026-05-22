@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { FolderTree, Headset, LogOut, ScrollText, Shield, Users } from 'lucide-vue-next'
+import { FolderTree, Headset, LayoutDashboard, LogOut, ScrollText, Shield, Users } from 'lucide-vue-next'
 import { useUserStore } from '@/stores/userStore'
 
 const router = useRouter()
@@ -10,6 +10,7 @@ const userStore = useUserStore()
 
 const currentUser = computed(() => userStore.user)
 
+const isDashboardActive = computed(() => route.path.startsWith('/dashboard'))
 const isCategoriesActive = computed(() => route.path.startsWith('/categories'))
 const isUsersActive = computed(() => route.path.startsWith('/users'))
 const isSupportActive = computed(() => route.path.startsWith('/support'))
@@ -39,6 +40,19 @@ const logout = () => {
       </div>
 
       <nav class="flex-1 space-y-1 px-4 py-6">
+        <button
+          :class="[
+            'flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-base font-medium transition-colors',
+            isDashboardActive
+              ? 'bg-white/20 text-white'
+              : 'text-white/70 hover:bg-white/10 hover:text-white',
+          ]"
+          type="button"
+          @click="router.push('/dashboard')"
+        >
+          <LayoutDashboard class="h-5 w-5" />
+          Dashboard
+        </button>
         <button
           :class="[
             'flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-base font-medium transition-colors',

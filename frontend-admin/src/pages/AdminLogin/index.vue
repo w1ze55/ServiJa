@@ -57,7 +57,7 @@ const handleLogin = async () => {
       avatar: user.avatar,
     })
 
-    router.push('/users')
+    router.push('/dashboard')
   } catch (err: unknown) {
     const error = err as { response?: { status?: number; data?: { message?: string } } }
     if (error.response?.status === 401 || error.response?.status === 403) {
