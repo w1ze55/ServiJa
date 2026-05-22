@@ -7,6 +7,41 @@ on:
 
 jobs:
   # ─────────────────────────────────────────────────────────────────
+  # Lint: detecta mojibake (UTF-8 corrompido) no fonte do backend.
+  # Falha rápida em pares Ã+latin1 que indicam dupla decodificação
+  # UTF-8 → Latin-1 → UTF-8.
+  # ─────────────────────────────────────────────────────────────────
+  lint:
+    name: Lint (encoding)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Detect mojibake (UTF-8 double-encoding)
+        run: |
+          set +e
+          PATTERN='Ã£|Ã§|Ã©|Ã­|Ã³|Ãº|Ã¡|Ãª|Ã´|Ã€|Ã‡|Ã‰|Ã“|ÃŠ|Ã‘|Ãƒ'
+          MATCHES=$(grep -RnE \
+            --include='*.java' \
+            --include='*.properties' \
+            --include='*.xml' \
+            --include='*.json' \
+            --include='*.yml' \
+            --include='*.yaml' \
+            "$PATTERN" backend/)
+          if [ -n "$MATCHES" ]; then
+            echo "::error::Mojibake (UTF-8 corrompido) detectado:"
+            echo "$MATCHES" | while IFS=: read -r file line content; do
+              echo "::error file=$file,line=$line::Mojibake: ${content#"${content%%[![:space:]]*}"}"
+            done
+            echo ""
+            echo "Total de ocorrências: $(echo "$MATCHES" | wc -l)"
+            exit 1
+          fi
+          echo "OK: nenhum mojibake encontrado"
+
+  # ─────────────────────────────────────────────────────────────────
   # Compile: builda frontends no runner e o JAR do backend na EC2
   # (reusa ~/.m2 local). Roda em paralelo com `tests`.
   # ─────────────────────────────────────────────────────────────────
@@ -140,7 +175,7 @@ jobs:
   # ─────────────────────────────────────────────────────────────────
   deploy:
     name: Deploy to EC2
-    needs: [compile, tests]
+    needs: [lint, compile, tests]
     runs-on: ubuntu-latest
     steps:
       - name: Download frontend dist
