@@ -5,6 +5,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.servija.servija.dto.ServiceRequest;
 import com.servija.servija.dto.ServiceResponse;
+import com.servija.servija.exception.ResourceNotFoundException;
 import com.servija.servija.model.Freelancer;
 import com.servija.servija.model.Service;
 import com.servija.servija.model.User;
@@ -13,6 +14,7 @@ import com.servija.servija.repository.ReviewRepository;
 import com.servija.servija.repository.ServiceRepository;
 import com.servija.servija.repository.ServiceRequestRepository;
 import com.servija.servija.repository.UserRepository;
+import com.servija.servija.util.PublicVisibilityRules;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
@@ -450,8 +452,36 @@ public class ServiceService {
         return response;
     }
 
+    @Transactional(readOnly = true)
+    public ServiceResponse getVisiblePublicServiceById(Long id) {
+        return toResponse(requirePublicService(id));
+    }
+
+    @Transactional(readOnly = true)
+    public ServiceResponse getVisiblePublicServiceByIdWithPricing(Long id) {
+        return toPublicResponse(requirePublicService(id));
+    }
+
+    private Service requirePublicService(Long id) {
+        Service service = serviceRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Serviço não encontrado"));
+
+        if (!isPubliclyVisible(service)) {
+            throw new ResourceNotFoundException("Serviço não encontrado");
+        }
+
+        return service;
+    }
+
     private List<ServiceResponse> toPublicResponses(List<Service> services) {
-        return services.stream().map(this::toPublicResponse).collect(Collectors.toList());
+        return services.stream()
+                .filter(this::isPubliclyVisible)
+                .map(this::toPublicResponse)
+                .collect(Collectors.toList());
+    }
+
+    boolean isPubliclyVisible(Service service) {
+        return PublicVisibilityRules.isServicePublic(service);
     }
 
     private void populateServiceReviewSummary(Long serviceId, ServiceResponse response) {

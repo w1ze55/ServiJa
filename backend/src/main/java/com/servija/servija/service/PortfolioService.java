@@ -10,6 +10,7 @@ import com.servija.servija.model.PortfolioImage;
 import com.servija.servija.model.PortfolioProject;
 import com.servija.servija.repository.PortfolioImageRepository;
 import com.servija.servija.repository.PortfolioProjectRepository;
+import com.servija.servija.util.PublicVisibilityRules;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -45,6 +46,7 @@ public class PortfolioService {
     public List<PortfolioProjectResponse> getPublicProjects(Long freelancerId) {
         List<PortfolioProject> projects = projectRepository.findByFreelancerIdOrderByCreatedAtDesc(freelancerId);
         return projects.stream()
+                .filter(project -> PublicVisibilityRules.isFreelancerPublic(project.getFreelancer()))
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }

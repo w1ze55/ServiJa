@@ -79,7 +79,6 @@ class AuthServicePasswordResetTest {
                 .resetPasswordToken("123456")
                 .resetPasswordTokenExpiry(LocalDateTime.now().plusMinutes(30))
                 .resetPasswordAttempts(2)
-                .resetPasswordLockUntil(LocalDateTime.now().plusMinutes(5))
                 .adminResetPasswordTokenHash("existing-admin-link-hash")
                 .adminResetPasswordTokenExpiry(LocalDateTime.now().plusMinutes(30))
                 .totalContracts(0)

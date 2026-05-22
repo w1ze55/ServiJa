@@ -9,10 +9,14 @@ import com.servija.servija.model.User;
 import com.servija.servija.repository.ContractorRepository;
 import com.servija.servija.repository.FreelancerRepository;
 import com.servija.servija.repository.UserRepository;
+import com.servija.servija.service.AddressService;
+import com.servija.servija.service.AdminResetPasswordLinkService;
+import com.servija.servija.service.AuditLogger;
 import com.servija.servija.service.AuthService;
 import com.servija.servija.service.CustomUserDetailsService;
 import com.servija.servija.service.EmailService;
 import com.servija.servija.service.JwtService;
+import com.servija.servija.service.PasswordPolicyService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -51,6 +55,14 @@ class AuthServiceLoginTest {
     private CustomUserDetailsService userDetailsService;
     @Mock
     private EmailService emailService;
+    @Mock
+    private AuditLogger auditLogger;
+    @Mock
+    private AddressService addressService;
+    @Mock
+    private PasswordPolicyService passwordPolicyService;
+    @Mock
+    private AdminResetPasswordLinkService adminResetPasswordLinkService;
 
     @InjectMocks
     private AuthService authService;
@@ -107,7 +119,7 @@ class AuthServiceLoginTest {
 
         assertThatThrownBy(() -> authService.login(loginRequest))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessage("Usuario nao encontrado");
+                .hasMessage("Usuário não encontrado");
     }
 
     @Test

@@ -1,4 +1,4 @@
-name: Deploy Servija (Homolog)
+name: Deploy ServiJa (Homolog)
 
 on:
   push:
@@ -6,18 +6,62 @@ on:
       - homolog
 
 jobs:
-  build-and-deploy:
+  # ─────────────────────────────────────────────────────────────────
+  # Lint: detecta mojibake (UTF-8 corrompido) no fonte do backend.
+  # Falha rápida em pares Ã+latin1 que indicam dupla decodificação
+  # UTF-8 → Latin-1 → UTF-8.
+  # ─────────────────────────────────────────────────────────────────
+  lint:
+    name: Lint (encoding)
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # ── Frontend build (CI) ────────────────────────────────────
+      - name: Detect mojibake (UTF-8 double-encoding)
+        run: |
+          set +e
+          PATTERN='Ã£|Ã§|Ã©|Ã­|Ã³|Ãº|Ã¡|Ãª|Ã´|Ã€|Ã‡|Ã‰|Ã“|ÃŠ|Ã‘|Ãƒ'
+          MATCHES=$(grep -RnE \
+            --include='*.java' \
+            --include='*.properties' \
+            --include='*.xml' \
+            --include='*.json' \
+            --include='*.yml' \
+            --include='*.yaml' \
+            "$PATTERN" backend/)
+          if [ -n "$MATCHES" ]; then
+            echo "::error::Mojibake (UTF-8 corrompido) detectado:"
+            echo "$MATCHES" | while IFS=: read -r file line content; do
+              echo "::error file=$file,line=$line::Mojibake: ${content#"${content%%[![:space:]]*}"}"
+            done
+            echo ""
+            echo "Total de ocorrências: $(echo "$MATCHES" | wc -l)"
+            exit 1
+          fi
+          echo "OK: nenhum mojibake encontrado"
+
+  # ─────────────────────────────────────────────────────────────────
+  # Compile: builda frontends no runner e o JAR do backend na EC2
+  # (reusa ~/.m2 local). Roda em paralelo com `tests`.
+  # ─────────────────────────────────────────────────────────────────
+  compile:
+    name: Compile
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── Frontend builds ────────────────────────────────────────
       - name: Set up Node 20
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: |
+            frontend/package-lock.json
+            frontend-admin/package-lock.json
 
       - name: Build frontend
         run: npm ci && npm run build
@@ -31,7 +75,21 @@ jobs:
         env:
           VITE_API_URL: https://homolog.servija.app
 
-      # ── Prepare SSH key ────────────────────────────────────────
+      - name: Upload frontend dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist
+          retention-days: 7
+
+      - name: Upload frontend-admin dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-admin-dist
+          path: frontend-admin/dist
+          retention-days: 7
+
+      # ── Backend build on EC2 (reusa ~/.m2 cache) ───────────────
       - name: Configure SSH key
         run: |
           mkdir -p ~/.ssh
@@ -39,7 +97,6 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
 
-      # ── Backend: sync source to EC2 and build there ────────────
       - name: Ensure backend build dir exists on EC2
         run: |
           ssh -i ~/.ssh/deploy_key ubuntu@${{ secrets.EC2_HOST }} \
@@ -57,30 +114,109 @@ jobs:
             backend/ \
             ubuntu@${{ secrets.EC2_HOST }}:/app/homolog/build/
 
-      - name: Build backend JAR on EC2 (reuses ~/.m2 cache)
+      - name: Build backend JAR on EC2 (skip tests)
         run: |
           ssh -i ~/.ssh/deploy_key ubuntu@${{ secrets.EC2_HOST }} \
             'set -e; \
              cd /app/homolog/build; \
              chmod +x mvnw; \
-             ./mvnw -B -ntp clean package -DskipTests; \
-             cp target/servija-0.0.1-SNAPSHOT.jar /app/homolog/app.jar'
+             ./mvnw -B -ntp clean package -DskipTests'
 
-      # ── Deploy frontend artifacts ──────────────────────────────
+  # ─────────────────────────────────────────────────────────────────
+  # Tests: roda a suite JUnit do backend no runner com cache do Maven.
+  # Paralelo a `compile`. Falha aqui bloqueia o deploy.
+  # ─────────────────────────────────────────────────────────────────
+  tests:
+    name: Tests (JUnit + Mockito)
+    needs: lint
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Run backend tests (JUnit + Mockito)
+        run: |
+          chmod +x mvnw
+          ./mvnw -B -ntp test
+        working-directory: backend
+
+      - name: Publish JUnit report
+        if: always()
+        uses: mikepenz/action-junit-report@v4
+        with:
+          report_paths: backend/target/surefire-reports/TEST-*.xml
+          check_name: JUnit + Mockito Report
+          fail_on_failure: true
+          require_tests: true
+          detailed_summary: true
+          include_passed: false
+
+      - name: Upload surefire reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-reports
+          path: backend/target/surefire-reports
+          retention-days: 7
+          if-no-files-found: ignore
+
+  # ─────────────────────────────────────────────────────────────────
+  # Deploy: gated por compile + tests. Baixa dists dos frontends,
+  # promove o JAR já buildado na EC2 e reinicia o serviço.
+  # ─────────────────────────────────────────────────────────────────
+  deploy:
+    name: Deploy to EC2
+    needs: [lint, compile, tests]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download frontend dist
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend-dist
+
+      - name: Download frontend-admin dist
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-admin-dist
+          path: frontend-admin-dist
+
+      - name: Configure SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+
       - name: Upload Vue dist to EC2
         run: |
           scp -i ~/.ssh/deploy_key -r \
-            frontend/dist/* \
+            frontend-dist/* \
             ubuntu@${{ secrets.EC2_HOST }}:/var/www/homolog/
 
       - name: Upload admin dist to EC2
         run: |
           scp -i ~/.ssh/deploy_key -r \
-            frontend-admin/dist/* \
+            frontend-admin-dist/* \
             ubuntu@${{ secrets.EC2_HOST }}:/var/www/homolog-admin/
 
-      # ── Set permissions & restart ────────────────────────────
-      - name: Fix permissions and restart service
+      - name: Promote JAR, fix permissions and restart service
         run: |
           ssh -i ~/.ssh/deploy_key ubuntu@${{ secrets.EC2_HOST }} \
-            'sudo mkdir -p /var/www/homolog-admin && sudo chown -R ubuntu:ubuntu /var/www/homolog-admin && chmod -R o+rX /var/www/homolog/ /var/www/homolog-admin/ && sudo systemctl restart servija-homolog'
+            'set -e; \
+             cp /app/homolog/build/target/servija-0.0.1-SNAPSHOT.jar /app/homolog/app.jar; \
+             sudo mkdir -p /var/www/homolog-admin; \
+             sudo chown -R ubuntu:ubuntu /var/www/homolog-admin; \
+             chmod -R o+rX /var/www/homolog/ /var/www/homolog-admin/; \
+             sudo systemctl restart servija-homolog'
