@@ -464,10 +464,10 @@ public class ServiceService {
 
     private Service requirePublicService(Long id) {
         Service service = serviceRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("ServiÃ§o nÃ£o encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Serviço não encontrado"));
 
         if (!isPubliclyVisible(service)) {
-            throw new ResourceNotFoundException("ServiÃ§o nÃ£o encontrado");
+            throw new ResourceNotFoundException("Serviço não encontrado");
         }
 
         return service;

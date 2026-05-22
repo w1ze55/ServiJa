@@ -812,13 +812,13 @@ public class ServiceRequestService {
     @Transactional
     public ServiceRequestResponse addContractorAttachments(Long id, ProjectAttachmentsRequest body, String contractorEmail) {
         ServiceRequest request = serviceRequestRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("SolicitaÃ§Ã£o nÃ£o encontrada"));
+                .orElseThrow(() -> new ResourceNotFoundException("Solicitação não encontrada"));
 
         User contractor = userRepository.findByEmail(contractorEmail)
-                .orElseThrow(() -> new ResourceNotFoundException("UsuÃ¡rio nÃ£o encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
 
         if (request.getContractor() == null || !request.getContractor().getId().equals(contractor.getId())) {
-            throw new IllegalStateException("Apenas o cliente da solicitaÃ§Ã£o pode enviar arquivos");
+            throw new IllegalStateException("Apenas o cliente da solicitação pode enviar arquivos");
         }
 
         List<String> attachmentsToAdd = resolveProjectAttachmentUrls(body);
@@ -838,7 +838,7 @@ public class ServiceRequestService {
 
         ServiceRequest saved = serviceRequestRepository.save(request);
         notificationService.notifyAttachmentAdded(saved, contractor, attachmentsToAdd.size());
-        log.info("Contractor attachments adicionados Ã  solicitaÃ§Ã£o {}: {} arquivos", id, attachmentsToAdd.size());
+        log.info("Contractor attachments adicionados à solicitação {}: {} arquivos", id, attachmentsToAdd.size());
         return toResponse(saved);
     }
 

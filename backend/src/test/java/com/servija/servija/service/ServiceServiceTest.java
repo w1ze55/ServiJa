@@ -155,7 +155,7 @@ class ServiceServiceTest {
     }
 
     @Test
-    @DisplayName("Deve ocultar serviÃ§o pÃºblico quando o freelancer estÃ¡ bloqueado")
+    @DisplayName("Deve ocultar serviço público quando o freelancer está bloqueado")
     void getVisiblePublicServiceByIdWithPricing_hidesBlockedFreelancer() {
         Service service = buildService(13L, new BigDecimal("120.00"));
         service.getFreelancer().setActive(false);
@@ -165,11 +165,11 @@ class ServiceServiceTest {
         org.assertj.core.api.Assertions.assertThatThrownBy(
                 () -> serviceService.getVisiblePublicServiceByIdWithPricing(13L))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessage("ServiÃ§o nÃ£o encontrado");
+                .hasMessage("Serviço não encontrado");
     }
 
     @Test
-    @DisplayName("Deve remover da listagem pÃºblica serviÃ§os de freelancers bloqueados")
+    @DisplayName("Deve remover da listagem pública serviços de freelancers bloqueados")
     void getAllActiveServices_filtersBlockedFreelancerServices() {
         Service visibleService = buildService(14L, new BigDecimal("90.00"));
         Service hiddenService = buildService(15L, new BigDecimal("110.00"));

@@ -45,7 +45,7 @@ class FreelancerControllerTest {
     }
 
     @Test
-    @DisplayName("Deve repassar filtros opcionais na busca de freelancers prÃ³ximos")
+    @DisplayName("Deve repassar filtros opcionais na busca de freelancers próximos")
     void getNearbyFreelancers_forwardsSearchFilters() throws Exception {
         when(freelancerService.findNearbyFreelancers(
                 any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
