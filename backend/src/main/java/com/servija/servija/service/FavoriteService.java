@@ -39,26 +39,26 @@ public class FavoriteService {
                     .flatMap(this::mapToVisibleResponse)
                     .orElseGet(() -> {
                         com.servija.servija.model.Service service = serviceRepository.findById(request.getServiceId())
-                                .orElseThrow(() -> new ResourceNotFoundException("ServiÃ§o nÃ£o encontrado"));
+                                .orElseThrow(() -> new ResourceNotFoundException("Serviço não encontrado"));
                         if (!serviceService.isPubliclyVisible(service)) {
-                            throw new ResourceNotFoundException("ServiÃ§o nÃ£o encontrado");
+                            throw new ResourceNotFoundException("Serviço não encontrado");
                         }
                         return mapToVisibleResponse(
                                 favoriteRepository.save(Favorite.builder().user(user).service(service).build()))
-                                .orElseThrow(() -> new ResourceNotFoundException("ServiÃ§o nÃ£o encontrado"));
+                                .orElseThrow(() -> new ResourceNotFoundException("Serviço não encontrado"));
                     });
         } else if (request.getFreelancerId() != null) {
             return favoriteRepository.findByUserIdAndFreelancerId(userId, request.getFreelancerId())
                     .flatMap(this::mapToVisibleResponse)
                     .orElseGet(() -> {
                         Freelancer freelancer = freelancerRepository.findById(request.getFreelancerId())
-                                .orElseThrow(() -> new ResourceNotFoundException("Freelancer nÃ£o encontrado"));
+                                .orElseThrow(() -> new ResourceNotFoundException("Freelancer não encontrado"));
                         if (!PublicVisibilityRules.isFreelancerPublic(freelancer)) {
-                            throw new ResourceNotFoundException("Freelancer nÃ£o encontrado");
+                            throw new ResourceNotFoundException("Freelancer não encontrado");
                         }
                         return mapToVisibleResponse(
                                 favoriteRepository.save(Favorite.builder().user(user).freelancer(freelancer).build()))
-                                .orElseThrow(() -> new ResourceNotFoundException("Freelancer nÃ£o encontrado"));
+                                .orElseThrow(() -> new ResourceNotFoundException("Freelancer não encontrado"));
                     });
         } else {
             throw new RuntimeException("Either serviceId or freelancerId must be provided");

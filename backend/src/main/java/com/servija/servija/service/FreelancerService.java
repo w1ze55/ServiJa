@@ -414,10 +414,10 @@ public class FreelancerService {
     @Transactional(readOnly = true)
     public FreelancerProfileResponse getVisiblePublicProfile(Long freelancerId) {
         Freelancer freelancer = freelancerRepository.findByIdWithServiceCities(freelancerId)
-                .orElseThrow(() -> new ResourceNotFoundException("Freelancer nÃ£o encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Freelancer não encontrado"));
 
         if (!isPubliclyVisible(freelancer)) {
-            throw new ResourceNotFoundException("Freelancer nÃ£o encontrado");
+            throw new ResourceNotFoundException("Freelancer não encontrado");
         }
 
         freelancerRepository.findByIdWithProfessionalLinks(freelancerId);

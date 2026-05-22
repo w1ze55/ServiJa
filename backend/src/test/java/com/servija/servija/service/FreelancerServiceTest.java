@@ -209,7 +209,7 @@ class FreelancerServiceTest {
     }
 
     @Test
-    @DisplayName("Deve buscar freelancers prÃ³ximos por serviÃ§o, tag e subcategoria")
+    @DisplayName("Deve buscar freelancers próximos por serviço, tag e subcategoria")
     void getVisiblePublicProfile_hidesBlockedFreelancer() {
         Freelancer freelancer = buildFreelancer();
         freelancer.setId(99L);
@@ -223,28 +223,28 @@ class FreelancerServiceTest {
     }
 
     @Test
-    @DisplayName("Deve ocultar perfil pÃºblico de freelancer bloqueado")
+    @DisplayName("Deve ocultar perfil público de freelancer bloqueado")
     void findNearbyFreelancers_filtersByServiceSearchAndCatalog() {
         ServiceCategory category = ServiceCategory.builder()
                 .id(10L)
                 .slug("eletrica")
-                .name("ElÃ©trica")
+                .name("Elétrica")
                 .build();
         ServiceSubcategory subcategory = ServiceSubcategory.builder()
                 .id(20L)
                 .category(category)
                 .slug("instalacao")
-                .name("InstalaÃ§Ã£o")
+                .name("Instalação")
                 .build();
 
-        Freelancer matching = buildNearbyFreelancer(1L, "JoÃ£o Silva", -23.5505, -46.6333);
+        Freelancer matching = buildNearbyFreelancer(1L, "João Silva", -23.5505, -46.6333);
         Freelancer other = buildNearbyFreelancer(2L, "Maria Souza", -23.5510, -46.6340);
         Service service = Service.builder()
                 .id(100L)
                 .freelancer(matching)
-                .title("InstalaÃ§Ã£o de ventilador")
-                .description("ServiÃ§o residencial")
-                .category("ElÃ©trica")
+                .title("Instalação de ventilador")
+                .description("Serviço residencial")
+                .category("Elétrica")
                 .serviceCategory(category)
                 .serviceSubcategory(subcategory)
                 .tags("[\"ventilador\",\"urgente\"]")
@@ -286,7 +286,7 @@ class FreelancerServiceTest {
         assertThat(result).singleElement().satisfies(response -> {
             assertThat(response.getId()).isEqualTo(1L);
             assertThat(response.getCategoryId()).isEqualTo(10L);
-            assertThat(response.getSubcategoryLabel()).isEqualTo("InstalaÃ§Ã£o");
+            assertThat(response.getSubcategoryLabel()).isEqualTo("Instalação");
         });
     }
 
@@ -424,7 +424,7 @@ class FreelancerServiceTest {
         freelancer.setCompletedJobs(3);
         freelancer.getServiceCities().add(ServiceCity.builder()
                 .freelancer(freelancer)
-                .city("SÃ£o Paulo")
+                .city("São Paulo")
                 .state("SP")
                 .latitude(BigDecimal.valueOf(latitude))
                 .longitude(BigDecimal.valueOf(longitude))
