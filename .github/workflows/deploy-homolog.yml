@@ -5,6 +5,10 @@ on:
     branches:
       - homolog
 
+# Default least-privilege para todos os jobs. Jobs específicos elevam quando necessário.
+permissions:
+  contents: read
+
 jobs:
   # ─────────────────────────────────────────────────────────────────
   # Lint: detecta mojibake (UTF-8 corrompido) no fonte do backend.
@@ -42,8 +46,41 @@ jobs:
           echo "OK: nenhum mojibake encontrado"
 
   # ─────────────────────────────────────────────────────────────────
+  # Security: OWASP Dependency-Check no backend. Falha em CVSS >= 7.
+  # Paralelo a compile/tests. NVD_API_KEY recomendado (evita rate-limit).
+  # ─────────────────────────────────────────────────────────────────
+  security:
+    name: Security scan (OWASP)
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: OWASP Dependency-Check (backend)
+        uses: dependency-check/Dependency-Check_Action@main
+        with:
+          project: servija-backend
+          path: backend
+          format: HTML
+          out: dependency-check-report
+          args: >-
+            --failOnCVSS 7
+            --enableRetired
+            ${{ secrets.NVD_API_KEY && format('--nvdApiKey {0}', secrets.NVD_API_KEY) || '' }}
+
+      - name: Upload OWASP report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-check-report
+          path: dependency-check-report
+          retention-days: 14
+          if-no-files-found: ignore
+
+  # ─────────────────────────────────────────────────────────────────
   # Compile: builda frontends no runner e o JAR do backend na EC2
-  # (reusa ~/.m2 local). Roda em paralelo com `tests`.
+  # (reusa ~/.m2 local). Roda em paralelo com `tests` e `security`.
   # ─────────────────────────────────────────────────────────────────
   compile:
     name: Compile
@@ -90,17 +127,24 @@ jobs:
           retention-days: 7
 
       # ── Backend build on EC2 (reusa ~/.m2 cache) ───────────────
-      - name: Configure SSH key
+      - name: Setup SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.EC2_SSH_KEY }}
+
+      - name: Pin EC2 host fingerprint
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+          if [ -z "${{ secrets.EC2_KNOWN_HOSTS }}" ]; then
+            echo "::error::Secret EC2_KNOWN_HOSTS não configurado. Gere em uma máquina trusted com 'ssh-keyscan -H <host>'."
+            exit 1
+          fi
+          echo "${{ secrets.EC2_KNOWN_HOSTS }}" >> ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
 
       - name: Ensure backend build dir exists on EC2
         run: |
-          ssh -i ~/.ssh/deploy_key ubuntu@${{ secrets.EC2_HOST }} \
-            'mkdir -p /app/homolog/build'
+          ssh ubuntu@${{ secrets.EC2_HOST }} 'mkdir -p /app/homolog/build'
 
       - name: Sync backend source to EC2
         run: |
@@ -110,24 +154,24 @@ jobs:
             --exclude '.idea/' \
             --exclude '*.iml' \
             --exclude 'src/node_modules/' \
-            -e "ssh -i ~/.ssh/deploy_key" \
             backend/ \
             ubuntu@${{ secrets.EC2_HOST }}:/app/homolog/build/
 
       - name: Build backend JAR on EC2 (skip tests)
         run: |
-          ssh -i ~/.ssh/deploy_key ubuntu@${{ secrets.EC2_HOST }} \
-            'set -e; \
-             cd /app/homolog/build; \
-             chmod +x mvnw; \
+          ssh ubuntu@${{ secrets.EC2_HOST }} \
+            'set -e
+             cd /app/homolog/build
+             chmod +x mvnw
              ./mvnw -B -ntp clean package -DskipTests'
 
   # ─────────────────────────────────────────────────────────────────
-  # Tests: roda a suite JUnit do backend no runner com cache do Maven.
-  # Paralelo a `compile`. Falha aqui bloqueia o deploy.
+  # Tests: roda a suite JUnit do backend no runner com cache do Maven
+  # e gera relatório de cobertura JaCoCo. Paralelo a `compile`/`security`.
+  # Falha aqui bloqueia o deploy.
   # ─────────────────────────────────────────────────────────────────
   tests:
-    name: Tests (JUnit + Mockito)
+    name: Tests (JUnit + Mockito + JaCoCo)
     needs: lint
     runs-on: ubuntu-latest
     permissions:
@@ -145,10 +189,13 @@ jobs:
           java-version: '21'
           cache: maven
 
-      - name: Run backend tests (JUnit + Mockito)
+      - name: Run backend tests with JaCoCo coverage
         run: |
           chmod +x mvnw
-          ./mvnw -B -ntp test
+          ./mvnw -B -ntp \
+            org.jacoco:jacoco-maven-plugin:0.8.12:prepare-agent \
+            test \
+            org.jacoco:jacoco-maven-plugin:0.8.12:report
         working-directory: backend
 
       - name: Publish JUnit report
@@ -171,13 +218,23 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
+      - name: Upload JaCoCo coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-coverage
+          path: backend/target/site/jacoco
+          retention-days: 14
+          if-no-files-found: warn
+
   # ─────────────────────────────────────────────────────────────────
-  # Deploy: gated por compile + tests. Baixa dists dos frontends,
-  # promove o JAR já buildado na EC2 e reinicia o serviço.
+  # Deploy: gated por security + compile + tests. Baixa dists dos
+  # frontends, promove o JAR (com backup), reinicia, faz health-check
+  # e rollback automático se o health falhar.
   # ─────────────────────────────────────────────────────────────────
   deploy:
     name: Deploy to EC2
-    needs: [lint, compile, tests]
+    needs: [lint, security, compile, tests]
     runs-on: ubuntu-latest
     steps:
       - name: Download frontend dist
@@ -192,31 +249,131 @@ jobs:
           name: frontend-admin-dist
           path: frontend-admin-dist
 
-      - name: Configure SSH key
+      - name: Setup SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.EC2_SSH_KEY }}
+
+      - name: Pin EC2 host fingerprint
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+          if [ -z "${{ secrets.EC2_KNOWN_HOSTS }}" ]; then
+            echo "::error::Secret EC2_KNOWN_HOSTS não configurado."
+            exit 1
+          fi
+          echo "${{ secrets.EC2_KNOWN_HOSTS }}" >> ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Prepare target dirs on EC2
+        run: |
+          ssh ubuntu@${{ secrets.EC2_HOST }} \
+            'sudo mkdir -p /var/www/homolog /var/www/homolog-admin
+             sudo chown -R ubuntu:ubuntu /var/www/homolog /var/www/homolog-admin'
 
       - name: Upload Vue dist to EC2
         run: |
-          scp -i ~/.ssh/deploy_key -r \
-            frontend-dist/* \
+          rsync -az --delete \
+            frontend-dist/ \
             ubuntu@${{ secrets.EC2_HOST }}:/var/www/homolog/
 
       - name: Upload admin dist to EC2
         run: |
-          scp -i ~/.ssh/deploy_key -r \
-            frontend-admin-dist/* \
+          rsync -az --delete \
+            frontend-admin-dist/ \
             ubuntu@${{ secrets.EC2_HOST }}:/var/www/homolog-admin/
 
-      - name: Promote JAR, fix permissions and restart service
+      - name: Backup current JAR
         run: |
-          ssh -i ~/.ssh/deploy_key ubuntu@${{ secrets.EC2_HOST }} \
-            'set -e; \
-             cp /app/homolog/build/target/servija-0.0.1-SNAPSHOT.jar /app/homolog/app.jar; \
-             sudo mkdir -p /var/www/homolog-admin; \
-             sudo chown -R ubuntu:ubuntu /var/www/homolog-admin; \
-             chmod -R o+rX /var/www/homolog/ /var/www/homolog-admin/; \
+          ssh ubuntu@${{ secrets.EC2_HOST }} \
+            'if [ -f /app/homolog/app.jar ]; then
+               cp /app/homolog/app.jar /app/homolog/app.jar.previous
+               echo "Backup criado: $(ls -la /app/homolog/app.jar.previous)"
+             else
+               echo "Sem JAR anterior (primeiro deploy?); nada a backupar."
+             fi'
+
+      - name: Promote JAR and restart service
+        id: promote
+        run: |
+          ssh ubuntu@${{ secrets.EC2_HOST }} \
+            'set -e
+             JAR=$(ls /app/homolog/build/target/servija-*.jar 2>/dev/null | head -n1)
+             if [ -z "$JAR" ]; then
+               echo "::error::Nenhum JAR servija-*.jar encontrado em /app/homolog/build/target/"
+               exit 1
+             fi
+             echo "Promovendo: $JAR"
+             cp "$JAR" /app/homolog/app.jar
+             chmod -R o+rX /var/www/homolog/ /var/www/homolog-admin/
              sudo systemctl restart servija-homolog'
+
+      - name: Health check
+        id: health
+        run: |
+          set +e
+          for i in 1 2 3 4 5 6 7 8 9 10; do
+            STATUS=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 5 https://homolog.servija.app/actuator/health || echo "000")
+            if [ "$STATUS" = "200" ]; then
+              echo "Health OK na tentativa $i (HTTP $STATUS)"
+              exit 0
+            fi
+            echo "Tentativa $i: HTTP $STATUS — aguardando 10s..."
+            sleep 10
+          done
+          echo "::error::Health check falhou após 10 tentativas"
+          exit 1
+
+      - name: Rollback on failure
+        if: failure() && steps.promote.outcome == 'success'
+        run: |
+          ssh ubuntu@${{ secrets.EC2_HOST }} \
+            'set -e
+             if [ -f /app/homolog/app.jar.previous ]; then
+               echo "Restaurando JAR anterior..."
+               cp /app/homolog/app.jar.previous /app/homolog/app.jar
+               sudo systemctl restart servija-homolog
+               echo "Rollback aplicado."
+             else
+               echo "::error::Sem /app/homolog/app.jar.previous — rollback impossível"
+               exit 1
+             fi'
+
+  # ─────────────────────────────────────────────────────────────────
+  # Notify: roda só em caso de falha em qualquer job upstream.
+  # Posta no Discord via webhook (pula silenciosamente se não setado).
+  # ─────────────────────────────────────────────────────────────────
+  notify:
+    name: Notify on failure
+    needs: [lint, security, compile, tests, deploy]
+    if: failure()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify Discord
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          if [ -z "$DISCORD_WEBHOOK_URL" ]; then
+            echo "DISCORD_WEBHOOK_URL não configurado; pulando notificação."
+            exit 0
+          fi
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          curl -X POST "$DISCORD_WEBHOOK_URL" \
+            -H 'Content-Type: application/json' \
+            -d "$(cat <<EOF
+          {
+            "username": "ServiJá CI",
+            "embeds": [{
+              "title": "❌ Deploy homolog FALHOU",
+              "url": "${RUN_URL}",
+              "color": 15158332,
+              "fields": [
+                {"name": "Workflow", "value": "${{ github.workflow }} #${{ github.run_number }}", "inline": true},
+                {"name": "Branch", "value": "${{ github.ref_name }}", "inline": true},
+                {"name": "Commit", "value": "\`${{ github.sha }}\`", "inline": false},
+                {"name": "Autor", "value": "${{ github.actor }}", "inline": true}
+              ],
+              "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            }]
+          }
+          EOF
+          )"
