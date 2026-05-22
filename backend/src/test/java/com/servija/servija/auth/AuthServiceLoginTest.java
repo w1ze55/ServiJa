@@ -119,7 +119,7 @@ class AuthServiceLoginTest {
 
         assertThatThrownBy(() -> authService.login(loginRequest))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessage("Usuario nao encontrado");
+                .hasMessage("Usuário não encontrado");
     }
 
     @Test
