@@ -1,4 +1,4 @@
-name: Deploy Servija (Homolog)
+name: Deploy ServiJa (Homolog)
 
 on:
   push:
@@ -47,6 +47,7 @@ jobs:
   # ─────────────────────────────────────────────────────────────────
   compile:
     name: Compile
+    needs: lint
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -127,6 +128,7 @@ jobs:
   # ─────────────────────────────────────────────────────────────────
   tests:
     name: Tests (JUnit + Mockito)
+    needs: lint
     runs-on: ubuntu-latest
     permissions:
       contents: read
