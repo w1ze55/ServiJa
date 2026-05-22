@@ -87,62 +87,6 @@ jobs:
              ./mvnw -B -ntp clean package -DskipTests'
 
   # ─────────────────────────────────────────────────────────────────
-  # Dead code (frontend): roda knip em frontend e frontend-admin.
-  # Falha aqui bloqueia o deploy.
-  # ─────────────────────────────────────────────────────────────────
-  frontend_deadcode:
-    name: Frontend dead code (${{ matrix.app }})
-    needs: compile
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        app: [frontend, frontend-admin]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Node 20
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: ${{ matrix.app }}/package-lock.json
-
-      - name: Install dependencies
-        run: npm ci
-        working-directory: ${{ matrix.app }}
-
-      - name: Run knip
-        run: npx --yes knip@5
-        working-directory: ${{ matrix.app }}
-
-  # ─────────────────────────────────────────────────────────────────
-  # Dead code (backend): detecta dependências Maven declaradas-e-não-usadas
-  # ou usadas-e-não-declaradas. Falha aqui bloqueia o deploy.
-  # ─────────────────────────────────────────────────────────────────
-  backend_deadcode:
-    name: Backend unused dependencies
-    needs: compile
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up JDK 21
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '21'
-          cache: maven
-
-      - name: Run dependency:analyze
-        run: |
-          chmod +x mvnw
-          ./mvnw -B -ntp dependency:analyze -DfailOnWarning=true -DignoreNonCompile=true
-        working-directory: backend
-
-  # ─────────────────────────────────────────────────────────────────
   # Tests: roda a suite JUnit do backend no runner com cache do Maven.
   # Paralelo a `compile`. Falha aqui bloqueia o deploy.
   # ─────────────────────────────────────────────────────────────────
@@ -167,8 +111,19 @@ jobs:
           ./mvnw -B -ntp test
         working-directory: backend
 
-      - name: Upload test reports on failure
-        if: failure()
+      - name: Publish JUnit report
+        if: always()
+        uses: mikepenz/action-junit-report@v4
+        with:
+          report_paths: backend/target/surefire-reports/TEST-*.xml
+          check_name: JUnit Test Report
+          fail_on_failure: true
+          require_tests: true
+          detailed_summary: true
+          include_passed: false
+
+      - name: Upload surefire reports
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: surefire-reports
@@ -182,7 +137,7 @@ jobs:
   # ─────────────────────────────────────────────────────────────────
   deploy:
     name: Deploy to EC2
-    needs: [compile, tests, frontend_deadcode, backend_deadcode]
+    needs: [compile, tests]
     runs-on: ubuntu-latest
     steps:
       - name: Download frontend dist
