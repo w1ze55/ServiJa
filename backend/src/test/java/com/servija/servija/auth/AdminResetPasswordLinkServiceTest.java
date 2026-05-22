@@ -106,7 +106,7 @@ class AdminResetPasswordLinkServiceTest {
         assertThat(user.getAdminResetPasswordTokenExpiry()).isAfter(LocalDateTime.now().plusMinutes(29));
         assertThatThrownBy(() -> adminResetPasswordLinkService.validateToken(firstToken))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Link de redefinicao invalido.");
+                .hasMessage("Link de redefinição inválido.");
 
         AdminResetPasswordLinkValidationResponse response =
                 adminResetPasswordLinkService.validateToken(secondToken);
@@ -123,7 +123,7 @@ class AdminResetPasswordLinkServiceTest {
 
         assertThatThrownBy(() -> adminResetPasswordLinkService.validateToken(token))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Este link de redefinicao expirou.");
+                .hasMessage("Este link de redefinição expirou.");
     }
 
     @Test
@@ -134,7 +134,7 @@ class AdminResetPasswordLinkServiceTest {
 
         assertThatThrownBy(() -> adminResetPasswordLinkService.validateToken(token))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Este link de redefinicao ja foi utilizado.");
+                .hasMessage("Este link de redefinição já foi utilizado.");
     }
 
     @Test

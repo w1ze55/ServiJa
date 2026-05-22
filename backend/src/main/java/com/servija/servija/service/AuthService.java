@@ -193,7 +193,7 @@ public class AuthService {
                 .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
 
         if (Boolean.TRUE.equals(user.getEmailVerified())) {
-            throw new IllegalStateException("E-mail ja verificado");
+            throw new IllegalStateException("E-mail já verificado");
         }
 
         if (user.getVerificationLockUntil() != null && user.getVerificationLockUntil().isAfter(LocalDateTime.now())) {
