@@ -46,17 +46,20 @@ jobs:
           echo "OK: nenhum mojibake encontrado"
 
   # ─────────────────────────────────────────────────────────────────
-  # Security: OWASP Dependency-Check no backend. Falha em CVSS >= 7.
-  # Paralelo a compile/tests. NVD_API_KEY recomendado (evita rate-limit).
+  # Security: scans de dependências (OWASP + Snyk) em backend e frontends.
+  # OWASP usa NVD; Snyk usa DB próprio + Snyk Vuln DB. Sobreposição é
+  # desejável — cada um pega CVEs/issues que o outro pode não ter.
+  # Paralelo a compile/tests. NVD_API_KEY e SNYK_TOKEN são secrets.
   # ─────────────────────────────────────────────────────────────────
   security:
-    name: Security scan (OWASP)
+    name: Security scan (OWASP + Snyk)
     needs: lint
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # ── OWASP Dependency-Check (backend only) ──────────────────
       - name: OWASP Dependency-Check (backend)
         uses: dependency-check/Dependency-Check_Action@main
         with:
@@ -65,7 +68,7 @@ jobs:
           format: HTML
           out: dependency-check-report
           args: >-
-            --failOnCVSS 7
+            --failOnCVSS 3
             --enableRetired
             ${{ secrets.NVD_API_KEY && format('--nvdApiKey {0}', secrets.NVD_API_KEY) || '' }}
 
@@ -75,6 +78,89 @@ jobs:
         with:
           name: dependency-check-report
           path: dependency-check-report
+          retention-days: 14
+          if-no-files-found: ignore
+
+      # ── Snyk: setup ambiente para escanear Maven + npm ─────────
+      - name: Set up JDK 21 (for Snyk Maven scan)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Set up Node 20 (for Snyk npm scan)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: |
+            frontend/package-lock.json
+            frontend-admin/package-lock.json
+
+      - name: Setup Snyk CLI
+        uses: snyk/actions/setup@master
+
+      - name: Verify Snyk token configured
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          if [ -z "$SNYK_TOKEN" ]; then
+            echo "::error::Secret SNYK_TOKEN não configurado."
+            exit 1
+          fi
+
+      # ── Snyk: backend (Maven) ──────────────────────────────────
+      - name: Snyk - Backend deps (Maven)
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        working-directory: backend
+        run: |
+          snyk test \
+            --file=pom.xml \
+            --severity-threshold=high \
+            --sarif-file-output=../snyk-backend.sarif || EXIT=$?
+          exit ${EXIT:-0}
+
+      # ── Snyk: frontend (npm) ───────────────────────────────────
+      - name: Install frontend deps
+        working-directory: frontend
+        run: npm ci
+
+      - name: Snyk - Frontend deps (npm)
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        working-directory: frontend
+        run: |
+          snyk test \
+            --severity-threshold=high \
+            --sarif-file-output=../snyk-frontend.sarif || EXIT=$?
+          exit ${EXIT:-0}
+
+      # ── Snyk: frontend-admin (npm) ─────────────────────────────
+      - name: Install frontend-admin deps
+        working-directory: frontend-admin
+        run: npm ci
+
+      - name: Snyk - Frontend-admin deps (npm)
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        working-directory: frontend-admin
+        run: |
+          snyk test \
+            --severity-threshold=high \
+            --sarif-file-output=../snyk-frontend-admin.sarif || EXIT=$?
+          exit ${EXIT:-0}
+
+      - name: Upload Snyk SARIF reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: snyk-reports
+          path: |
+            snyk-backend.sarif
+            snyk-frontend.sarif
+            snyk-frontend-admin.sarif
           retention-days: 14
           if-no-files-found: ignore
 
@@ -339,40 +425,74 @@ jobs:
              fi'
 
   # ─────────────────────────────────────────────────────────────────
-  # Notify: roda só em caso de falha em qualquer job upstream.
-  # Posta no Discord via webhook (pula silenciosamente se não setado).
+  # Notify: roda sempre. Detecta success/failure/cancelled olhando
+  # needs.*.result e posta no Discord com cor/emoji apropriados.
+  # Pula silenciosamente se DISCORD_WEBHOOK_URL não estiver setado.
   # ─────────────────────────────────────────────────────────────────
   notify:
-    name: Notify on failure
+    name: Notify Discord
     needs: [lint, security, compile, tests, deploy]
-    if: failure()
+    if: always()
     runs-on: ubuntu-latest
     steps:
-      - name: Notify Discord
+      - name: Send Discord notification
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          LINT_RESULT: ${{ needs.lint.result }}
+          SECURITY_RESULT: ${{ needs.security.result }}
+          COMPILE_RESULT: ${{ needs.compile.result }}
+          TESTS_RESULT: ${{ needs.tests.result }}
+          DEPLOY_RESULT: ${{ needs.deploy.result }}
+          ANY_FAILURE: ${{ contains(needs.*.result, 'failure') }}
+          ANY_CANCELLED: ${{ contains(needs.*.result, 'cancelled') }}
         run: |
           if [ -z "$DISCORD_WEBHOOK_URL" ]; then
             echo "DISCORD_WEBHOOK_URL não configurado; pulando notificação."
             exit 0
           fi
+
+          if [ "$ANY_FAILURE" = "true" ]; then
+            STATUS_TITLE="❌ FALHOU"
+            COLOR=15158332
+          elif [ "$ANY_CANCELLED" = "true" ]; then
+            STATUS_TITLE="⚠️ CANCELADO"
+            COLOR=15844367
+          else
+            STATUS_TITLE="✅ SUCESSO"
+            COLOR=3066993
+          fi
+
+          status_emoji() {
+            case "$1" in
+              success)   echo "✅" ;;
+              failure)   echo "❌" ;;
+              cancelled) echo "⚠️" ;;
+              skipped)   echo "⏭️" ;;
+              *)         echo "❓" ;;
+            esac
+          }
+
+          JOBS_LINE="$(status_emoji $LINT_RESULT) Lint · $(status_emoji $SECURITY_RESULT) Security · $(status_emoji $COMPILE_RESULT) Compile · $(status_emoji $TESTS_RESULT) Tests · $(status_emoji $DEPLOY_RESULT) Deploy"
           RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
           curl -X POST "$DISCORD_WEBHOOK_URL" \
             -H 'Content-Type: application/json' \
             -d "$(cat <<EOF
           {
             "username": "ServiJá CI",
             "embeds": [{
-              "title": "❌ Deploy homolog FALHOU",
+              "title": "${STATUS_TITLE} — Deploy homolog",
               "url": "${RUN_URL}",
-              "color": 15158332,
+              "color": ${COLOR},
               "fields": [
-                {"name": "Workflow", "value": "${{ github.workflow }} #${{ github.run_number }}", "inline": true},
                 {"name": "Branch", "value": "${{ github.ref_name }}", "inline": true},
+                {"name": "Autor", "value": "${{ github.actor }}", "inline": true},
+                {"name": "Run", "value": "#${{ github.run_number }}", "inline": true},
                 {"name": "Commit", "value": "\`${{ github.sha }}\`", "inline": false},
-                {"name": "Autor", "value": "${{ github.actor }}", "inline": true}
+                {"name": "Jobs", "value": "${JOBS_LINE}", "inline": false}
               ],
-              "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+              "timestamp": "${TIMESTAMP}"
             }]
           }
           EOF
