@@ -46,20 +46,17 @@ jobs:
           echo "OK: nenhum mojibake encontrado"
 
   # ─────────────────────────────────────────────────────────────────
-  # Security: scans de dependências (OWASP + Snyk) em backend e frontends.
-  # OWASP usa NVD; Snyk usa DB próprio + Snyk Vuln DB. Sobreposição é
-  # desejável — cada um pega CVEs/issues que o outro pode não ter.
-  # Paralelo a compile/tests. NVD_API_KEY e SNYK_TOKEN são secrets.
+  # OWASP Dependency-Check: escaneia deps do backend usando o NVD.
+  # Paralelo aos jobs Snyk/compile/tests. NVD_API_KEY é secret opcional.
   # ─────────────────────────────────────────────────────────────────
-  security:
-    name: Security scan (OWASP + Snyk)
+  security-owasp:
+    name: Security scan - OWASP (backend)
     needs: lint
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # ── OWASP Dependency-Check (backend only) ──────────────────
       - name: OWASP Dependency-Check (backend)
         uses: dependency-check/Dependency-Check_Action@main
         with:
@@ -81,13 +78,70 @@ jobs:
           retention-days: 14
           if-no-files-found: ignore
 
-      # ── Snyk: setup ambiente para escanear Maven + npm ─────────
+  # ─────────────────────────────────────────────────────────────────
+  # Snyk (backend): escaneia o pom.xml usando o DB do Snyk.
+  # Paralelo a security-owasp/security-snyk-frontend/compile/tests.
+  # SNYK_TOKEN é secret.
+  # ─────────────────────────────────────────────────────────────────
+  security-snyk-backend:
+    name: Security scan - Snyk (backend)
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Set up JDK 21 (for Snyk Maven scan)
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '21'
           cache: maven
+
+      - name: Setup Snyk CLI
+        uses: snyk/actions/setup@master
+
+      - name: Verify Snyk token configured
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          if [ -z "$SNYK_TOKEN" ]; then
+            echo "::error::Secret SNYK_TOKEN não configurado."
+            exit 1
+          fi
+
+      - name: Snyk - Backend deps (Maven)
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        working-directory: backend
+        run: |
+          snyk test \
+            --file=pom.xml \
+            --severity-threshold=high \
+            --sarif-file-output=../snyk-backend.sarif || EXIT=$?
+          exit ${EXIT:-0}
+
+      - name: Upload Snyk backend SARIF report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: snyk-backend-report
+          path: snyk-backend.sarif
+          retention-days: 14
+          if-no-files-found: ignore
+
+  # ─────────────────────────────────────────────────────────────────
+  # Snyk (frontend): escaneia frontend (cliente) e frontend-admin.
+  # Paralelo a security-owasp/security-snyk-backend/compile/tests.
+  # SNYK_TOKEN é secret.
+  # ─────────────────────────────────────────────────────────────────
+  security-snyk-frontend:
+    name: Security scan - Snyk (frontend)
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Set up Node 20 (for Snyk npm scan)
         uses: actions/setup-node@v4
@@ -109,18 +163,6 @@ jobs:
             echo "::error::Secret SNYK_TOKEN não configurado."
             exit 1
           fi
-
-      # ── Snyk: backend (Maven) ──────────────────────────────────
-      - name: Snyk - Backend deps (Maven)
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        working-directory: backend
-        run: |
-          snyk test \
-            --file=pom.xml \
-            --severity-threshold=high \
-            --sarif-file-output=../snyk-backend.sarif || EXIT=$?
-          exit ${EXIT:-0}
 
       # ── Snyk: frontend (npm) ───────────────────────────────────
       - name: Install frontend deps
@@ -152,13 +194,12 @@ jobs:
             --sarif-file-output=../snyk-frontend-admin.sarif || EXIT=$?
           exit ${EXIT:-0}
 
-      - name: Upload Snyk SARIF reports
+      - name: Upload Snyk frontend SARIF reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: snyk-reports
+          name: snyk-frontend-reports
           path: |
-            snyk-backend.sarif
             snyk-frontend.sarif
             snyk-frontend-admin.sarif
           retention-days: 14
@@ -314,13 +355,13 @@ jobs:
           if-no-files-found: warn
 
   # ─────────────────────────────────────────────────────────────────
-  # Deploy: gated por security + compile + tests. Baixa dists dos
-  # frontends, promove o JAR (com backup), reinicia, faz health-check
-  # e rollback automático se o health falhar.
+  # Deploy: gated por OWASP + Snyk (back+front) + compile + tests.
+  # Baixa dists dos frontends, promove o JAR (com backup), reinicia,
+  # faz health-check e rollback automático se o health falhar.
   # ─────────────────────────────────────────────────────────────────
   deploy:
     name: Deploy to EC2
-    needs: [lint, security, compile, tests]
+    needs: [lint, security-owasp, compile, tests]
     runs-on: ubuntu-latest
     steps:
       - name: Download frontend dist
@@ -431,7 +472,7 @@ jobs:
   # ─────────────────────────────────────────────────────────────────
   notify:
     name: Notify Discord
-    needs: [lint, security, compile, tests, deploy]
+    needs: [lint, security-owasp, security-snyk-backend, security-snyk-frontend, compile, tests, deploy]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -439,7 +480,9 @@ jobs:
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           LINT_RESULT: ${{ needs.lint.result }}
-          SECURITY_RESULT: ${{ needs.security.result }}
+          OWASP_RESULT: ${{ needs.security-owasp.result }}
+          SNYK_BACKEND_RESULT: ${{ needs.security-snyk-backend.result }}
+          SNYK_FRONTEND_RESULT: ${{ needs.security-snyk-frontend.result }}
           COMPILE_RESULT: ${{ needs.compile.result }}
           TESTS_RESULT: ${{ needs.tests.result }}
           DEPLOY_RESULT: ${{ needs.deploy.result }}
@@ -472,7 +515,7 @@ jobs:
             esac
           }
 
-          JOBS_LINE="$(status_emoji $LINT_RESULT) Lint · $(status_emoji $SECURITY_RESULT) Security · $(status_emoji $COMPILE_RESULT) Compile · $(status_emoji $TESTS_RESULT) Tests · $(status_emoji $DEPLOY_RESULT) Deploy"
+          JOBS_LINE="$(status_emoji $LINT_RESULT) Lint · $(status_emoji $OWASP_RESULT) OWASP · $(status_emoji $SNYK_BACKEND_RESULT) Snyk-Back · $(status_emoji $SNYK_FRONTEND_RESULT) Snyk-Front · $(status_emoji $COMPILE_RESULT) Compile · $(status_emoji $TESTS_RESULT) Tests · $(status_emoji $DEPLOY_RESULT) Deploy"
           RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
