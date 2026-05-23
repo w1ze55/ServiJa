@@ -46,17 +46,20 @@ jobs:
           echo "OK: nenhum mojibake encontrado"
 
   # ─────────────────────────────────────────────────────────────────
-  # Security: OWASP Dependency-Check no backend. Falha em CVSS >= 7.
-  # Paralelo a compile/tests. NVD_API_KEY recomendado (evita rate-limit).
+  # Security: scans de dependências (OWASP + Snyk) em backend e frontends.
+  # OWASP usa NVD; Snyk usa DB próprio + Snyk Vuln DB. Sobreposição é
+  # desejável — cada um pega CVEs/issues que o outro pode não ter.
+  # Paralelo a compile/tests. NVD_API_KEY e SNYK_TOKEN são secrets.
   # ─────────────────────────────────────────────────────────────────
   security:
-    name: Security scan (OWASP)
+    name: Security scan (OWASP + Snyk)
     needs: lint
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # ── OWASP Dependency-Check (backend only) ──────────────────
       - name: OWASP Dependency-Check (backend)
         uses: dependency-check/Dependency-Check_Action@main
         with:
@@ -65,7 +68,7 @@ jobs:
           format: HTML
           out: dependency-check-report
           args: >-
-            --failOnCVSS 7
+            --failOnCVSS 3
             --enableRetired
             ${{ secrets.NVD_API_KEY && format('--nvdApiKey {0}', secrets.NVD_API_KEY) || '' }}
 
@@ -75,6 +78,89 @@ jobs:
         with:
           name: dependency-check-report
           path: dependency-check-report
+          retention-days: 14
+          if-no-files-found: ignore
+
+      # ── Snyk: setup ambiente para escanear Maven + npm ─────────
+      - name: Set up JDK 21 (for Snyk Maven scan)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Set up Node 20 (for Snyk npm scan)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: |
+            frontend/package-lock.json
+            frontend-admin/package-lock.json
+
+      - name: Setup Snyk CLI
+        uses: snyk/actions/setup@master
+
+      - name: Verify Snyk token configured
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          if [ -z "$SNYK_TOKEN" ]; then
+            echo "::error::Secret SNYK_TOKEN não configurado."
+            exit 1
+          fi
+
+      # ── Snyk: backend (Maven) ──────────────────────────────────
+      - name: Snyk - Backend deps (Maven)
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        working-directory: backend
+        run: |
+          snyk test \
+            --file=pom.xml \
+            --severity-threshold=high \
+            --sarif-file-output=../snyk-backend.sarif || EXIT=$?
+          exit ${EXIT:-0}
+
+      # ── Snyk: frontend (npm) ───────────────────────────────────
+      - name: Install frontend deps
+        working-directory: frontend
+        run: npm ci
+
+      - name: Snyk - Frontend deps (npm)
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        working-directory: frontend
+        run: |
+          snyk test \
+            --severity-threshold=high \
+            --sarif-file-output=../snyk-frontend.sarif || EXIT=$?
+          exit ${EXIT:-0}
+
+      # ── Snyk: frontend-admin (npm) ─────────────────────────────
+      - name: Install frontend-admin deps
+        working-directory: frontend-admin
+        run: npm ci
+
+      - name: Snyk - Frontend-admin deps (npm)
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        working-directory: frontend-admin
+        run: |
+          snyk test \
+            --severity-threshold=high \
+            --sarif-file-output=../snyk-frontend-admin.sarif || EXIT=$?
+          exit ${EXIT:-0}
+
+      - name: Upload Snyk SARIF reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: snyk-reports
+          path: |
+            snyk-backend.sarif
+            snyk-frontend.sarif
+            snyk-frontend-admin.sarif
           retention-days: 14
           if-no-files-found: ignore
 
