@@ -79,24 +79,18 @@ jobs:
           if-no-files-found: ignore
 
   # ─────────────────────────────────────────────────────────────────
-  # Snyk (backend): escaneia o pom.xml usando o DB do Snyk.
-  # Paralelo a security-owasp/security-snyk-frontend/compile/tests.
-  # SNYK_TOKEN é secret.
+  # Snyk Code (backend SAST): análise estática do código-fonte Java
+  # buscando bugs de segurança (SQLi, XSS, secrets, etc.). Diferente
+  # do Snyk Open Source — não checa dependências, checa o seu código.
+  # Deps do backend são cobertas pelo OWASP. SNYK_TOKEN é secret.
   # ─────────────────────────────────────────────────────────────────
-  security-snyk-backend:
-    name: Security scan - Snyk (backend)
+  security-snyk-code-backend:
+    name: Security scan - Snyk Code (backend SAST)
     needs: lint
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Set up JDK 21 (for Snyk Maven scan)
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '21'
-          cache: maven
 
       - name: Setup Snyk CLI
         uses: snyk/actions/setup@master
@@ -110,33 +104,32 @@ jobs:
             exit 1
           fi
 
-      - name: Snyk - Backend deps (Maven)
+      - name: Snyk Code - Backend (Java SAST)
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         working-directory: backend
         run: |
-          snyk test \
-            --file=pom.xml \
+          snyk code test \
             --severity-threshold=high \
-            --sarif-file-output=../snyk-backend.sarif || EXIT=$?
+            --sarif-file-output=../snyk-code-backend.sarif || EXIT=$?
           exit ${EXIT:-0}
 
-      - name: Upload Snyk backend SARIF report
+      - name: Upload Snyk Code backend SARIF report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: snyk-backend-report
-          path: snyk-backend.sarif
+          name: snyk-code-backend-report
+          path: snyk-code-backend.sarif
           retention-days: 14
           if-no-files-found: ignore
 
   # ─────────────────────────────────────────────────────────────────
-  # Snyk (frontend): escaneia frontend (cliente) e frontend-admin.
-  # Paralelo a security-owasp/security-snyk-backend/compile/tests.
+  # Snyk Open Source (frontend SCA): escaneia deps npm de frontend
+  # (cliente) e frontend-admin. Deps do backend são cobertas pelo OWASP.
   # SNYK_TOKEN é secret.
   # ─────────────────────────────────────────────────────────────────
   security-snyk-frontend:
-    name: Security scan - Snyk (frontend)
+    name: Security scan - Snyk Open Source (frontend deps)
     needs: lint
     runs-on: ubuntu-latest
     steps:
@@ -202,6 +195,62 @@ jobs:
           path: |
             snyk-frontend.sarif
             snyk-frontend-admin.sarif
+          retention-days: 14
+          if-no-files-found: ignore
+
+  # ─────────────────────────────────────────────────────────────────
+  # Snyk Code (frontend SAST): análise estática do código-fonte Vue/JS
+  # de frontend e frontend-admin (XSS, eval, secrets, etc.). Não checa
+  # deps — isso é o `security-snyk-frontend`. SNYK_TOKEN é secret.
+  # ─────────────────────────────────────────────────────────────────
+  security-snyk-code-frontend:
+    name: Security scan - Snyk Code (frontend SAST)
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Snyk CLI
+        uses: snyk/actions/setup@master
+
+      - name: Verify Snyk token configured
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          if [ -z "$SNYK_TOKEN" ]; then
+            echo "::error::Secret SNYK_TOKEN não configurado."
+            exit 1
+          fi
+
+      - name: Snyk Code - Frontend (Vue/JS SAST)
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        working-directory: frontend
+        run: |
+          snyk code test \
+            --severity-threshold=high \
+            --sarif-file-output=../snyk-code-frontend.sarif || EXIT=$?
+          exit ${EXIT:-0}
+
+      - name: Snyk Code - Frontend-admin (Vue/JS SAST)
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        working-directory: frontend-admin
+        run: |
+          snyk code test \
+            --severity-threshold=high \
+            --sarif-file-output=../snyk-code-frontend-admin.sarif || EXIT=$?
+          exit ${EXIT:-0}
+
+      - name: Upload Snyk Code frontend SARIF reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: snyk-code-frontend-reports
+          path: |
+            snyk-code-frontend.sarif
+            snyk-code-frontend-admin.sarif
           retention-days: 14
           if-no-files-found: ignore
 
@@ -355,13 +404,14 @@ jobs:
           if-no-files-found: warn
 
   # ─────────────────────────────────────────────────────────────────
-  # Deploy: gated por OWASP + Snyk (back+front) + compile + tests.
-  # Baixa dists dos frontends, promove o JAR (com backup), reinicia,
-  # faz health-check e rollback automático se o health falhar.
+  # Deploy: gated por OWASP (deps back) + Snyk SCA (deps front) +
+  # Snyk Code (SAST back+front) + compile + tests. Baixa dists dos
+  # frontends, promove o JAR (com backup), reinicia, faz health-check
+  # e rollback automático se o health falhar.
   # ─────────────────────────────────────────────────────────────────
   deploy:
     name: Deploy to EC2
-    needs: [lint, security-owasp, compile, tests]
+    needs: [lint, security-owasp, security-snyk-frontend, security-snyk-code-backend, security-snyk-code-frontend, compile, tests]
     runs-on: ubuntu-latest
     steps:
       - name: Download frontend dist
@@ -472,7 +522,7 @@ jobs:
   # ─────────────────────────────────────────────────────────────────
   notify:
     name: Notify Discord
-    needs: [lint, security-owasp, security-snyk-backend, security-snyk-frontend, compile, tests, deploy]
+    needs: [lint, security-owasp, security-snyk-frontend, security-snyk-code-backend, security-snyk-code-frontend, compile, tests, deploy]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -481,8 +531,9 @@ jobs:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           LINT_RESULT: ${{ needs.lint.result }}
           OWASP_RESULT: ${{ needs.security-owasp.result }}
-          SNYK_BACKEND_RESULT: ${{ needs.security-snyk-backend.result }}
           SNYK_FRONTEND_RESULT: ${{ needs.security-snyk-frontend.result }}
+          SNYK_CODE_BACKEND_RESULT: ${{ needs.security-snyk-code-backend.result }}
+          SNYK_CODE_FRONTEND_RESULT: ${{ needs.security-snyk-code-frontend.result }}
           COMPILE_RESULT: ${{ needs.compile.result }}
           TESTS_RESULT: ${{ needs.tests.result }}
           DEPLOY_RESULT: ${{ needs.deploy.result }}
@@ -515,7 +566,7 @@ jobs:
             esac
           }
 
-          JOBS_LINE="$(status_emoji $LINT_RESULT) Lint · $(status_emoji $OWASP_RESULT) OWASP · $(status_emoji $SNYK_BACKEND_RESULT) Snyk-Back · $(status_emoji $SNYK_FRONTEND_RESULT) Snyk-Front · $(status_emoji $COMPILE_RESULT) Compile · $(status_emoji $TESTS_RESULT) Tests · $(status_emoji $DEPLOY_RESULT) Deploy"
+          JOBS_LINE="$(status_emoji $LINT_RESULT) Lint · $(status_emoji $OWASP_RESULT) OWASP · $(status_emoji $SNYK_FRONTEND_RESULT) Snyk-OS-Front · $(status_emoji $SNYK_CODE_BACKEND_RESULT) Snyk-Code-Back · $(status_emoji $SNYK_CODE_FRONTEND_RESULT) Snyk-Code-Front · $(status_emoji $COMPILE_RESULT) Compile · $(status_emoji $TESTS_RESULT) Tests · $(status_emoji $DEPLOY_RESULT) Deploy"
           RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
@@ -523,7 +574,7 @@ jobs:
             -H 'Content-Type: application/json' \
             -d "$(cat <<EOF
           {
-            "username": "ServiJá CI",
+            "username": "ServiJá Pipeline",
             "embeds": [{
               "title": "${STATUS_TITLE} — Deploy homolog",
               "url": "${RUN_URL}",
