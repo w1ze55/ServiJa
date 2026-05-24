@@ -94,11 +94,23 @@ function closeLightbox() { lightboxIndex.value = -1; }
 function prevImage() { if (canPrev.value) lightboxIndex.value -= 1; }
 function nextImage() { if (canNext.value) lightboxIndex.value += 1; }
 
+function sanitizeFilename(name: string) {
+  const cleaned = name.replace(/[^a-zA-Z0-9._-]/g, '_').replace(/^[._]+/, '');
+  return cleaned.slice(0, 120) || 'imagem';
+}
+
 function filenameFromUrl(url: string) {
   try {
-    const u = new URL(url, window.location.href);
+    const u = new URL(url);
     const last = u.pathname.split('/').filter(Boolean).pop();
-    return last ? decodeURIComponent(last) : 'imagem';
+    if (!last) return 'imagem';
+    let decoded: string;
+    try {
+      decoded = decodeURIComponent(last);
+    } catch {
+      decoded = last;
+    }
+    return sanitizeFilename(decoded);
   } catch {
     return 'imagem';
   }
