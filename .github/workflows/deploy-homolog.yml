@@ -46,46 +46,13 @@ jobs:
           echo "OK: nenhum mojibake encontrado"
 
   # ─────────────────────────────────────────────────────────────────
-  # OWASP Dependency-Check: escaneia deps do backend usando o NVD.
-  # Paralelo aos jobs Snyk/compile/tests. NVD_API_KEY é secret opcional.
+  # Security - SAST (back + front): análise estática do código-fonte
+  # Java (backend) e Vue/JS (frontend + frontend-admin) buscando bugs
+  # de segurança (SQLi, XSS, secrets, eval, etc.). Não checa deps —
+  # isso é o job `security-deps`. SNYK_TOKEN é secret.
   # ─────────────────────────────────────────────────────────────────
-  security-owasp:
-    name: Security scan - OWASP (backend)
-    needs: lint
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: OWASP Dependency-Check (backend)
-        uses: dependency-check/Dependency-Check_Action@main
-        with:
-          project: servija-backend
-          path: backend
-          format: HTML
-          out: dependency-check-report
-          args: >-
-            --failOnCVSS 3
-            --enableRetired
-            ${{ secrets.NVD_API_KEY && format('--nvdApiKey {0}', secrets.NVD_API_KEY) || '' }}
-
-      - name: Upload OWASP report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: dependency-check-report
-          path: dependency-check-report
-          retention-days: 14
-          if-no-files-found: ignore
-
-  # ─────────────────────────────────────────────────────────────────
-  # Snyk Code (backend SAST): análise estática do código-fonte Java
-  # buscando bugs de segurança (SQLi, XSS, secrets, etc.). Diferente
-  # do Snyk Open Source — não checa dependências, checa o seu código.
-  # Deps do backend são cobertas pelo OWASP. SNYK_TOKEN é secret.
-  # ─────────────────────────────────────────────────────────────────
-  security-snyk-code-backend:
-    name: Security scan - Snyk Code (backend SAST)
+  security-sast:
+    name: Security scan - SAST (back + front)
     needs: lint
     runs-on: ubuntu-latest
     steps:
@@ -114,28 +81,75 @@ jobs:
             --sarif-file-output=../snyk-code-backend.sarif || EXIT=$?
           exit ${EXIT:-0}
 
-      - name: Upload Snyk Code backend SARIF report
+      - name: Snyk Code - Frontend (Vue/JS SAST)
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        working-directory: frontend
+        run: |
+          snyk code test \
+            --severity-threshold=high \
+            --sarif-file-output=../snyk-code-frontend.sarif || EXIT=$?
+          exit ${EXIT:-0}
+
+      - name: Snyk Code - Frontend-admin (Vue/JS SAST)
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        working-directory: frontend-admin
+        run: |
+          snyk code test \
+            --severity-threshold=high \
+            --sarif-file-output=../snyk-code-frontend-admin.sarif || EXIT=$?
+          exit ${EXIT:-0}
+
+      - name: Upload Snyk Code SARIF reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: snyk-code-backend-report
-          path: snyk-code-backend.sarif
+          name: snyk-code-reports
+          path: |
+            snyk-code-backend.sarif
+            snyk-code-frontend.sarif
+            snyk-code-frontend-admin.sarif
           retention-days: 14
           if-no-files-found: ignore
 
   # ─────────────────────────────────────────────────────────────────
-  # Snyk Open Source (frontend SCA): escaneia deps npm de frontend
-  # (cliente) e frontend-admin. Deps do backend são cobertas pelo OWASP.
-  # SNYK_TOKEN é secret.
+  # Security - Dependencies (back + front): OWASP Dependency-Check
+  # nas deps do backend (Maven/NVD) e Snyk Open Source nas deps npm
+  # de frontend e frontend-admin. NVD_API_KEY é opcional; SNYK_TOKEN
+  # é secret obrigatório.
   # ─────────────────────────────────────────────────────────────────
-  security-snyk-frontend:
-    name: Security scan - Snyk Open Source (frontend deps)
+  security-deps:
+    name: Security scan - Dependencies (back + front)
     needs: lint
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # ── OWASP: backend (Maven) ─────────────────────────────────
+      - name: OWASP Dependency-Check (backend)
+        uses: dependency-check/Dependency-Check_Action@main
+        with:
+          project: servija-backend
+          path: backend
+          format: HTML
+          out: dependency-check-report
+          args: >-
+            --failOnCVSS 3
+            --enableRetired
+            ${{ secrets.NVD_API_KEY && format('--nvdApiKey {0}', secrets.NVD_API_KEY) || '' }}
+
+      - name: Upload OWASP report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-check-report
+          path: dependency-check-report
+          retention-days: 14
+          if-no-files-found: ignore
+
+      # ── Snyk: frontends (npm) ──────────────────────────────────
       - name: Set up Node 20 (for Snyk npm scan)
         uses: actions/setup-node@v4
         with:
@@ -157,7 +171,6 @@ jobs:
             exit 1
           fi
 
-      # ── Snyk: frontend (npm) ───────────────────────────────────
       - name: Install frontend deps
         working-directory: frontend
         run: npm ci
@@ -172,7 +185,6 @@ jobs:
             --sarif-file-output=../snyk-frontend.sarif || EXIT=$?
           exit ${EXIT:-0}
 
-      # ── Snyk: frontend-admin (npm) ─────────────────────────────
       - name: Install frontend-admin deps
         working-directory: frontend-admin
         run: npm ci
@@ -199,64 +211,9 @@ jobs:
           if-no-files-found: ignore
 
   # ─────────────────────────────────────────────────────────────────
-  # Snyk Code (frontend SAST): análise estática do código-fonte Vue/JS
-  # de frontend e frontend-admin (XSS, eval, secrets, etc.). Não checa
-  # deps — isso é o `security-snyk-frontend`. SNYK_TOKEN é secret.
-  # ─────────────────────────────────────────────────────────────────
-  security-snyk-code-frontend:
-    name: Security scan - Snyk Code (frontend SAST)
-    needs: lint
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Snyk CLI
-        uses: snyk/actions/setup@master
-
-      - name: Verify Snyk token configured
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        run: |
-          if [ -z "$SNYK_TOKEN" ]; then
-            echo "::error::Secret SNYK_TOKEN não configurado."
-            exit 1
-          fi
-
-      - name: Snyk Code - Frontend (Vue/JS SAST)
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        working-directory: frontend
-        run: |
-          snyk code test \
-            --severity-threshold=high \
-            --sarif-file-output=../snyk-code-frontend.sarif || EXIT=$?
-          exit ${EXIT:-0}
-
-      - name: Snyk Code - Frontend-admin (Vue/JS SAST)
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        working-directory: frontend-admin
-        run: |
-          snyk code test \
-            --severity-threshold=high \
-            --sarif-file-output=../snyk-code-frontend-admin.sarif || EXIT=$?
-          exit ${EXIT:-0}
-
-      - name: Upload Snyk Code frontend SARIF reports
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: snyk-code-frontend-reports
-          path: |
-            snyk-code-frontend.sarif
-            snyk-code-frontend-admin.sarif
-          retention-days: 14
-          if-no-files-found: ignore
-
-  # ─────────────────────────────────────────────────────────────────
   # Compile: builda frontends no runner e o JAR do backend na EC2
-  # (reusa ~/.m2 local). Roda em paralelo com `tests` e `security`.
+  # (reusa ~/.m2 local). Roda em paralelo com `tests` e os jobs de
+  # security.
   # ─────────────────────────────────────────────────────────────────
   compile:
     name: Compile
@@ -343,8 +300,8 @@ jobs:
 
   # ─────────────────────────────────────────────────────────────────
   # Tests: roda a suite JUnit do backend no runner com cache do Maven
-  # e gera relatório de cobertura JaCoCo. Paralelo a `compile`/`security`.
-  # Falha aqui bloqueia o deploy.
+  # e gera relatório de cobertura JaCoCo. Paralelo a `compile` e aos
+  # jobs de security. Falha aqui bloqueia o deploy.
   # ─────────────────────────────────────────────────────────────────
   tests:
     name: Tests (JUnit + Mockito + JaCoCo)
@@ -404,14 +361,171 @@ jobs:
           if-no-files-found: warn
 
   # ─────────────────────────────────────────────────────────────────
-  # Deploy: gated por OWASP (deps back) + Snyk SCA (deps front) +
-  # Snyk Code (SAST back+front) + compile + tests. Baixa dists dos
-  # frontends, promove o JAR (com backup), reinicia, faz health-check
-  # e rollback automático se o health falhar.
+  # Diagnose: roda APENAS se security-sast, security-deps ou tests
+  # falharem. Baixa os artefatos relevantes (SARIF do Snyk, surefire
+  # XMLs, OWASP report) e envia um embed extra no Discord com o
+  # detalhamento das falhas. O `notify` geral continua independente.
+  # ─────────────────────────────────────────────────────────────────
+  diagnose:
+    name: Diagnose failures (Discord)
+    needs: [security-sast, security-deps, tests]
+    if: |
+      always() && (
+        needs.security-sast.result == 'failure' ||
+        needs.security-deps.result == 'failure' ||
+        needs.tests.result == 'failure'
+      )
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Snyk Code SARIF (SAST)
+        if: needs.security-sast.result == 'failure'
+        uses: actions/download-artifact@v4
+        with:
+          name: snyk-code-reports
+          path: artifacts/snyk-code
+        continue-on-error: true
+
+      - name: Download Snyk frontend SARIF (deps)
+        if: needs.security-deps.result == 'failure'
+        uses: actions/download-artifact@v4
+        with:
+          name: snyk-frontend-reports
+          path: artifacts/snyk-frontend
+        continue-on-error: true
+
+      - name: Download OWASP report (deps)
+        if: needs.security-deps.result == 'failure'
+        uses: actions/download-artifact@v4
+        with:
+          name: dependency-check-report
+          path: artifacts/owasp
+        continue-on-error: true
+
+      - name: Download surefire reports (tests)
+        if: needs.tests.result == 'failure'
+        uses: actions/download-artifact@v4
+        with:
+          name: surefire-reports
+          path: artifacts/surefire
+        continue-on-error: true
+
+      - name: Build and send Discord diagnostic
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          SAST_RESULT: ${{ needs.security-sast.result }}
+          DEPS_RESULT: ${{ needs.security-deps.result }}
+          TESTS_RESULT: ${{ needs.tests.result }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -e
+          if [ -z "$DISCORD_WEBHOOK_URL" ]; then
+            echo "DISCORD_WEBHOOK_URL não configurado; pulando diagnóstico."
+            exit 0
+          fi
+
+          # Newline literal usado para concatenar linhas em strings bash sem
+          # quebrar o bloco `run: |` do YAML.
+          NL=$'\n'
+
+          # Discord field value limit: 1024 chars. Deixamos folga p/ o code-fence.
+          truncate_field() {
+            local s="$1"
+            if [ "${#s}" -gt 950 ]; then
+              printf '%s%s... [truncado — ver artefatos do run]' "${s:0:950}" "$NL"
+            else
+              printf '%s' "$s"
+            fi
+          }
+
+          FIELDS_JSON='[]'
+
+          # ── SAST (Snyk Code SARIF) ────────────────────────────
+          if [ "$SAST_RESULT" = "failure" ]; then
+            SAST_BODY=""
+            shopt -s nullglob
+            for f in artifacts/snyk-code/*.sarif; do
+              NAME=$(basename "$f" .sarif)
+              COUNT=$(jq '[.runs[]?.results[]?] | length' "$f" 2>/dev/null || echo "?")
+              TOP=$(jq -r '.runs[]?.results[]? | "  - [\(.level // "warning")] \(.ruleId // "?"): \((.message.text // "") | gsub("\n"; " ") | .[0:140])"' "$f" 2>/dev/null | head -5)
+              SAST_BODY="${SAST_BODY}• ${NAME}: ${COUNT} issues${NL}${TOP}${NL}"
+            done
+            shopt -u nullglob
+            [ -z "$SAST_BODY" ] && SAST_BODY="(sem SARIF disponível — ver logs do job)"
+            SAST_BODY=$(truncate_field "$SAST_BODY")
+            FIELDS_JSON=$(echo "$FIELDS_JSON" | jq --arg v "$SAST_BODY" '. + [{name: "❌ SAST (Snyk Code)", value: ("```\n" + $v + "\n```"), inline: false}]')
+          fi
+
+          # ── Dependencies (OWASP + Snyk Open Source) ───────────
+          if [ "$DEPS_RESULT" = "failure" ]; then
+            DEPS_BODY=""
+            shopt -s nullglob
+            for f in artifacts/snyk-frontend/*.sarif; do
+              NAME=$(basename "$f" .sarif)
+              COUNT=$(jq '[.runs[]?.results[]?] | length' "$f" 2>/dev/null || echo "?")
+              TOP=$(jq -r '.runs[]?.results[]? | "  - [\(.level // "warning")] \(.ruleId // "?")"' "$f" 2>/dev/null | sort -u | head -5)
+              DEPS_BODY="${DEPS_BODY}• ${NAME}: ${COUNT} vulns${NL}${TOP}${NL}"
+            done
+            shopt -u nullglob
+            if [ -d artifacts/owasp ]; then
+              OWASP_HTML=$(find artifacts/owasp -maxdepth 3 -name '*.html' | head -1)
+              if [ -n "$OWASP_HTML" ]; then
+                # Extrai contagem de severidades do HTML (best-effort).
+                HIGH=$(grep -oE 'High[^<]*<[^>]*>[^<]*[0-9]+' "$OWASP_HTML" 2>/dev/null | grep -oE '[0-9]+' | head -1)
+                CRIT=$(grep -oE 'Critical[^<]*<[^>]*>[^<]*[0-9]+' "$OWASP_HTML" 2>/dev/null | grep -oE '[0-9]+' | head -1)
+                DEPS_BODY="${DEPS_BODY}• OWASP (backend): Critical=${CRIT:-?}, High=${HIGH:-?} — ver dependency-check-report nos artefatos${NL}"
+              fi
+            fi
+            [ -z "$DEPS_BODY" ] && DEPS_BODY="(sem artefatos disponíveis — ver logs do job)"
+            DEPS_BODY=$(truncate_field "$DEPS_BODY")
+            FIELDS_JSON=$(echo "$FIELDS_JSON" | jq --arg v "$DEPS_BODY" '. + [{name: "❌ Dependencies (OWASP + Snyk OS)", value: ("```\n" + $v + "\n```"), inline: false}]')
+          fi
+
+          # ── Tests (surefire XML) ──────────────────────────────
+          if [ "$TESTS_RESULT" = "failure" ]; then
+            TESTS_BODY=""
+            if [ -d artifacts/surefire ]; then
+              TOTALS=$(grep -h '<testsuite ' artifacts/surefire/*.xml 2>/dev/null \
+                | grep -oE '(tests|failures|errors|skipped)="[0-9]+"' \
+                | awk -F'"' '{a[$1]+=$2} END{ printf "tests=%d, failures=%d, errors=%d, skipped=%d", a["tests="]+0, a["failures="]+0, a["errors="]+0, a["skipped="]+0 }')
+              FAILED=$(awk '/<testcase /{tc=$0} /<(failure|error)[ >]/{cn="";n="";if(match(tc,/classname="[^"]*"/))cn=substr(tc,RSTART+11,RLENGTH-12);if(match(tc,/name="[^"]*"/))n=substr(tc,RSTART+6,RLENGTH-7);print "  - "cn"."n} /<\/testcase>/{tc=""}' artifacts/surefire/*.xml 2>/dev/null | sort -u | head -10)
+              TESTS_BODY="totais: ${TOTALS}${NL}${NL}falhas/erros:${NL}${FAILED}"
+            fi
+            [ -z "$TESTS_BODY" ] && TESTS_BODY="(sem surefire-reports disponível — ver logs do job)"
+            TESTS_BODY=$(truncate_field "$TESTS_BODY")
+            FIELDS_JSON=$(echo "$FIELDS_JSON" | jq --arg v "$TESTS_BODY" '. + [{name: "❌ Tests (JUnit + Mockito)", value: ("```\n" + $v + "\n```"), inline: false}]')
+          fi
+
+          PAYLOAD=$(jq -n \
+            --arg title "🔍 Diagnóstico de falhas — homolog" \
+            --arg url "$RUN_URL" \
+            --arg branch "${{ github.ref_name }}" \
+            --arg sha "${{ github.sha }}" \
+            --arg runn "#${{ github.run_number }}" \
+            --argjson fields "$FIELDS_JSON" \
+            '{
+              username: "ServiJá Pipeline",
+              embeds: [{
+                title: $title,
+                url: $url,
+                color: 15158332,
+                description: ("Pipeline interrompido por falha em jobs de qualidade/segurança.\nBranch `" + $branch + "` · Run " + $runn + " · `" + $sha + "`"),
+                fields: $fields
+              }]
+            }')
+
+          curl -X POST "$DISCORD_WEBHOOK_URL" \
+            -H 'Content-Type: application/json' \
+            --data-binary "$PAYLOAD"
+
+  # ─────────────────────────────────────────────────────────────────
+  # Deploy: gated por SAST (back+front) + Dependencies (back+front) +
+  # compile + tests. Baixa dists dos frontends, promove o JAR (com
+  # backup), reinicia, faz health-check e rollback automático se o
+  # health falhar.
   # ─────────────────────────────────────────────────────────────────
   deploy:
     name: Deploy to EC2
-    needs: [lint, security-owasp, security-snyk-frontend, security-snyk-code-backend, security-snyk-code-frontend, compile, tests]
+    needs: [lint, security-sast, security-deps, compile, tests]
     runs-on: ubuntu-latest
     steps:
       - name: Download frontend dist
@@ -522,7 +636,7 @@ jobs:
   # ─────────────────────────────────────────────────────────────────
   notify:
     name: Notify Discord
-    needs: [lint, security-owasp, security-snyk-frontend, security-snyk-code-backend, security-snyk-code-frontend, compile, tests, deploy]
+    needs: [lint, security-sast, security-deps, compile, tests, deploy]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -530,10 +644,8 @@ jobs:
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           LINT_RESULT: ${{ needs.lint.result }}
-          OWASP_RESULT: ${{ needs.security-owasp.result }}
-          SNYK_FRONTEND_RESULT: ${{ needs.security-snyk-frontend.result }}
-          SNYK_CODE_BACKEND_RESULT: ${{ needs.security-snyk-code-backend.result }}
-          SNYK_CODE_FRONTEND_RESULT: ${{ needs.security-snyk-code-frontend.result }}
+          SAST_RESULT: ${{ needs.security-sast.result }}
+          DEPS_RESULT: ${{ needs.security-deps.result }}
           COMPILE_RESULT: ${{ needs.compile.result }}
           TESTS_RESULT: ${{ needs.tests.result }}
           DEPLOY_RESULT: ${{ needs.deploy.result }}
@@ -566,7 +678,7 @@ jobs:
             esac
           }
 
-          JOBS_LINE="$(status_emoji $LINT_RESULT) Lint · $(status_emoji $OWASP_RESULT) OWASP · $(status_emoji $SNYK_FRONTEND_RESULT) Snyk-OS-Front · $(status_emoji $SNYK_CODE_BACKEND_RESULT) Snyk-Code-Back · $(status_emoji $SNYK_CODE_FRONTEND_RESULT) Snyk-Code-Front · $(status_emoji $COMPILE_RESULT) Compile · $(status_emoji $TESTS_RESULT) Tests · $(status_emoji $DEPLOY_RESULT) Deploy"
+          JOBS_LINE="$(status_emoji $LINT_RESULT) Lint · $(status_emoji $SAST_RESULT) SAST · $(status_emoji $DEPS_RESULT) Deps · $(status_emoji $COMPILE_RESULT) Compile · $(status_emoji $TESTS_RESULT) Tests · $(status_emoji $DEPLOY_RESULT) Deploy"
           RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
