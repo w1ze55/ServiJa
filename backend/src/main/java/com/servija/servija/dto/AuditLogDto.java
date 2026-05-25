@@ -23,6 +23,7 @@ public class AuditLogDto {
     private String httpPath;
     private Integer httpStatus;
     private AuditLog.Result result;
+    private AuditSeverity severity;
     private String ipAddress;
     private String userAgent;
     private String payload;

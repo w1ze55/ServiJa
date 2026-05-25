@@ -2,6 +2,7 @@ package com.servija.servija.service;
 
 import com.servija.servija.dto.AuditLogDto;
 import com.servija.servija.dto.AuditLogPageResponse;
+import com.servija.servija.dto.AuditSeverity;
 import com.servija.servija.model.AuditLog;
 import com.servija.servija.repository.AuditLogRepository;
 import jakarta.persistence.criteria.Predicate;
@@ -32,12 +33,13 @@ public class AuditLogService {
             String entityType,
             AuditLog.ActorType actorType,
             AuditLog.Result result,
+            AuditSeverity severity,
             LocalDate dateFrom,
             LocalDate dateTo,
             int page,
             int size) {
 
-        Specification<AuditLog> spec = buildSpec(search, action, entityType, actorType, result, dateFrom, dateTo);
+        Specification<AuditLog> spec = buildSpec(search, action, entityType, actorType, result, severity, dateFrom, dateTo);
         PageRequest pageable = PageRequest.of(page, size, Sort.by("timestamp").descending());
         Page<AuditLog> pageResult = auditLogRepository.findAll(spec, pageable);
 
@@ -58,6 +60,7 @@ public class AuditLogService {
             String entityType,
             AuditLog.ActorType actorType,
             AuditLog.Result result,
+            AuditSeverity severity,
             LocalDate dateFrom,
             LocalDate dateTo) {
 
@@ -90,6 +93,16 @@ public class AuditLogService {
                 predicates.add(cb.equal(root.get("result"), result));
             }
 
+            if (severity != null) {
+                if (severity == AuditSeverity.INFO) {
+                    predicates.add(cb.or(
+                            cb.isNull(root.get("action")),
+                            cb.not(root.get("action").in(AuditSeverityResolver.nonInfoActions()))));
+                } else {
+                    predicates.add(root.get("action").in(AuditSeverityResolver.actionsFor(severity)));
+                }
+            }
+
             if (dateFrom != null) {
                 predicates.add(cb.greaterThanOrEqualTo(root.get("timestamp"), dateFrom.atStartOfDay()));
             }
@@ -118,6 +131,7 @@ public class AuditLogService {
                 .httpPath(log.getHttpPath())
                 .httpStatus(log.getHttpStatus())
                 .result(log.getResult())
+                .severity(AuditSeverityResolver.resolve(log.getAction()))
                 .ipAddress(log.getIpAddress())
                 .userAgent(log.getUserAgent())
                 .payload(log.getPayload())

@@ -20,6 +20,7 @@ export const useAuditLogStore = defineStore('auditLog', () => {
     entityType: '',
     actorType: '',
     result: '',
+    severity: '',
     dateFrom: '',
     dateTo: '',
     page: 0,

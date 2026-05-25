@@ -1,6 +1,7 @@
 package com.servija.servija.controller;
 
 import com.servija.servija.dto.AuditLogPageResponse;
+import com.servija.servija.dto.AuditSeverity;
 import com.servija.servija.model.AuditLog;
 import com.servija.servija.service.AuditLogService;
 import lombok.RequiredArgsConstructor;
@@ -29,12 +30,13 @@ public class AuditLogController {
             @RequestParam(required = false) String entityType,
             @RequestParam(required = false) AuditLog.ActorType actorType,
             @RequestParam(required = false) AuditLog.Result result,
+            @RequestParam(required = false) AuditSeverity severity,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
 
         return ResponseEntity.ok(
-                auditLogService.listLogs(search, action, entityType, actorType, result, dateFrom, dateTo, page, size));
+                auditLogService.listLogs(search, action, entityType, actorType, result, severity, dateFrom, dateTo, page, size));
     }
 }
