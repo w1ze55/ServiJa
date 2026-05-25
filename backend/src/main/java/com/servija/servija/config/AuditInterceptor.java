@@ -102,6 +102,7 @@ public class AuditInterceptor implements HandlerInterceptor {
                                 Exception ex) {
         try {
             if (!shouldLog(request)) return;
+            if (auditLogger.isRequestAlreadyAudited(request)) return;
 
             User actor = auditLogger.currentActor();
             // Skip admins (they get tracked separately if at all)

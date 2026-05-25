@@ -27,4 +27,6 @@ public class AuditLogDto {
     private String ipAddress;
     private String userAgent;
     private String payload;
+    private String oldValue;
+    private String newValue;
 }

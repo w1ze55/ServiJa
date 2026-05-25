@@ -79,4 +79,10 @@ public class AuditLog {
 
     @Column(columnDefinition = "TEXT")
     private String payload;
+
+    @Column(name = "old_value", columnDefinition = "TEXT")
+    private String oldValue;
+
+    @Column(name = "new_value", columnDefinition = "TEXT")
+    private String newValue;
 }

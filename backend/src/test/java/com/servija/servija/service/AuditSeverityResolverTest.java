@@ -13,8 +13,18 @@ class AuditSeverityResolverTest {
     }
 
     @Test
+    void resolvesNewSemanticWarningAction() {
+        assertEquals(AuditSeverity.WARNING, AuditSeverityResolver.resolve("SERVICE_DEACTIVATED"));
+    }
+
+    @Test
     void resolvesKnownCriticalAction() {
         assertEquals(AuditSeverity.CRITICAL, AuditSeverityResolver.resolve("ACCOUNT_DELETED"));
+    }
+
+    @Test
+    void resolvesNewSemanticCriticalAction() {
+        assertEquals(AuditSeverity.CRITICAL, AuditSeverityResolver.resolve("USER_SUSPENDED"));
     }
 
     @Test

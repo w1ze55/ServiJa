@@ -3,6 +3,7 @@ package com.servija.servija.service;
 import com.servija.servija.dto.AuditLogDto;
 import com.servija.servija.dto.AuditLogPageResponse;
 import com.servija.servija.dto.AuditSeverity;
+import com.servija.servija.exception.ResourceNotFoundException;
 import com.servija.servija.model.AuditLog;
 import com.servija.servija.repository.AuditLogRepository;
 import jakarta.persistence.criteria.Predicate;
@@ -27,6 +28,12 @@ public class AuditLogService {
         return auditLogRepository.save(log);
     }
 
+    public AuditLogDto getLog(Long id) {
+        AuditLog log = auditLogRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Log de auditoria nao encontrado"));
+        return toDto(log, true);
+    }
+
     public AuditLogPageResponse listLogs(
             String search,
             String action,
@@ -43,7 +50,9 @@ public class AuditLogService {
         PageRequest pageable = PageRequest.of(page, size, Sort.by("timestamp").descending());
         Page<AuditLog> pageResult = auditLogRepository.findAll(spec, pageable);
 
-        List<AuditLogDto> content = pageResult.getContent().stream().map(this::toDto).toList();
+        List<AuditLogDto> content = pageResult.getContent().stream()
+                .map(log -> toDto(log, false))
+                .toList();
 
         return AuditLogPageResponse.builder()
                 .content(content)
@@ -115,7 +124,7 @@ public class AuditLogService {
         };
     }
 
-    private AuditLogDto toDto(AuditLog log) {
+    private AuditLogDto toDto(AuditLog log, boolean includeDetails) {
         return AuditLogDto.builder()
                 .id(log.getId())
                 .timestamp(log.getTimestamp())
@@ -135,6 +144,8 @@ public class AuditLogService {
                 .ipAddress(log.getIpAddress())
                 .userAgent(log.getUserAgent())
                 .payload(log.getPayload())
+                .oldValue(includeDetails ? log.getOldValue() : null)
+                .newValue(includeDetails ? log.getNewValue() : null)
                 .build();
     }
 }

@@ -23,6 +23,8 @@ export interface AuditLogEntry {
   ipAddress: string | null;
   userAgent: string | null;
   payload: string | null;
+  oldValue?: string | null;
+  newValue?: string | null;
 }
 
 export interface AuditLogPageResponse {
@@ -47,6 +49,11 @@ export interface AuditLogListParams {
 }
 
 export const auditLogService = {
+  async getLog(id: number): Promise<AuditLogEntry> {
+    const response = await api.get<AuditLogEntry>(`/admin/audit-logs/${id}`);
+    return response.data;
+  },
+
   async listLogs(params: AuditLogListParams = {}): Promise<AuditLogPageResponse> {
     const clean: Record<string, unknown> = {};
     if (params.search) clean.search = params.search;

@@ -93,6 +93,11 @@ const ACTION_META: Record<string, ActionMeta> = {
     cls: "bg-rose-50 text-rose-700",
     icon: ShieldAlert,
   },
+  EMAIL_VERIFIED: {
+    label: "E-mail verificado",
+    cls: "bg-emerald-50 text-emerald-700",
+    icon: Check,
+  },
   // User profile
   PROFILE_UPDATED: {
     label: "Perfil atualizado",
@@ -124,6 +129,21 @@ const ACTION_META: Record<string, ActionMeta> = {
     cls: "bg-blue-50 text-blue-700",
     icon: MapPin,
   },
+  ADMIN_USER_UPDATED: {
+    label: "UsuÃ¡rio editado por admin",
+    cls: "bg-blue-50 text-blue-700",
+    icon: UserCog,
+  },
+  USER_SUSPENDED: {
+    label: "UsuÃ¡rio suspenso",
+    cls: "bg-red-50 text-red-700",
+    icon: ShieldAlert,
+  },
+  USER_REACTIVATED: {
+    label: "UsuÃ¡rio reativado",
+    cls: "bg-emerald-50 text-emerald-700",
+    icon: Check,
+  },
   // Services
   SERVICE_CREATED: {
     label: "Serviço criado",
@@ -142,6 +162,16 @@ const ACTION_META: Record<string, ActionMeta> = {
   },
   SERVICE_TOGGLED: {
     label: "Serviço ativado/pausado",
+    cls: "bg-amber-50 text-amber-700",
+    icon: ToggleLeft,
+  },
+  SERVICE_ACTIVATED: {
+    label: "ServiÃ§o ativado",
+    cls: "bg-emerald-50 text-emerald-700",
+    icon: ToggleLeft,
+  },
+  SERVICE_DEACTIVATED: {
+    label: "ServiÃ§o desativado",
     cls: "bg-amber-50 text-amber-700",
     icon: ToggleLeft,
   },
@@ -277,6 +307,26 @@ const ACTION_META: Record<string, ActionMeta> = {
     cls: "bg-amber-50 text-amber-700",
     icon: Headset,
   },
+  CATEGORY_ARCHIVED: {
+    label: "Categoria arquivada",
+    cls: "bg-amber-50 text-amber-700",
+    icon: Folder,
+  },
+  CATEGORY_RESTORED: {
+    label: "Categoria restaurada",
+    cls: "bg-emerald-50 text-emerald-700",
+    icon: Folder,
+  },
+  SUBCATEGORY_ARCHIVED: {
+    label: "Subcategoria arquivada",
+    cls: "bg-amber-50 text-amber-700",
+    icon: Folder,
+  },
+  SUBCATEGORY_RESTORED: {
+    label: "Subcategoria restaurada",
+    cls: "bg-emerald-50 text-emerald-700",
+    icon: Folder,
+  },
   // Adjustments
   ADJUSTMENT_REQUESTED: {
     label: "Ajuste solicitado",
@@ -294,6 +344,34 @@ const ACTION_META: Record<string, ActionMeta> = {
     icon: Trash2,
   },
 };
+
+Object.assign(ACTION_META, {
+  ADMIN_USER_UPDATED: {
+    label: "Usuario editado por admin",
+    cls: "bg-blue-50 text-blue-700",
+    icon: UserCog,
+  },
+  USER_SUSPENDED: {
+    label: "Usuario suspenso",
+    cls: "bg-red-50 text-red-700",
+    icon: ShieldAlert,
+  },
+  USER_REACTIVATED: {
+    label: "Usuario reativado",
+    cls: "bg-emerald-50 text-emerald-700",
+    icon: Check,
+  },
+  SERVICE_ACTIVATED: {
+    label: "Servico ativado",
+    cls: "bg-emerald-50 text-emerald-700",
+    icon: ToggleLeft,
+  },
+  SERVICE_DEACTIVATED: {
+    label: "Servico desativado",
+    cls: "bg-amber-50 text-amber-700",
+    icon: ToggleLeft,
+  },
+});
 
 const fallbackActionMeta: ActionMeta = {
   label: "",
@@ -321,6 +399,7 @@ const ENTITY_ICONS: Record<string, unknown> = {
   ADJUSTMENT: Receipt,
   SYSTEM: Server,
   CATEGORY: Folder,
+  SUBCATEGORY: Folder,
 };
 
 const ENTITY_LABEL: Record<string, string> = {
@@ -338,6 +417,7 @@ const ENTITY_LABEL: Record<string, string> = {
   ADJUSTMENT: "Ajuste",
   SYSTEM: "Sistema",
   CATEGORY: "Categoria",
+  SUBCATEGORY: "Subcategoria",
 };
 
 // ---- actor type metadata ------------------------------------------------
@@ -621,8 +701,9 @@ const pageNumbers = () => {
 
 // ---- drawer --------------------------------------------------------------
 const openDrawer = (log: AuditLogEntry) => {
-  store.selectedLog = log;
+  store.setSelectedLog(log);
   drawerOpen.value = true;
+  void store.loadLogDetail(log.id);
 };
 const closeDrawer = () => {
   drawerOpen.value = false;
@@ -1198,6 +1279,7 @@ onMounted(() => onFilterChange());
 
   <AuditLogDrawer
     :log="store.selectedLog"
+    :loading="store.isDetailLoading"
     :open="drawerOpen"
     @close="closeDrawer"
   />
