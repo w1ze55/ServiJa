@@ -3,6 +3,7 @@ package com.servija.servija.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.servija.servija.dto.ServiceResponse;
 import com.servija.servija.exception.ResourceNotFoundException;
+import com.servija.servija.model.AuditLog;
 import com.servija.servija.model.Freelancer;
 import com.servija.servija.model.Service;
 import com.servija.servija.model.ServiceRequest;
@@ -11,19 +12,24 @@ import com.servija.servija.repository.ReviewRepository;
 import com.servija.servija.repository.ServiceRepository;
 import com.servija.servija.repository.ServiceRequestRepository;
 import com.servija.servija.repository.UserRepository;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -51,8 +57,19 @@ class ServiceServiceTest {
     @Mock
     private ObjectMapper objectMapper;
 
+    @Mock
+    private CategoryCatalogService categoryCatalogService;
+
+    @Mock
+    private AuditLogger auditLogger;
+
     @InjectMocks
     private ServiceService serviceService;
+
+    @AfterEach
+    void tearDown() {
+        SecurityContextHolder.clearContext();
+    }
 
     @Test
     @DisplayName("Deve retornar faixa média de preço quando houver serviços concluídos com valor")
@@ -184,6 +201,48 @@ class ServiceServiceTest {
         List<ServiceResponse> responses = serviceService.getAllActiveServices();
 
         assertThat(responses).extracting(ServiceResponse::getId).containsExactly(14L);
+    }
+
+    @Test
+    @DisplayName("Deve gerar auditoria semantica com diff ao atualizar o titulo do servico")
+    void updateService_recordsSemanticAuditForTitleChange() {
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken("freela@servija.com", "secret"));
+
+        Freelancer freelancer = Freelancer.builder()
+                .id(3L)
+                .email("freela@servija.com")
+                .name("Freelancer")
+                .active(true)
+                .build();
+
+        Service service = buildService(30L, new BigDecimal("1000"));
+        service.setTitle("Nome antigo");
+
+        com.servija.servija.dto.ServiceRequest request = com.servija.servija.dto.ServiceRequest.builder()
+                .title("Nome novo")
+                .build();
+
+        when(userRepository.findByEmail("freela@servija.com")).thenReturn(Optional.of(freelancer));
+        when(freelancerRepository.findById(3L)).thenReturn(Optional.of(freelancer));
+        when(serviceRepository.findById(30L)).thenReturn(Optional.of(service));
+        when(serviceRepository.save(service)).thenAnswer(invocation -> {
+            service.setPrice(new BigDecimal("1000.00"));
+            return service;
+        });
+
+        ServiceResponse response = serviceService.updateService(30L, request);
+
+        assertThat(response.getTitle()).isEqualTo("Nome novo");
+        verify(auditLogger).recordSemantic(
+                eq("SERVICE_UPDATED"),
+                eq("SERVICE"),
+                eq("30"),
+                eq("Nome novo"),
+                eq(AuditLog.Result.SUCCESS),
+                eq(Map.of("fieldsChanged", List.of("title"))),
+                eq(Map.of("title", "Nome antigo")),
+                eq(Map.of("title", "Nome novo")));
     }
 
     private Service buildService(Long id, BigDecimal price) {

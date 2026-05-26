@@ -12,7 +12,6 @@ import com.servija.servija.model.Contractor;
 import com.servija.servija.model.Freelancer;
 import com.servija.servija.model.User;
 import com.servija.servija.model.ServiceRequest;
-import java.util.List;
 import com.servija.servija.repository.ContractorRepository;
 import com.servija.servija.repository.FreelancerRepository;
 import com.servija.servija.repository.ReviewRepository;
@@ -20,6 +19,9 @@ import com.servija.servija.repository.ServiceRequestRepository;
 import com.servija.servija.repository.UserRepository;
 
 import java.math.BigDecimal;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -41,6 +43,7 @@ public class UserService {
     private final EntityManager entityManager;
     private final FileStorageService fileStorageService;
     private final WebSocketService webSocketService;
+    private final AuditLogger auditLogger;
 
     @Transactional
     public void changePassword(String email, ChangePasswordRequest request) {
@@ -48,6 +51,8 @@ public class UserService {
                 .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
 
         // Validar senha atual
+        var previousUpdatedAt = user.getUpdatedAt();
+
         if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
             throw new InvalidCredentialsException("Senha atual incorreta");
         }
@@ -70,12 +75,22 @@ public class UserService {
 
         // Salvar no repositório apropriado
         if (user instanceof Contractor) {
-            contractorRepository.save((Contractor) user);
+            user = contractorRepository.save((Contractor) user);
         } else if (user instanceof Freelancer) {
-            freelancerRepository.save((Freelancer) user);
+            user = freelancerRepository.save((Freelancer) user);
         } else {
-            userRepository.save(user);
+            user = userRepository.save(user);
         }
+
+        auditLogger.recordSemantic(
+                "PASSWORD_CHANGED",
+                "USER",
+                String.valueOf(user.getId()),
+                user.getName(),
+                com.servija.servija.model.AuditLog.Result.SUCCESS,
+                Map.of("fieldsChanged", List.of("updatedAt")),
+                singleFieldState("updatedAt", previousUpdatedAt),
+                singleFieldState("updatedAt", user.getUpdatedAt()));
     }
 
     @Transactional
@@ -142,6 +157,17 @@ public class UserService {
                 .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado após atualização"));
 
         webSocketService.notifyProfileImageUpdate(email, finalAvatarUrl);
+        if (!java.util.Objects.equals(summarizeAvatarValue(oldAvatarUrl), summarizeAvatarValue(updatedUser.getAvatarUrl()))) {
+            auditLogger.recordSemantic(
+                    "AVATAR_UPDATED",
+                    "USER",
+                    String.valueOf(updatedUser.getId()),
+                    updatedUser.getName(),
+                    com.servija.servija.model.AuditLog.Result.SUCCESS,
+                    java.util.Map.of("fieldsChanged", java.util.List.of("avatarUrl")),
+                    singleFieldState("avatarUrl", summarizeAvatarValue(oldAvatarUrl)),
+                    singleFieldState("avatarUrl", summarizeAvatarValue(updatedUser.getAvatarUrl())));
+        }
 
         return buildUserDto(updatedUser);
     }
@@ -195,6 +221,7 @@ public class UserService {
                 .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
 
         // Atualizar dados básicos
+        Map<String, Object> beforeState = buildUserAuditState(user);
         user.setName(request.getName());
         user.setPhone(request.getPhone());
         if (request.getCpf() != null && !request.getCpf().isEmpty()) {
@@ -208,6 +235,20 @@ public class UserService {
             user = freelancerRepository.save((com.servija.servija.model.Freelancer) user);
         } else {
             user = userRepository.save(user);
+        }
+
+        Map<String, Object> afterState = buildUserAuditState(user);
+        List<String> changedFields = AuditStateDiffUtils.changedFields(beforeState, afterState);
+        if (!changedFields.isEmpty()) {
+            auditLogger.recordSemantic(
+                    "PROFILE_UPDATED",
+                    "USER",
+                    String.valueOf(user.getId()),
+                    user.getName(),
+                    com.servija.servija.model.AuditLog.Result.SUCCESS,
+                    Map.of("fieldsChanged", changedFields),
+                    AuditStateDiffUtils.filterFields(beforeState, changedFields),
+                    AuditStateDiffUtils.filterFields(afterState, changedFields));
         }
 
         return buildUserDto(user);
@@ -289,5 +330,29 @@ public class UserService {
 
     private boolean isS3Url(String url) {
         return url != null && url.contains(".s3.") && url.contains("amazonaws.com");
+    }
+
+    private Map<String, Object> buildUserAuditState(User user) {
+        Map<String, Object> state = new LinkedHashMap<>();
+        state.put("name", user.getName());
+        state.put("phone", user.getPhone());
+        state.put("cpf", user.getCpf());
+        return state;
+    }
+
+    private String summarizeAvatarValue(String avatarUrl) {
+        if (avatarUrl == null || avatarUrl.isBlank()) {
+            return null;
+        }
+        if (avatarUrl.startsWith("data:image")) {
+            return "[INLINE_IMAGE]";
+        }
+        return avatarUrl.length() <= 120 ? avatarUrl : avatarUrl.substring(0, 117) + "...";
+    }
+
+    private Map<String, Object> singleFieldState(String fieldName, Object value) {
+        Map<String, Object> state = new LinkedHashMap<>();
+        state.put(fieldName, value);
+        return state;
     }
 }

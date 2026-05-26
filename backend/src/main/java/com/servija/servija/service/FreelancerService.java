@@ -35,6 +35,7 @@ import org.springframework.util.StringUtils;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -58,6 +59,7 @@ public class FreelancerService {
     private final CategoryCatalogService categoryCatalogService;
     private final IbgeLocationService ibgeLocationService;
     private final GeocodingService geocodingService;
+    private final AuditLogger auditLogger;
 
     @Transactional(readOnly = true)
     public FreelancerProfileResponse getProfile() {
@@ -83,6 +85,7 @@ public class FreelancerService {
     @Transactional
     public FreelancerProfileResponse updateProfile(FreelancerProfileRequest request) {
         Freelancer freelancer = getCurrentFreelancer();
+        Map<String, Object> beforeState = buildFreelancerAuditState(freelancer);
 
         // Atualizar campos básicos
         if (request.getName() != null) {
@@ -190,6 +193,19 @@ public class FreelancerService {
         }
 
         freelancer = freelancerRepository.save(freelancer);
+        Map<String, Object> afterState = buildFreelancerAuditState(freelancer);
+        List<String> changedFields = AuditStateDiffUtils.changedFields(beforeState, afterState);
+        if (!changedFields.isEmpty()) {
+            auditLogger.recordSemantic(
+                    "FREELANCER_PROFILE_UPDATED",
+                    "USER",
+                    String.valueOf(freelancer.getId()),
+                    freelancer.getName(),
+                    com.servija.servija.model.AuditLog.Result.SUCCESS,
+                    Map.of("fieldsChanged", changedFields),
+                    AuditStateDiffUtils.filterFields(beforeState, changedFields),
+                    AuditStateDiffUtils.filterFields(afterState, changedFields));
+        }
         return mapToResponse(freelancer);
     }
 
@@ -406,9 +422,27 @@ public class FreelancerService {
     @Transactional
     public void updateLocation(BigDecimal latitude, BigDecimal longitude) {
         Freelancer freelancer = getCurrentFreelancer();
+        Map<String, Object> beforeState = new LinkedHashMap<>();
+        beforeState.put("latitude", freelancer.getLatitude());
+        beforeState.put("longitude", freelancer.getLongitude());
         freelancer.setLatitude(latitude);
         freelancer.setLongitude(longitude);
-        freelancerRepository.save(freelancer);
+        freelancer = freelancerRepository.save(freelancer);
+        Map<String, Object> afterState = new LinkedHashMap<>();
+        afterState.put("latitude", freelancer.getLatitude());
+        afterState.put("longitude", freelancer.getLongitude());
+        List<String> changedFields = AuditStateDiffUtils.changedFields(beforeState, afterState);
+        if (!changedFields.isEmpty()) {
+            auditLogger.recordSemantic(
+                    "FREELANCER_LOCATION_UPDATED",
+                    "USER",
+                    String.valueOf(freelancer.getId()),
+                    freelancer.getName(),
+                    com.servija.servija.model.AuditLog.Result.SUCCESS,
+                    Map.of("fieldsChanged", changedFields),
+                    AuditStateDiffUtils.filterFields(beforeState, changedFields),
+                    AuditStateDiffUtils.filterFields(afterState, changedFields));
+        }
     }
 
     @Transactional(readOnly = true)
@@ -979,6 +1013,36 @@ public class FreelancerService {
         if (!alreadyPresent) {
             subcategories.add(candidate);
         }
+    }
+
+    private Map<String, Object> buildFreelancerAuditState(Freelancer freelancer) {
+        FreelancerProfileResponse response = mapToResponse(freelancer);
+        Map<String, Object> state = new LinkedHashMap<>();
+        state.put("name", response.getName());
+        state.put("profession", response.getProfession());
+        state.put("bio", response.getBio());
+        state.put("category", response.getCategoryLabel());
+        state.put("subcategories", response.getSubcategoryLabels());
+        state.put("serviceType", response.getServiceType());
+        state.put("cities", response.getCities());
+        state.put("serviceCities", response.getServiceCities() == null
+                ? List.of()
+                : response.getServiceCities().stream()
+                .map(city -> city.getCity() + ", " + city.getState())
+                .toList());
+        state.put("professionalLinks", response.getProfessionalLinks() == null
+                ? List.of()
+                : response.getProfessionalLinks().stream()
+                .map(link -> {
+                    Map<String, Object> linkState = new LinkedHashMap<>();
+                    linkState.put("type", link.getType());
+                    linkState.put("url", link.getUrl());
+                    linkState.put("label", link.getLabel());
+                    return linkState;
+                })
+                .toList());
+        state.put("socialLinks", response.getSocialLinks());
+        return state;
     }
 
     private static final class NormalizedServiceCity {

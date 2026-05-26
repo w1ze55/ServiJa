@@ -372,7 +372,7 @@ const faqItems = [
             </h2>
             <p class="b-faq-side-desc">Não achou o que procura? Fale com a gente.</p>
             <a href="mailto:contato@servija.com.br" class="b-faq-side-link">
-              <Mail :size="16" /> contato@servija.com.br
+              <Mail :size="16" /> servija8@gmail.com
             </a>
           </div>
           <div class="b-faq-list">

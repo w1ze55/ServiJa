@@ -151,7 +151,7 @@ public class AuthService {
                         null,
                         attempted.getEmail(),
                         com.servija.servija.model.AuditLog.Result.FAILURE,
-                        Map.of("reason", e.getClass().getSimpleName()));
+                        Map.of("reason", resolveLoginFailureReason(e, false)));
             } else if (attempted == null) {
                 auditLogger.recordGuest(
                         request.getEmail(),
@@ -160,7 +160,7 @@ public class AuthService {
                         null,
                         request.getEmail(),
                         com.servija.servija.model.AuditLog.Result.FAILURE,
-                        Map.of("reason", "USER_NOT_FOUND"));
+                        Map.of("reason", resolveLoginFailureReason(e, true)));
             }
             throw e;
         }
@@ -191,6 +191,8 @@ public class AuthService {
     public AuthResponse verifyEmail(String email, String code) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
+
+        int attemptsUsed = safeAttempts(user.getVerificationAttempts()) + 1;
 
         if (Boolean.TRUE.equals(user.getEmailVerified())) {
             throw new IllegalStateException("E-mail já verificado");
@@ -240,6 +242,15 @@ public class AuthService {
 
         UserDetails userDetails = userDetailsService.loadUserByUsername(user.getEmail());
         String token = jwtService.generateToken(userDetails);
+
+        auditLogger.recordFor(
+                user,
+                "EMAIL_VERIFIED",
+                "AUTH",
+                null,
+                user.getEmail(),
+                com.servija.servija.model.AuditLog.Result.SUCCESS,
+                Map.of("attempts", attemptsUsed));
 
         return buildAuthResponse(user, token);
     }
@@ -360,6 +371,19 @@ public class AuthService {
 
     private int safeAttempts(Integer attempts) {
         return attempts == null ? 0 : attempts;
+    }
+
+    private String resolveLoginFailureReason(Exception exception, boolean userNotFound) {
+        if (userNotFound || exception instanceof ResourceNotFoundException) {
+            return "user_not_found";
+        }
+        if (exception instanceof TooManyAttemptsException) {
+            return "too_many_attempts";
+        }
+        if (exception instanceof InvalidCredentialsException && "Conta suspensa".equalsIgnoreCase(exception.getMessage())) {
+            return "account_suspended";
+        }
+        return "invalid_credentials";
     }
 
     private User saveUser(User user) {

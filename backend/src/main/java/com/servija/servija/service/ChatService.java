@@ -129,6 +129,7 @@ public class ChatService {
         Map<String, Integer> unread = new HashMap<>(conv.getUnreadCount() != null ? conv.getUnreadCount() : Map.of());
         unread.put(role, 0);
         conv.setUnreadCount(unread);
+        conv.setUpdatedAt(Instant.now());
         conversationRepository.save(conv);
     }
 

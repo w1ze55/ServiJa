@@ -26,9 +26,12 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 @Slf4j
 public class AuditLogger {
 
+    public static final String REQUEST_AUDITED_ATTRIBUTE = AuditLogger.class.getName() + ".AUDITED";
+
     private final AuditLogService auditLogService;
     private final UserRepository userRepository;
     private final ObjectMapper objectMapper;
+    private final AuditLogContentService auditLogContentService;
 
     public void record(
             String action,
@@ -37,7 +40,7 @@ public class AuditLogger {
             String entityLabel,
             AuditLog.Result result,
             Object payload) {
-        persist(currentActor(), null, action, entityType, entityId, entityLabel, result, payload);
+        persist(currentActor(), null, action, entityType, entityId, entityLabel, result, payload, null, null);
     }
 
     public void recordFor(
@@ -48,7 +51,7 @@ public class AuditLogger {
             String entityLabel,
             AuditLog.Result result,
             Object payload) {
-        persist(actor, null, action, entityType, entityId, entityLabel, result, payload);
+        persist(actor, null, action, entityType, entityId, entityLabel, result, payload, null, null);
     }
 
     public void recordGuest(
@@ -59,7 +62,45 @@ public class AuditLogger {
             String entityLabel,
             AuditLog.Result result,
             Object payload) {
-        persist(null, attemptedEmail, action, entityType, entityId, entityLabel, result, payload);
+        persist(null, attemptedEmail, action, entityType, entityId, entityLabel, result, payload, null, null);
+    }
+
+    public void recordSemantic(
+            String action,
+            String entityType,
+            String entityId,
+            String entityLabel,
+            AuditLog.Result result,
+            Object payload,
+            Object oldValue,
+            Object newValue) {
+        persist(currentActor(), null, action, entityType, entityId, entityLabel, result, payload, oldValue, newValue);
+    }
+
+    public void recordSemanticFor(
+            User actor,
+            String action,
+            String entityType,
+            String entityId,
+            String entityLabel,
+            AuditLog.Result result,
+            Object payload,
+            Object oldValue,
+            Object newValue) {
+        persist(actor, null, action, entityType, entityId, entityLabel, result, payload, oldValue, newValue);
+    }
+
+    public void recordSemanticGuest(
+            String attemptedEmail,
+            String action,
+            String entityType,
+            String entityId,
+            String entityLabel,
+            AuditLog.Result result,
+            Object payload,
+            Object oldValue,
+            Object newValue) {
+        persist(null, attemptedEmail, action, entityType, entityId, entityLabel, result, payload, oldValue, newValue);
     }
 
     public void recordRaw(AuditLog log) {
@@ -78,14 +119,18 @@ public class AuditLogger {
             String entityId,
             String entityLabel,
             AuditLog.Result result,
-            Object payload) {
+            Object payload,
+            Object oldValue,
+            Object newValue) {
         try {
             HttpServletRequest request = currentRequest();
             String ip = request != null ? extractIp(request) : null;
             String ua = request != null ? truncate(request.getHeader("User-Agent"), 512) : null;
             String httpMethod = request != null ? request.getMethod() : null;
             String httpPath = request != null ? truncate(request.getRequestURI(), 255) : null;
-            String payloadJson = serializePayload(payload);
+            String payloadJson = auditLogContentService.serializePayload(action, payload);
+            String oldValueJson = auditLogContentService.serializeState(oldValue);
+            String newValueJson = auditLogContentService.serializeState(newValue);
 
             AuditLog logEntry = AuditLog.builder()
                     .actorId(actor != null ? actor.getId() : null)
@@ -102,8 +147,11 @@ public class AuditLogger {
                     .ipAddress(truncate(ip, 64))
                     .userAgent(ua)
                     .payload(payloadJson)
+                    .oldValue(oldValueJson)
+                    .newValue(newValueJson)
                     .build();
 
+            markCurrentRequestAsAudited(request);
             auditLogService.save(logEntry);
         } catch (Exception e) {
             log("write", e);
@@ -157,6 +205,20 @@ public class AuditLogger {
             return objectMapper.writeValueAsString(payload);
         } catch (Exception e) {
             return null;
+        }
+    }
+
+    public void markCurrentRequestAsAudited() {
+        markCurrentRequestAsAudited(currentRequest());
+    }
+
+    public boolean isRequestAlreadyAudited(HttpServletRequest request) {
+        return request != null && Boolean.TRUE.equals(request.getAttribute(REQUEST_AUDITED_ATTRIBUTE));
+    }
+
+    private void markCurrentRequestAsAudited(HttpServletRequest request) {
+        if (request != null) {
+            request.setAttribute(REQUEST_AUDITED_ATTRIBUTE, Boolean.TRUE);
         }
     }
 

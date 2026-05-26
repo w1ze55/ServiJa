@@ -28,7 +28,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Pattern;
 
 @Service
@@ -45,6 +47,7 @@ public class AdminUserService {
     private final ServiceRequestRepository serviceRequestRepository;
     private final ReviewRepository reviewRepository;
     private final AdminResetPasswordLinkService adminResetPasswordLinkService;
+    private final AuditLogger auditLogger;
 
     public AdminUserPageResponse listUsers(
             String search,
@@ -96,8 +99,18 @@ public class AdminUserService {
             throw new IllegalArgumentException("Não é possível bloquear a própria conta");
         }
 
+        String previousStatus = userStatus(user.getActive());
         user.setActive(request.getActive());
         User saved = userRepository.save(user);
+        auditLogger.recordSemantic(
+                Boolean.TRUE.equals(saved.getActive()) ? "USER_REACTIVATED" : "USER_SUSPENDED",
+                "USER",
+                String.valueOf(saved.getId()),
+                saved.getName(),
+                com.servija.servija.model.AuditLog.Result.SUCCESS,
+                null,
+                Map.of("status", previousStatus),
+                Map.of("status", userStatus(saved.getActive())));
         return toSummaryDto(saved);
     }
 
@@ -106,6 +119,7 @@ public class AdminUserService {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
 
+        Map<String, Object> beforeState = buildAuditState(user);
         validateEditRequest(request, user);
 
         user.setName(request.getName());
@@ -128,10 +142,12 @@ public class AdminUserService {
         if (user instanceof Freelancer freelancer && request.getBio() != null) {
             freelancer.setBio(request.getBio());
             freelancerRepository.save(freelancer);
+            recordUserUpdateAudit(freelancer, beforeState, buildAuditState(freelancer));
             return toDetailDto(freelancer);
         }
 
         User saved = userRepository.save(user);
+        recordUserUpdateAudit(saved, beforeState, buildAuditState(saved));
         return toDetailDto(saved);
     }
 
@@ -325,5 +341,37 @@ public class AdminUserService {
         }
 
         return builder.build();
+    }
+
+    private void recordUserUpdateAudit(User user, Map<String, Object> beforeState, Map<String, Object> afterState) {
+        List<String> changedFields = AuditStateDiffUtils.changedFields(beforeState, afterState);
+        if (changedFields.isEmpty()) {
+            return;
+        }
+        auditLogger.recordSemantic(
+                "ADMIN_USER_UPDATED",
+                "USER",
+                String.valueOf(user.getId()),
+                user.getName(),
+                com.servija.servija.model.AuditLog.Result.SUCCESS,
+                Map.of("fieldsChanged", changedFields),
+                AuditStateDiffUtils.filterFields(beforeState, changedFields),
+                AuditStateDiffUtils.filterFields(afterState, changedFields));
+    }
+
+    private Map<String, Object> buildAuditState(User user) {
+        Map<String, Object> state = new LinkedHashMap<>();
+        state.put("name", user.getName());
+        state.put("email", user.getEmail());
+        state.put("phone", user.getPhone());
+        state.put("userType", user.getUserType() != null ? user.getUserType().name() : null);
+        if (user instanceof Freelancer freelancer) {
+            state.put("bio", freelancer.getBio());
+        }
+        return state;
+    }
+
+    private String userStatus(Boolean active) {
+        return Boolean.TRUE.equals(active) ? "ACTIVE" : "SUSPENDED";
     }
 }

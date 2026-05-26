@@ -12,6 +12,7 @@ export const useAuditLogStore = defineStore('auditLog', () => {
   const totalPages = ref(0);
   const currentPage = ref(0);
   const isLoading = ref(false);
+  const isDetailLoading = ref(false);
   const selectedLog = ref<AuditLogEntry | null>(null);
 
   const filters = ref<AuditLogListParams>({
@@ -20,6 +21,7 @@ export const useAuditLogStore = defineStore('auditLog', () => {
     entityType: '',
     actorType: '',
     result: '',
+    severity: '',
     dateFrom: '',
     dateTo: '',
     page: 0,
@@ -44,15 +46,35 @@ export const useAuditLogStore = defineStore('auditLog', () => {
     selectedLog.value = null;
   };
 
+  const setSelectedLog = (log: AuditLogEntry | null) => {
+    selectedLog.value = log;
+  };
+
+  const loadLogDetail = async (id: number) => {
+    isDetailLoading.value = true;
+    try {
+      const detail = await auditLogService.getLog(id);
+      if (selectedLog.value?.id === id) {
+        selectedLog.value = detail;
+      }
+      return detail;
+    } finally {
+      isDetailLoading.value = false;
+    }
+  };
+
   return {
     logs,
     totalElements,
     totalPages,
     currentPage,
     isLoading,
+    isDetailLoading,
     selectedLog,
     filters,
     loadLogs,
+    loadLogDetail,
+    setSelectedLog,
     clearSelectedLog,
   };
 });

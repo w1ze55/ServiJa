@@ -35,7 +35,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -54,6 +56,7 @@ public class CategoryCatalogService {
     private final PortfolioProjectRepository portfolioProjectRepository;
     private final ServiceRequestRepository serviceRequestRepository;
     private final ObjectMapper objectMapper;
+    private final AuditLogger auditLogger;
 
     @Value("${servija.catalog.seed-resource:classpath:catalog/service-category-catalog.json}")
     private Resource seedResource;
@@ -99,26 +102,51 @@ public class CategoryCatalogService {
     @Transactional
     public ServiceCategoryResponse updateCategory(Long categoryId, ServiceCategoryRequest request) {
         ServiceCategory category = getCategoryOrThrow(categoryId);
+        Map<String, Object> beforeState = buildCategoryAuditState(category);
         category.setName(normalizeName(request.getName()));
         category.setSortOrder(request.getSortOrder());
-        return toCategoryResponse(serviceCategoryRepository.save(category));
+        ServiceCategory saved = serviceCategoryRepository.save(category);
+        recordCategoryAudit("CATEGORY_UPDATED", saved, beforeState);
+        return toCategoryResponse(saved);
     }
 
     @Transactional
     public ServiceCategoryResponse archiveCategory(Long categoryId) {
         ServiceCategory category = getCategoryOrThrow(categoryId);
+        Map<String, Object> beforeState = buildCategoryAuditState(category);
         category.setActive(false);
         if (category.getSubcategories() != null) {
             category.getSubcategories().forEach(subcategory -> subcategory.setActive(false));
         }
-        return toCategoryResponse(serviceCategoryRepository.save(category));
+        ServiceCategory saved = serviceCategoryRepository.save(category);
+        auditLogger.recordSemantic(
+                "CATEGORY_ARCHIVED",
+                "CATEGORY",
+                String.valueOf(saved.getId()),
+                saved.getName(),
+                com.servija.servija.model.AuditLog.Result.SUCCESS,
+                null,
+                beforeState,
+                buildCategoryAuditState(saved));
+        return toCategoryResponse(saved);
     }
 
     @Transactional
     public ServiceCategoryResponse restoreCategory(Long categoryId) {
         ServiceCategory category = getCategoryOrThrow(categoryId);
+        Map<String, Object> beforeState = buildCategoryAuditState(category);
         category.setActive(true);
-        return toCategoryResponse(serviceCategoryRepository.save(category));
+        ServiceCategory saved = serviceCategoryRepository.save(category);
+        auditLogger.recordSemantic(
+                "CATEGORY_RESTORED",
+                "CATEGORY",
+                String.valueOf(saved.getId()),
+                saved.getName(),
+                com.servija.servija.model.AuditLog.Result.SUCCESS,
+                null,
+                beforeState,
+                buildCategoryAuditState(saved));
+        return toCategoryResponse(saved);
     }
 
     @Transactional
@@ -139,6 +167,7 @@ public class CategoryCatalogService {
     public ServiceSubcategoryResponse updateSubcategory(Long subcategoryId, ServiceSubcategoryRequest request) {
         ServiceSubcategory subcategory = getSubcategoryOrThrow(subcategoryId);
         ServiceCategory category = getCategoryOrThrow(request.getCategoryId());
+        Map<String, Object> beforeState = buildSubcategoryAuditState(subcategory);
         String normalizedName = normalizeName(request.getName());
         if (!subcategory.getCategory().getId().equals(category.getId()) || !subcategory.getName().equalsIgnoreCase(normalizedName)) {
             subcategory.setSlug(ensureUniqueSubcategorySlug(category, normalizedName, subcategory.getId()));
@@ -146,14 +175,27 @@ public class CategoryCatalogService {
         subcategory.setCategory(category);
         subcategory.setName(normalizedName);
         subcategory.setSortOrder(request.getSortOrder());
-        return toSubcategoryResponse(serviceSubcategoryRepository.save(subcategory));
+        ServiceSubcategory saved = serviceSubcategoryRepository.save(subcategory);
+        recordSubcategoryAudit("SUBCATEGORY_UPDATED", saved, beforeState);
+        return toSubcategoryResponse(saved);
     }
 
     @Transactional
     public ServiceSubcategoryResponse archiveSubcategory(Long subcategoryId) {
         ServiceSubcategory subcategory = getSubcategoryOrThrow(subcategoryId);
+        Map<String, Object> beforeState = buildSubcategoryAuditState(subcategory);
         subcategory.setActive(false);
-        return toSubcategoryResponse(serviceSubcategoryRepository.save(subcategory));
+        ServiceSubcategory saved = serviceSubcategoryRepository.save(subcategory);
+        auditLogger.recordSemantic(
+                "SUBCATEGORY_ARCHIVED",
+                "SUBCATEGORY",
+                String.valueOf(saved.getId()),
+                saved.getName(),
+                com.servija.servija.model.AuditLog.Result.SUCCESS,
+                null,
+                beforeState,
+                buildSubcategoryAuditState(saved));
+        return toSubcategoryResponse(saved);
     }
 
     @Transactional
@@ -162,8 +204,19 @@ public class CategoryCatalogService {
         if (!Boolean.TRUE.equals(subcategory.getCategory().getActive())) {
             throw new IllegalArgumentException("A categoria pai precisa estar ativa para restaurar a subcategoria");
         }
+        Map<String, Object> beforeState = buildSubcategoryAuditState(subcategory);
         subcategory.setActive(true);
-        return toSubcategoryResponse(serviceSubcategoryRepository.save(subcategory));
+        ServiceSubcategory saved = serviceSubcategoryRepository.save(subcategory);
+        auditLogger.recordSemantic(
+                "SUBCATEGORY_RESTORED",
+                "SUBCATEGORY",
+                String.valueOf(saved.getId()),
+                saved.getName(),
+                com.servija.servija.model.AuditLog.Result.SUCCESS,
+                null,
+                beforeState,
+                buildSubcategoryAuditState(saved));
+        return toSubcategoryResponse(saved);
     }
 
     @Transactional(readOnly = true)
@@ -489,6 +542,58 @@ public class CategoryCatalogService {
                 .createdAt(subcategory.getCreatedAt())
                 .updatedAt(subcategory.getUpdatedAt())
                 .build();
+    }
+
+    private Map<String, Object> buildCategoryAuditState(ServiceCategory category) {
+        Map<String, Object> state = new LinkedHashMap<>();
+        state.put("name", category.getName());
+        state.put("sortOrder", category.getSortOrder());
+        state.put("active", category.getActive());
+        return state;
+    }
+
+    private Map<String, Object> buildSubcategoryAuditState(ServiceSubcategory subcategory) {
+        Map<String, Object> state = new LinkedHashMap<>();
+        state.put("categoryId", subcategory.getCategory() != null ? subcategory.getCategory().getId() : null);
+        state.put("categoryName", subcategory.getCategory() != null ? subcategory.getCategory().getName() : null);
+        state.put("name", subcategory.getName());
+        state.put("sortOrder", subcategory.getSortOrder());
+        state.put("active", subcategory.getActive());
+        return state;
+    }
+
+    private void recordCategoryAudit(String action, ServiceCategory category, Map<String, Object> beforeState) {
+        Map<String, Object> afterState = buildCategoryAuditState(category);
+        List<String> changedFields = AuditStateDiffUtils.changedFields(beforeState, afterState);
+        if (changedFields.isEmpty()) {
+            return;
+        }
+        auditLogger.recordSemantic(
+                action,
+                "CATEGORY",
+                String.valueOf(category.getId()),
+                category.getName(),
+                com.servija.servija.model.AuditLog.Result.SUCCESS,
+                Map.of("fieldsChanged", changedFields),
+                AuditStateDiffUtils.filterFields(beforeState, changedFields),
+                AuditStateDiffUtils.filterFields(afterState, changedFields));
+    }
+
+    private void recordSubcategoryAudit(String action, ServiceSubcategory subcategory, Map<String, Object> beforeState) {
+        Map<String, Object> afterState = buildSubcategoryAuditState(subcategory);
+        List<String> changedFields = AuditStateDiffUtils.changedFields(beforeState, afterState);
+        if (changedFields.isEmpty()) {
+            return;
+        }
+        auditLogger.recordSemantic(
+                action,
+                "SUBCATEGORY",
+                String.valueOf(subcategory.getId()),
+                subcategory.getName(),
+                com.servija.servija.model.AuditLog.Result.SUCCESS,
+                Map.of("fieldsChanged", changedFields),
+                AuditStateDiffUtils.filterFields(beforeState, changedFields),
+                AuditStateDiffUtils.filterFields(afterState, changedFields));
     }
 
     @Data

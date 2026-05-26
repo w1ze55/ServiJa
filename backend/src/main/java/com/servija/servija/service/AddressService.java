@@ -12,7 +12,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -24,6 +26,7 @@ public class AddressService {
     private final AddressRepository addressRepository;
     private final UserRepository userRepository;
     private final GeocodingService geocodingService;
+    private final AuditLogger auditLogger;
 
     @Transactional
     public List<AddressResponse> getUserAddresses(String email) {
@@ -102,6 +105,8 @@ public class AddressService {
         Address address = addressRepository.findByIdAndUserId(addressId, user.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Endereço não encontrado"));
 
+        Map<String, Object> beforeState = buildAddressAuditState(address);
+
         address.setLabel(request.getLabel());
         address.setStreet(request.getStreet());
         address.setNumber(request.getNumber());
@@ -118,6 +123,7 @@ public class AddressService {
         }
 
         address = addressRepository.save(address);
+        recordAddressAudit("ADDRESS_UPDATED", address, beforeState);
         return AddressResponse.fromEntity(address);
     }
 
@@ -150,10 +156,13 @@ public class AddressService {
         Address address = addressRepository.findByIdAndUserId(addressId, user.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Endereço não encontrado"));
 
+        Map<String, Object> beforeState = buildAddressAuditState(address);
+
         addressRepository.clearDefaultForUser(user.getId(), address.getId());
         address.setIsDefault(true);
         address = ensureCoordinates(address);
         address = addressRepository.save(address);
+        recordAddressAudit("ADDRESS_DEFAULT_SET", address, beforeState);
 
         return AddressResponse.fromEntity(address);
     }
@@ -203,5 +212,38 @@ public class AddressService {
                 && value.compareTo(BigDecimal.valueOf(min)) >= 0
                 && value.compareTo(BigDecimal.valueOf(max)) <= 0
                 && value.compareTo(BigDecimal.ZERO) != 0;
+    }
+
+    private void recordAddressAudit(String action, Address address, Map<String, Object> beforeState) {
+        Map<String, Object> afterState = buildAddressAuditState(address);
+        List<String> changedFields = AuditStateDiffUtils.changedFields(beforeState, afterState);
+        if (changedFields.isEmpty()) {
+            return;
+        }
+        auditLogger.recordSemantic(
+                action,
+                "ADDRESS",
+                String.valueOf(address.getId()),
+                address.getLabel(),
+                com.servija.servija.model.AuditLog.Result.SUCCESS,
+                Map.of("fieldsChanged", changedFields),
+                AuditStateDiffUtils.filterFields(beforeState, changedFields),
+                AuditStateDiffUtils.filterFields(afterState, changedFields));
+    }
+
+    private Map<String, Object> buildAddressAuditState(Address address) {
+        Map<String, Object> state = new LinkedHashMap<>();
+        state.put("label", address.getLabel());
+        state.put("street", address.getStreet());
+        state.put("number", address.getNumber());
+        state.put("complement", address.getComplement());
+        state.put("neighborhood", address.getNeighborhood());
+        state.put("city", address.getCity());
+        state.put("state", address.getState());
+        state.put("zipCode", address.getZipCode());
+        state.put("latitude", address.getLatitude());
+        state.put("longitude", address.getLongitude());
+        state.put("default", address.getIsDefault());
+        return state;
     }
 }

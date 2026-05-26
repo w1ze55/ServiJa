@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -27,6 +28,7 @@ public class WithdrawalService {
     private final FreelancerWalletService walletService;
     private final AsaasService asaasService;
     private final BankAccountService bankAccountService;
+    private final AuditLogger auditLogger;
 
     private static final BigDecimal MIN_WITHDRAWAL_AMOUNT = new BigDecimal("10.00");
     private static final BigDecimal MAX_WITHDRAWAL_AMOUNT = new BigDecimal("50000.00");
@@ -96,6 +98,19 @@ public class WithdrawalService {
                 .build();
 
         withdrawal = withdrawalRepository.save(withdrawal);
+
+        Map<String, Object> auditPayload = new LinkedHashMap<>();
+        auditPayload.put("amount", withdrawal.getAmount());
+        auditPayload.put("withdrawalMethod", withdrawal.getWithdrawalMethod().name());
+        auditLogger.recordSemantic(
+                "WITHDRAWAL_REQUESTED",
+                "WITHDRAWAL",
+                String.valueOf(withdrawal.getId()),
+                "Saque " + withdrawal.getWithdrawalMethod().name(),
+                com.servija.servija.model.AuditLog.Result.SUCCESS,
+                auditPayload,
+                null,
+                null);
 
         walletService.deductAvailableBalance(freelancer, amount);
 
