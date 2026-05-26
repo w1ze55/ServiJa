@@ -8,6 +8,7 @@ import com.servija.servija.model.User;
 import com.servija.servija.repository.ContractorRepository;
 import com.servija.servija.repository.FreelancerRepository;
 import com.servija.servija.repository.UserRepository;
+import com.servija.servija.service.AuditLogger;
 import com.servija.servija.service.AuthService;
 import com.servija.servija.service.CustomUserDetailsService;
 import com.servija.servija.service.EmailService;
@@ -53,6 +54,8 @@ class AuthServiceVerificationTest {
     private CustomUserDetailsService userDetailsService;
     @Mock
     private EmailService emailService;
+    @Mock
+    private AuditLogger auditLogger;
 
     @InjectMocks
     private AuthService authService;

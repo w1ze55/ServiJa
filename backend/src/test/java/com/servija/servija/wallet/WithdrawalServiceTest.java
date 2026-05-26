@@ -7,6 +7,7 @@ import com.servija.servija.model.WithdrawalRequest;
 import com.servija.servija.repository.UserRepository;
 import com.servija.servija.repository.WithdrawalRequestRepository;
 import com.servija.servija.service.AsaasService;
+import com.servija.servija.service.AuditLogger;
 import com.servija.servija.service.BankAccountService;
 import com.servija.servija.service.FreelancerWalletService;
 import com.servija.servija.service.WithdrawalService;
@@ -51,6 +52,9 @@ class WithdrawalServiceTest {
 
     @Mock
     private BankAccountService bankAccountService;
+
+    @Mock
+    private AuditLogger auditLogger;
 
     @InjectMocks
     private WithdrawalService withdrawalService;
