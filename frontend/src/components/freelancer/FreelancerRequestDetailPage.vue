@@ -57,7 +57,7 @@ import Separator from '../ui/separator.vue';
 import WorkModelBadge from '../shared/WorkModelBadge.vue';
 import { useProposalStore, type Proposal, type Milestone } from '@/stores/proposalStore';
 import ServiceRequestTimeline from '../service/ServiceRequestTimeline.vue';
-import ChatBox from '../shared/ChatBox.vue';
+import ProjectChatPanel from '../shared/ProjectChatPanel.vue';
 import { useRouter } from 'vue-router';
 import { useServiceRequestWebSocket } from '@/composables/useServiceRequestWebSocket';
 import { toast } from '@/utils/toast';
@@ -106,7 +106,6 @@ const milestoneForm = ref({
 });
 const showAddMilestone = ref(false);
 
-const isSendingMessage = ref(false);
 
 // WebSocket
 let wsConnection: any = null;
@@ -429,25 +428,6 @@ const handleRemoveMilestone = (id: string) => {
 
 const handleProposalAttachmentReject = (message: string) => {
   toast.error(message);
-};
-
-const handleSendMessage = async (message: string, attachments: File[]) => {
-  if (!proposal.value) return;
-
-  isSendingMessage.value = true;
-  const success = await proposalStore.sendMessage(
-    proposal.value.id,
-    message,
-    attachments.length > 0 ? attachments : undefined
-  );
-  isSendingMessage.value = false;
-
-  if (success) {
-    proposal.value = proposalStore.getProposalById(proposal.value.id) || null;
-    toast.success('Mensagem enviada');
-  } else {
-    toast.error('Erro ao enviar mensagem');
-  }
 };
 
 const handlePrepareProposal = () => {
@@ -1002,13 +982,10 @@ const getStatusBadge = (currentProposal: Proposal) => {
       <Card v-if="activeSection === 'messages'" class="p-6">
         <h3 class="font-semibold text-[#263238] mb-4">Mensagens</h3>
 
-        <ChatBox
-          :messages="proposal.messages || []"
+        <ProjectChatPanel
+          :service-request-id="Number(proposal.id)"
           current-user-role="freelancer"
-          :is-locked="proposal.status !== 'in_progress' && proposal.status !== 'delivered'"
           :service-status="proposal.status"
-          :is-sending="isSendingMessage"
-          @send-message="handleSendMessage"
         />
       </Card>
 
