@@ -88,9 +88,9 @@ public class UserService {
                 String.valueOf(user.getId()),
                 user.getName(),
                 com.servija.servija.model.AuditLog.Result.SUCCESS,
-                null,
-                previousUpdatedAt != null ? Map.of("updatedAt", previousUpdatedAt) : null,
-                user.getUpdatedAt() != null ? Map.of("updatedAt", user.getUpdatedAt()) : null);
+                Map.of("fieldsChanged", List.of("updatedAt")),
+                singleFieldState("updatedAt", previousUpdatedAt),
+                singleFieldState("updatedAt", user.getUpdatedAt()));
     }
 
     @Transactional
@@ -157,6 +157,17 @@ public class UserService {
                 .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado após atualização"));
 
         webSocketService.notifyProfileImageUpdate(email, finalAvatarUrl);
+        if (!java.util.Objects.equals(summarizeAvatarValue(oldAvatarUrl), summarizeAvatarValue(updatedUser.getAvatarUrl()))) {
+            auditLogger.recordSemantic(
+                    "AVATAR_UPDATED",
+                    "USER",
+                    String.valueOf(updatedUser.getId()),
+                    updatedUser.getName(),
+                    com.servija.servija.model.AuditLog.Result.SUCCESS,
+                    java.util.Map.of("fieldsChanged", java.util.List.of("avatarUrl")),
+                    singleFieldState("avatarUrl", summarizeAvatarValue(oldAvatarUrl)),
+                    singleFieldState("avatarUrl", summarizeAvatarValue(updatedUser.getAvatarUrl())));
+        }
 
         return buildUserDto(updatedUser);
     }
@@ -326,6 +337,22 @@ public class UserService {
         state.put("name", user.getName());
         state.put("phone", user.getPhone());
         state.put("cpf", user.getCpf());
+        return state;
+    }
+
+    private String summarizeAvatarValue(String avatarUrl) {
+        if (avatarUrl == null || avatarUrl.isBlank()) {
+            return null;
+        }
+        if (avatarUrl.startsWith("data:image")) {
+            return "[INLINE_IMAGE]";
+        }
+        return avatarUrl.length() <= 120 ? avatarUrl : avatarUrl.substring(0, 117) + "...";
+    }
+
+    private Map<String, Object> singleFieldState(String fieldName, Object value) {
+        Map<String, Object> state = new LinkedHashMap<>();
+        state.put(fieldName, value);
         return state;
     }
 }

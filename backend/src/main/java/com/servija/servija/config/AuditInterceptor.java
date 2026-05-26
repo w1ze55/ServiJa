@@ -28,6 +28,7 @@ public class AuditInterceptor implements HandlerInterceptor {
     private static final List<String> SKIP_PATH_PREFIXES = List.of(
             "/api/admin/",
             "/api/auth/",
+            "/api/chat/",
             "/api/payments/webhook",
             "/api/webhooks/",
             "/swagger",
@@ -47,6 +48,11 @@ public class AuditInterceptor implements HandlerInterceptor {
             new Mapping("PUT",    "/api/users/me/avatar",                                  "AVATAR_UPDATED",             "USER"),
             new Mapping("PUT",    "/api/users/me",                                         "PROFILE_UPDATED",            "USER"),
             new Mapping("DELETE", "/api/users/me",                                         "ACCOUNT_DELETED",            "USER"),
+
+            new Mapping("POST",   "/api/addresses",                                        "ADDRESS_CREATED",            "ADDRESS"),
+            new Mapping("PUT",    "/api/addresses/{id}",                                   "ADDRESS_UPDATED",            "ADDRESS"),
+            new Mapping("DELETE", "/api/addresses/{id}",                                   "ADDRESS_DELETED",            "ADDRESS"),
+            new Mapping("PUT",    "/api/addresses/{id}/default",                           "ADDRESS_DEFAULT_SET",        "ADDRESS"),
 
             new Mapping("POST",   "/api/services",                                         "SERVICE_CREATED",            "SERVICE"),
             new Mapping("PUT",    "/api/services/{id}",                                    "SERVICE_UPDATED",            "SERVICE"),

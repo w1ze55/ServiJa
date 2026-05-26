@@ -346,30 +346,135 @@ const ACTION_META: Record<string, ActionMeta> = {
 };
 
 Object.assign(ACTION_META, {
+  ACCOUNT_DELETED: {
+    label: "Conta excluída",
+    cls: "bg-red-50 text-red-700",
+    icon: Trash2,
+  },
+  FREELANCER_LOCATION_UPDATED: {
+    label: "Localização atualizada",
+    cls: "bg-blue-50 text-blue-700",
+    icon: MapPin,
+  },
   ADMIN_USER_UPDATED: {
-    label: "Usuario editado por admin",
+    label: "Usuário editado por admin",
     cls: "bg-blue-50 text-blue-700",
     icon: UserCog,
   },
   USER_SUSPENDED: {
-    label: "Usuario suspenso",
+    label: "Usuário suspenso",
     cls: "bg-red-50 text-red-700",
     icon: ShieldAlert,
   },
   USER_REACTIVATED: {
-    label: "Usuario reativado",
+    label: "Usuário reativado",
     cls: "bg-emerald-50 text-emerald-700",
     icon: Check,
   },
+  SERVICE_CREATED: {
+    label: "Serviço criado",
+    cls: "bg-emerald-50 text-emerald-700",
+    icon: FilePlus,
+  },
+  SERVICE_UPDATED: {
+    label: "Serviço atualizado",
+    cls: "bg-blue-50 text-blue-700",
+    icon: FileEdit,
+  },
+  SERVICE_DELETED: {
+    label: "Serviço excluído",
+    cls: "bg-red-50 text-red-700",
+    icon: FileX2,
+  },
+  SERVICE_TOGGLED: {
+    label: "Serviço ativado/pausado",
+    cls: "bg-amber-50 text-amber-700",
+    icon: ToggleLeft,
+  },
   SERVICE_ACTIVATED: {
-    label: "Servico ativado",
+    label: "Serviço ativado",
     cls: "bg-emerald-50 text-emerald-700",
     icon: ToggleLeft,
   },
   SERVICE_DEACTIVATED: {
-    label: "Servico desativado",
+    label: "Serviço desativado",
     cls: "bg-amber-50 text-amber-700",
     icon: ToggleLeft,
+  },
+  SERVICE_REQUEST_CREATED: {
+    label: "Solicitação criada",
+    cls: "bg-emerald-50 text-emerald-700",
+    icon: ClipboardList,
+  },
+  SERVICE_REQUEST_COMPLETED: {
+    label: "Serviço concluído",
+    cls: "bg-emerald-50 text-emerald-700",
+    icon: ClipboardCheck,
+  },
+  SERVICE_REQUEST_DELETED: {
+    label: "Solicitação excluída",
+    cls: "bg-red-50 text-red-700",
+    icon: Trash2,
+  },
+  REVIEW_CREATED: {
+    label: "Avaliação criada",
+    cls: "bg-emerald-50 text-emerald-700",
+    icon: Star,
+  },
+  BANK_ACCOUNT_ADDED: {
+    label: "Conta bancária criada",
+    cls: "bg-emerald-50 text-emerald-700",
+    icon: Landmark,
+  },
+  BANK_ACCOUNT_DELETED: {
+    label: "Conta bancária excluída",
+    cls: "bg-red-50 text-red-700",
+    icon: Landmark,
+  },
+  BANK_ACCOUNT_DEFAULT: {
+    label: "Conta padrão definida",
+    cls: "bg-blue-50 text-blue-700",
+    icon: Landmark,
+  },
+  PORTFOLIO_DELETED: {
+    label: "Projeto excluído",
+    cls: "bg-red-50 text-red-700",
+    icon: FolderHeart,
+  },
+  ADJUSTMENT_DELETED: {
+    label: "Ajuste excluído",
+    cls: "bg-red-50 text-red-700",
+    icon: Trash2,
+  },
+  ADDRESS_CREATED: {
+    label: "Endereço criado",
+    cls: "bg-emerald-50 text-emerald-700",
+    icon: MapPin,
+  },
+  ADDRESS_UPDATED: {
+    label: "Endereço atualizado",
+    cls: "bg-blue-50 text-blue-700",
+    icon: MapPin,
+  },
+  ADDRESS_DELETED: {
+    label: "Endereço excluído",
+    cls: "bg-red-50 text-red-700",
+    icon: MapPin,
+  },
+  ADDRESS_DEFAULT_SET: {
+    label: "Endereço padrão definido",
+    cls: "bg-blue-50 text-blue-700",
+    icon: MapPin,
+  },
+  CATEGORY_UPDATED: {
+    label: "Categoria atualizada",
+    cls: "bg-blue-50 text-blue-700",
+    icon: Folder,
+  },
+  SUBCATEGORY_UPDATED: {
+    label: "Subcategoria atualizada",
+    cls: "bg-blue-50 text-blue-700",
+    icon: Folder,
   },
 });
 
@@ -392,6 +497,7 @@ const ENTITY_ICONS: Record<string, unknown> = {
   PAYMENT: CreditCard,
   WITHDRAWAL: Wallet,
   BANK_ACCOUNT: Landmark,
+  ADDRESS: MapPin,
   PORTFOLIO: FolderHeart,
   FAVORITE: Heart,
   SUPPORT_TICKET: Headset,
@@ -420,6 +526,17 @@ const ENTITY_LABEL: Record<string, string> = {
   SUBCATEGORY: "Subcategoria",
 };
 
+Object.assign(ENTITY_LABEL, {
+  USER: "Usuário",
+  SERVICE: "Serviço",
+  SERVICE_REQUEST: "Solicitação",
+  REVIEW: "Avaliação",
+  BANK_ACCOUNT: "Conta bancária",
+  PORTFOLIO: "Portfólio",
+  AUTH: "Autenticação",
+  ADDRESS: "Endereço",
+});
+
 // ---- actor type metadata ------------------------------------------------
 const ACTOR_TYPE_META: Record<ActorType, { label: string; cls: string }> = {
   CONTRACTOR: { label: "Contratante", cls: "bg-blue-50 text-blue-700" },
@@ -427,6 +544,10 @@ const ACTOR_TYPE_META: Record<ActorType, { label: string; cls: string }> = {
   ADMIN: { label: "Admin", cls: "bg-violet-50 text-violet-700" },
   GUEST: { label: "Anônimo", cls: "bg-slate-100 text-slate-700" },
 };
+
+Object.assign(ACTOR_TYPE_META, {
+  GUEST: { label: "Anônimo", cls: "bg-slate-100 text-slate-700" },
+});
 
 // ---- avatar colors -------------------------------------------------------
 const AVATAR_COLORS = [
@@ -558,6 +679,25 @@ const selectedSeverityLabel = computed(() =>
     : "Severidade: Todas",
 );
 
+const selectedActorTypeLabelUi = computed(() => {
+  switch (actorTypeFilter.value) {
+    case "CONTRACTOR":
+      return "Contratante";
+    case "FREELANCER":
+      return "Freelancer";
+    case "GUEST":
+      return "Anônimo";
+    default:
+      return "Tipo: Todos";
+  }
+});
+
+const selectedActionLabelUi = computed(() =>
+  actionFilter.value
+    ? (ACTION_META[actionFilter.value]?.label ?? actionFilter.value)
+    : "Todas as ações",
+);
+
 const handleActorTypeChange = (value: string) => {
   actorTypeFilter.value = value as ActorType | "";
   onFilterChange();
@@ -589,6 +729,12 @@ const handleTimeFilterChange = (value: string) => {
 };
 
 const selectedTimeFilterLabel = computed(
+  () =>
+    TIME_FILTER_OPTIONS.find((option) => option.value === timeFilter.value)
+      ?.label || "Últimos 30 dias",
+);
+
+const selectedTimeFilterLabelUi = computed(
   () =>
     TIME_FILTER_OPTIONS.find((option) => option.value === timeFilter.value)
       ?.label || "Últimos 30 dias",
@@ -826,7 +972,7 @@ onMounted(() => onFilterChange());
           >
             <SelectTrigger class="min-w-[180px]">
               <SelectValue
-                :label="selectedActorTypeLabel"
+                :label="selectedActorTypeLabelUi"
                 placeholder="Tipo: Todos"
               />
             </SelectTrigger>
@@ -886,7 +1032,7 @@ onMounted(() => onFilterChange());
           >
             <SelectTrigger class="min-w-[220px]">
               <SelectValue
-                :label="selectedActionLabel"
+                :label="selectedActionLabelUi"
                 placeholder="Todas as ações"
               />
             </SelectTrigger>
@@ -950,7 +1096,7 @@ onMounted(() => onFilterChange());
           >
             <SelectTrigger class="min-w-[220px]">
               <SelectValue
-                :label="selectedTimeFilterLabel"
+                :label="selectedTimeFilterLabelUi"
                 placeholder="Últimos 30 dias"
               />
             </SelectTrigger>

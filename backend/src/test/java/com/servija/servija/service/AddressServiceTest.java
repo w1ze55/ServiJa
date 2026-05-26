@@ -36,6 +36,9 @@ class AddressServiceTest {
     @Mock
     private GeocodingService geocodingService;
 
+    @Mock
+    private AuditLogger auditLogger;
+
     @InjectMocks
     private AddressService addressService;
 

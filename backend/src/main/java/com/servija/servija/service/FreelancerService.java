@@ -422,9 +422,27 @@ public class FreelancerService {
     @Transactional
     public void updateLocation(BigDecimal latitude, BigDecimal longitude) {
         Freelancer freelancer = getCurrentFreelancer();
+        Map<String, Object> beforeState = new LinkedHashMap<>();
+        beforeState.put("latitude", freelancer.getLatitude());
+        beforeState.put("longitude", freelancer.getLongitude());
         freelancer.setLatitude(latitude);
         freelancer.setLongitude(longitude);
-        freelancerRepository.save(freelancer);
+        freelancer = freelancerRepository.save(freelancer);
+        Map<String, Object> afterState = new LinkedHashMap<>();
+        afterState.put("latitude", freelancer.getLatitude());
+        afterState.put("longitude", freelancer.getLongitude());
+        List<String> changedFields = AuditStateDiffUtils.changedFields(beforeState, afterState);
+        if (!changedFields.isEmpty()) {
+            auditLogger.recordSemantic(
+                    "FREELANCER_LOCATION_UPDATED",
+                    "USER",
+                    String.valueOf(freelancer.getId()),
+                    freelancer.getName(),
+                    com.servija.servija.model.AuditLog.Result.SUCCESS,
+                    Map.of("fieldsChanged", changedFields),
+                    AuditStateDiffUtils.filterFields(beforeState, changedFields),
+                    AuditStateDiffUtils.filterFields(afterState, changedFields));
+        }
     }
 
     @Transactional(readOnly = true)

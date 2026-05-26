@@ -1,6 +1,8 @@
 package com.servija.servija.service;
 
+import java.math.BigDecimal;
 import java.util.Collection;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -22,7 +24,7 @@ public final class AuditStateDiffUtils {
         }
 
         return orderedKeys.stream()
-                .filter(key -> !Objects.equals(valueOf(before, key), valueOf(after, key)))
+                .filter(key -> !sameValue(valueOf(before, key), valueOf(after, key)))
                 .toList();
     }
 
@@ -41,5 +43,51 @@ public final class AuditStateDiffUtils {
 
     private static Object valueOf(Map<String, Object> state, String key) {
         return state == null ? null : state.get(key);
+    }
+
+    private static boolean sameValue(Object left, Object right) {
+        if (left == right) {
+            return true;
+        }
+        if (left == null || right == null) {
+            return false;
+        }
+        if (left instanceof BigDecimal leftDecimal && right instanceof BigDecimal rightDecimal) {
+            return leftDecimal.compareTo(rightDecimal) == 0;
+        }
+        if (left instanceof Map<?, ?> leftMap && right instanceof Map<?, ?> rightMap) {
+            return sameMap(leftMap, rightMap);
+        }
+        if (left instanceof Collection<?> leftCollection && right instanceof Collection<?> rightCollection) {
+            return sameCollection(leftCollection, rightCollection);
+        }
+        return Objects.equals(left, right);
+    }
+
+    private static boolean sameMap(Map<?, ?> left, Map<?, ?> right) {
+        if (left.size() != right.size()) {
+            return false;
+        }
+        for (Map.Entry<?, ?> entry : left.entrySet()) {
+            Object rightValue = right.get(entry.getKey());
+            if (!sameValue(entry.getValue(), rightValue)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean sameCollection(Collection<?> left, Collection<?> right) {
+        if (left.size() != right.size()) {
+            return false;
+        }
+        Iterator<?> leftIterator = left.iterator();
+        Iterator<?> rightIterator = right.iterator();
+        while (leftIterator.hasNext() && rightIterator.hasNext()) {
+            if (!sameValue(leftIterator.next(), rightIterator.next())) {
+                return false;
+            }
+        }
+        return true;
     }
 }

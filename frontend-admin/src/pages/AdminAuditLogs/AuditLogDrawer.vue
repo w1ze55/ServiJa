@@ -31,25 +31,28 @@ const emit = defineEmits<{
   close: [];
 }>();
 
+const EMPTY_VALUE = "Não informado";
+
 const ACTOR_TYPE_LABEL: Record<ActorType, string> = {
   CONTRACTOR: "Contratante",
   FREELANCER: "Freelancer",
   ADMIN: "Admin",
-  GUEST: "Anonimo",
+  GUEST: "Anônimo",
 };
 
 const ENTITY_LABEL: Record<string, string> = {
-  USER: "Usuario",
-  SERVICE: "Servico",
-  SERVICE_REQUEST: "Solicitacao",
-  REVIEW: "Avaliacao",
+  USER: "Usuário",
+  SERVICE: "Serviço",
+  SERVICE_REQUEST: "Solicitação",
+  REVIEW: "Avaliação",
   PAYMENT: "Pagamento",
   WITHDRAWAL: "Saque",
-  BANK_ACCOUNT: "Conta bancaria",
-  PORTFOLIO: "Portfolio",
+  BANK_ACCOUNT: "Conta bancária",
+  ADDRESS: "Endereço",
+  PORTFOLIO: "Portfólio",
   FAVORITE: "Favorito",
   SUPPORT_TICKET: "Suporte",
-  AUTH: "Autenticacao",
+  AUTH: "Autenticação",
   ADJUSTMENT: "Ajuste",
   SYSTEM: "Sistema",
   CATEGORY: "Categoria",
@@ -61,13 +64,13 @@ const formattedTimestamp = computed(() => {
   const date = new Date(props.log.timestamp);
   return (
     date.toLocaleDateString("pt-BR") +
-    " as " +
+    " às " +
     date.toLocaleTimeString("pt-BR")
   );
 });
 
 const entityLabel = computed(() => {
-  if (!props.log?.entityType) return "—";
+  if (!props.log?.entityType) return EMPTY_VALUE;
   return ENTITY_LABEL[props.log.entityType] ?? props.log.entityType;
 });
 
@@ -80,7 +83,6 @@ const showDiff = computed(
   () => !isEmptyJson(oldValue.value) || !isEmptyJson(newValue.value),
 );
 
-const payloadEntries = computed(() => toEntries(payloadValue.value));
 const beforeEntries = computed(() => toEntries(oldValue.value));
 const afterEntries = computed(() => toEntries(newValue.value));
 
@@ -159,13 +161,6 @@ function formatScalar(value: JsonPrimitive): string {
   return String(value);
 }
 
-function scalarClass(value: JsonPrimitive): string {
-  if (typeof value === "string") return "text-emerald-700";
-  if (typeof value === "number") return "text-amber-700";
-  if (typeof value === "boolean") return "text-violet-700";
-  return "text-slate-500";
-}
-
 function formatStructured(value: Exclude<JsonValue, JsonPrimitive>): string {
   return JSON.stringify(value, null, 2);
 }
@@ -240,7 +235,7 @@ function formatStructured(value: Exclude<JsonValue, JsonPrimitive>): string {
                 </span>
               </div>
               <h2 class="text-lg font-semibold text-slate-900">
-                {{ log.entityLabel ?? log.entityType ?? log.action }}
+                {{ log.entityLabel ?? entityLabel ?? log.action }}
               </h2>
               <p class="mt-1 text-sm text-slate-500">{{ formattedTimestamp }}</p>
             </div>
@@ -249,43 +244,45 @@ function formatStructured(value: Exclude<JsonValue, JsonPrimitive>): string {
               <dl class="grid grid-cols-2 gap-x-4 gap-y-3">
                 <div>
                   <dt class="text-xs font-medium uppercase tracking-wide text-slate-500">
-                    Usuario
+                    Usuário
                   </dt>
                   <dd class="mt-1 text-sm font-medium text-slate-900">
-                    {{ log.actorName ?? "—" }}
+                    {{ log.actorName ?? EMPTY_VALUE }}
                   </dd>
-                  <dd class="text-xs text-slate-500">{{ log.actorEmail ?? "—" }}</dd>
+                  <dd class="text-xs text-slate-500">
+                    {{ log.actorEmail ?? EMPTY_VALUE }}
+                  </dd>
                 </div>
                 <div>
                   <dt class="text-xs font-medium uppercase tracking-wide text-slate-500">
                     Tipo
                   </dt>
                   <dd class="mt-1 text-sm font-medium text-slate-900">
-                    {{ log.actorType ? ACTOR_TYPE_LABEL[log.actorType] : "—" }}
+                    {{ log.actorType ? ACTOR_TYPE_LABEL[log.actorType] : EMPTY_VALUE }}
                   </dd>
-                  <dd class="text-xs text-slate-500">ID: {{ log.actorId ?? "—" }}</dd>
+                  <dd class="text-xs text-slate-500">ID: {{ log.actorId ?? EMPTY_VALUE }}</dd>
                 </div>
                 <div>
                   <dt class="text-xs font-medium uppercase tracking-wide text-slate-500">
                     Entidade
                   </dt>
                   <dd class="mt-1 text-sm font-medium text-slate-900">{{ entityLabel }}</dd>
-                  <dd class="text-xs text-slate-500">{{ log.entityId ?? "—" }}</dd>
+                  <dd class="text-xs text-slate-500">{{ log.entityId ?? EMPTY_VALUE }}</dd>
                 </div>
                 <div>
                   <dt class="text-xs font-medium uppercase tracking-wide text-slate-500">
-                    Requisicao
+                    Requisição
                   </dt>
                   <dd class="mt-1 text-xs font-mono text-slate-900">
-                    {{ log.httpMethod ?? "—" }} {{ log.httpPath ?? "" }}
+                    {{ log.httpMethod ?? EMPTY_VALUE }} {{ log.httpPath ?? "" }}
                   </dd>
                 </div>
                 <div>
                   <dt class="text-xs font-medium uppercase tracking-wide text-slate-500">
-                    Endereco IP
+                    Endereço IP
                   </dt>
                   <dd class="mt-1 text-sm font-mono text-slate-900">
-                    {{ log.ipAddress ?? "—" }}
+                    {{ log.ipAddress ?? EMPTY_VALUE }}
                   </dd>
                 </div>
                 <div>
@@ -293,7 +290,7 @@ function formatStructured(value: Exclude<JsonValue, JsonPrimitive>): string {
                     User Agent
                   </dt>
                   <dd class="mt-1 break-words text-xs text-slate-700">
-                    {{ log.userAgent ?? "—" }}
+                    {{ log.userAgent ?? EMPTY_VALUE }}
                   </dd>
                 </div>
               </dl>
@@ -301,32 +298,25 @@ function formatStructured(value: Exclude<JsonValue, JsonPrimitive>): string {
 
             <div v-if="showDiff" class="space-y-3">
               <h3 class="text-sm font-semibold text-slate-900">Alterações</h3>
-              <div class="grid gap-4 md:grid-cols-2">
-                <section class="rounded-xl border border-red-100 bg-red-50/70 p-4">
-                  <p class="mb-3 text-xs font-semibold uppercase tracking-wide text-red-700">
+              <div class="space-y-4">
+                <section class="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <p class="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-600">
                     Antes
                   </p>
-                  <p v-if="!beforeEntries.length" class="text-sm text-red-700">
+                  <p v-if="!beforeEntries.length" class="text-sm text-slate-500">
                     Registro inexistente
                   </p>
-                  <div v-else class="space-y-1 font-mono text-xs">
+                  <div v-else class="space-y-1 overflow-x-auto font-mono text-xs text-slate-700">
                     <div class="text-slate-400">{</div>
                     <div
                       v-for="entry in beforeEntries"
                       :key="`before-${entry.key}`"
-                      class="pl-4"
-                      :class="
-                        changedKeys.has(entry.key)
-                          ? 'font-semibold underline decoration-red-300 underline-offset-2'
-                          : ''
-                      "
+                      class="break-words pl-4"
+                      :class="changedKeys.has(entry.key) ? 'font-semibold' : ''"
                     >
-                      <span class="text-sky-700">"{{ entry.key }}"</span>
+                      <span class="text-slate-700">"{{ entry.key }}"</span>
                       <span class="text-slate-400">: </span>
-                      <span
-                        v-if="isScalar(entry.value)"
-                        :class="scalarClass(entry.value)"
-                      >
+                      <span v-if="isScalar(entry.value)" class="text-slate-700">
                         {{ formatScalar(entry.value) }}
                       </span>
                       <pre
@@ -339,33 +329,24 @@ function formatStructured(value: Exclude<JsonValue, JsonPrimitive>): string {
                   </div>
                 </section>
 
-                <section class="rounded-xl border border-emerald-100 bg-emerald-50/70 p-4">
-                  <p
-                    class="mb-3 text-xs font-semibold uppercase tracking-wide text-emerald-700"
-                  >
+                <section class="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <p class="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-600">
                     Depois
                   </p>
-                  <p v-if="!afterEntries.length" class="text-sm text-emerald-700">
+                  <p v-if="!afterEntries.length" class="text-sm text-slate-500">
                     Registro removido
                   </p>
-                  <div v-else class="space-y-1 font-mono text-xs">
+                  <div v-else class="space-y-1 overflow-x-auto font-mono text-xs text-slate-700">
                     <div class="text-slate-400">{</div>
                     <div
                       v-for="entry in afterEntries"
                       :key="`after-${entry.key}`"
-                      class="pl-4"
-                      :class="
-                        changedKeys.has(entry.key)
-                          ? 'font-semibold underline decoration-emerald-300 underline-offset-2'
-                          : ''
-                      "
+                      class="break-words pl-4"
+                      :class="changedKeys.has(entry.key) ? 'font-semibold' : ''"
                     >
-                      <span class="text-sky-700">"{{ entry.key }}"</span>
+                      <span class="text-slate-700">"{{ entry.key }}"</span>
                       <span class="text-slate-400">: </span>
-                      <span
-                        v-if="isScalar(entry.value)"
-                        :class="scalarClass(entry.value)"
-                      >
+                      <span v-if="isScalar(entry.value)" class="text-slate-700">
                         {{ formatScalar(entry.value) }}
                       </span>
                       <pre

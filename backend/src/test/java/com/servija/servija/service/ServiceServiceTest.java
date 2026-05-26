@@ -216,7 +216,7 @@ class ServiceServiceTest {
                 .active(true)
                 .build();
 
-        Service service = buildService(30L, new BigDecimal("250.00"));
+        Service service = buildService(30L, new BigDecimal("1000"));
         service.setTitle("Nome antigo");
 
         com.servija.servija.dto.ServiceRequest request = com.servija.servija.dto.ServiceRequest.builder()
@@ -226,7 +226,10 @@ class ServiceServiceTest {
         when(userRepository.findByEmail("freela@servija.com")).thenReturn(Optional.of(freelancer));
         when(freelancerRepository.findById(3L)).thenReturn(Optional.of(freelancer));
         when(serviceRepository.findById(30L)).thenReturn(Optional.of(service));
-        when(serviceRepository.save(service)).thenReturn(service);
+        when(serviceRepository.save(service)).thenAnswer(invocation -> {
+            service.setPrice(new BigDecimal("1000.00"));
+            return service;
+        });
 
         ServiceResponse response = serviceService.updateService(30L, request);
 

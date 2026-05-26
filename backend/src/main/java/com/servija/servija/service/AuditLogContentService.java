@@ -97,7 +97,9 @@ public class AuditLogContentService {
                     "method", firstPresent(data, "method", "withdrawalMethod"));
             case "PROFILE_UPDATED", "FREELANCER_PROFILE_UPDATED", "ADMIN_USER_UPDATED", "SERVICE_UPDATED" -> mapOf(
                     "fieldsChanged", normalizeFieldsChanged(data.get("fieldsChanged")));
-            default -> null;
+            default -> data.containsKey("fieldsChanged")
+                    ? mapOf("fieldsChanged", normalizeFieldsChanged(data.get("fieldsChanged")))
+                    : null;
         };
     }
 

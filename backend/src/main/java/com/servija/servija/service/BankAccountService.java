@@ -152,9 +152,23 @@ public class BankAccountService {
             throw new IllegalStateException("Sem permissao");
         }
 
+        Map<String, Object> beforeState = Map.of("default", Boolean.TRUE.equals(account.getIsDefault()));
         bankAccountRepository.clearDefaultForUser(user.getId());
         account.setIsDefault(true);
         bankAccountRepository.save(account);
+        Map<String, Object> afterState = Map.of("default", Boolean.TRUE.equals(account.getIsDefault()));
+        List<String> changedFields = AuditStateDiffUtils.changedFields(beforeState, afterState);
+        if (!changedFields.isEmpty()) {
+            auditLogger.recordSemantic(
+                    "BANK_ACCOUNT_DEFAULT",
+                    "BANK_ACCOUNT",
+                    String.valueOf(account.getId()),
+                    buildAuditEntityLabel(account),
+                    com.servija.servija.model.AuditLog.Result.SUCCESS,
+                    Map.of("fieldsChanged", changedFields),
+                    AuditStateDiffUtils.filterFields(beforeState, changedFields),
+                    AuditStateDiffUtils.filterFields(afterState, changedFields));
+        }
 
         log.info("Conta {} definida como padrao para {}", accountId, email);
         return mapToResponse(account);

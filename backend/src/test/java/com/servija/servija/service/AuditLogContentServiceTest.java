@@ -96,6 +96,17 @@ class AuditLogContentServiceTest {
     }
 
     @Test
+    void serializesGenericUpdatePayloadWhenFieldsChangedIsPresent() throws Exception {
+        String payloadJson = auditLogContentService.serializePayload(
+                "ADDRESS_UPDATED",
+                Map.of("fieldsChanged", List.of("city")));
+
+        assertEquals(
+                Map.of("fieldsChanged", List.of("city")),
+                readMap(payloadJson));
+    }
+
+    @Test
     void sanitizesSensitiveDataFromStateSnapshots() throws Exception {
         String stateJson = auditLogContentService.serializeState(Map.of(
                 "cpf", "12345678901",
