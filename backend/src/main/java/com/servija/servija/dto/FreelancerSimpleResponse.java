@@ -15,4 +15,5 @@ public class FreelancerSimpleResponse {
     private String professionalTitle;
     private String category;
     private String avatarUrl;
+    private String location;
 }

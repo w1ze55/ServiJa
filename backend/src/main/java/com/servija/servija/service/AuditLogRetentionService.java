@@ -4,6 +4,7 @@ import com.servija.servija.dto.AuditSeverity;
 import com.servija.servija.repository.AuditLogRepository;
 import jakarta.transaction.Transactional;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -22,6 +23,7 @@ public class AuditLogRetentionService {
     private final Period criticalRetention;
     private final Clock clock;
 
+    @Autowired
     public AuditLogRetentionService(
             AuditLogRepository auditLogRepository,
             @Value("${audit.retention.info:P1M}") String infoRetention,

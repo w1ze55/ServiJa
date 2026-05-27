@@ -62,6 +62,7 @@
               avatar: fav.freelancer!.avatarUrl,
               category: fav.freelancer!.category,
               professionalTitle: fav.freelancer!.professionalTitle,
+              location: fav.freelancer!.location,
               rating: 5.0,
               reviewCount: 0,
               isAvailable: true
