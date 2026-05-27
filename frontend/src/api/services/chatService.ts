@@ -4,7 +4,11 @@ export interface ConversationDTO {
   id: string;
   serviceRequestId: number;
   contractorEmail: string;
+  contractorName: string | null;
+  contractorAvatarUrl: string | null;
   providerEmail: string;
+  providerName: string | null;
+  providerAvatarUrl: string | null;
   locked: boolean;
   lastMessage: { content: string; senderId: string; sentAt: string } | null;
   unreadCount: Record<string, number>;

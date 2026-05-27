@@ -159,13 +159,27 @@ public class ChatService {
     }
 
     private ConversationDTO toDTO(Conversation c) {
+        ServiceRequest serviceRequest = serviceRequestRepository.findById(c.getServiceRequestId()).orElse(null);
+        String contractorName = serviceRequest != null && serviceRequest.getContractor() != null
+                ? serviceRequest.getContractor().getName()
+                : null;
+        String contractorAvatarUrl = serviceRequest != null && serviceRequest.getContractor() != null
+                ? serviceRequest.getContractor().getAvatarUrl()
+                : null;
+        String providerName = serviceRequest != null && serviceRequest.getFreelancer() != null
+                ? serviceRequest.getFreelancer().getName()
+                : null;
+        String providerAvatarUrl = serviceRequest != null && serviceRequest.getFreelancer() != null
+                ? serviceRequest.getFreelancer().getAvatarUrl()
+                : null;
         ConversationDTO.LastMessageDTO lastMsg = c.getLastMessage() == null ? null :
                 new ConversationDTO.LastMessageDTO(
                         c.getLastMessage().getContent(),
                         c.getLastMessage().getSenderId(),
                         c.getLastMessage().getSentAt());
         return new ConversationDTO(c.getId(), c.getServiceRequestId(),
-                c.getContractorEmail(), c.getProviderEmail(), c.isLocked(),
+                c.getContractorEmail(), contractorName, contractorAvatarUrl,
+                c.getProviderEmail(), providerName, providerAvatarUrl, c.isLocked(),
                 lastMsg, c.getUnreadCount(), c.getCreatedAt(), c.getUpdatedAt());
     }
 
