@@ -11,5 +11,6 @@ public record MessageDTO(
     String content,
     String attachmentUrl,
     String status,
-    Instant sentAt
+    Instant sentAt,
+    Instant readAt
 ) {}

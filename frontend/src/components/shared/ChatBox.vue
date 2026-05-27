@@ -12,6 +12,8 @@ export interface ChatMessage {
   senderName: string;
   message: string;
   timestamp: string;
+  status?: string;
+  readAt?: string | null;
   attachments?: Array<{
     id: string;
     name: string;

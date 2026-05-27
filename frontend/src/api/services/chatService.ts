@@ -26,6 +26,15 @@ export interface MessageDTO {
   attachmentUrl: string | null;
   status: string;
   sentAt: string;
+  readAt: string | null;
+}
+
+export interface ReadReceiptDTO {
+  conversationId: string;
+  readerEmail: string;
+  readerRole: 'contractor' | 'provider';
+  messageIds: string[];
+  readAt: string;
 }
 
 export interface PageResponse<T> {
