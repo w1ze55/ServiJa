@@ -216,6 +216,7 @@ public class PortfolioService {
         List<String> imageUrls = project.getImages().stream()
                 .map(PortfolioImage::getImageUrl)
                 .collect(Collectors.toList());
+        PortfolioProjectResponse deletedProject = mapToResponse(project);
 
         projectRepository.delete(project);
 
@@ -229,6 +230,17 @@ public class PortfolioService {
                 }
             }
         }
+
+        auditLogger.recordSemantic(
+                "PORTFOLIO_DELETED",
+                "PORTFOLIO",
+                String.valueOf(projectId),
+                deletedProject.getTitle(),
+                com.servija.servija.model.AuditLog.Result.SUCCESS,
+                null,
+                deletedProject,
+                null,
+                null);
     }
 
     private boolean isS3Url(String url) {

@@ -28,6 +28,7 @@ public class FavoriteService {
     private final FreelancerRepository freelancerRepository;
     private final UserRepository userRepository;
     private final ServiceService serviceService;
+    private final AuditLogger auditLogger;
 
     @Transactional
     public FavoriteResponse addFavorite(Long userId, FavoriteRequest request) {
@@ -75,7 +76,19 @@ public class FavoriteService {
             throw new RuntimeException("You don't have permission to remove this favorite");
         }
 
+        FavoriteResponse deletedFavorite = mapToVisibleResponse(favorite).orElse(null);
         favoriteRepository.delete(favorite);
+
+        auditLogger.recordSemantic(
+                "FAVORITE_REMOVED",
+                "FAVORITE",
+                String.valueOf(favoriteId),
+                "Favorito " + favoriteId,
+                com.servija.servija.model.AuditLog.Result.SUCCESS,
+                null,
+                deletedFavorite,
+                null,
+                null);
     }
 
     public List<FavoriteResponse> getUserFavorites(Long userId) {

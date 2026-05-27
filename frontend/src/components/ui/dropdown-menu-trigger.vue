@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { inject, ref, onMounted, nextTick } from 'vue';
+import { inject, nextTick, onMounted, ref } from 'vue';
 
 interface Props {
   asChild?: boolean;
@@ -10,32 +10,37 @@ const props = defineProps<Props>();
 const dropdownMenu = inject<{ toggle: () => void; triggerRef?: { value: HTMLElement | null } }>('dropdownMenu');
 const triggerElementRef = ref<HTMLElement | null>(null);
 
+const syncTriggerRef = () => {
+  if (!triggerElementRef.value || !dropdownMenu?.triggerRef) return;
+
+  const actualTrigger =
+    (triggerElementRef.value.querySelector('button') as HTMLElement | null) ||
+    (triggerElementRef.value.firstElementChild as HTMLElement | null) ||
+    triggerElementRef.value;
+
+  dropdownMenu.triggerRef.value = actualTrigger;
+};
+
 const handleClick = () => {
+  syncTriggerRef();
   dropdownMenu?.toggle();
-  // Atualiza a referência do trigger após abrir
-  nextTick(() => {
-    if (triggerElementRef.value && dropdownMenu?.triggerRef) {
-      // Pega o primeiro elemento filho (o botão real) ou o próprio elemento
-      const actualTrigger = triggerElementRef.value.querySelector('button') || triggerElementRef.value.firstElementChild as HTMLElement || triggerElementRef.value;
-      dropdownMenu.triggerRef.value = actualTrigger;
-    }
-  });
+
+  // Mantem a referencia no botao real mesmo quando o slot re-renderiza.
+  nextTick(syncTriggerRef);
 };
 
 onMounted(() => {
-  nextTick(() => {
-    if (triggerElementRef.value && dropdownMenu?.triggerRef) {
-      // Pega o primeiro elemento filho (o botão real) ou o próprio elemento
-      const actualTrigger = triggerElementRef.value.querySelector('button') || triggerElementRef.value.firstElementChild as HTMLElement || triggerElementRef.value;
-      dropdownMenu.triggerRef.value = actualTrigger;
-    }
-  });
+  nextTick(syncTriggerRef);
 });
 </script>
 
 <template>
-  <div ref="triggerElementRef" @click="handleClick" v-bind="$attrs">
+  <div
+    ref="triggerElementRef"
+    :class="props.asChild ? 'inline-flex' : undefined"
+    @click.capture="handleClick"
+    v-bind="$attrs"
+  >
     <slot />
   </div>
 </template>
-

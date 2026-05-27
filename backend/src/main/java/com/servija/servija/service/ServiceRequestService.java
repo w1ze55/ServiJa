@@ -61,6 +61,7 @@ public class ServiceRequestService {
     private final FreelancerWalletService walletService;
     private final CategoryCatalogService categoryCatalogService;
     private final ChatService chatService;
+    private final AuditLogger auditLogger;
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private static final BigDecimal MIN_NEGOTIATED_AMOUNT = new BigDecimal("20.00");
@@ -751,6 +752,7 @@ public class ServiceRequestService {
                 .orElseThrow(() -> new RuntimeException("Service request not found"));
 
         String attachments = request.getAttachments();
+        ServiceRequestResponse deletedRequest = toResponse(request);
         serviceRequestRepository.delete(request);
 
         // Deletar anexos do S3 se existirem
@@ -777,6 +779,17 @@ public class ServiceRequestService {
                 }
             }
         }
+
+        auditLogger.recordSemantic(
+                "SERVICE_REQUEST_DELETED",
+                "SERVICE_REQUEST",
+                String.valueOf(id),
+                deletedRequest.getServiceName(),
+                com.servija.servija.model.AuditLog.Result.SUCCESS,
+                null,
+                deletedRequest,
+                null,
+                null);
     }
 
     @Transactional

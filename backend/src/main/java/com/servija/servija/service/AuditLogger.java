@@ -40,7 +40,18 @@ public class AuditLogger {
             String entityLabel,
             AuditLog.Result result,
             Object payload) {
-        persist(currentActor(), null, action, entityType, entityId, entityLabel, result, payload, null, null);
+        persist(currentActor(), null, action, entityType, entityId, entityLabel, result, payload, null, null, null);
+    }
+
+    public void record(
+            String action,
+            String entityType,
+            String entityId,
+            String entityLabel,
+            AuditLog.Result result,
+            Object payload,
+            Object response) {
+        persist(currentActor(), null, action, entityType, entityId, entityLabel, result, payload, response, null, null);
     }
 
     public void recordFor(
@@ -51,7 +62,19 @@ public class AuditLogger {
             String entityLabel,
             AuditLog.Result result,
             Object payload) {
-        persist(actor, null, action, entityType, entityId, entityLabel, result, payload, null, null);
+        persist(actor, null, action, entityType, entityId, entityLabel, result, payload, null, null, null);
+    }
+
+    public void recordFor(
+            User actor,
+            String action,
+            String entityType,
+            String entityId,
+            String entityLabel,
+            AuditLog.Result result,
+            Object payload,
+            Object response) {
+        persist(actor, null, action, entityType, entityId, entityLabel, result, payload, response, null, null);
     }
 
     public void recordGuest(
@@ -62,7 +85,7 @@ public class AuditLogger {
             String entityLabel,
             AuditLog.Result result,
             Object payload) {
-        persist(null, attemptedEmail, action, entityType, entityId, entityLabel, result, payload, null, null);
+        persist(null, attemptedEmail, action, entityType, entityId, entityLabel, result, payload, null, null, null);
     }
 
     public void recordSemantic(
@@ -74,7 +97,20 @@ public class AuditLogger {
             Object payload,
             Object oldValue,
             Object newValue) {
-        persist(currentActor(), null, action, entityType, entityId, entityLabel, result, payload, oldValue, newValue);
+        persist(currentActor(), null, action, entityType, entityId, entityLabel, result, payload, null, oldValue, newValue);
+    }
+
+    public void recordSemantic(
+            String action,
+            String entityType,
+            String entityId,
+            String entityLabel,
+            AuditLog.Result result,
+            Object payload,
+            Object response,
+            Object oldValue,
+            Object newValue) {
+        persist(currentActor(), null, action, entityType, entityId, entityLabel, result, payload, response, oldValue, newValue);
     }
 
     public void recordSemanticFor(
@@ -87,7 +123,21 @@ public class AuditLogger {
             Object payload,
             Object oldValue,
             Object newValue) {
-        persist(actor, null, action, entityType, entityId, entityLabel, result, payload, oldValue, newValue);
+        persist(actor, null, action, entityType, entityId, entityLabel, result, payload, null, oldValue, newValue);
+    }
+
+    public void recordSemanticFor(
+            User actor,
+            String action,
+            String entityType,
+            String entityId,
+            String entityLabel,
+            AuditLog.Result result,
+            Object payload,
+            Object response,
+            Object oldValue,
+            Object newValue) {
+        persist(actor, null, action, entityType, entityId, entityLabel, result, payload, response, oldValue, newValue);
     }
 
     public void recordSemanticGuest(
@@ -100,7 +150,7 @@ public class AuditLogger {
             Object payload,
             Object oldValue,
             Object newValue) {
-        persist(null, attemptedEmail, action, entityType, entityId, entityLabel, result, payload, oldValue, newValue);
+        persist(null, attemptedEmail, action, entityType, entityId, entityLabel, result, payload, null, oldValue, newValue);
     }
 
     public void recordRaw(AuditLog log) {
@@ -120,6 +170,7 @@ public class AuditLogger {
             String entityLabel,
             AuditLog.Result result,
             Object payload,
+            Object response,
             Object oldValue,
             Object newValue) {
         try {
@@ -129,6 +180,7 @@ public class AuditLogger {
             String httpMethod = request != null ? request.getMethod() : null;
             String httpPath = request != null ? truncate(request.getRequestURI(), 255) : null;
             String payloadJson = auditLogContentService.serializePayload(action, payload);
+            String responseJson = auditLogContentService.serializeResponse(response);
             String oldValueJson = auditLogContentService.serializeState(oldValue);
             String newValueJson = auditLogContentService.serializeState(newValue);
 
@@ -147,6 +199,7 @@ public class AuditLogger {
                     .ipAddress(truncate(ip, 64))
                     .userAgent(ua)
                     .payload(payloadJson)
+                    .response(responseJson)
                     .oldValue(oldValueJson)
                     .newValue(newValueJson)
                     .build();
@@ -199,13 +252,15 @@ public class AuditLogger {
     }
 
     public String serializePayload(Object payload) {
-        if (payload == null) return null;
-        if (payload instanceof String s) return s;
-        try {
-            return objectMapper.writeValueAsString(payload);
-        } catch (Exception e) {
-            return null;
-        }
+        return auditLogContentService.serializeState(payload);
+    }
+
+    public String serializePayload(String action, Object payload) {
+        return auditLogContentService.serializePayload(action, payload);
+    }
+
+    public String serializeResponse(Object response) {
+        return auditLogContentService.serializeResponse(response);
     }
 
     public void markCurrentRequestAsAudited() {

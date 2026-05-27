@@ -136,6 +136,7 @@ public class AddressService {
                 .orElseThrow(() -> new ResourceNotFoundException("Endereço não encontrado"));
 
         boolean wasDefault = address.getIsDefault();
+        AddressResponse deletedAddress = AddressResponse.fromEntity(address);
         addressRepository.delete(address);
 
         if (wasDefault) {
@@ -146,6 +147,17 @@ public class AddressService {
                 addressRepository.save(newDefault);
             }
         }
+
+        auditLogger.recordSemantic(
+                "ADDRESS_DELETED",
+                "ADDRESS",
+                String.valueOf(addressId),
+                address.getLabel(),
+                com.servija.servija.model.AuditLog.Result.SUCCESS,
+                null,
+                deletedAddress,
+                null,
+                null);
     }
 
     @Transactional

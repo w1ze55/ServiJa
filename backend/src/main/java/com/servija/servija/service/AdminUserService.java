@@ -108,7 +108,7 @@ public class AdminUserService {
                 String.valueOf(saved.getId()),
                 saved.getName(),
                 com.servija.servija.model.AuditLog.Result.SUCCESS,
-                null,
+                Map.of("fieldsChanged", List.of("status")),
                 Map.of("status", previousStatus),
                 Map.of("status", userStatus(saved.getActive())));
         return toSummaryDto(saved);
@@ -160,6 +160,9 @@ public class AdminUserService {
             throw new IllegalArgumentException("Não é possível excluir um administrador");
         }
 
+        Map<String, Object> deletedUser = buildAuditState(user);
+        String entityLabel = user.getName();
+
         if (hard) {
             userRepository.delete(user);
         } else {
@@ -167,6 +170,17 @@ public class AdminUserService {
             user.setDeletedAt(LocalDateTime.now());
             userRepository.save(user);
         }
+
+        auditLogger.recordSemantic(
+                "USER_DELETED",
+                "USER",
+                String.valueOf(id),
+                entityLabel,
+                com.servija.servija.model.AuditLog.Result.SUCCESS,
+                null,
+                deletedUser,
+                null,
+                null);
     }
 
     @Transactional

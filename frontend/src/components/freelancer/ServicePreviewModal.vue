@@ -347,7 +347,7 @@ const selectedImage = ref(0);
           <!-- Nota informativa -->
           <div class="mt-4 p-3 bg-blue-50 rounded-lg">
             <p class="text-sm text-[#435574] text-center">
-              💡 <strong>Modo de Visualização:</strong> Este é o preview de como os clientes verão seu serviço
+              <strong>Modo de Visualização:</strong> Este é o preview de como os clientes verão seu serviço
             </p>
           </div>
         </div>

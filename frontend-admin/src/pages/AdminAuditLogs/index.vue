@@ -130,17 +130,17 @@ const ACTION_META: Record<string, ActionMeta> = {
     icon: MapPin,
   },
   ADMIN_USER_UPDATED: {
-    label: "UsuÃ¡rio editado por admin",
+    label: "Usuário editado por admin",
     cls: "bg-blue-50 text-blue-700",
     icon: UserCog,
   },
   USER_SUSPENDED: {
-    label: "UsuÃ¡rio suspenso",
+    label: "Usuário suspenso",
     cls: "bg-red-50 text-red-700",
     icon: ShieldAlert,
   },
   USER_REACTIVATED: {
-    label: "UsuÃ¡rio reativado",
+    label: "Usuário reativado",
     cls: "bg-emerald-50 text-emerald-700",
     icon: Check,
   },
@@ -166,12 +166,12 @@ const ACTION_META: Record<string, ActionMeta> = {
     icon: ToggleLeft,
   },
   SERVICE_ACTIVATED: {
-    label: "ServiÃ§o ativado",
+    label: "Serviço ativado",
     cls: "bg-emerald-50 text-emerald-700",
     icon: ToggleLeft,
   },
   SERVICE_DEACTIVATED: {
-    label: "ServiÃ§o desativado",
+    label: "Serviço desativado",
     cls: "bg-amber-50 text-amber-700",
     icon: ToggleLeft,
   },
@@ -307,6 +307,11 @@ const ACTION_META: Record<string, ActionMeta> = {
     cls: "bg-amber-50 text-amber-700",
     icon: Headset,
   },
+  CATEGORY_CREATED: {
+    label: "Categoria criada",
+    cls: "bg-emerald-50 text-emerald-700",
+    icon: Folder,
+  },
   CATEGORY_ARCHIVED: {
     label: "Categoria arquivada",
     cls: "bg-amber-50 text-amber-700",
@@ -314,6 +319,11 @@ const ACTION_META: Record<string, ActionMeta> = {
   },
   CATEGORY_RESTORED: {
     label: "Categoria restaurada",
+    cls: "bg-emerald-50 text-emerald-700",
+    icon: Folder,
+  },
+  SUBCATEGORY_CREATED: {
+    label: "Subcategoria criada",
     cls: "bg-emerald-50 text-emerald-700",
     icon: Folder,
   },
@@ -470,6 +480,11 @@ Object.assign(ACTION_META, {
     label: "Categoria atualizada",
     cls: "bg-blue-50 text-blue-700",
     icon: Folder,
+  },
+  USER_DELETED: {
+    label: "Usuário excluído",
+    cls: "bg-red-50 text-red-700",
+    icon: Trash2,
   },
   SUBCATEGORY_UPDATED: {
     label: "Subcategoria atualizada",

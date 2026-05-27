@@ -80,6 +80,9 @@ public class AuditLog {
     @Column(columnDefinition = "TEXT")
     private String payload;
 
+    @Column(columnDefinition = "TEXT")
+    private String response;
+
     @Column(name = "old_value", columnDefinition = "TEXT")
     private String oldValue;
 

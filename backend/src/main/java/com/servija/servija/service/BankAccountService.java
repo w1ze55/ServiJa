@@ -86,11 +86,7 @@ public class BankAccountService {
         account = bankAccountRepository.save(account);
         log.info("Conta bancaria criada: {} para {}", account.getId(), email);
 
-        Map<String, Object> auditPayload = new LinkedHashMap<>();
-        auditPayload.put("accountType", account.getAccountType().name());
-        if (account.getPixKeyType() != null) {
-            auditPayload.put("pixKeyType", account.getPixKeyType());
-        }
+        BankAccountResponse response = mapToResponse(account);
 
         auditLogger.recordSemantic(
                 "BANK_ACCOUNT_ADDED",
@@ -98,11 +94,12 @@ public class BankAccountService {
                 String.valueOf(account.getId()),
                 buildAuditEntityLabel(account),
                 com.servija.servija.model.AuditLog.Result.SUCCESS,
-                auditPayload,
+                dto,
+                response,
                 null,
                 null);
 
-        return mapToResponse(account);
+        return response;
     }
 
     @Transactional
@@ -116,7 +113,7 @@ public class BankAccountService {
         }
 
         String entityLabel = buildAuditEntityLabel(account);
-        Map<String, Object> oldValue = buildAuditSnapshot(account);
+        Map<String, Object> deletedAccount = buildAuditSnapshot(account);
         bankAccountRepository.delete(account);
 
         if (Boolean.TRUE.equals(account.getIsDefault())) {
@@ -138,7 +135,8 @@ public class BankAccountService {
                 entityLabel,
                 com.servija.servija.model.AuditLog.Result.SUCCESS,
                 null,
-                oldValue,
+                deletedAccount,
+                null,
                 null);
     }
 
