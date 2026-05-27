@@ -62,6 +62,9 @@ class ServiceRequestServiceTest {
     @Mock
     private JdbcTemplate jdbcTemplate;
 
+    @Mock
+    private ChatService chatService;
+
     @InjectMocks
     private ServiceRequestService serviceRequestService;
 
