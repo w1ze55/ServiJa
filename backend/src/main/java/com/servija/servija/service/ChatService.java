@@ -119,6 +119,16 @@ public class ChatService {
         return dto;
     }
 
+    public void lockConversationByServiceRequest(Long serviceRequestId) {
+        conversationRepository.findByServiceRequestId(serviceRequestId).ifPresent(conv -> {
+            if (!conv.isLocked()) {
+                conv.setLocked(true);
+                conv.setUpdatedAt(Instant.now());
+                conversationRepository.save(conv);
+            }
+        });
+    }
+
     public void markAsRead(String conversationId, String userEmail) {
         Conversation conv = conversationRepository.findById(conversationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Conversa não encontrada"));
