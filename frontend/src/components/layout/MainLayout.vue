@@ -86,6 +86,7 @@ interface Props {
   onNavigate: (page: string) => void;
   onLogout: () => void;
   onSearch?: (query: string) => void;
+  fullBleed?: boolean;
 }
 
 const props = defineProps<Props>();
@@ -899,13 +900,13 @@ const handleNotificationStreamEvent = (event: Event) => {
 
     <!-- Main Content -->
     <div
-      :class="`transition-all duration-300 ${sidebarExpanded ? 'lg:ml-64' : 'lg:ml-20'}`"
+      :class="`transition-all duration-300 flex flex-col ${sidebarExpanded ? 'lg:ml-64' : 'lg:ml-20'} ${props.fullBleed ? 'h-screen' : ''}`"
     >
       <!-- Pending Review Banner -->
       <PendingReviewBanner />
 
       <!-- Page Content -->
-      <main class="p-6 pt-20 lg:pt-6">
+      <main :class="props.fullBleed ? 'flex-1 min-h-0 overflow-hidden' : 'p-6 pt-20 lg:pt-6'">
         <slot />
       </main>
     </div>

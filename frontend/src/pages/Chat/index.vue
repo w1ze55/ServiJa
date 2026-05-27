@@ -512,10 +512,11 @@ const handleSearch = (query: string) => router.push({ path: '/search', query: { 
     :on-navigate="handleNavigate"
     :on-logout="handleLogout"
     :on-search="handleSearch"
+    :full-bleed="true"
   >
-    <div class="w-full">
+    <div class="h-full w-full">
       <div
-        class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex h-[calc(100vh-160px)] min-h-[560px]"
+        class="bg-white overflow-hidden flex h-full"
       >
         <!-- ============ SIDEBAR (lista de conversas) ============ -->
         <aside
@@ -524,7 +525,7 @@ const handleSearch = (query: string) => router.push({ path: '/search', query: { 
             activeConversation && !showSidebarMobile ? 'hidden md:flex' : 'flex',
           ]"
         >
-          <div class="p-4 border-b border-gray-100">
+          <div class="p-4 pl-16 md:pl-4 border-b border-gray-100">
             <h1 class="text-lg font-semibold text-gray-900 mb-3">Mensagens</h1>
             <div class="relative">
               <Search class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -644,7 +645,7 @@ const handleSearch = (query: string) => router.push({ path: '/search', query: { 
           <template v-else-if="activeConversation">
             <!-- Header da conversa -->
             <header
-              class="flex items-center gap-3 px-4 py-3 bg-white border-b border-gray-200 flex-shrink-0"
+              class="flex items-center gap-3 px-4 pl-16 md:pl-4 py-3 bg-white border-b border-gray-200 flex-shrink-0"
             >
               <button
                 @click="showSidebarMobile = true"
