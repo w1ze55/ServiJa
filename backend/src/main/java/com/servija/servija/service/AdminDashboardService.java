@@ -261,7 +261,7 @@ public class AdminDashboardService {
                             ServiceRequestHistory.OperationType.SERVICE_COMPLETED.name(),
                             range.startDateTime(),
                             range.endExclusiveDateTime())) {
-                LocalDate bucketDate = LocalDate.parse(projection.getBucketDate());
+                LocalDate bucketDate = projection.getBucketDate();
                 totalsByBucket.put(bucketDate, defaultMoney(projection.getRevenue()));
             }
         } else {
