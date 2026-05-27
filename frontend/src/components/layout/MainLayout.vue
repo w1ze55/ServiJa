@@ -482,13 +482,13 @@ const handleNotificationStreamEvent = (event: Event) => {
         <!-- Location -->
         <div
           :class="`py-4 border-b border-white/10 transition-all duration-300 ${
-            sidebarExpanded ? 'px-4' : 'px-0'
+            sidebarExpanded ? 'px-4' : 'px-2'
           }`"
         >
           <button
             @click="openMap"
-            :class="`w-full flex items-center text-white/70 hover:text-white transition-colors ${
-              sidebarExpanded ? 'gap-2 text-left' : 'justify-center'
+            :class="`w-full flex items-center rounded-lg transition-all duration-200 text-white/70 hover:bg-white/10 hover:text-white ${
+              sidebarExpanded ? 'gap-3 px-4 py-3 text-left' : 'py-3 justify-center'
             }`"
             title="Ver mapa com profissionais próximos"
           >
