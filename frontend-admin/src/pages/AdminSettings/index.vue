@@ -47,7 +47,7 @@ function onDisabled() {
   <AdminLayout>
     <div class="mx-auto max-w-3xl space-y-6">
       <header>
-        <h1 class="text-2xl font-bold text-slate-900">Segurança</h1>
+        <h1 class="text-2xl font-semibold text-slate-900">Segurança</h1>
         <p class="text-sm text-slate-500">Gerencie como você acessa o painel administrativo.</p>
       </header>
 
