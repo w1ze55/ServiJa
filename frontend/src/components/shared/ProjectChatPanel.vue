@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import ChatBox from './ChatBox.vue';
 import type { ChatMessage } from './ChatBox.vue';
 import { chatService } from '@/api/services/chatService';
@@ -22,6 +22,11 @@ const isSending = ref(false);
 const loading = ref(true);
 const error = ref('');
 const userEmail = ref('');
+
+const TERMINAL_STATUSES = ['completed', 'rejected', 'archived', 'cancelled'];
+const isLocked = computed(
+  () => (conversation.value?.locked ?? false) || TERMINAL_STATUSES.includes(props.serviceStatus ?? '')
+);
 
 const { onMessage, connect, disconnect } = useChatWebSocket();
 
@@ -130,7 +135,7 @@ async function handleSend(messageText: string, attachments: File[]) {
       v-else
       :messages="messages"
       :current-user-role="currentUserRole"
-      :is-locked="conversation?.locked ?? false"
+      :is-locked="isLocked"
       :is-sending="isSending"
       :service-status="(serviceStatus as any)"
       @send-message="handleSend"
