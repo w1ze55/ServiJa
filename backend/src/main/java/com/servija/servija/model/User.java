@@ -106,6 +106,30 @@ public class User implements UserDetails {
     @Column
     private LocalDateTime deletedAt;
 
+    // ---- 2FA (TOTP) ----
+    @Column(name = "totp_secret_encrypted")
+    private byte[] totpSecretEncrypted;
+
+    @Column(name = "pending_totp_secret_encrypted")
+    private byte[] pendingTotpSecretEncrypted;
+
+    @Column(name = "pending_totp_created_at")
+    private LocalDateTime pendingTotpCreatedAt;
+
+    @Column(name = "totp_enabled", nullable = false)
+    @lombok.Builder.Default
+    private Boolean totpEnabled = false;
+
+    @Column(name = "totp_enabled_at")
+    private LocalDateTime totpEnabledAt;
+
+    @Column(name = "totp_failed_attempts", nullable = false)
+    @lombok.Builder.Default
+    private Integer totpFailedAttempts = 0;
+
+    @Column(name = "totp_locked_until")
+    private LocalDateTime totpLockedUntil;
+
     public enum UserType {
         CONTRACTOR,
         FREELANCER,

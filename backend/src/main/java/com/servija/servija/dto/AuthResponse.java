@@ -16,11 +16,14 @@ import java.time.LocalDateTime;
 public class AuthResponse {
 
     private String token;
-    
+
     @Builder.Default
     private String tokenType = "Bearer";
-    
+
     private UserDto user;
+
+    /** When true, the JWT in {@code token} is a short-lived challenge token; client must call /api/auth/2fa/verify. */
+    private Boolean requires2fa;
 
     @Data
     @Builder

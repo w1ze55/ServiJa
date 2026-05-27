@@ -11,6 +11,7 @@ import AuthCard from './AuthCard.vue'
 import EmailVerification from './EmailVerification.vue'
 import ForgotPassword from './ForgotPassword.vue'
 import ResetPassword from './ResetPassword.vue'
+import TwoFactorChallenge from './TwoFactorChallenge.vue'
 import type { PersonalData } from './SignupPersonalData.vue'
 import type { User } from '@/types'
 import api from '@/api/config/axios'
@@ -20,6 +21,7 @@ type AuthPage =
   | 'email-verification'
   | 'forgot-password'
   | 'reset-password'
+  | 'two-factor-challenge'
 
 interface AuthFlowProps {
   onLogin: (user: User) => void
@@ -46,45 +48,64 @@ import { useUserStore } from '@/stores/userStore'
 
 const userStore = useUserStore()
 
+// Challenge token vive só em memória — nunca em localStorage
+const pendingChallengeToken = ref<string | null>(null)
+
+function finalizeLogin(userData: any, fallbackEmail = '') {
+  if (userData.token) {
+    localStorage.setItem('token', userData.token)
+  }
+
+  const apiUserType = userData.user?.userType
+  const userType = apiUserType === 'ADMIN'
+    ? 'admin'
+    : apiUserType === 'FREELANCER'
+      ? 'provider'
+      : 'contractor'
+
+  const user: User = {
+    id: userData.user?.id?.toString() || '',
+    name: userData.user?.name || '',
+    email: userData.user?.email || fallbackEmail,
+    type: userType,
+    avatar: userData.user?.avatarUrl || undefined,
+  }
+
+  userStore.setUser(user)
+  props.onLogin(user)
+}
+
 async function handleLogin(email: string, password: string) {
   try {
     const response = await api.post('/auth/login', { email, password })
-    
+
     const userData = response.data
-    
-    // Salvar token no localStorage
-    if (userData.token) {
-      localStorage.setItem('token', userData.token)
-    }
-    
-    // Mapear tipo de usuário da API para o formato do frontend
-    const apiUserType = userData.user?.userType
-    const userType = apiUserType === 'ADMIN'
-      ? 'admin'
-      : apiUserType === 'FREELANCER'
-        ? 'provider'
-        : 'contractor'
-    
-    const user: User = {
-      id: userData.user?.id?.toString() || '',
-      name: userData.user?.name || '',
-      email: userData.user?.email || email,
-      type: userType,
-      avatar: userData.user?.avatarUrl || undefined,
+
+    if (userData.requires2fa && userData.token) {
+      pendingChallengeToken.value = userData.token
+      currentPage.value = 'two-factor-challenge'
+      return
     }
 
-    // Atualizar store global
-    userStore.setUser(user)
-
-    props.onLogin(user)
+    finalizeLogin(userData, email)
   } catch (error: any) {
-    const errorMessage = error.response?.data?.message || 
-                         error.response?.data?.error || 
+    const errorMessage = error.response?.data?.message ||
+                         error.response?.data?.error ||
                          'Email ou senha incorretos'
     if (loginErrorCallback) {
       loginErrorCallback(errorMessage)
     }
   }
+}
+
+function handleTwoFactorVerified(data: any) {
+  pendingChallengeToken.value = null
+  finalizeLogin(data)
+}
+
+function handleTwoFactorBack() {
+  pendingChallengeToken.value = null
+  currentPage.value = 'auth-card'
 }
 
 // Wrapper que permite passar callback de erro
@@ -154,6 +175,8 @@ const currentComponent = computed(() => {
       return ForgotPassword
     case 'reset-password':
       return ResetPassword
+    case 'two-factor-challenge':
+      return TwoFactorChallenge
     default:
       return AuthCard
   }
@@ -188,6 +211,13 @@ const currentProps = computed(() => {
         resetToken: props.resetToken,
         onSuccess: handleResetPasswordSuccess,
         onBack: handleResetPasswordBack,
+      }
+
+    case 'two-factor-challenge':
+      return {
+        challengeToken: pendingChallengeToken.value || '',
+        onVerified: handleTwoFactorVerified,
+        onBack: handleTwoFactorBack,
       }
 
     default:

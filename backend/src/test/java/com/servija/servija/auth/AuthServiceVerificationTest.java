@@ -238,6 +238,7 @@ class AuthServiceVerificationTest {
 
             assertThat(user.getVerificationCode()).isNotNull();
             assertThat(user.getVerificationCode()).hasSize(6);
+            assertThat(user.getVerificationCode()).isNotEqualTo(originalCode);
             assertThat(user.getVerificationAttempts()).isZero();
             assertThat(user.getVerificationLockUntil()).isNull();
             verify(emailService).sendVerificationEmail(eq("joao@email.com"), eq("João Silva"), anyString());

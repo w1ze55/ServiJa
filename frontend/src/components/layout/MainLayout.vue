@@ -13,11 +13,10 @@ import {
   User,
   LogOut,
   MessageSquare,
-  Bell,
   Briefcase,
+  History,
 
   Images,
-  DollarSign,
   Wallet,
 
   Package,
@@ -87,6 +86,7 @@ interface Props {
   onNavigate: (page: string) => void;
   onLogout: () => void;
   onSearch?: (query: string) => void;
+  fullBleed?: boolean;
 }
 
 const props = defineProps<Props>();
@@ -125,6 +125,49 @@ const sidebarOpen = ref(false);
 const sidebarPinned = ref(false);
 const sidebarExpanded = ref(false);
 const professionalDropdownOpen = ref(false);
+
+// Estado dos dropdowns do rodapé da sidebar
+const desktopNotificationsOpen = ref(false);
+const desktopUserMenuOpen = ref(false);
+const mobileNotificationsOpen = ref(false);
+const mobileUserMenuOpen = ref(false);
+
+// Timer para fechamento da sidebar ao sair com o mouse
+let sidebarCloseTimer: ReturnType<typeof setTimeout> | null = null;
+const SIDEBAR_CLOSE_DELAY = 150;
+
+const cancelSidebarClose = () => {
+  if (sidebarCloseTimer !== null) {
+    clearTimeout(sidebarCloseTimer);
+    sidebarCloseTimer = null;
+  }
+};
+
+const scheduleSidebarClose = () => {
+  cancelSidebarClose();
+  sidebarCloseTimer = setTimeout(() => {
+    if (!sidebarPinned.value) {
+      sidebarExpanded.value = false;
+    }
+    sidebarCloseTimer = null;
+  }, SIDEBAR_CLOSE_DELAY);
+};
+
+// Fecha dropdowns quando a sidebar desktop colapsa
+watch(sidebarExpanded, (expanded) => {
+  if (!expanded) {
+    desktopNotificationsOpen.value = false;
+    desktopUserMenuOpen.value = false;
+  }
+});
+
+// Fecha dropdowns quando a sidebar mobile fecha
+watch(sidebarOpen, (open) => {
+  if (!open) {
+    mobileNotificationsOpen.value = false;
+    mobileUserMenuOpen.value = false;
+  }
+});
 
 // Localização do usuário
 const userLocation = ref("Carregando...");
@@ -314,12 +357,13 @@ const toggleSidebarPin = () => {
 };
 
 const handleMouseEnter = () => {
+  cancelSidebarClose();
   sidebarExpanded.value = true;
 };
 
 const handleMouseLeave = () => {
   if (!sidebarPinned.value) {
-    sidebarExpanded.value = false;
+    scheduleSidebarClose();
   }
 };
 
@@ -538,6 +582,103 @@ const handleNotificationStreamEvent = (event: Event) => {
             </button>
           </template>
         </nav>
+
+        <!-- Footer: Notifications + User Menu (Desktop) -->
+        <div
+          :class="`border-t border-white/10 ${sidebarExpanded ? 'p-3' : 'py-3 px-2'}`"
+        >
+          <div
+            :class="sidebarExpanded ? 'flex items-center gap-2' : 'flex flex-col items-center gap-2'"
+          >
+            <NotificationsDropdown
+              v-model:open="desktopNotificationsOpen"
+              :user-type="currentUser.type === 'provider' ? 'provider' : 'contractor'"
+              @content-enter="cancelSidebarClose"
+              @content-leave="scheduleSidebarClose"
+            />
+
+            <DropdownMenu v-model:open="desktopUserMenuOpen">
+              <DropdownMenuTrigger
+                :class="sidebarExpanded ? 'flex-1 min-w-0' : ''"
+                @click="cancelSidebarClose"
+              >
+                <button
+                  :class="`
+                    flex items-center rounded-lg transition-colors hover:bg-white/10
+                    ${sidebarExpanded ? 'gap-2 px-2 py-2 w-full' : 'p-1'}
+                  `"
+                  :title="!sidebarExpanded ? currentUser.name : ''"
+                >
+                  <Avatar class="h-9 w-9 border-2 border-[#286AD8] flex-shrink-0">
+                    <AvatarImage
+                      :key="currentUser.avatar"
+                      :src="currentUser.avatar"
+                      :alt="currentUser.name"
+                    />
+                    <AvatarFallback class="bg-[#286AD8] text-white text-sm">
+                      {{ getInitials(currentUser.name) }}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div
+                    v-show="sidebarExpanded"
+                    class="flex-1 min-w-0 text-left"
+                  >
+                    <p class="text-sm font-medium text-white truncate">
+                      {{ currentUser.name }}
+                    </p>
+                    <p class="text-xs text-white/50 truncate">
+                      {{ currentUser.email }}
+                    </p>
+                  </div>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="end"
+                class="w-56 z-[70]"
+                @mouseenter="cancelSidebarClose"
+                @mouseleave="scheduleSidebarClose"
+              >
+                <DropdownMenuLabel>Minha Conta</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  @click="
+                    props.onNavigate(
+                      currentUser.type === 'contractor'
+                        ? 'profile'
+                        : 'freelancer-profile-settings',
+                    )
+                  "
+                >
+                  <User class="mr-2 h-4 w-4" />
+                  <span>Perfil</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  v-if="currentUser.type === 'contractor'"
+                  @click="props.onNavigate('favorites')"
+                >
+                  <Heart class="mr-2 h-4 w-4" />
+                  <span>Favoritos</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  v-if="currentUser.type === 'provider'"
+                  @click="props.onNavigate('freelancer-wallet')"
+                >
+                  <History class="mr-2 h-4 w-4" />
+                  <span>Histórico de Transações</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem @click="props.onNavigate('settings')">
+                  <Settings class="mr-2 h-4 w-4" />
+                  <span>Configurações</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem @click="props.onLogout">
+                  <LogOut class="mr-2 h-4 w-4" />
+                  <span>Sair</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
       </div>
     </aside>
 
@@ -656,52 +797,41 @@ const handleNotificationStreamEvent = (event: Event) => {
             </button>
           </template>
         </nav>
-      </div>
-    </aside>
 
-    <!-- Main Content -->
-    <div
-      :class="`transition-all duration-300 ${sidebarExpanded ? 'lg:ml-64' : 'lg:ml-20'}`"
-    >
-      <!-- Top Bar -->
-      <header class="bg-white border-b border-gray-200 sticky top-0 z-30">
-        <div class="px-4 py-4">
-          <div class="flex items-center justify-between gap-4">
-            <!-- Mobile Menu Button -->
-            <button
-              @click="sidebarOpen = true"
-              class="lg:hidden text-[#263238] hover:text-[#435574]"
-            >
-              <Menu class="h-6 w-6"/>
-            </button>
-
-            <!-- Spacer -->
-            <div class="flex-1"/>
-
-            <!-- Notifications Dropdown -->
+        <!-- Footer: Notifications + User Menu (Mobile) -->
+        <div class="border-t border-white/10 p-3">
+          <div class="flex items-center gap-2">
             <NotificationsDropdown
+              v-model:open="mobileNotificationsOpen"
               :user-type="currentUser.type === 'provider' ? 'provider' : 'contractor'"
             />
 
-            <!-- User Menu -->
-            <DropdownMenu>
-              <DropdownMenuTrigger>
+            <DropdownMenu v-model:open="mobileUserMenuOpen">
+              <DropdownMenuTrigger class="flex-1 min-w-0">
                 <button
-                  class="flex items-center gap-2 hover:opacity-80 transition-opacity"
+                  class="w-full flex items-center gap-2 px-2 py-2 rounded-lg transition-colors hover:bg-white/10"
                 >
-                  <Avatar class="h-10 w-10 border-2 border-[#286AD8]">
+                  <Avatar class="h-9 w-9 border-2 border-[#286AD8] flex-shrink-0">
                     <AvatarImage
                       :key="currentUser.avatar"
                       :src="currentUser.avatar"
                       :alt="currentUser.name"
                     />
-                    <AvatarFallback class="bg-[#286AD8] text-white">
+                    <AvatarFallback class="bg-[#286AD8] text-white text-sm">
                       {{ getInitials(currentUser.name) }}
                     </AvatarFallback>
                   </Avatar>
+                  <div class="flex-1 min-w-0 text-left">
+                    <p class="text-sm font-medium text-white truncate">
+                      {{ currentUser.name }}
+                    </p>
+                    <p class="text-xs text-white/50 truncate">
+                      {{ currentUser.email }}
+                    </p>
+                  </div>
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" class="w-56">
+              <DropdownMenuContent align="end" class="w-56 z-[70]">
                 <DropdownMenuLabel>Minha Conta</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
@@ -710,24 +840,39 @@ const handleNotificationStreamEvent = (event: Event) => {
                       currentUser.type === 'contractor'
                         ? 'profile'
                         : 'freelancer-profile-settings',
-                    )
+                    );
+                    sidebarOpen = false;
                   "
                 >
                   <User class="mr-2 h-4 w-4" />
                   <span>Perfil</span>
                 </DropdownMenuItem>
-                <DropdownMenuItem @click="props.onNavigate('notifications')">
-                  <Bell class="mr-2 h-4 w-4" />
-                  <span>Notificações</span>
+                <DropdownMenuItem
+                  v-if="currentUser.type === 'contractor'"
+                  @click="
+                    props.onNavigate('favorites');
+                    sidebarOpen = false;
+                  "
+                >
+                  <Heart class="mr-2 h-4 w-4" />
+                  <span>Favoritos</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   v-if="currentUser.type === 'provider'"
-                  @click="props.onNavigate('freelancer-dashboard')"
+                  @click="
+                    props.onNavigate('freelancer-wallet');
+                    sidebarOpen = false;
+                  "
                 >
-                  <DollarSign class="mr-2 h-4 w-4" />
-                  <span>Dashboard</span>
+                  <History class="mr-2 h-4 w-4" />
+                  <span>Histórico de Transações</span>
                 </DropdownMenuItem>
-                <DropdownMenuItem @click="props.onNavigate('settings')">
+                <DropdownMenuItem
+                  @click="
+                    props.onNavigate('settings');
+                    sidebarOpen = false;
+                  "
+                >
                   <Settings class="mr-2 h-4 w-4" />
                   <span>Configurações</span>
                 </DropdownMenuItem>
@@ -740,13 +885,28 @@ const handleNotificationStreamEvent = (event: Event) => {
             </DropdownMenu>
           </div>
         </div>
-      </header>
+      </div>
+    </aside>
 
+    <!-- Floating Mobile Menu Button -->
+    <button
+      v-if="!sidebarOpen"
+      @click="sidebarOpen = true"
+      class="lg:hidden fixed top-4 left-4 z-50 p-2 rounded-lg bg-white shadow-md border border-gray-200 text-[#263238] hover:bg-gray-50"
+      aria-label="Abrir menu"
+    >
+      <Menu class="h-6 w-6" />
+    </button>
+
+    <!-- Main Content -->
+    <div
+      :class="`transition-all duration-300 flex flex-col ${sidebarExpanded ? 'lg:ml-64' : 'lg:ml-20'} ${props.fullBleed ? 'h-screen' : ''}`"
+    >
       <!-- Pending Review Banner -->
       <PendingReviewBanner />
 
       <!-- Page Content -->
-      <main class="p-6">
+      <main :class="props.fullBleed ? 'flex-1 min-h-0 overflow-hidden' : 'p-6 pt-20 lg:pt-6'">
         <slot />
       </main>
     </div>

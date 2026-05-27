@@ -36,6 +36,8 @@ public class AuthService {
     private static final int VERIFICATION_CODE_EXPIRY_MINUTES = 10;
     private static final int RESET_PASSWORD_CODE_EXPIRY_MINUTES = 30;
 
+    private static final long TOTP_CHALLENGE_TTL_MS = 5 * 60 * 1000L;
+
     private final UserRepository userRepository;
     private final ContractorRepository contractorRepository;
     private final FreelancerRepository freelancerRepository;
@@ -48,6 +50,7 @@ public class AuthService {
     private final AddressService addressService;
     private final PasswordPolicyService passwordPolicyService;
     private final AdminResetPasswordLinkService adminResetPasswordLinkService;
+    private final TotpService totpService;
 
     @Transactional
     public AuthResponse register(RegisterRequest request) {
@@ -128,6 +131,10 @@ public class AuthService {
                 throw new InvalidCredentialsException("Conta suspensa");
             }
 
+            if (Boolean.TRUE.equals(user.getTotpEnabled())) {
+                return buildChallengeResponse(user);
+            }
+
             UserDetails userDetails = userDetailsService.loadUserByUsername(user.getEmail());
             String token = jwtService.generateToken(userDetails);
 
@@ -181,10 +188,117 @@ public class AuthService {
             throw new InvalidCredentialsException("Conta suspensa");
         }
 
+        if (Boolean.TRUE.equals(user.getTotpEnabled())) {
+            return buildChallengeResponse(user);
+        }
+
         UserDetails userDetails = userDetailsService.loadUserByUsername(user.getEmail());
         String token = jwtService.generateToken(userDetails);
 
         return buildAuthResponse(user, token);
+    }
+
+    /**
+     * Completes a 2FA login by verifying the TOTP/backup code presented with a valid challenge token.
+     */
+    @Transactional
+    public AuthResponse verifyTwoFactorChallenge(String challengeToken, String code) {
+        String email;
+        try {
+            email = jwtService.extractUsername(challengeToken);
+        } catch (Exception e) {
+            throw new InvalidCredentialsException("Token de desafio inválido ou expirado");
+        }
+
+        Boolean pending = safeBoolClaim(challengeToken, "totp_pending");
+        if (!Boolean.TRUE.equals(pending)) {
+            throw new InvalidCredentialsException("Token de desafio inválido");
+        }
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
+
+        if (!user.getActive() || !Boolean.TRUE.equals(user.getTotpEnabled())) {
+            throw new InvalidCredentialsException("Credenciais invalidas");
+        }
+
+        // Validate the challenge token itself against the user (signature + non-expired).
+        UserDetails userDetails = userDetailsService.loadUserByUsername(user.getEmail());
+        if (!jwtService.isTokenValid(challengeToken, userDetails)) {
+            throw new InvalidCredentialsException("Token de desafio inválido ou expirado");
+        }
+
+        TotpService.VerifyResult result = totpService.verifyChallenge(user, code);
+        if (result == TotpService.VerifyResult.LOCKED) {
+            auditLogger.recordFor(
+                    user,
+                    "2FA_FAILED",
+                    "AUTH",
+                    null,
+                    user.getEmail(),
+                    com.servija.servija.model.AuditLog.Result.FAILURE,
+                    Map.of("reason", "locked"));
+            throw new TooManyAttemptsException(
+                    "Muitas tentativas. Aguarde para tentar novamente.",
+                    0,
+                    user.getTotpLockedUntil());
+        }
+        if (result == TotpService.VerifyResult.INVALID) {
+            auditLogger.recordFor(
+                    user,
+                    "2FA_FAILED",
+                    "AUTH",
+                    null,
+                    user.getEmail(),
+                    com.servija.servija.model.AuditLog.Result.FAILURE,
+                    Map.of("reason", "invalid_code"));
+            throw new InvalidCredentialsException("Código inválido");
+        }
+
+        String token = jwtService.generateToken(userDetails);
+
+        String method = result == TotpService.VerifyResult.OK_BACKUP ? "password+backup" : "password+totp";
+        auditLogger.recordFor(
+                user,
+                "LOGIN",
+                "AUTH",
+                null,
+                user.getEmail(),
+                com.servija.servija.model.AuditLog.Result.SUCCESS,
+                Map.of("method", method));
+
+        if (result == TotpService.VerifyResult.OK_BACKUP) {
+            auditLogger.recordFor(
+                    user,
+                    "2FA_BACKUP_USED",
+                    "AUTH",
+                    null,
+                    user.getEmail(),
+                    com.servija.servija.model.AuditLog.Result.SUCCESS,
+                    Map.of());
+        }
+
+        return buildAuthResponse(user, token);
+    }
+
+    private Boolean safeBoolClaim(String token, String name) {
+        try {
+            return jwtService.extractClaim(token, c -> c.get(name, Boolean.class));
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private AuthResponse buildChallengeResponse(User user) {
+        UserDetails userDetails = userDetailsService.loadUserByUsername(user.getEmail());
+        Map<String, Object> claims = new java.util.HashMap<>();
+        claims.put("totp_pending", true);
+        String challenge = jwtService.generateToken(userDetails, claims, TOTP_CHALLENGE_TTL_MS);
+        return AuthResponse.builder()
+                .token(challenge)
+                .tokenType("Bearer")
+                .requires2fa(true)
+                .build();
     }
 
     @Transactional(noRollbackFor = { IllegalArgumentException.class, TooManyAttemptsException.class })
@@ -315,7 +429,23 @@ public class AuthService {
         user.setPassword(passwordEncoder.encode(newPassword));
         adminResetPasswordLinkService.clearAdminResetLink(user);
         clearResetPasswordChallenge(user);
+
+        boolean had2fa = Boolean.TRUE.equals(user.getTotpEnabled());
+        if (had2fa) {
+            totpService.disable(user);
+        }
         saveUser(user);
+
+        if (had2fa) {
+            auditLogger.recordFor(
+                    user,
+                    "2FA_DISABLED",
+                    "AUTH",
+                    null,
+                    user.getEmail(),
+                    com.servija.servija.model.AuditLog.Result.SUCCESS,
+                    Map.of("reason", "password_reset"));
+        }
     }
 
     private void validateResetPasswordCode(User user, String code, boolean consumeAttemptsOnFailure) {

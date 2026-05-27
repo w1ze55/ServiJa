@@ -47,7 +47,6 @@ public class PaymentService {
     private static final BigDecimal ASAAS_CREDIT_CARD_FIXED_FEE = new BigDecimal("0.49"); // Taxa fixa cartão
     private static final BigDecimal ASAAS_CREDIT_CARD_PERCENTAGE = new BigDecimal("0.0199"); // 1,99% cartão
     private static final BigDecimal MIN_NEGOTIATED_AMOUNT = new BigDecimal("20.00"); // Valor mínimo para pagamento
-    private static final int RELEASE_DAYS = 7; // Dias para liberar saldo ao freelancer
 
     @Transactional
     public PaymentResponse createPayment(String email, PaymentRequest request) {

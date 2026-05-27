@@ -9,6 +9,7 @@ import Button from '@/components/ui/button.vue';
 import { chatService } from '@/api/services/chatService';
 import type { ConversationDTO, MessageDTO } from '@/api/services/chatService';
 import { useChatWebSocket } from '@/composables/useChatWebSocket';
+import { useServiceRequestWebSocket, type ServiceRequestNotification } from '@/composables/useServiceRequestWebSocket';
 import { uploadFiles } from '@/api/uploadService';
 import { useNavigation } from '@/utils/navigation';
 import { toast } from '@/utils/toast';
@@ -25,6 +26,8 @@ import {
   ExternalLink,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
+  CheckCircle2,
 } from 'lucide-vue-next';
 
 const IMAGE_EXT_RE = /\.(jpg|jpeg|png|gif|webp|bmp|svg)(\?.*)?$/i;
@@ -150,6 +153,31 @@ const messagesContainer = ref<HTMLElement | null>(null);
 
 const { onMessage, connect, disconnect } = useChatWebSocket();
 
+const cachedUser = (() => {
+  try {
+    const raw = localStorage.getItem('user');
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+})();
+const srWs = useServiceRequestWebSocket(cachedUser?.email ?? '');
+function handleServiceRequestNotification(event: Event) {
+  const detail = (event as CustomEvent<ServiceRequestNotification>).detail;
+  if (!detail) return;
+  if (detail.type !== 'SERVICE_REQUEST_STATUS_CHANGED') return;
+  if (detail.status !== 'COMPLETED') return;
+  const idx = conversations.value.findIndex(
+    (c) => c.serviceRequestId === detail.serviceRequestId
+  );
+  if (idx >= 0 && !conversations.value[idx].locked) {
+    conversations.value.splice(idx, 1, { ...conversations.value[idx], locked: true });
+  }
+  if (activeConversation.value?.serviceRequestId === detail.serviceRequestId) {
+    activeConversation.value = { ...activeConversation.value, locked: true };
+  }
+}
+
 const currentUserRole = computed<'client' | 'freelancer'>(() =>
   user.value?.type === 'provider' ? 'freelancer' : 'client'
 );
@@ -239,6 +267,8 @@ function toDisplay(msg: MessageDTO): ChatMessage {
   };
 }
 
+const showResolved = ref(false);
+
 const filteredConversations = computed(() => {
   const q = searchQuery.value.toLowerCase().trim();
   const base = [...conversations.value].sort((a, b) => {
@@ -249,6 +279,13 @@ const filteredConversations = computed(() => {
   if (!q) return base;
   return base.filter((c) => otherParty(c).toLowerCase().includes(q));
 });
+
+const activeConversations = computed(() =>
+  filteredConversations.value.filter((c) => !c.locked)
+);
+const resolvedConversations = computed(() =>
+  filteredConversations.value.filter((c) => c.locked)
+);
 
 // Agrupa mensagens por dia para renderizar divisores
 const groupedMessages = computed(() => {
@@ -382,6 +419,7 @@ function onKeydown(e: KeyboardEvent) {
 onBeforeUnmount(() => {
   for (const url of Object.values(attachmentPreviews.value)) URL.revokeObjectURL(url);
   window.removeEventListener('keydown', onKeydown);
+  window.removeEventListener('service-request-notification', handleServiceRequestNotification);
 });
 
 onMounted(async () => {
@@ -392,6 +430,11 @@ onMounted(async () => {
     return;
   }
   user.value = JSON.parse(userData);
+
+  window.addEventListener('service-request-notification', handleServiceRequestNotification);
+  if (user.value?.email) {
+    srWs.connect().catch(() => {});
+  }
 
   await loadConversations();
 
@@ -512,10 +555,11 @@ const handleSearch = (query: string) => router.push({ path: '/search', query: { 
     :on-navigate="handleNavigate"
     :on-logout="handleLogout"
     :on-search="handleSearch"
+    :full-bleed="true"
   >
-    <div class="w-full">
+    <div class="h-full w-full">
       <div
-        class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex h-[calc(100vh-160px)] min-h-[560px]"
+        class="bg-white overflow-hidden flex h-full"
       >
         <!-- ============ SIDEBAR (lista de conversas) ============ -->
         <aside
@@ -524,7 +568,7 @@ const handleSearch = (query: string) => router.push({ path: '/search', query: { 
             activeConversation && !showSidebarMobile ? 'hidden md:flex' : 'flex',
           ]"
         >
-          <div class="p-4 border-b border-gray-100">
+          <div class="p-4 pl-16 md:pl-4 border-b border-gray-100">
             <h1 class="text-lg font-semibold text-gray-900 mb-3">Mensagens</h1>
             <div class="relative">
               <Search class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -555,49 +599,109 @@ const handleSearch = (query: string) => router.push({ path: '/search', query: { 
             </div>
 
             <!-- Lista -->
-            <ul v-else class="py-1">
-              <li v-for="conv in filteredConversations" :key="conv.id">
-                <button
-                  @click="openConversation(conv.serviceRequestId)"
-                  :class="[
-                    'w-full flex items-center gap-3 px-3 py-3 hover:bg-gray-50 transition-colors text-left border-l-2',
-                    activeConversation?.id === conv.id
-                      ? 'bg-blue-50/60 border-blue-600'
-                      : 'border-transparent',
-                  ]"
-                >
-                  <div
-                    class="flex-shrink-0 h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-semibold text-sm"
+            <template v-else>
+              <ul class="py-1">
+                <li v-for="conv in activeConversations" :key="conv.id">
+                  <button
+                    @click="openConversation(conv.serviceRequestId)"
+                    :class="[
+                      'w-full flex items-center gap-3 px-3 py-3 hover:bg-gray-50 transition-colors text-left border-l-2',
+                      activeConversation?.id === conv.id
+                        ? 'bg-blue-50/60 border-blue-600'
+                        : 'border-transparent',
+                    ]"
                   >
-                    {{ initials(otherParty(conv)) }}
-                  </div>
-                  <div class="flex-1 min-w-0">
-                    <div class="flex items-center justify-between gap-2">
-                      <span class="font-medium text-sm text-gray-900 truncate capitalize">
-                        {{ displayName(otherParty(conv)) || otherParty(conv) }}
-                      </span>
-                      <span class="text-[10px] text-gray-400 flex-shrink-0">
-                        {{ formatTime(conv.lastMessage?.sentAt) }}
-                      </span>
+                    <div
+                      class="flex-shrink-0 h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-semibold text-sm"
+                    >
+                      {{ initials(otherParty(conv)) }}
                     </div>
-                    <div class="flex items-center justify-between gap-2 mt-0.5">
-                      <p class="text-xs text-gray-500 truncate">
-                        {{ conv.lastMessage?.content || 'Conversa iniciada' }}
+                    <div class="flex-1 min-w-0">
+                      <div class="flex items-center justify-between gap-2">
+                        <span class="font-medium text-sm text-gray-900 truncate capitalize">
+                          {{ displayName(otherParty(conv)) || otherParty(conv) }}
+                        </span>
+                        <span class="text-[10px] text-gray-400 flex-shrink-0">
+                          {{ formatTime(conv.lastMessage?.sentAt) }}
+                        </span>
+                      </div>
+                      <div class="flex items-center justify-between gap-2 mt-0.5">
+                        <p class="text-xs text-gray-500 truncate">
+                          {{ conv.lastMessage?.content || 'Conversa iniciada' }}
+                        </p>
+                        <span
+                          v-if="unreadForMe(conv) > 0"
+                          class="flex-shrink-0 h-5 min-w-5 px-1.5 rounded-full bg-blue-600 text-white text-[10px] font-semibold flex items-center justify-center"
+                        >
+                          {{ unreadForMe(conv) > 9 ? '9+' : unreadForMe(conv) }}
+                        </span>
+                      </div>
+                      <p class="text-[10px] text-gray-400 mt-0.5">
+                        Solicitação #{{ conv.serviceRequestId }}
                       </p>
-                      <span
-                        v-if="unreadForMe(conv) > 0"
-                        class="flex-shrink-0 h-5 min-w-5 px-1.5 rounded-full bg-blue-600 text-white text-[10px] font-semibold flex items-center justify-center"
-                      >
-                        {{ unreadForMe(conv) > 9 ? '9+' : unreadForMe(conv) }}
-                      </span>
                     </div>
-                    <p class="text-[10px] text-gray-400 mt-0.5">
-                      Solicitação #{{ conv.serviceRequestId }}
-                    </p>
-                  </div>
+                  </button>
+                </li>
+              </ul>
+
+              <div v-if="resolvedConversations.length > 0" class="mt-1 border-t border-gray-100">
+                <button
+                  @click="showResolved = !showResolved"
+                  class="w-full flex items-center gap-2 px-3 py-2.5 text-left hover:bg-gray-50 transition-colors"
+                >
+                  <ChevronDown
+                    :class="[
+                      'h-4 w-4 text-gray-400 transition-transform',
+                      showResolved ? '' : '-rotate-90',
+                    ]"
+                  />
+                  <CheckCircle2 class="h-3.5 w-3.5 text-emerald-500" />
+                  <span class="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                    Atendimentos resolvidos
+                  </span>
+                  <span class="ml-auto text-[10px] text-gray-400">
+                    {{ resolvedConversations.length }}
+                  </span>
                 </button>
-              </li>
-            </ul>
+                <ul v-if="showResolved" class="pb-1">
+                  <li v-for="conv in resolvedConversations" :key="conv.id">
+                    <button
+                      @click="openConversation(conv.serviceRequestId)"
+                      :class="[
+                        'w-full flex items-center gap-3 px-3 py-3 hover:bg-gray-50 transition-colors text-left border-l-2 opacity-75',
+                        activeConversation?.id === conv.id
+                          ? 'bg-blue-50/60 border-blue-600'
+                          : 'border-transparent',
+                      ]"
+                    >
+                      <div
+                        class="flex-shrink-0 h-10 w-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 font-semibold text-sm"
+                      >
+                        {{ initials(otherParty(conv)) }}
+                      </div>
+                      <div class="flex-1 min-w-0">
+                        <div class="flex items-center justify-between gap-2">
+                          <span class="font-medium text-sm text-gray-700 truncate capitalize">
+                            {{ displayName(otherParty(conv)) || otherParty(conv) }}
+                          </span>
+                          <span class="text-[10px] text-gray-400 flex-shrink-0">
+                            {{ formatTime(conv.lastMessage?.sentAt) }}
+                          </span>
+                        </div>
+                        <div class="flex items-center justify-between gap-2 mt-0.5">
+                          <p class="text-xs text-gray-500 truncate">
+                            {{ conv.lastMessage?.content || 'Conversa iniciada' }}
+                          </p>
+                        </div>
+                        <p class="text-[10px] text-gray-400 mt-0.5">
+                          Solicitação #{{ conv.serviceRequestId }} · Encerrada
+                        </p>
+                      </div>
+                    </button>
+                  </li>
+                </ul>
+              </div>
+            </template>
           </div>
         </aside>
 
@@ -644,7 +748,7 @@ const handleSearch = (query: string) => router.push({ path: '/search', query: { 
           <template v-else-if="activeConversation">
             <!-- Header da conversa -->
             <header
-              class="flex items-center gap-3 px-4 py-3 bg-white border-b border-gray-200 flex-shrink-0"
+              class="flex items-center gap-3 px-4 pl-16 md:pl-4 py-3 bg-white border-b border-gray-200 flex-shrink-0"
             >
               <button
                 @click="showSidebarMobile = true"
@@ -772,9 +876,9 @@ const handleSearch = (query: string) => router.push({ path: '/search', query: { 
                 v-if="activeConversation.locked"
                 class="flex items-center justify-center gap-2 py-3 px-4 bg-gray-50 rounded-lg border border-dashed border-gray-200"
               >
-                <Lock class="h-4 w-4 text-[#286AD8]" />
+                <CheckCircle2 class="h-4 w-4 text-emerald-500" />
                 <p class="text-sm text-[#435574]">
-                  O chat será liberado após a confirmação do pagamento.
+                  Serviço concluído. O chat foi encerrado.
                 </p>
               </div>
 

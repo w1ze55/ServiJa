@@ -15,6 +15,7 @@ import ClienteProfileSettings from "@/pages/ClienteProfileSettings/index.vue";
 import ClienteRequestDetailPage from "@/pages/ClienteRequestDetail/index.vue";
 import MapPage from "@/pages/Map/map.vue";
 import SettingsPage from "@/pages/Settings/index.vue";
+import SecuritySettingsPage from "@/pages/SecuritySettings/index.vue";
 import FreelancerServicesPage from "@/pages/FreelancerServices/index.vue";
 import FreelancerProposalsPage from "@/pages/FreelancerProposals/index.vue";
 import FreelancerRequestDetailPage from "@/pages/FreelancerRequestDetail/index.vue";
@@ -227,6 +228,12 @@ const routes: RouteRecordRaw[] = [
     path: "/settings",
     name: "settings",
     component: SettingsPage,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: "/settings/security",
+    name: "settings-security",
+    component: SecuritySettingsPage,
     meta: { requiresAuth: true },
   },
 

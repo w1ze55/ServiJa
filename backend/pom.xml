@@ -149,6 +149,13 @@
 			<version>1.46.0</version>
 		</dependency>
 
+		<!-- TOTP (Google Authenticator) -->
+		<dependency>
+			<groupId>dev.samstevens.totp</groupId>
+			<artifactId>totp</artifactId>
+			<version>1.7.1</version>
+		</dependency>
+
 		<!-- Reports -->
 		<dependency>
 			<groupId>org.apache.poi</groupId>

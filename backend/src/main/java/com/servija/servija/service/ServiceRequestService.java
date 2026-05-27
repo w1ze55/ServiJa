@@ -60,6 +60,7 @@ public class ServiceRequestService {
     private final NotificationService notificationService;
     private final FreelancerWalletService walletService;
     private final CategoryCatalogService categoryCatalogService;
+    private final ChatService chatService;
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private static final BigDecimal MIN_NEGOTIATED_AMOUNT = new BigDecimal("20.00");
@@ -697,6 +698,8 @@ public class ServiceRequestService {
             releaseFreelancerBalanceIfNeeded(request);
             request.setStatus(Status.COMPLETED);
             ServiceRequest saved = serviceRequestRepository.save(request);
+
+            chatService.lockConversationByServiceRequest(saved.getId());
 
             historyService.record(saved, user, OperationType.SERVICE_COMPLETED,
                     "Serviço marcado como concluído pelo cliente");

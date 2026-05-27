@@ -641,20 +641,6 @@ public class FreelancerService {
 
     private NearbyFreelancerResponse mapToNearbyResponse(
             Freelancer freelancer,
-            BigDecimal latitude,
-            BigDecimal longitude,
-            Double distance) {
-        return mapToNearbyResponse(
-                freelancer,
-                null,
-                latitude,
-                longitude,
-                distance,
-                freelancer.getCompletedJobs() != null ? freelancer.getCompletedJobs() : 0);
-    }
-
-    private NearbyFreelancerResponse mapToNearbyResponse(
-            Freelancer freelancer,
             Address address,
             BigDecimal latitude,
             BigDecimal longitude,
@@ -926,26 +912,6 @@ public class FreelancerService {
                 || (request.getSubcategoryIds() != null && !request.getSubcategoryIds().isEmpty())
                 || StringUtils.hasText(request.getCategory())
                 || StringUtils.hasText(request.getSubcategory());
-    }
-
-    private boolean matchesCategoryFilter(Freelancer freelancer, String filter) {
-        if (!StringUtils.hasText(filter)) {
-            return true;
-        }
-
-        String normalizedFilter = filter.trim().toLowerCase();
-        return (freelancer.getServiceCategory() != null
-                && (freelancer.getServiceCategory().getSlug().equalsIgnoreCase(filter)
-                        || freelancer.getServiceCategory().getName().equalsIgnoreCase(filter)))
-                || (freelancer.getServiceSubcategory() != null
-                        && (freelancer.getServiceSubcategory().getSlug().equalsIgnoreCase(filter)
-                                || freelancer.getServiceSubcategory().getName().equalsIgnoreCase(filter)))
-                || getResolvedFreelancerSubcategories(freelancer).stream()
-                        .anyMatch(subcategory -> subcategory.getSlug().equalsIgnoreCase(filter)
-                                || subcategory.getName().equalsIgnoreCase(filter))
-                || (freelancer.getCategory() != null && freelancer.getCategory().toLowerCase().equals(normalizedFilter))
-                || (freelancer.getServiceType() != null
-                        && freelancer.getServiceType().toLowerCase().equals(normalizedFilter));
     }
 
     private List<Long> normalizeSubcategoryIds(FreelancerProfileRequest request) {

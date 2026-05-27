@@ -11,6 +11,7 @@ import com.servija.servija.dto.MessageResponse;
 import com.servija.servija.dto.RegistrationValidationRequest;
 import com.servija.servija.dto.RegisterRequest;
 import com.servija.servija.dto.ResetPasswordRequest;
+import com.servija.servija.dto.TwoFactorVerifyRequest;
 import com.servija.servija.dto.VerifyEmailRequest;
 import com.servija.servija.dto.VerifyResetPasswordCodeRequest;
 import com.servija.servija.service.AdminResetPasswordLinkService;
@@ -93,6 +94,18 @@ public class AuthController {
     })
     public ResponseEntity<AuthResponse> loginAdmin(@Valid @RequestBody LoginRequest request) {
         AuthResponse response = authService.loginAdmin(request);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/2fa/verify")
+    @Operation(summary = "Concluir login com 2FA", description = "Valida o codigo TOTP ou backup code e retorna o JWT definitivo")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Codigo validado, login concluido", content = @Content(schema = @Schema(implementation = AuthResponse.class))),
+            @ApiResponse(responseCode = "401", description = "Codigo ou token invalido", content = @Content(schema = @Schema(implementation = MessageResponse.class))),
+            @ApiResponse(responseCode = "429", description = "Muitas tentativas", content = @Content(schema = @Schema(implementation = MessageResponse.class)))
+    })
+    public ResponseEntity<AuthResponse> verifyTwoFactor(@Valid @RequestBody TwoFactorVerifyRequest request) {
+        AuthResponse response = authService.verifyTwoFactorChallenge(request.getChallengeToken(), request.getCode());
         return ResponseEntity.ok(response);
     }
 

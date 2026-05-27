@@ -45,6 +45,7 @@ class AsaasServiceTest {
 
     @Test
     @DisplayName("Deve criar cliente com notificationDisabled=true e desativar notificacoes em lote")
+    @SuppressWarnings({"unchecked", "rawtypes"})
     void getOrCreateCustomer_createsCustomerWithNotificationsDisabled() {
         ArgumentCaptor<HttpEntity> createCustomerCaptor = ArgumentCaptor.forClass(HttpEntity.class);
         ArgumentCaptor<HttpEntity> batchUpdateCaptor = ArgumentCaptor.forClass(HttpEntity.class);
