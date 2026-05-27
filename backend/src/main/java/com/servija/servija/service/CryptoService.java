@@ -10,6 +10,7 @@ import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.ByteBuffer;
 import java.security.SecureRandom;
+import java.util.Arrays;
 import java.util.Base64;
 
 @Service
@@ -56,12 +57,12 @@ public class CryptoService {
 
     public String decrypt(byte[] payload) {
         if (payload == null) return null;
+        if (payload.length <= IV_LENGTH) {
+            throw new RuntimeException("Failed to decrypt: payload too short");
+        }
         try {
-            ByteBuffer buf = ByteBuffer.wrap(payload);
-            byte[] iv = new byte[IV_LENGTH];
-            buf.get(iv);
-            byte[] ciphertext = new byte[buf.remaining()];
-            buf.get(ciphertext);
+            byte[] iv = Arrays.copyOfRange(payload, 0, IV_LENGTH);
+            byte[] ciphertext = Arrays.copyOfRange(payload, IV_LENGTH, payload.length);
 
             Cipher cipher = Cipher.getInstance(TRANSFORMATION);
             cipher.init(Cipher.DECRYPT_MODE, key, new GCMParameterSpec(TAG_LENGTH_BITS, iv));
