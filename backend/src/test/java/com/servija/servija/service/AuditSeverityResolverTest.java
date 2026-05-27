@@ -8,13 +8,18 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class AuditSeverityResolverTest {
 
     @Test
-    void resolvesKnownWarningAction() {
-        assertEquals(AuditSeverity.WARNING, AuditSeverityResolver.resolve("BANK_ACCOUNT_ADDED"));
+    void resolvesKnownInfoAction() {
+        assertEquals(AuditSeverity.INFO, AuditSeverityResolver.resolve("BANK_ACCOUNT_ADDED"));
     }
 
     @Test
-    void resolvesNewSemanticWarningAction() {
-        assertEquals(AuditSeverity.WARNING, AuditSeverityResolver.resolve("SERVICE_DEACTIVATED"));
+    void resolvesNewSemanticInfoAction() {
+        assertEquals(AuditSeverity.INFO, AuditSeverityResolver.resolve("SERVICE_DEACTIVATED"));
+    }
+
+    @Test
+    void resolvesKnownWarningAction() {
+        assertEquals(AuditSeverity.WARNING, AuditSeverityResolver.resolve("WITHDRAWAL_REQUESTED"));
     }
 
     @Test
