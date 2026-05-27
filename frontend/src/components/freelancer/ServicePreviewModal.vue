@@ -282,7 +282,7 @@ const selectedImage = ref(0);
           <!-- Descrição -->
           <div class="mb-6">
             <h3 class="text-lg text-[#263238] font-semibold mb-3">Sobre o Serviço</h3>
-            <p class="text-[#435574] leading-relaxed whitespace-pre-line">
+            <p class="text-[#435574] leading-relaxed whitespace-pre-line break-words">
               {{ service.description }}
             </p>
           </div>

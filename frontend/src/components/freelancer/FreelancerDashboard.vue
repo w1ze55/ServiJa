@@ -1354,19 +1354,19 @@ onUnmounted(() => {
               @click="props.onNavigate('freelancer-proposals', { proposalId: proposal.id })"
             >
               <div class="flex items-start gap-3 mb-3">
-                <Avatar class="h-10 w-10">
+                <Avatar class="h-10 w-10 shrink-0">
                   <AvatarImage :src="proposal.clientAvatar" :alt="proposal.clientName" />
                   <AvatarFallback class="bg-[#286AD8] text-white">{{ getInitials(proposal.clientName) }}</AvatarFallback>
                 </Avatar>
-                <div class="flex-1">
-                  <div class="flex items-start justify-between mb-1">
-                    <div>
-                      <p class="text-sm text-[#263238]">{{ proposal.clientName }}</p>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-start justify-between gap-2 mb-1">
+                    <div class="min-w-0">
+                      <p class="text-sm text-[#263238] break-words">{{ proposal.clientName }}</p>
                       <p class="text-xs text-[#435574]">{{ proposal.receivedAt }}</p>
                     </div>
-                    <Badge variant="secondary" class="text-xs">{{ proposal.service }}</Badge>
+                    <Badge variant="secondary" class="text-xs shrink-0">{{ proposal.service }}</Badge>
                   </div>
-                  <p class="text-sm text-[#435574] line-clamp-2 mb-2">{{ proposal.description }}</p>
+                  <p class="text-sm text-[#435574] line-clamp-2 mb-2 break-words">{{ proposal.description }}</p>
                   <div class="flex items-center gap-4 text-xs text-[#435574]">
                     <span class="flex items-center gap-1">
                       <DollarSign class="h-3 w-3" />
@@ -1403,12 +1403,12 @@ onUnmounted(() => {
               :key="job.id"
               class="p-4 rounded-lg border border-gray-200 hover:border-[#286AD8] transition-colors cursor-pointer"
             >
-              <div class="flex items-start justify-between mb-3">
-                <div>
-                  <p class="text-sm text-[#263238] mb-1">{{ job.service }}</p>
-                  <p class="text-xs text-[#435574]">Cliente: {{ job.clientName }}</p>
+              <div class="flex items-start justify-between gap-2 mb-3">
+                <div class="min-w-0">
+                  <p class="text-sm text-[#263238] mb-1 break-words">{{ job.service }}</p>
+                  <p class="text-xs text-[#435574] break-words">Cliente: {{ job.clientName }}</p>
                 </div>
-                <Badge variant="secondary" class="text-xs">{{ job.deadline }}</Badge>
+                <Badge variant="secondary" class="text-xs shrink-0">{{ job.deadline }}</Badge>
               </div>
               <div class="space-y-2">
                 <div class="flex items-center justify-between text-xs">
