@@ -5,6 +5,7 @@ import AdminUsersPage from '@/pages/AdminUsers/index.vue'
 import AdminCategoriesPage from '@/pages/AdminCategories/index.vue'
 import AdminSupportPage from '@/pages/AdminSupport/AdminSupport.vue'
 import AdminAuditLogsPage from '@/pages/AdminAuditLogs/index.vue'
+import AdminSettingsPage from '@/pages/AdminSettings/index.vue'
 import NotFoundPage from '@/pages/NotFound/index.vue'
 
 const routes = [
@@ -46,6 +47,12 @@ const routes = [
     path: '/audit-logs',
     name: 'admin-audit-logs',
     component: AdminAuditLogsPage,
+    meta: { requiresAuth: true, userType: 'admin' },
+  },
+  {
+    path: '/settings/security',
+    name: 'admin-settings-security',
+    component: AdminSettingsPage,
     meta: { requiresAuth: true, userType: 'admin' },
   },
   {

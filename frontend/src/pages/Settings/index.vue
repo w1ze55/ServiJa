@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { User, Settings, FileText, Bell, HelpCircle, LogOut, ChevronRight, MessageSquare, CreditCard, Construction } from 'lucide-vue-next';
+import { User, Settings, FileText, Bell, HelpCircle, LogOut, ChevronRight, MessageSquare, CreditCard, Construction, Shield } from 'lucide-vue-next';
 import Card from '@/components/ui/card.vue';
 import MainLayout from '@/components/layout/MainLayout.vue';
 import { useNavigation } from '@/utils/navigation';
@@ -60,6 +60,13 @@ const settingsOptions = computed<SettingsOption[]>(() => {
         onClick: () => router.push('/notifications'),
       },
       {
+        id: 'security',
+        icon: Shield,
+        title: 'Segurança',
+        description: 'Autenticação em dois fatores e senha',
+        onClick: () => router.push('/settings/security'),
+      },
+      {
         id: 'payment',
         icon: CreditCard,
         title: 'Formas de Pagamento',
@@ -89,6 +96,13 @@ const settingsOptions = computed<SettingsOption[]>(() => {
         title: 'Notificações',
         description: 'Visualize suas notificações',
         onClick: () => router.push('/notifications'),
+      },
+      {
+        id: 'security',
+        icon: Shield,
+        title: 'Segurança',
+        description: 'Autenticação em dois fatores e senha',
+        onClick: () => router.push('/settings/security'),
       },
       {
         id: 'help',
