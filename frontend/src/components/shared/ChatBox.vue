@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted, nextTick, watch } from 'vue';
 import { Send, Paperclip, X, Lock, MessageSquare } from 'lucide-vue-next';
 import Button from '../ui/button.vue';
 import Textarea from '../ui/textarea.vue';
@@ -58,6 +58,16 @@ const emit = defineEmits<{
 const newMessage = ref('');
 const messageAttachments = ref<File[]>([]);
 const messageAttachmentInput = ref<HTMLInputElement | null>(null);
+const scrollContainer = ref<HTMLElement | null>(null);
+
+async function scrollToBottom() {
+  await nextTick();
+  const el = scrollContainer.value;
+  if (el) el.scrollTop = el.scrollHeight;
+}
+
+onMounted(scrollToBottom);
+watch(() => props.messages.length, scrollToBottom);
 
 const handleAttachmentChange = (event: Event) => {
   const target = event.target as HTMLInputElement;
@@ -111,7 +121,7 @@ const formatDate = (dateString: string) => {
       <p class="text-[#435574]">Nenhuma mensagem ainda</p>
     </div>
 
-    <div v-else class="space-y-4 max-h-96 overflow-y-auto mb-4">
+    <div v-else ref="scrollContainer" class="space-y-4 max-h-96 overflow-y-auto mb-4">
       <div
         v-for="msg in messages"
         :key="msg.id"
