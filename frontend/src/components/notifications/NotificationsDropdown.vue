@@ -19,9 +19,15 @@ import {
 
 interface Props {
   userType: NotificationUserType;
+  open?: boolean;
 }
 
 const props = defineProps<Props>();
+const emit = defineEmits<{
+  'update:open': [value: boolean];
+  'content-enter': [];
+  'content-leave': [];
+}>();
 
 const router = useRouter();
 const notificationStore = useNotificationStore();
@@ -48,7 +54,10 @@ onMounted(async () => {
 </script>
 
 <template>
-  <DropdownMenu>
+  <DropdownMenu
+    :open="props.open"
+    @update:open="(value) => emit('update:open', value)"
+  >
     <DropdownMenuTrigger>
       <button
         class="relative rounded-xl p-2 text-[#435574] transition-colors hover:bg-gray-100"
@@ -59,7 +68,12 @@ onMounted(async () => {
       </button>
     </DropdownMenuTrigger>
 
-    <DropdownMenuContent align="end" class="w-[380px] space-y-4 p-4">
+    <DropdownMenuContent
+      align="end"
+      class="w-[380px] space-y-4 p-4 z-[70]"
+      @mouseenter="emit('content-enter')"
+      @mouseleave="emit('content-leave')"
+    >
       <div class="flex items-center justify-between gap-3">
         <div>
           <h3 class="text-base font-semibold text-[#263238]">Notificações</h3>
