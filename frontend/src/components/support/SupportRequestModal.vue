@@ -153,7 +153,7 @@ const validateForm = () => {
   }
 
   if (!formData.value.description.trim()) {
-    nextErrors.description = 'Descreva sua solicitacao.';
+    nextErrors.description = 'Descreva sua solicitação.';
   }
 
   errors.value = nextErrors;
@@ -270,7 +270,7 @@ const handleSubmit = async () => {
 
         <div class="space-y-2">
           <Label for="support-description">
-            Descricao <span class="text-red-500">*</span>
+            Descrição <span class="text-red-500">*</span>
           </Label>
           <div class="relative">
             <Textarea
