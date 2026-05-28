@@ -125,7 +125,7 @@ const primaryCards = computed(() => {
   return [
     {
       key: 'revenue',
-      title: 'Faturamento total',
+      title: 'Movimentação total',
       value: formatCurrency(summary.value.totalRevenue.current),
       supportingText: `vs ${formatCurrency(summary.value.totalRevenue.previous)} ${comparisonLabel.value}`,
       subtitle: 'Valores pagos em serviços realizados',
@@ -136,7 +136,7 @@ const primaryCards = computed(() => {
     },
     {
       key: 'servija-fee',
-      title: 'Parte da Servi Já',
+      title: 'Faturamento Servi Já',
       value: formatCurrency(summary.value.serviJaFee.current),
       supportingText: `vs ${formatCurrency(summary.value.serviJaFee.previous)} ${comparisonLabel.value}`,
       subtitle: 'Taxa fixa de 5% sobre o faturamento',

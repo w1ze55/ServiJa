@@ -986,7 +986,7 @@ onMounted(() => {
 
               <button
                 type="button"
-                class="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#286AD8] px-4 py-3 text-sm font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                class="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-sm font-medium text-white transition disabled:cursor-not-allowed disabled:opacity-60"
                 :disabled="store.isMutating"
                 @click="handleAddAccount"
               >
