@@ -285,20 +285,6 @@ public class AuditLogContentService {
         };
     }
 
-    private String normalizeBankAccountType(Object rawType) {
-        if (rawType == null) {
-            return null;
-        }
-        String value = String.valueOf(rawType).trim().toUpperCase(Locale.ROOT);
-        if ("PIX_KEY".equals(value)) {
-            return "PIX";
-        }
-        if ("BANK_ACCOUNT".equals(value)) {
-            return "TED";
-        }
-        return value;
-    }
-
     private String normalizeKey(String value) {
         if (value == null) {
             return null;

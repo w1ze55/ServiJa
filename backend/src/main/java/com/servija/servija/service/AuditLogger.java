@@ -1,6 +1,5 @@
 package com.servija.servija.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.servija.servija.model.AuditLog;
 import com.servija.servija.model.User;
 import com.servija.servija.repository.UserRepository;
@@ -13,14 +12,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
-/**
- * Façade for writing audit log entries. Captures actor (current user) automatically
- * from SecurityContextHolder and IP/UserAgent/HTTP info from the current request.
- *
- * The dedicated AuditInterceptor records most user mutations automatically; this
- * helper exists for flows that bypass it (login/register before security context
- * is set, or where extra semantic data is needed).
- */
+
 @Component
 @RequiredArgsConstructor
 @Slf4j
@@ -30,7 +22,6 @@ public class AuditLogger {
 
     private final AuditLogService auditLogService;
     private final UserRepository userRepository;
-    private final ObjectMapper objectMapper;
     private final AuditLogContentService auditLogContentService;
 
     public void record(
