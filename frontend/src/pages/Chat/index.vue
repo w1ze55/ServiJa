@@ -31,6 +31,7 @@ import {
   ChevronRight,
   ChevronDown,
   CheckCircle2,
+  CheckCheck,
 } from 'lucide-vue-next';
 
 const IMAGE_EXT_RE = /\.(jpg|jpeg|png|gif|webp|bmp|svg)(\?.*)?$/i;
@@ -154,7 +155,28 @@ const showSidebarMobile = ref(false);
 
 const messagesContainer = ref<HTMLElement | null>(null);
 
-const { onMessage, connect, disconnect } = useChatWebSocket();
+const { onMessage, onReadReceipt, connect, disconnect } = useChatWebSocket();
+
+const pendingReadConversationIds = new Set<string>();
+
+async function markAsReadIfVisible(conversationId: string): Promise<void> {
+  if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
+    pendingReadConversationIds.add(conversationId);
+    return;
+  }
+  await chatService.markAsRead(conversationId);
+}
+
+function flushPendingReads() {
+  if (document.visibilityState !== 'visible') return;
+  const ids = Array.from(pendingReadConversationIds);
+  pendingReadConversationIds.clear();
+  for (const id of ids) {
+    chatService.markAsRead(id).catch(() => {
+      pendingReadConversationIds.add(id);
+    });
+  }
+}
 
 const cachedUser = (() => {
   try {
@@ -303,6 +325,8 @@ function toDisplay(msg: MessageDTO): ChatMessage {
     senderName: isMe ? user.value.name : counterpartyName || displayName(msg.senderId),
     message: msg.content,
     timestamp: msg.sentAt,
+    status: msg.status,
+    readAt: msg.readAt,
     attachments: msg.attachmentUrl
       ? [{ id: msg.id, name: 'Anexo', url: msg.attachmentUrl, size: '' }]
       : undefined,
@@ -377,7 +401,7 @@ async function openConversation(serviceRequestId: number, opts: { pushRoute?: bo
     const page = await chatService.getMessages(conv.id);
     messages.value = page.content.map(toDisplay);
 
-    await chatService.markAsRead(conv.id);
+    await markAsReadIfVisible(conv.id);
     // Zera badge local
     const idx = conversations.value.findIndex((c) => c.id === conv.id);
     if (idx >= 0) {
@@ -396,7 +420,7 @@ async function openConversation(serviceRequestId: number, opts: { pushRoute?: bo
       if (incoming.conversationId !== activeConversation.value.id) return;
       if (messages.value.some((m) => m.id === incoming.id)) return;
       messages.value.push(toDisplay(incoming));
-      chatService.markAsRead(activeConversation.value.id).catch(() => {});
+      markAsReadIfVisible(activeConversation.value.id).catch(() => {});
       // Atualiza preview na lista
       const i = conversations.value.findIndex((c) => c.id === incoming.conversationId);
       if (i >= 0) {
@@ -409,6 +433,14 @@ async function openConversation(serviceRequestId: number, opts: { pushRoute?: bo
           },
         });
       }
+    };
+    onReadReceipt.value = (receipt) => {
+      if (!activeConversation.value) return;
+      if (receipt.conversationId !== activeConversation.value.id) return;
+      const ids = new Set(receipt.messageIds);
+      messages.value = messages.value.map((m) =>
+        ids.has(m.id) ? { ...m, status: 'read', readAt: receipt.readAt } : m
+      );
     };
     connect(conv.id);
     loadingChat.value = false;
@@ -466,10 +498,12 @@ onBeforeUnmount(() => {
   for (const url of Object.values(attachmentPreviews.value)) URL.revokeObjectURL(url);
   window.removeEventListener('keydown', onKeydown);
   window.removeEventListener('service-request-notification', handleServiceRequestNotification);
+  document.removeEventListener('visibilitychange', flushPendingReads);
 });
 
 onMounted(async () => {
   window.addEventListener('keydown', onKeydown);
+  document.addEventListener('visibilitychange', flushPendingReads);
   const userData = localStorage.getItem('user');
   if (!userData) {
     router.push('/login');
@@ -936,14 +970,24 @@ const handleSearch = (query: string) => router.push({ path: '/search', query: { 
                         />
                       </template>
                     </div>
-                    <p
+                    <div
                       :class="[
-                        'text-[10px] mt-1 text-right',
+                        'text-[10px] mt-1 flex items-center justify-end gap-1',
                         msg.sender === currentUserRole ? 'text-white/70' : 'text-gray-400',
                       ]"
                     >
-                      {{ formatHour(msg.timestamp) }}
-                    </p>
+                      <span>{{ formatHour(msg.timestamp) }}</span>
+                      <CheckCheck
+                        v-if="msg.sender === currentUserRole && msg.status === 'read'"
+                        class="h-3.5 w-3.5 text-sky-300"
+                        aria-label="Visualizado"
+                      />
+                      <CheckCheck
+                        v-else-if="msg.sender === currentUserRole"
+                        class="h-3.5 w-3.5 text-white/50"
+                        aria-label="Enviado"
+                      />
+                    </div>
                   </div>
                 </div>
               </template>

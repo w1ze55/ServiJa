@@ -2,6 +2,7 @@ package com.servija.servija.service;
 
 import com.servija.servija.dto.chat.ConversationDTO;
 import com.servija.servija.dto.chat.MessageDTO;
+import com.servija.servija.dto.chat.ReadReceiptDTO;
 import com.servija.servija.dto.chat.SendMessageRequest;
 import com.servija.servija.exception.ResourceNotFoundException;
 import com.servija.servija.model.ServiceRequest;
@@ -141,6 +142,21 @@ public class ChatService {
         conv.setUnreadCount(unread);
         conv.setUpdatedAt(Instant.now());
         conversationRepository.save(conv);
+
+        List<Message> toMark = messageRepository
+                .findByConversationIdAndSenderIdNotAndReadAtIsNull(conversationId, userEmail);
+        if (!toMark.isEmpty()) {
+            Instant readAt = Instant.now();
+            for (Message m : toMark) {
+                m.setStatus("read");
+                m.setReadAt(readAt);
+            }
+            messageRepository.saveAll(toMark);
+
+            List<String> ids = toMark.stream().map(Message::getId).toList();
+            ReadReceiptDTO receipt = new ReadReceiptDTO(conversationId, userEmail, role, ids, readAt);
+            webSocketService.notifyChatRead(conversationId, receipt);
+        }
     }
 
     private void assertParticipant(ServiceRequest sr, String email) {
@@ -186,6 +202,6 @@ public class ChatService {
     private MessageDTO toDTO(Message m) {
         return new MessageDTO(m.getId(), m.getConversationId(), m.getSenderId(),
                 m.getSenderType(), m.getType(), m.getContent(),
-                m.getAttachmentUrl(), m.getStatus(), m.getSentAt());
+                m.getAttachmentUrl(), m.getStatus(), m.getSentAt(), m.getReadAt());
     }
 }
