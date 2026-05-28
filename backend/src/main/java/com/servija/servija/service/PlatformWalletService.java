@@ -72,8 +72,9 @@ public class PlatformWalletService {
 
     private BigDecimal resolveNetPlatformFee(Payment payment) {
         BigDecimal platformFee = payment.getPlatformFee() != null ? payment.getPlatformFee() : BigDecimal.ZERO;
+        BigDecimal installmentFee = payment.getInstallmentFee() != null ? payment.getInstallmentFee() : BigDecimal.ZERO;
         BigDecimal gatewayFee = payment.getGatewayFee() != null ? payment.getGatewayFee() : BigDecimal.ZERO;
-        return platformFee.subtract(gatewayFee);
+        return platformFee.add(installmentFee).subtract(gatewayFee);
     }
 
     private PlatformWallet createWallet() {

@@ -18,6 +18,7 @@ public class PaymentResponse {
     private Long serviceRequestId;
     private BigDecimal amount;
     private BigDecimal platformFee;
+    private BigDecimal installmentFee;
     private BigDecimal gatewayFee;
     private BigDecimal totalAmount;
     private String paymentMethod;

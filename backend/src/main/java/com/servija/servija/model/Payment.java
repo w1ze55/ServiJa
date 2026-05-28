@@ -41,6 +41,10 @@ public class Payment {
     @Column(name = "platform_fee", nullable = false, precision = 10, scale = 2)
     private BigDecimal platformFee;
 
+    @Column(name = "installment_fee", nullable = false, precision = 10, scale = 2)
+    @Builder.Default
+    private BigDecimal installmentFee = BigDecimal.ZERO;
+
     @Column(name = "gateway_fee", precision = 10, scale = 2)
     @Builder.Default
     private BigDecimal gatewayFee = BigDecimal.ZERO;

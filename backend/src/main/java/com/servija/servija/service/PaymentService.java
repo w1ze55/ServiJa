@@ -47,6 +47,13 @@ public class PaymentService {
     private static final BigDecimal ASAAS_CREDIT_CARD_FIXED_FEE = new BigDecimal("0.49");
     private static final BigDecimal ASAAS_CREDIT_CARD_ONE_TIME_PERCENTAGE = new BigDecimal("0.0299");
     private static final BigDecimal ASAAS_CREDIT_CARD_INSTALLMENT_PERCENTAGE = new BigDecimal("0.0349");
+    private static final Map<Integer, BigDecimal> CREDIT_CARD_INSTALLMENT_FEE_PERCENTAGES = Map.of(
+            2, new BigDecimal("0.012"),
+            3, new BigDecimal("0.014"),
+            4, new BigDecimal("0.016"),
+            5, new BigDecimal("0.018"),
+            6, new BigDecimal("0.020")
+    );
     private static final BigDecimal MIN_NEGOTIATED_AMOUNT = new BigDecimal("40.00");
     private static final int MAX_CREDIT_CARD_INSTALLMENTS = 6;
 
@@ -77,9 +84,11 @@ public class PaymentService {
         validatePaymentAmount(request.getAmount(), agreedAmount);
         validateMinimumPaymentAmount(agreedAmount);
 
-        BigDecimal totalAmount = agreedAmount.setScale(2, RoundingMode.HALF_UP);
-        BigDecimal platformFee = calculatePlatformFee(totalAmount);
-        BigDecimal freelancerAmount = totalAmount.subtract(platformFee);
+        BigDecimal serviceAmount = agreedAmount.setScale(2, RoundingMode.HALF_UP);
+        BigDecimal installmentFee = calculateInstallmentFee(paymentMethod, serviceAmount, installmentCount);
+        BigDecimal totalAmount = serviceAmount.add(installmentFee).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal platformFee = calculatePlatformFee(serviceAmount);
+        BigDecimal freelancerAmount = serviceAmount.subtract(platformFee);
         BigDecimal gatewayFee = calculateGatewayFee(paymentMethod, totalAmount, installmentCount);
 
         // Obter CPF do contratante (usar CPF do request se fornecido, senão usar do
@@ -104,6 +113,7 @@ public class PaymentService {
                 .freelancer(serviceRequest.getFreelancer())
                 .amount(freelancerAmount) // Valor que o freelancer recebe
                 .platformFee(platformFee)
+                .installmentFee(installmentFee)
                 .gatewayFee(gatewayFee)
                 .totalAmount(totalAmount) // Valor que o cliente paga
                 .paymentMethod(paymentMethod)
@@ -231,6 +241,20 @@ public class PaymentService {
 
     private BigDecimal calculatePlatformFee(BigDecimal amount) {
         return amount.multiply(PLATFORM_FEE_PERCENTAGE).setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal calculateInstallmentFee(String paymentMethod, BigDecimal serviceAmount, Integer installmentCount) {
+        if (!"credit-card".equals(paymentMethod) || installmentCount == null || installmentCount <= 1) {
+            return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        }
+
+        BigDecimal rate = CREDIT_CARD_INSTALLMENT_FEE_PERCENTAGES.getOrDefault(
+                installmentCount,
+                BigDecimal.ZERO
+        );
+
+        return serviceAmount.multiply(rate)
+                .setScale(2, RoundingMode.HALF_UP);
     }
 
     private BigDecimal calculateGatewayFee(String paymentMethod, BigDecimal amount, Integer installmentCount) {
@@ -469,6 +493,7 @@ public class PaymentService {
                 .serviceRequestId(payment.getServiceRequest().getId())
                 .amount(payment.getAmount())
                 .platformFee(payment.getPlatformFee())
+                .installmentFee(payment.getInstallmentFee())
                 .gatewayFee(payment.getGatewayFee())
                 .totalAmount(payment.getTotalAmount())
                 .paymentMethod(payment.getPaymentMethod())

@@ -136,10 +136,10 @@ const primaryCards = computed(() => {
     },
     {
       key: 'servija-fee',
-      title: 'Faturamento Servi Já',
+      title: 'Receita líquida Servi Já',
       value: formatCurrency(summary.value.serviJaFee.current),
       supportingText: `vs ${formatCurrency(summary.value.serviJaFee.previous)} ${comparisonLabel.value}`,
-      subtitle: 'Receita líquida após taxas e repasses',
+      subtitle: 'Taxas da plataforma e parcelamento, já líquidas do gateway',
       changePercent: summary.value.serviJaFee.changePercent,
       icon: BadgeDollarSign,
       iconWrapper: 'bg-blue-100',

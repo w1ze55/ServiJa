@@ -45,7 +45,7 @@ class PlatformWalletReportServiceTest {
                 .id(1L)
                 .availableBalance(new BigDecimal("300.00"))
                 .reservedBalance(new BigDecimal("120.00"))
-                .totalEarned(new BigDecimal("503.01"))
+                .totalEarned(new BigDecimal("504.81"))
                 .totalWithdrawn(new BigDecimal("80.00"))
                 .build();
 
@@ -53,7 +53,7 @@ class PlatformWalletReportServiceTest {
                 PlatformWalletTransactionResponse.builder()
                         .id(1L)
                         .type("FEE")
-                        .amount(new BigDecimal("3.01"))
+                        .amount(new BigDecimal("4.81"))
                         .status("COMPLETED")
                         .description("Receita liquida da plataforma liberada")
                         .paymentMethod("PIX")
@@ -100,13 +100,13 @@ class PlatformWalletReportServiceTest {
             assertThat(workbook.getSheetAt(0).getRow(6).getCell(0).getStringCellValue())
                     .isEqualTo("Receita liquida acumulada");
             assertThat(workbook.getSheetAt(0).getRow(6).getCell(1).getStringCellValue())
-                    .isEqualTo("R$ 503.01");
+                    .isEqualTo("R$ 504.81");
             assertThat(workbook.getSheetAt(0).getRow(9).getCell(1).getStringCellValue())
                     .isEqualTo("R$ 80.00");
             assertThat(workbook.getSheetAt(1).getRow(1).getCell(0).getStringCellValue())
                     .isEqualTo("Receita liquida");
             assertThat(workbook.getSheetAt(1).getRow(1).getCell(4).getStringCellValue())
-                    .isEqualTo("R$ 3.01");
+                    .isEqualTo("R$ 4.81");
         }
     }
 

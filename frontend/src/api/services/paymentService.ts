@@ -18,6 +18,7 @@ export interface Payment {
   serviceRequestId: string;
   amount: number;
   platformFee?: number;
+  installmentFee?: number;
   gatewayFee?: number;
   totalAmount?: number;
   paymentMethod: string;

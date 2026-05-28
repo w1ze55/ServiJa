@@ -134,7 +134,9 @@ class PaymentServiceTest {
         assertThat(response.getId()).isEqualTo(77L);
         assertThat(response.getAmount()).isEqualByComparingTo("95.00");
         assertThat(response.getPlatformFee()).isEqualByComparingTo("5.00");
+        assertThat(response.getInstallmentFee()).isEqualByComparingTo("0.00");
         assertThat(response.getGatewayFee()).isEqualByComparingTo("1.99");
+        assertThat(response.getTotalAmount()).isEqualByComparingTo("100.00");
         assertThat(response.getInstallmentCount()).isNull();
         assertThat(response.getPaymentMethod()).isEqualTo("pix");
         assertThat(response.getStatus()).isEqualTo("PROCESSING");
@@ -165,16 +167,19 @@ class PaymentServiceTest {
         PaymentResponse response = paymentService.createPayment("cliente@servija.com", request);
 
         assertThat(response.getId()).isEqualTo(78L);
+        assertThat(response.getAmount()).isEqualByComparingTo("95.00");
         assertThat(response.getPlatformFee()).isEqualByComparingTo("5.00");
+        assertThat(response.getInstallmentFee()).isEqualByComparingTo("0.00");
         assertThat(response.getGatewayFee()).isEqualByComparingTo("3.48");
+        assertThat(response.getTotalAmount()).isEqualByComparingTo("100.00");
         assertThat(response.getInstallmentCount()).isEqualTo(1);
         assertThat(response.getStatus()).isEqualTo("COMPLETED");
         verify(walletService).addPendingBalance(serviceRequest.getFreelancer(), new BigDecimal("95.00"));
     }
 
     @Test
-    @DisplayName("Deve criar pagamento parcelado no cartao com taxa de 3,49 por cento")
-    void createPayment_createsInstallmentCreditCardPayment() {
+    @DisplayName("Deve criar pagamento parcelado em 2x com acrescimo de 1,2 por cento")
+    void createPayment_createsTwoInstallmentCreditCardPaymentWithSurcharge() {
         User contractor = buildUser(1L, "cliente@servija.com", User.UserType.CONTRACTOR);
         ServiceRequest serviceRequest = buildAcceptedRequest(contractor, new BigDecimal("100.00"), false);
 
@@ -190,13 +195,49 @@ class PaymentServiceTest {
                 .serviceRequestId(10L)
                 .paymentMethod("credit-card")
                 .amount(new BigDecimal("100.00"))
+                .cardData(buildCardData(2))
+                .build();
+
+        PaymentResponse response = paymentService.createPayment("cliente@servija.com", request);
+
+        assertThat(response.getAmount()).isEqualByComparingTo("95.00");
+        assertThat(response.getPlatformFee()).isEqualByComparingTo("5.00");
+        assertThat(response.getInstallmentFee()).isEqualByComparingTo("1.20");
+        assertThat(response.getGatewayFee()).isEqualByComparingTo("4.02");
+        assertThat(response.getTotalAmount()).isEqualByComparingTo("101.20");
+        assertThat(response.getInstallmentCount()).isEqualTo(2);
+        assertThat(response.getStatus()).isEqualTo("COMPLETED");
+        verify(walletService).addPendingBalance(serviceRequest.getFreelancer(), new BigDecimal("95.00"));
+    }
+
+    @Test
+    @DisplayName("Deve criar pagamento parcelado no cartao com taxa de 3,49 por cento")
+    void createPayment_createsInstallmentCreditCardPayment() {
+        User contractor = buildUser(1L, "cliente@servija.com", User.UserType.CONTRACTOR);
+        ServiceRequest serviceRequest = buildAcceptedRequest(contractor, new BigDecimal("100.00"), false);
+
+        mockBaseLookups(contractor, serviceRequest);
+        when(asaasService.getOrCreateCustomer(anyString(), anyString(), anyString())).thenReturn("cus_123");
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> {
+            Payment payment = invocation.getArgument(0);
+            payment.setId(80L);
+            return payment;
+        });
+
+        PaymentRequest request = PaymentRequest.builder()
+                .serviceRequestId(10L)
+                .paymentMethod("credit-card")
+                .amount(new BigDecimal("100.00"))
                 .cardData(buildCardData(6))
                 .build();
 
         PaymentResponse response = paymentService.createPayment("cliente@servija.com", request);
 
+        assertThat(response.getAmount()).isEqualByComparingTo("95.00");
         assertThat(response.getPlatformFee()).isEqualByComparingTo("5.00");
-        assertThat(response.getGatewayFee()).isEqualByComparingTo("3.98");
+        assertThat(response.getInstallmentFee()).isEqualByComparingTo("2.00");
+        assertThat(response.getGatewayFee()).isEqualByComparingTo("4.05");
+        assertThat(response.getTotalAmount()).isEqualByComparingTo("102.00");
         assertThat(response.getInstallmentCount()).isEqualTo(6);
         assertThat(response.getStatus()).isEqualTo("COMPLETED");
         verify(walletService).addPendingBalance(serviceRequest.getFreelancer(), new BigDecimal("95.00"));

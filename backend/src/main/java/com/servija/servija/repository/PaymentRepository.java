@@ -74,7 +74,7 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
     LocalDateTime findEarliestCreatedAt();
 
     @Query("""
-            select sum(coalesce(p.platformFee, 0) - coalesce(p.gatewayFee, 0))
+            select sum(coalesce(p.platformFee, 0) + coalesce(p.installmentFee, 0) - coalesce(p.gatewayFee, 0))
             from Payment p
             where p.platformFeeReleasedAt >= :start
               and p.platformFeeReleasedAt < :end

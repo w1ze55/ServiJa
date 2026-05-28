@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import { usePaymentWebSocket } from '../../composables/usePaymentWebSocket';
 import {
   CreditCard,
   QrCode,
   ArrowLeft,
+  ChevronDown,
   Shield,
   Clock,
   MapPin,
@@ -75,8 +76,18 @@ const { connected: wsConnected, connectionError: wsError, connect: connectWS, di
 
 const paymentMethod = ref<string>('');
 const creditCardInstallmentOptions = Array.from({ length: 6 }, (_, index) => index + 1);
+const CREDIT_CARD_INSTALLMENT_FEE_RATES: Record<number, number> = {
+  2: 0.012,
+  3: 0.014,
+  4: 0.016,
+  5: 0.018,
+  6: 0.02,
+};
 
 const togglePaymentMethod = (method: string) => {
+  if (paymentMethod.value === method) {
+    isInstallmentSelectorOpen.value = false;
+  }
   paymentMethod.value = paymentMethod.value === method ? '' : method;
 };
 
@@ -92,6 +103,8 @@ const copyFeedbackVisible = ref(false);
 const copyFeedbackFading = ref(false);
 let copyFeedbackTimeout: ReturnType<typeof setTimeout> | null = null;
 let copyFeedbackFadeTimeout: ReturnType<typeof setTimeout> | null = null;
+const isInstallmentSelectorOpen = ref(false);
+const installmentSelectorRef = ref<HTMLElement | null>(null);
 
 const cardData = ref({
   number: '',
@@ -101,8 +114,109 @@ const cardData = ref({
   installmentCount: 1,
 });
 
-const platformFee = computed(() => 0); // Cliente não paga taxa - desconto é do freelancer
-const totalAmount = computed(() => props.proposal.price);
+const roundCurrency = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
+
+const formatCurrency = (value: number) =>
+  new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+  }).format(value || 0);
+
+const formatPercent = (value: number) =>
+  `${(value * 100).toLocaleString('pt-BR', {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  })}%`;
+
+const serviceAmount = computed(() => roundCurrency(Number(props.proposal.price || 0)));
+
+const installmentOptions = computed(() =>
+  creditCardInstallmentOptions.map((installmentCount) => {
+    const hasInterest = installmentCount > 1;
+    const feeRate = CREDIT_CARD_INSTALLMENT_FEE_RATES[installmentCount] ?? 0;
+    const installmentFee = hasInterest
+      ? roundCurrency(serviceAmount.value * feeRate)
+      : 0;
+    const totalAmount = roundCurrency(serviceAmount.value + installmentFee);
+    const perInstallmentAmount = roundCurrency(totalAmount / installmentCount);
+
+    return {
+      installmentCount,
+      feeRate,
+      hasInterest,
+      installmentFee,
+      totalAmount,
+      perInstallmentAmount,
+      description: hasInterest ? 'com juros' : 'sem juros',
+    };
+  }),
+);
+
+const selectedInstallmentOption = computed(
+  () => installmentOptions.value.find((option) => option.installmentCount === cardData.value.installmentCount)
+    ?? installmentOptions.value[0],
+);
+
+const installmentFee = computed(() =>
+  paymentMethod.value === 'credit-card' ? selectedInstallmentOption.value?.installmentFee ?? 0 : 0,
+);
+
+const totalAmount = computed(() =>
+  paymentMethod.value === 'credit-card' ? selectedInstallmentOption.value?.totalAmount ?? serviceAmount.value : serviceAmount.value,
+);
+
+const selectedInstallmentSummary = computed(() => {
+  if (paymentMethod.value !== 'credit-card' || !selectedInstallmentOption.value) {
+    return null;
+  }
+
+  const option = selectedInstallmentOption.value;
+  return `Em ${option.installmentCount}x de ${formatCurrency(option.perInstallmentAmount)}${
+    option.hasInterest ? ' com juros' : ' sem juros'
+  }`;
+});
+
+const selectedInstallmentSummaryNote = computed(() => {
+  if (paymentMethod.value !== 'credit-card' || !selectedInstallmentOption.value) {
+    return null;
+  }
+
+  if (!selectedInstallmentOption.value.hasInterest) {
+    return 'Pagamento em 1x sem juros.';
+  }
+
+  return `Valor total inclui taxa de parcelamento da plataforma`;
+});
+
+const selectInstallment = (installmentCount: number) => {
+  cardData.value.installmentCount = installmentCount;
+  isInstallmentSelectorOpen.value = false;
+};
+
+const scrollInstallmentSelectorIntoView = () => {
+  const selectorElement = installmentSelectorRef.value;
+  if (!selectorElement) {
+    return;
+  }
+
+  const selectorTop = selectorElement.getBoundingClientRect().top + window.scrollY - 96;
+  window.scrollTo({
+    top: Math.max(selectorTop, 0),
+    behavior: 'smooth',
+  });
+};
+
+const toggleInstallmentSelector = async () => {
+  const willOpen = !isInstallmentSelectorOpen.value;
+  isInstallmentSelectorOpen.value = willOpen;
+
+  if (!willOpen) {
+    return;
+  }
+
+  await nextTick();
+  window.setTimeout(scrollInstallmentSelectorIntoView, 60);
+};
 
 const formatCardNumber = (value: string) => {
   const cleaned = value.replace(/\s/g, '');
@@ -182,6 +296,10 @@ const copyPixCode = async () => {
 
 // Observar mudanças no método de pagamento
 watch(paymentMethod, async (newMethod, oldMethod) => {
+  if (newMethod !== 'credit-card') {
+    isInstallmentSelectorOpen.value = false;
+  }
+
   // Se voltando para PIX e já existe pagamento, carregar QR Code se necessário
   if (newMethod === 'pix' && currentPaymentId.value) {
     if (!pixData.value) {
@@ -253,7 +371,7 @@ const generatePixQrCode = async () => {
       body: JSON.stringify({
         serviceRequestId: parseInt(props.requestId),
         paymentMethod: 'PIX',
-        amount: totalAmount.value,
+        amount: serviceAmount.value,
         cpf: pixCpf.value.replace(/\D/g, ''),
       }),
     });
@@ -330,7 +448,9 @@ const handleConfirmPayment = async () => {
     await props.onConfirmPayment(paymentMethod.value, {
       cardData: paymentMethod.value === 'credit-card' ? cardData.value : null,
       requestId: props.requestId,
-      amount: totalAmount.value,
+      amount: serviceAmount.value,
+      totalAmount: totalAmount.value,
+      installmentFee: installmentFee.value,
     });
   } catch (error) {
     console.error('Erro ao processar pagamento:', error);
@@ -486,12 +606,18 @@ const checkExistingPayment = async () => {
         paymentConfirmed.value = true;
         currentPaymentId.value = payment.id;
         paymentMethod.value = payment.paymentMethod?.toLowerCase() || 'pix';
+        if (payment.installmentCount) {
+          cardData.value.installmentCount = payment.installmentCount;
+        }
         return;
       }
       
       // Se o pagamento ainda não foi completado, pré-carregar dados
       if (payment.status === 'PENDING' || payment.status === 'PROCESSING') {
         currentPaymentId.value = payment.id;
+        if (payment.installmentCount) {
+          cardData.value.installmentCount = payment.installmentCount;
+        }
         // Não selecionar método automaticamente - deixar usuário escolher
         
         // Pré-carregar QR Code em background (sem selecionar PIX)
@@ -987,19 +1113,68 @@ const onLeave = (el: Element, done: () => void) => {
 
                           <div class="space-y-2">
                             <Label for="card-installments">Parcelas</Label>
-                            <select
+                            <div
+                              ref="installmentSelectorRef"
                               id="card-installments"
-                              v-model="cardData.installmentCount"
-                              class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-[#263238] outline-none transition focus:border-[#286AD8] focus:ring-2 focus:ring-[#286AD8]/15"
+                              class="overflow-hidden rounded-2xl border border-slate-200 bg-white"
                             >
-                              <option
-                                v-for="installment in creditCardInstallmentOptions"
-                                :key="installment"
-                                :value="installment"
+                              <button
+                                type="button"
+                                class="flex w-full items-start justify-between gap-4 px-4 py-3 text-left transition hover:bg-slate-50"
+                                :aria-expanded="isInstallmentSelectorOpen"
+                                @click="toggleInstallmentSelector"
                               >
-                                {{ installment }}x
-                              </option>
-                            </select>
+                                <div class="min-w-0">
+                                  <p class="text-sm font-medium text-[#263238]">
+                                    {{ selectedInstallmentSummary }}
+                                  </p>
+                                  <p class="mt-1 text-xs text-[#435574]">
+                                    {{ selectedInstallmentSummaryNote }}
+                                  </p>
+                                </div>
+                                <ChevronDown
+                                  class="mt-1 h-4 w-4 shrink-0 text-slate-500 transition-transform"
+                                  :class="isInstallmentSelectorOpen ? 'rotate-180' : ''"
+                                />
+                              </button>
+
+                              <Transition :css="false" @before-enter="onBeforeEnter" @enter="onEnter" @before-leave="onBeforeLeave" @leave="onLeave">
+                                <div v-if="isInstallmentSelectorOpen" class="border-t border-slate-200">
+                                  <div class="grid grid-cols-[minmax(0,1fr)_auto] gap-4 bg-slate-50 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                    <span>Prazo</span>
+                                    <span>Total (R$)</span>
+                                  </div>
+
+                                  <button
+                                    v-for="option in installmentOptions"
+                                    :key="option.installmentCount"
+                                    type="button"
+                                    class="grid w-full grid-cols-[minmax(0,1fr)_auto] gap-4 border-t border-slate-200 px-4 py-3 text-left transition hover:bg-slate-50"
+                                    :class="option.installmentCount === cardData.installmentCount ? 'bg-blue-50/80' : 'bg-white'"
+                                    @click="selectInstallment(option.installmentCount)"
+                                  >
+                                    <div class="min-w-0">
+                                      <p class="text-sm font-medium text-[#263238]">
+                                        Em {{ option.installmentCount }}x de {{ formatCurrency(option.perInstallmentAmount) }}
+                                      </p>
+                                      <p class="mt-1 text-xs text-[#435574]">
+                                        {{ option.description }}
+                                      </p>
+                                    </div>
+
+                                    <div class="flex items-start gap-3">
+                                      <p class="pt-0.5 text-sm font-semibold text-[#263238]">
+                                        {{ formatCurrency(option.totalAmount) }}
+                                      </p>
+                                      <div
+                                        class="mt-1 h-4 w-4 rounded-full border-2 transition-colors"
+                                        :class="option.installmentCount === cardData.installmentCount ? 'border-[#286AD8] bg-[#286AD8]' : 'border-slate-300 bg-white'"
+                                      />
+                                    </div>
+                                  </button>
+                                </div>
+                              </Transition>
+                            </div>
                           </div>
 
                           <div class="pt-2">
@@ -1018,9 +1193,9 @@ const onLeave = (el: Element, done: () => void) => {
                             </Button>
                             <p class="text-xs text-center text-[#435574] mt-3">
                               Ao confirmar, você concorda com os
-                              <a href="#" class="text-[#286AD8] hover:underline">Termos de Serviço</a>
+                              <router-link to="/politicas?tab=termos" class="text-[#286AD8] hover:underline">Termos de Serviço</router-link>
                               e
-                              <a href="#" class="text-[#286AD8] hover:underline">Política de Privacidade</a>
+                              <router-link to="/politicas" class="text-[#286AD8] hover:underline">Política de Privacidade</router-link>
                             </p>
                           </div>
                         </div>
@@ -1083,7 +1258,14 @@ const onLeave = (el: Element, done: () => void) => {
           <div class="space-y-2 mb-4">
             <div class="flex justify-between text-[#435574]">
               <span>Valor do serviço</span>
-              <span>R$ {{ proposal.price.toFixed(2) }}</span>
+              <span>{{ formatCurrency(serviceAmount) }}</span>
+            </div>
+            <div
+              v-if="paymentMethod === 'credit-card' && installmentFee > 0"
+              class="flex justify-between text-[#435574]"
+            >
+              <span>Taxa de parcelamento</span>
+              <span>{{ formatCurrency(installmentFee) }}</span>
             </div>
           </div>
 
@@ -1092,7 +1274,7 @@ const onLeave = (el: Element, done: () => void) => {
           <!-- Total -->
           <div class="flex justify-between">
             <span class="text-[#263238]">Total</span>
-            <span class="text-[#263238]">R$ {{ totalAmount.toFixed(2) }}</span>
+            <span class="text-[#263238]">{{ formatCurrency(totalAmount) }}</span>
           </div>
         </Card>
       </div>

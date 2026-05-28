@@ -448,7 +448,7 @@ const summaryCards = computed(() => [
   {
     key: 'earned',
     title: 'Receita liquida acumulada',
-    subtitle: 'Total apropriado apos as taxas da Asaas',
+    subtitle: 'Total liquido com taxas da plataforma e acrescimos de parcelamento',
     value: formatCurrency(wallet.value?.totalEarned),
     icon: ReceiptText,
     iconWrapper: 'bg-blue-100',
