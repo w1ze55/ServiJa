@@ -89,6 +89,9 @@ public class Payment {
     @Column(name = "completed_at")
     private LocalDateTime completedAt;
 
+    @Column(name = "platform_fee_released_at")
+    private LocalDateTime platformFeeReleasedAt;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

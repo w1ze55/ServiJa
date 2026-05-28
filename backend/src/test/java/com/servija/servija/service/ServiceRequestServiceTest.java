@@ -60,6 +60,9 @@ class ServiceRequestServiceTest {
     private FreelancerWalletService walletService;
 
     @Mock
+    private PlatformWalletService platformWalletService;
+
+    @Mock
     private JdbcTemplate jdbcTemplate;
 
     @Mock
@@ -205,6 +208,7 @@ class ServiceRequestServiceTest {
 
         assertThat(response.getStatus()).isEqualTo("COMPLETED");
         verify(walletService).releasePendingBalance(payment);
+        verify(platformWalletService).releasePlatformFeeIfNeeded(payment);
     }
 
     private ServiceRequest buildRequest(String freelancerAttachmentsJson) {
