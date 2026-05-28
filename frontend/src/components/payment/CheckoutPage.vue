@@ -74,6 +74,7 @@ const userEmail = getUserEmail();
 const { connected: wsConnected, connectionError: wsError, connect: connectWS, disconnect: disconnectWS } = usePaymentWebSocket(userEmail);
 
 const paymentMethod = ref<string>('');
+const creditCardInstallmentOptions = Array.from({ length: 6 }, (_, index) => index + 1);
 
 const togglePaymentMethod = (method: string) => {
   paymentMethod.value = paymentMethod.value === method ? '' : method;
@@ -97,6 +98,7 @@ const cardData = ref({
   name: '',
   expiry: '',
   cvv: '',
+  installmentCount: 1,
 });
 
 const platformFee = computed(() => 0); // Cliente não paga taxa - desconto é do freelancer
@@ -310,7 +312,13 @@ const handleConfirmPayment = async () => {
   }
 
   if (paymentMethod.value === 'credit-card') {
-    if (!cardData.value.number || !cardData.value.name || !cardData.value.expiry || !cardData.value.cvv) {
+    if (
+      !cardData.value.number
+      || !cardData.value.name
+      || !cardData.value.expiry
+      || !cardData.value.cvv
+      || !cardData.value.installmentCount
+    ) {
       alert('Preencha todos os dados do cartão');
       return;
     }
@@ -922,7 +930,7 @@ const onLeave = (el: Element, done: () => void) => {
                   <CreditCard class="h-5 w-5 text-[#286AD8]" />
                   <div class="flex-1">
                     <p class="text-[#263238]">Cartão de Crédito</p>
-                    <p class="text-sm text-[#435574]">Parcelamento disponível</p>
+                    <p class="text-sm text-[#435574]">Parcelamento até 6x</p>
                   </div>
                 </div>
 
@@ -975,6 +983,23 @@ const onLeave = (el: Element, done: () => void) => {
                                 maxlength="4"
                               />
                             </div>
+                          </div>
+
+                          <div class="space-y-2">
+                            <Label for="card-installments">Parcelas</Label>
+                            <select
+                              id="card-installments"
+                              v-model="cardData.installmentCount"
+                              class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-[#263238] outline-none transition focus:border-[#286AD8] focus:ring-2 focus:ring-[#286AD8]/15"
+                            >
+                              <option
+                                v-for="installment in creditCardInstallmentOptions"
+                                :key="installment"
+                                :value="installment"
+                              >
+                                {{ installment }}x
+                              </option>
+                            </select>
                           </div>
 
                           <div class="pt-2">

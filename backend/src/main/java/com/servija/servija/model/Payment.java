@@ -51,6 +51,9 @@ public class Payment {
     @Column(name = "payment_method", nullable = false, length = 50)
     private String paymentMethod;
 
+    @Column(name = "installment_count")
+    private Integer installmentCount;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     @Builder.Default

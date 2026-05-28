@@ -45,7 +45,7 @@ class PlatformWalletReportServiceTest {
                 .id(1L)
                 .availableBalance(new BigDecimal("300.00"))
                 .reservedBalance(new BigDecimal("120.00"))
-                .totalEarned(new BigDecimal("500.00"))
+                .totalEarned(new BigDecimal("503.01"))
                 .totalWithdrawn(new BigDecimal("80.00"))
                 .build();
 
@@ -53,9 +53,9 @@ class PlatformWalletReportServiceTest {
                 PlatformWalletTransactionResponse.builder()
                         .id(1L)
                         .type("FEE")
-                        .amount(new BigDecimal("50.00"))
+                        .amount(new BigDecimal("3.01"))
                         .status("COMPLETED")
-                        .description("Taxa da plataforma liberada")
+                        .description("Receita liquida da plataforma liberada")
                         .paymentMethod("PIX")
                         .serviceName("Instalacao")
                         .referenceLabel("Servico #10")
@@ -97,14 +97,16 @@ class PlatformWalletReportServiceTest {
             assertThat(workbook.getSheet("Resumo")).isNotNull();
             assertThat(workbook.getSheetAt(0).getRow(0).getCell(1).getStringCellValue())
                     .isEqualTo("Carteira da plataforma");
+            assertThat(workbook.getSheetAt(0).getRow(6).getCell(0).getStringCellValue())
+                    .isEqualTo("Receita liquida acumulada");
             assertThat(workbook.getSheetAt(0).getRow(6).getCell(1).getStringCellValue())
-                    .isEqualTo("R$ 500.00");
+                    .isEqualTo("R$ 503.01");
             assertThat(workbook.getSheetAt(0).getRow(9).getCell(1).getStringCellValue())
                     .isEqualTo("R$ 80.00");
             assertThat(workbook.getSheetAt(1).getRow(1).getCell(0).getStringCellValue())
-                    .isEqualTo("Taxa");
+                    .isEqualTo("Receita liquida");
             assertThat(workbook.getSheetAt(1).getRow(1).getCell(4).getStringCellValue())
-                    .isEqualTo("R$ 50.00");
+                    .isEqualTo("R$ 3.01");
         }
     }
 

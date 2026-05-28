@@ -19,6 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -41,12 +42,13 @@ public class PaymentService {
     private final WebSocketService webSocketService;
     private final NotificationService notificationService;
 
-    private static final BigDecimal PLATFORM_FEE_PERCENTAGE = new BigDecimal("0.05"); // 5%
-    private static final BigDecimal ASAAS_PIX_FEE = new BigDecimal("0.99"); // Taxa Asaas para PIX (promocional)
-    private static final BigDecimal ASAAS_BOLETO_FEE = new BigDecimal("0.99"); // Taxa Asaas para Boleto (promocional)
-    private static final BigDecimal ASAAS_CREDIT_CARD_FIXED_FEE = new BigDecimal("0.49"); // Taxa fixa cartão
-    private static final BigDecimal ASAAS_CREDIT_CARD_PERCENTAGE = new BigDecimal("0.0199"); // 1,99% cartão
-    private static final BigDecimal MIN_NEGOTIATED_AMOUNT = new BigDecimal("20.00"); // Valor mínimo para pagamento
+    private static final BigDecimal PLATFORM_FEE_PERCENTAGE = new BigDecimal("0.05");
+    private static final BigDecimal ASAAS_PIX_FEE = new BigDecimal("1.99");
+    private static final BigDecimal ASAAS_CREDIT_CARD_FIXED_FEE = new BigDecimal("0.49");
+    private static final BigDecimal ASAAS_CREDIT_CARD_ONE_TIME_PERCENTAGE = new BigDecimal("0.0299");
+    private static final BigDecimal ASAAS_CREDIT_CARD_INSTALLMENT_PERCENTAGE = new BigDecimal("0.0349");
+    private static final BigDecimal MIN_NEGOTIATED_AMOUNT = new BigDecimal("40.00");
+    private static final int MAX_CREDIT_CARD_INSTALLMENTS = 6;
 
     @Transactional
     public PaymentResponse createPayment(String email, PaymentRequest request) {
@@ -69,29 +71,16 @@ public class PaymentService {
             throw new IllegalStateException("Já existe um pagamento para esta solicitação");
         }
 
+        String paymentMethod = normalizePaymentMethod(request.getPaymentMethod());
+        Integer installmentCount = resolveInstallmentCount(paymentMethod, request.getCardData());
         BigDecimal agreedAmount = resolveAgreedAmount(serviceRequest);
         validatePaymentAmount(request.getAmount(), agreedAmount);
-        validateMinimumPaymentAmount(serviceRequest, agreedAmount);
+        validateMinimumPaymentAmount(agreedAmount);
 
-        BigDecimal totalAmount = agreedAmount;
-
-        BigDecimal platformFee = agreedAmount.multiply(PLATFORM_FEE_PERCENTAGE);
-
-        BigDecimal freelancerAmount = agreedAmount.subtract(platformFee);
-
-        BigDecimal gatewayFee = BigDecimal.ZERO;
-        switch (request.getPaymentMethod().toLowerCase()) {
-            case "pix":
-                gatewayFee = ASAAS_PIX_FEE;
-                break;
-            case "boleto":
-                gatewayFee = ASAAS_BOLETO_FEE;
-                break;
-            case "credit-card":
-                gatewayFee = ASAAS_CREDIT_CARD_FIXED_FEE
-                        .add(agreedAmount.multiply(ASAAS_CREDIT_CARD_PERCENTAGE));
-                break;
-        }
+        BigDecimal totalAmount = agreedAmount.setScale(2, RoundingMode.HALF_UP);
+        BigDecimal platformFee = calculatePlatformFee(totalAmount);
+        BigDecimal freelancerAmount = totalAmount.subtract(platformFee);
+        BigDecimal gatewayFee = calculateGatewayFee(paymentMethod, totalAmount, installmentCount);
 
         // Obter CPF do contratante (usar CPF do request se fornecido, senão usar do
         // perfil)
@@ -117,14 +106,15 @@ public class PaymentService {
                 .platformFee(platformFee)
                 .gatewayFee(gatewayFee)
                 .totalAmount(totalAmount) // Valor que o cliente paga
-                .paymentMethod(request.getPaymentMethod())
+                .paymentMethod(paymentMethod)
+                .installmentCount(installmentCount)
                 .status(Payment.PaymentStatus.PENDING)
                 .transactionId(UUID.randomUUID().toString())
                 .asaasCustomerId(asaasCustomerId)
                 .build();
 
         // Processar pagamento baseado no método
-        switch (request.getPaymentMethod().toLowerCase()) {
+        switch (paymentMethod) {
             case "pix":
                 processPixPayment(payment, asaasCustomerId, serviceRequest);
                 break;
@@ -154,7 +144,7 @@ public class PaymentService {
                 serviceRequest,
                 contractor,
                 com.servija.servija.model.ServiceRequestHistory.OperationType.PAYMENT_CREATED,
-                "Pagamento de R$ " + String.format("%.2f", totalAmount) + " criado via " + request.getPaymentMethod().toUpperCase());
+                "Pagamento de R$ " + String.format("%.2f", totalAmount) + " criado via " + paymentMethod.toUpperCase());
 
         // Para pagamento com cartão (aprovação instantânea), atualizar status e notificar
         if (payment.getStatus() == Payment.PaymentStatus.COMPLETED) {
@@ -209,11 +199,54 @@ public class PaymentService {
         }
     }
 
-    private void validateMinimumPaymentAmount(ServiceRequest serviceRequest, BigDecimal agreedAmount) {
-        boolean legacyLowValueAllowed = Boolean.TRUE.equals(serviceRequest.getLegacyLowValueAllowed());
-        if (!legacyLowValueAllowed && agreedAmount.compareTo(MIN_NEGOTIATED_AMOUNT) < 0) {
-            throw new IllegalStateException("O valor mínimo para pagamento é R$ 20,00");
+    private void validateMinimumPaymentAmount(BigDecimal agreedAmount) {
+        if (agreedAmount.compareTo(MIN_NEGOTIATED_AMOUNT) < 0) {
+            throw new IllegalStateException("O valor minimo para pagamento e R$ 40,00");
         }
+    }
+
+    private String normalizePaymentMethod(String paymentMethod) {
+        if (paymentMethod == null || paymentMethod.isBlank()) {
+            throw new IllegalArgumentException("Metodo de pagamento invalido");
+        }
+        return paymentMethod.trim().toLowerCase();
+    }
+
+    private Integer resolveInstallmentCount(String paymentMethod, PaymentRequest.CardData cardData) {
+        if (!"credit-card".equals(paymentMethod)) {
+            return null;
+        }
+
+        if (cardData == null || cardData.getInstallmentCount() == null) {
+            throw new IllegalArgumentException("Informe a quantidade de parcelas do cartao");
+        }
+
+        int installmentCount = cardData.getInstallmentCount();
+        if (installmentCount < 1 || installmentCount > MAX_CREDIT_CARD_INSTALLMENTS) {
+            throw new IllegalArgumentException("O parcelamento no cartao deve ser entre 1x e 6x");
+        }
+
+        return installmentCount;
+    }
+
+    private BigDecimal calculatePlatformFee(BigDecimal amount) {
+        return amount.multiply(PLATFORM_FEE_PERCENTAGE).setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal calculateGatewayFee(String paymentMethod, BigDecimal amount, Integer installmentCount) {
+        return switch (paymentMethod) {
+            case "pix" -> ASAAS_PIX_FEE;
+            case "credit-card" -> {
+                BigDecimal percentage = installmentCount != null && installmentCount > 1
+                        ? ASAAS_CREDIT_CARD_INSTALLMENT_PERCENTAGE
+                        : ASAAS_CREDIT_CARD_ONE_TIME_PERCENTAGE;
+                yield ASAAS_CREDIT_CARD_FIXED_FEE
+                        .add(amount.multiply(percentage))
+                        .setScale(2, RoundingMode.HALF_UP);
+            }
+            case "wallet" -> BigDecimal.ZERO;
+            default -> throw new IllegalArgumentException("Metodo de pagamento invalido");
+        };
     }
 
     private void processPixPayment(Payment payment, String asaasCustomerId, ServiceRequest serviceRequest) {
@@ -439,6 +472,7 @@ public class PaymentService {
                 .gatewayFee(payment.getGatewayFee())
                 .totalAmount(payment.getTotalAmount())
                 .paymentMethod(payment.getPaymentMethod())
+                .installmentCount(payment.getInstallmentCount())
                 .status(payment.getStatus().name())
                 .transactionId(payment.getTransactionId())
                 .pixQrCode(payment.getPixQrCode())

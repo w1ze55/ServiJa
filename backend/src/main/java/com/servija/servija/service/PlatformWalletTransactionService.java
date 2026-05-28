@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -34,7 +35,11 @@ public class PlatformWalletTransactionService {
         if (typeFilter == null || typeFilter.equalsIgnoreCase("ALL") || typeFilter.equalsIgnoreCase("FEE")) {
             for (Payment payment : paymentRepository.findByPlatformFeeReleasedAtIsNotNullOrderByPlatformFeeReleasedAtDesc()) {
                 LocalDateTime releasedAt = payment.getPlatformFeeReleasedAt();
+                BigDecimal netPlatformFee = resolveNetPlatformFee(payment);
                 if (!dateRange.includes(releasedAt)) {
+                    continue;
+                }
+                if (netPlatformFee.compareTo(BigDecimal.ZERO) <= 0) {
                     continue;
                 }
 
@@ -48,9 +53,9 @@ public class PlatformWalletTransactionService {
                 transactions.add(PlatformWalletTransactionResponse.builder()
                         .id(payment.getId())
                         .type("FEE")
-                        .amount(payment.getPlatformFee())
+                        .amount(netPlatformFee)
                         .status("COMPLETED")
-                        .description("Taxa da plataforma liberada")
+                        .description("Receita liquida da plataforma liberada")
                         .paymentMethod(payment.getPaymentMethod())
                         .serviceName(serviceName)
                         .referenceLabel(serviceRequestId != null ? "Serviço #" + serviceRequestId : "Pagamento #" + payment.getId())
@@ -80,6 +85,12 @@ public class PlatformWalletTransactionService {
 
         transactions.sort(Comparator.comparing(PlatformWalletTransactionResponse::getDate).reversed());
         return transactions;
+    }
+
+    private BigDecimal resolveNetPlatformFee(Payment payment) {
+        BigDecimal platformFee = payment.getPlatformFee() != null ? payment.getPlatformFee() : BigDecimal.ZERO;
+        BigDecimal gatewayFee = payment.getGatewayFee() != null ? payment.getGatewayFee() : BigDecimal.ZERO;
+        return platformFee.subtract(gatewayFee);
     }
 
     private record DateRange(LocalDateTime startInclusive, LocalDateTime endExclusive) {

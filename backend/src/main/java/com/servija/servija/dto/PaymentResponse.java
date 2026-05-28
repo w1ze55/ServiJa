@@ -21,6 +21,7 @@ public class PaymentResponse {
     private BigDecimal gatewayFee;
     private BigDecimal totalAmount;
     private String paymentMethod;
+    private Integer installmentCount;
     private String status;
     private String transactionId;
     private String asaasPaymentId;

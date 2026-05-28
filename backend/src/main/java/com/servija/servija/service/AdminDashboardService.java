@@ -37,7 +37,6 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class AdminDashboardService {
 
-    private static final BigDecimal PLATFORM_FEE_PERCENTAGE = new BigDecimal("0.05");
     private static final BigDecimal ONE_HUNDRED = new BigDecimal("100");
     private static final Locale PT_BR = Locale.forLanguageTag("pt-BR");
     private static final List<User.UserType> BUSINESS_USER_TYPES =
@@ -84,8 +83,14 @@ public class AdminDashboardService {
                         previousRange.startDateTime(),
                         previousRange.endExclusiveDateTime()));
 
-        BigDecimal currentServiJaFee = calculatePlatformFee(currentRevenue);
-        BigDecimal previousServiJaFee = calculatePlatformFee(previousRevenue);
+        BigDecimal currentServiJaFee = defaultMoney(paymentRepository
+                .sumNetPlatformRevenueReleasedBetween(
+                        currentRange.startDateTime(),
+                        currentRange.endExclusiveDateTime()));
+        BigDecimal previousServiJaFee = defaultMoney(paymentRepository
+                .sumNetPlatformRevenueReleasedBetween(
+                        previousRange.startDateTime(),
+                        previousRange.endExclusiveDateTime()));
 
         BigDecimal currentAverageTicket = calculateAverageTicket(currentRevenue, currentCompletedServices);
         BigDecimal previousAverageTicket = calculateAverageTicket(previousRevenue, previousCompletedServices);
@@ -318,10 +323,6 @@ public class AdminDashboardService {
                         .contractsCount(item.getTotal())
                         .build())
                 .toList();
-    }
-
-    private BigDecimal calculatePlatformFee(BigDecimal revenue) {
-        return normalizeMoney(revenue.multiply(PLATFORM_FEE_PERCENTAGE));
     }
 
     private BigDecimal calculateAverageTicket(BigDecimal revenue, long completedServices) {

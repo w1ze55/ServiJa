@@ -361,7 +361,6 @@ onMounted(async () => {
                     {{ getStatusLabel(request.status) }}
                   </Badge>
                 </div>
-                <p class="line-clamp-2 text-sm text-[#435574]">{{ request.description }}</p>
                 <div class="mt-3 flex items-center justify-between gap-3 text-xs text-[#435574]">
                   <span>{{ formatApiDate(request.createdAt, { day: '2-digit', month: '2-digit', year: 'numeric' }) }}</span>
                   <span>{{ formatTimeAgoFromApiDate(request.updatedAt || request.createdAt) }}</span>
@@ -446,29 +445,43 @@ onMounted(async () => {
                   </p>
                 </div>
               </div>
-              <Button variant="ghost" class="text-[#286AD8]" @click="handleNavigate('favorites')">
-                Ver tudo
-                <ArrowRight class="ml-2 h-4 w-4" />
-              </Button>
+              <div class="flex items-center gap-2 sm:gap-3">
+                <Tabs v-model="favoritesTab" class="shrink-0">
+                  <TabsList class="grid h-10 grid-cols-2 rounded-2xl bg-slate-100 p-1">
+                    <TabsTrigger
+                      value="services"
+                      class="h-8 w-8 rounded-xl p-0 text-[#435574] data-[state=active]:text-[#286AD8]"
+                      aria-label="Serviços favoritos"
+                      title="Serviços"
+                    >
+                      <Briefcase class="h-4 w-4" />
+                      <span class="sr-only">Serviços</span>
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="professionals"
+                      class="h-8 w-8 rounded-xl p-0 text-[#435574] data-[state=active]:text-[#286AD8]"
+                      aria-label="Profissionais favoritos"
+                      title="Profissionais"
+                    >
+                      <User class="h-4 w-4" />
+                      <span class="sr-only">Profissionais</span>
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
+
+                <Button variant="ghost" class="text-[#286AD8]" @click="handleNavigate('favorites')">
+                  Ver tudo
+                  <ArrowRight class="ml-2 h-4 w-4" />
+                </Button>
+              </div>
             </div>
 
-            <Tabs v-model="favoritesTab" class="w-full">
-              <TabsList class="inline-grid h-auto w-auto min-w-[260px] grid-cols-2 rounded-2xl bg-slate-100 p-1">
-                <TabsTrigger value="services" class="rounded-xl px-5">
-                  Serviços
-                </TabsTrigger>
-                <TabsTrigger value="professionals" class="rounded-xl px-5">
-                  Profissionais
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
-
-            <div v-if="favoritePreviewItems.length" class="mt-4 space-y-3">
+            <div v-if="favoritePreviewItems.length" class="space-y-3">
               <template v-if="favoritesTab === 'services'">
                 <button
                   v-for="service in favoriteServices"
                   :key="service.id"
-                  class="w-full rounded-2xl border border-slate-100 p-4 text-left transition-colors hover:border-[#286AD8]/25 hover:bg-slate-50"
+                  class="flex min-h-[112px] w-full flex-col justify-between rounded-2xl border border-slate-100 p-4 text-left transition-colors hover:border-[#286AD8]/25 hover:bg-slate-50"
                   @click="handleViewService({ providerId: service.freelancerId, serviceId: service.id })"
                 >
                   <div class="mb-2 flex items-start justify-between gap-3">
@@ -491,7 +504,7 @@ onMounted(async () => {
                 <button
                   v-for="freelancer in favoriteProfessionals"
                   :key="freelancer.id"
-                  class="w-full rounded-2xl border border-slate-100 p-4 text-left transition-colors hover:border-[#286AD8]/25 hover:bg-slate-50"
+                  class="flex min-h-[112px] w-full flex-col justify-between rounded-2xl border border-slate-100 p-4 text-left transition-colors hover:border-[#286AD8]/25 hover:bg-slate-50"
                   @click="handleViewProfile(freelancer.id)"
                 >
                   <div class="mb-2 flex items-start justify-between gap-3">
@@ -508,7 +521,7 @@ onMounted(async () => {
                       <Heart class="h-4 w-4 fill-current" />
                     </button>
                   </div>
-                  <div class="flex items-center justify-between gap-3 text-xs text-[#435574]">
+                  <div class="mt-3 flex items-center justify-between gap-3 text-xs text-[#435574]">
                     <span class="truncate">{{ freelancer.location || 'Localização não informada' }}</span>
                     <span>{{ Number(freelancer.rating || 0).toFixed(1) }} ★</span>
                   </div>

@@ -51,22 +51,29 @@ public class PlatformWalletService {
             return false;
         }
 
-        BigDecimal platformFee = lockedPayment.getPlatformFee();
-        if (platformFee == null || platformFee.compareTo(BigDecimal.ZERO) <= 0) {
+        BigDecimal netPlatformFee = resolveNetPlatformFee(lockedPayment);
+        if (netPlatformFee.compareTo(BigDecimal.ZERO) <= 0) {
             lockedPayment.setPlatformFeeReleasedAt(LocalDateTime.now());
             paymentRepository.save(lockedPayment);
+            log.warn("Pagamento {} nao possui receita liquida para liberar na carteira da plataforma", lockedPayment.getId());
             return false;
         }
 
         PlatformWallet wallet = lockWallet();
-        wallet.creditPlatformFee(platformFee);
+        wallet.creditPlatformFee(netPlatformFee);
         lockedPayment.setPlatformFeeReleasedAt(LocalDateTime.now());
 
         platformWalletRepository.save(wallet);
         paymentRepository.save(lockedPayment);
 
-        log.info("Taxa da plataforma liberada para pagamento {}: R$ {}", lockedPayment.getId(), platformFee);
+        log.info("Receita liquida da plataforma liberada para pagamento {}: R$ {}", lockedPayment.getId(), netPlatformFee);
         return true;
+    }
+
+    private BigDecimal resolveNetPlatformFee(Payment payment) {
+        BigDecimal platformFee = payment.getPlatformFee() != null ? payment.getPlatformFee() : BigDecimal.ZERO;
+        BigDecimal gatewayFee = payment.getGatewayFee() != null ? payment.getGatewayFee() : BigDecimal.ZERO;
+        return platformFee.subtract(gatewayFee);
     }
 
     private PlatformWallet createWallet() {

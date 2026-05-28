@@ -40,6 +40,7 @@ class PlatformWalletTransactionServiceTest {
         Payment payment = Payment.builder()
                 .id(1L)
                 .platformFee(new BigDecimal("25.00"))
+                .gatewayFee(new BigDecimal("1.99"))
                 .paymentMethod("PIX")
                 .platformFeeReleasedAt(LocalDateTime.of(2026, 5, 10, 10, 0))
                 .build();
@@ -65,6 +66,7 @@ class PlatformWalletTransactionServiceTest {
         assertThat(result.get(0).getType()).isEqualTo("WITHDRAWAL");
         assertThat(result.get(0).getAmount()).isEqualByComparingTo(new BigDecimal("-200.00"));
         assertThat(result.get(1).getType()).isEqualTo("FEE");
+        assertThat(result.get(1).getAmount()).isEqualByComparingTo(new BigDecimal("23.01"));
         assertThat(result.get(1).getReferenceLabel()).isEqualTo("Pagamento #1");
         assertThat(result.get(1).getServiceName()).contains("Serv");
     }
@@ -75,6 +77,7 @@ class PlatformWalletTransactionServiceTest {
         Payment inside = Payment.builder()
                 .id(1L)
                 .platformFee(new BigDecimal("15.00"))
+                .gatewayFee(new BigDecimal("3.48"))
                 .paymentMethod("CARD")
                 .platformFeeReleasedAt(LocalDateTime.of(2026, 5, 10, 10, 0))
                 .build();
@@ -82,6 +85,7 @@ class PlatformWalletTransactionServiceTest {
         Payment outside = Payment.builder()
                 .id(2L)
                 .platformFee(new BigDecimal("20.00"))
+                .gatewayFee(new BigDecimal("1.99"))
                 .paymentMethod("PIX")
                 .platformFeeReleasedAt(LocalDateTime.of(2026, 5, 20, 10, 0))
                 .build();
@@ -99,6 +103,7 @@ class PlatformWalletTransactionServiceTest {
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getId()).isEqualTo(1L);
         assertThat(result.get(0).getType()).isEqualTo("FEE");
+        assertThat(result.get(0).getAmount()).isEqualByComparingTo(new BigDecimal("11.52"));
     }
 
     @Test

@@ -119,6 +119,262 @@ const parseAmount = (value: string) => {
   return Number.isFinite(parsed) ? parsed : 0
 }
 
+const PIX_KEY_EMAIL_MAX_LENGTH = 256
+
+const formatCpf = (value: string) => {
+  const digits = value.replace(/\D/g, '').slice(0, 11)
+
+  if (digits.length <= 3) return digits
+  if (digits.length <= 6) return `${digits.slice(0, 3)}.${digits.slice(3)}`
+  if (digits.length <= 9) return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6)}`
+  return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`
+}
+
+const formatCnpj = (value: string) => {
+  const digits = value.replace(/\D/g, '').slice(0, 14)
+
+  if (digits.length <= 2) return digits
+  if (digits.length <= 5) return `${digits.slice(0, 2)}.${digits.slice(2)}`
+  if (digits.length <= 8) return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5)}`
+  if (digits.length <= 12) return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8)}`
+  return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8, 12)}-${digits.slice(12)}`
+}
+
+const formatPhone = (value: string) => {
+  const digits = value.replace(/\D/g, '').slice(0, 11)
+
+  if (digits.length <= 2) return digits
+  if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`
+  if (digits.length <= 10) return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`
+}
+
+const validateCpf = (value: string) => {
+  const digits = value.replace(/\D/g, '')
+
+  if (digits.length !== 11) return false
+  if (/^(\d)\1{10}$/.test(digits)) return false
+
+  let sum = 0
+  let remainder = 0
+
+  for (let index = 1; index <= 9; index += 1) {
+    sum += Number(digits.substring(index - 1, index)) * (11 - index)
+  }
+
+  remainder = (sum * 10) % 11
+  if (remainder === 10 || remainder === 11) remainder = 0
+  if (remainder !== Number(digits.substring(9, 10))) return false
+
+  sum = 0
+  for (let index = 1; index <= 10; index += 1) {
+    sum += Number(digits.substring(index - 1, index)) * (12 - index)
+  }
+
+  remainder = (sum * 10) % 11
+  if (remainder === 10 || remainder === 11) remainder = 0
+  return remainder === Number(digits.substring(10, 11))
+}
+
+const validateCnpj = (value: string) => {
+  const digits = value.replace(/\D/g, '')
+
+  if (digits.length !== 14) return false
+  if (/^(\d)\1{13}$/.test(digits)) return false
+
+  const calculateDigit = (base: string, factors: number[]) => {
+    const total = base
+      .split('')
+      .reduce((sum, digit, index) => sum + Number(digit) * factors[index], 0)
+
+    const remainder = total % 11
+    return remainder < 2 ? 0 : 11 - remainder
+  }
+
+  const firstDigit = calculateDigit(digits.slice(0, 12), [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2])
+  const secondDigit = calculateDigit(digits.slice(0, 13), [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2])
+
+  return firstDigit === Number(digits[12]) && secondDigit === Number(digits[13])
+}
+
+const validateEmail = (value: string) =>
+  !!value && value.length <= PIX_KEY_EMAIL_MAX_LENGTH && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+
+const getPixKeyDigits = (value: string) => value.replace(/\D/g, '')
+
+const getPixKeyDigitLimit = (type: PixKeyType) => {
+  if (type === 'CPF' || type === 'PHONE') return 11
+  if (type === 'CNPJ') return 14
+  return null
+}
+
+const isNumericPixKeyType = (type: PixKeyType) => type === 'CPF' || type === 'CNPJ' || type === 'PHONE'
+
+const shouldBlockNonNumericPixKeyInput = (type: PixKeyType, event: InputEvent) => {
+  if (!isNumericPixKeyType(type) || !event.data || event.inputType !== 'insertText') {
+    return false
+  }
+
+  return /\D/.test(event.data)
+}
+
+const formatPixKeyValue = (value: string, type: PixKeyType) => {
+  if (type === 'CPF') return formatCpf(value)
+  if (type === 'CNPJ') return formatCnpj(value)
+  if (type === 'PHONE') return formatPhone(value)
+  if (type === 'EMAIL') return value.trim().slice(0, PIX_KEY_EMAIL_MAX_LENGTH)
+  return value.trim()
+}
+
+const normalizePixKeyValue = (value: string, type: PixKeyType) => {
+  if (type === 'CPF' || type === 'CNPJ' || type === 'PHONE') {
+    return getPixKeyDigits(value)
+  }
+
+  return value.trim()
+}
+
+const getPixKeyMaxLength = (type: PixKeyType) => {
+  if (type === 'CPF') return formatCpf('9'.repeat(11)).length
+  if (type === 'CNPJ') return formatCnpj('9'.repeat(14)).length
+  if (type === 'PHONE') return formatPhone('9'.repeat(11)).length
+  if (type === 'EMAIL') return PIX_KEY_EMAIL_MAX_LENGTH
+  return 255
+}
+
+const getPixKeyInputMode = (type: PixKeyType) => {
+  if (type === 'EMAIL') return 'email'
+  if (type === 'RANDOM') return 'text'
+  return 'numeric'
+}
+
+const getPixKeyPlaceholder = (type: PixKeyType) => {
+  if (type === 'CPF') return '000.000.000-00'
+  if (type === 'CNPJ') return '00.000.000/0000-00'
+  if (type === 'EMAIL') return 'email@exemplo.com'
+  if (type === 'PHONE') return '(11) 99999-9999'
+  return 'Informe a chave PIX'
+}
+
+const getPixKeyError = (value: string, type: PixKeyType) => {
+  const normalizedValue = normalizePixKeyValue(value, type)
+
+  if (!normalizedValue) {
+    return 'Informe a chave PIX.'
+  }
+
+  if (type === 'CPF' && !validateCpf(value)) {
+    return 'Informe um CPF válido para a chave PIX.'
+  }
+
+  if (type === 'CNPJ' && !validateCnpj(value)) {
+    return 'Informe um CNPJ válido para a chave PIX.'
+  }
+
+  if (type === 'EMAIL' && !validateEmail(normalizedValue)) {
+    return 'Informe um e-mail válido para a chave PIX.'
+  }
+
+  if (type === 'PHONE' && normalizedValue.length !== 11) {
+    return 'Informe um telefone com 11 dígitos para a chave PIX.'
+  }
+
+  return ''
+}
+
+const newPixKeyPlaceholder = computed(() => getPixKeyPlaceholder(newPixKeyType.value))
+const newPixKeyMaxLength = computed(() => getPixKeyMaxLength(newPixKeyType.value))
+const newPixKeyInputMode = computed(() => getPixKeyInputMode(newPixKeyType.value))
+
+const handleNewPixKeyInput = (event: Event) => {
+  const target = event.target as HTMLInputElement
+  newPixKey.value = formatPixKeyValue(target.value, newPixKeyType.value)
+}
+
+const handleNewPixKeyBeforeInput = (event: InputEvent) => {
+  if (shouldBlockNonNumericPixKeyInput(newPixKeyType.value, event)) {
+    event.preventDefault()
+    return
+  }
+
+  const digitLimit = getPixKeyDigitLimit(newPixKeyType.value)
+  const target = event.target as HTMLInputElement | null
+  const insertedDigits = getPixKeyDigits(event.data ?? '')
+
+  if (!digitLimit || !target || !insertedDigits) {
+    return
+  }
+
+  const selectionStart = target.selectionStart ?? target.value.length
+  const selectionEnd = target.selectionEnd ?? selectionStart
+  const selectedDigits = getPixKeyDigits(target.value.slice(selectionStart, selectionEnd)).length
+  const nextDigitsCount = getPixKeyDigits(target.value).length - selectedDigits + insertedDigits.length
+
+  if (nextDigitsCount > digitLimit) {
+    event.preventDefault()
+  }
+}
+
+const getNewPixKeyError = () => getPixKeyError(newPixKey.value, newPixKeyType.value)
+
+const getHolderCpfCnpjDigits = (value = newHolderCpfCnpj.value) =>
+  value.replace(/\D/g, '').slice(0, 14)
+
+const formatHolderCpfCnpj = (value: string) => {
+  const digits = getHolderCpfCnpjDigits(value)
+  return digits.length <= 11 ? formatCpf(digits) : formatCnpj(digits)
+}
+
+const holderCpfCnpjPlaceholder = computed(() =>
+  getHolderCpfCnpjDigits().length > 11 ? '00.000.000/0000-00' : '000.000.000-00'
+)
+
+const handleHolderCpfCnpjInput = (event: Event) => {
+  const target = event.target as HTMLInputElement
+  newHolderCpfCnpj.value = formatHolderCpfCnpj(target.value)
+}
+
+const handleHolderCpfCnpjBeforeInput = (event: InputEvent) => {
+  if (event.inputType === 'insertText' && event.data && /\D/.test(event.data)) {
+    event.preventDefault()
+    return
+  }
+
+  const target = event.target as HTMLInputElement | null
+  const insertedDigits = (event.data ?? '').replace(/\D/g, '')
+
+  if (!target || !insertedDigits) {
+    return
+  }
+
+  const selectionStart = target.selectionStart ?? target.value.length
+  const selectionEnd = target.selectionEnd ?? selectionStart
+  const selectedDigits = target.value.slice(selectionStart, selectionEnd).replace(/\D/g, '').length
+  const nextDigitsCount = target.value.replace(/\D/g, '').length - selectedDigits + insertedDigits.length
+
+  if (nextDigitsCount > 14) {
+    event.preventDefault()
+  }
+}
+
+const getHolderCpfCnpjError = () => {
+  const digits = getHolderCpfCnpjDigits()
+
+  if (!digits) {
+    return 'Informe o CPF/CNPJ do titular.'
+  }
+
+  if (digits.length <= 11) {
+    return validateCpf(newHolderCpfCnpj.value) ? '' : 'Informe um CPF válido para o titular.'
+  }
+
+  if (digits.length !== 14) {
+    return 'Informe um CNPJ com 14 dígitos para o titular.'
+  }
+
+  return validateCnpj(newHolderCpfCnpj.value) ? '' : 'Informe um CNPJ válido para o titular.'
+}
+
 const formatStatusLabel = (status?: string) => {
   switch (status) {
     case 'COMPLETED':
@@ -191,8 +447,8 @@ const summaryCards = computed(() => [
   },
   {
     key: 'earned',
-    title: 'Taxas acumuladas',
-    subtitle: 'Total de 5% liberado em serviços concluídos',
+    title: 'Receita liquida acumulada',
+    subtitle: 'Total apropriado apos as taxas da Asaas',
     value: formatCurrency(wallet.value?.totalEarned),
     icon: ReceiptText,
     iconWrapper: 'bg-blue-100',
@@ -272,10 +528,13 @@ const buildAccountPayload = (): AdminPlatformCreateBankAccountRequest => ({
   accountDigit: newAccountType.value === 'BANK_ACCOUNT' ? newAccountDigit.value.trim() : undefined,
   accountBankType:
     newAccountType.value === 'BANK_ACCOUNT' ? newAccountBankType.value : undefined,
-  pixKey: newAccountType.value === 'PIX_KEY' ? newPixKey.value.trim() : undefined,
+  pixKey:
+    newAccountType.value === 'PIX_KEY'
+      ? normalizePixKeyValue(newPixKey.value, newPixKeyType.value)
+      : undefined,
   pixKeyType: newAccountType.value === 'PIX_KEY' ? newPixKeyType.value : undefined,
   holderName: newHolderName.value.trim(),
-  holderCpfCnpj: newHolderCpfCnpj.value.trim(),
+  holderCpfCnpj: getHolderCpfCnpjDigits(),
   isDefault: newIsDefault.value,
 })
 
@@ -284,13 +543,15 @@ const validateAccountForm = () => {
     return 'Informe o nome do titular.'
   }
 
-  if (!newHolderCpfCnpj.value.trim()) {
-    return 'Informe o CPF/CNPJ do titular.'
+  const holderCpfCnpjError = getHolderCpfCnpjError()
+  if (holderCpfCnpjError) {
+    return holderCpfCnpjError
   }
 
   if (newAccountType.value === 'PIX_KEY') {
-    if (!newPixKey.value.trim()) {
-      return 'Informe a chave PIX.'
+    const pixKeyError = getNewPixKeyError()
+    if (pixKeyError) {
+      return pixKeyError
     }
     return ''
   }
@@ -393,6 +654,10 @@ watch(
   }
 )
 
+watch(newPixKeyType, (value) => {
+  newPixKey.value = formatPixKeyValue(newPixKey.value, value)
+})
+
 onMounted(() => {
   store.loadAll().catch(() => {
     toast.error(store.errorMessage || 'Não foi possível carregar a carteira da plataforma.')
@@ -405,7 +670,7 @@ onMounted(() => {
     <div class="space-y-6">
       <PageHeader
         title="Carteira da Plataforma"
-        subtitle="Gerencie o saldo institucional da Servi Já, as contas globais de saque e o histórico das taxas de 5%."
+        subtitle="Gerencie o saldo institucional da Servi Já, as contas globais de saque e o historico da receita liquida da plataforma."
       >
         <template #actions>
           <div class="flex flex-col gap-2 sm:flex-row">
@@ -477,7 +742,7 @@ onMounted(() => {
         </div>
 
         <div class="grid grid-cols-1 gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-          <Card radius="3xl">
+          <Card radius="3xl" class="xl:col-span-2">
             <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <h2 class="text-xl font-semibold text-slate-900">Contas de saque da plataforma</h2>
@@ -597,7 +862,7 @@ onMounted(() => {
                   :class="store.transactionType === 'FEE' ? 'bg-slate-900 text-white' : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'"
                   @click="store.transactionType = 'FEE'"
                 >
-                  Taxas
+                  Receitas
                 </button>
                 <button
                   type="button"
@@ -880,10 +1145,14 @@ onMounted(() => {
                   <div class="space-y-1">
                     <label class="text-sm font-medium text-slate-700">Chave PIX</label>
                     <input
-                      v-model="newPixKey"
+                      :value="newPixKey"
                       type="text"
+                      :inputmode="newPixKeyInputMode"
+                      :maxlength="newPixKeyMaxLength"
                       class="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-                      placeholder="Informe a chave PIX"
+                      :placeholder="newPixKeyPlaceholder"
+                      @beforeinput="handleNewPixKeyBeforeInput"
+                      @input="handleNewPixKeyInput"
                     />
                   </div>
                 </div>
@@ -971,10 +1240,14 @@ onMounted(() => {
                 <div class="space-y-1">
                   <label class="text-sm font-medium text-slate-700">CPF/CNPJ do titular</label>
                   <input
-                    v-model="newHolderCpfCnpj"
+                    :value="newHolderCpfCnpj"
                     type="text"
+                    inputmode="numeric"
+                    maxlength="18"
                     class="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-                    placeholder="Somente números ou valor formatado"
+                    :placeholder="holderCpfCnpjPlaceholder"
+                    @beforeinput="handleHolderCpfCnpjBeforeInput"
+                    @input="handleHolderCpfCnpjInput"
                   />
                 </div>
               </div>

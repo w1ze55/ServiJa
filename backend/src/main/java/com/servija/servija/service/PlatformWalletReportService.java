@@ -96,7 +96,7 @@ public class PlatformWalletReportService {
             summaryRowIndex = createKeyValueRow(summarySheet, summaryRowIndex, "Tipo de transação", normalizeTypeLabel(type), null);
             summaryRowIndex = createKeyValueRow(summarySheet, summaryRowIndex, "Período", buildPeriodLabel(dateFrom, dateTo), null);
             summaryRowIndex++;
-            summaryRowIndex = createKeyValueRow(summarySheet, summaryRowIndex, "Taxas acumuladas", formatBRL(wallet.getTotalEarned()), headerStyle);
+            summaryRowIndex = createKeyValueRow(summarySheet, summaryRowIndex, "Receita liquida acumulada", formatBRL(wallet.getTotalEarned()), headerStyle);
             summaryRowIndex = createKeyValueRow(summarySheet, summaryRowIndex, "Disponível para saque", formatBRL(wallet.getAvailableBalance()), null);
             summaryRowIndex = createKeyValueRow(summarySheet, summaryRowIndex, "Em processamento", formatBRL(wallet.getReservedBalance()), null);
             createKeyValueRow(summarySheet, summaryRowIndex, "Total sacado", formatBRL(wallet.getTotalWithdrawn()), null);
@@ -156,7 +156,7 @@ public class PlatformWalletReportService {
             document.add(new Paragraph("Período: " + buildPeriodLabel(dateFrom, dateTo)));
             document.add(new Paragraph(" "));
             document.add(new Paragraph("Resumo", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12)));
-            document.add(new Paragraph("Taxas acumuladas: " + formatBRL(wallet.getTotalEarned())));
+            document.add(new Paragraph("Receita liquida acumulada: " + formatBRL(wallet.getTotalEarned())));
             document.add(new Paragraph("Disponível para saque: " + formatBRL(wallet.getAvailableBalance())));
             document.add(new Paragraph("Em processamento: " + formatBRL(wallet.getReservedBalance())));
             document.add(new Paragraph("Total sacado: " + formatBRL(wallet.getTotalWithdrawn())));
@@ -220,7 +220,7 @@ public class PlatformWalletReportService {
 
     private String translateTransactionType(String type) {
         if (type == null) return "-";
-        return "FEE".equals(type) ? "Taxa" : "Saque";
+        return "FEE".equals(type) ? "Receita liquida" : "Saque";
     }
 
     private String translateStatus(String status) {
@@ -239,7 +239,7 @@ public class PlatformWalletReportService {
         if (type == null || type.isBlank() || "ALL".equalsIgnoreCase(type)) {
             return "Todos";
         }
-        return "FEE".equalsIgnoreCase(type) ? "Taxas" : "Saques";
+        return "FEE".equalsIgnoreCase(type) ? "Receitas liquidas" : "Saques";
     }
 
     private String buildPeriodLabel(LocalDate dateFrom, LocalDate dateTo) {

@@ -139,7 +139,7 @@ const primaryCards = computed(() => {
       title: 'Faturamento Servi Já',
       value: formatCurrency(summary.value.serviJaFee.current),
       supportingText: `vs ${formatCurrency(summary.value.serviJaFee.previous)} ${comparisonLabel.value}`,
-      subtitle: 'Taxa fixa de 5% sobre o faturamento',
+      subtitle: 'Receita líquida após taxas e repasses',
       changePercent: summary.value.serviJaFee.changePercent,
       icon: BadgeDollarSign,
       iconWrapper: 'bg-blue-100',

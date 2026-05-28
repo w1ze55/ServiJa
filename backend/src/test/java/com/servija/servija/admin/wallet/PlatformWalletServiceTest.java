@@ -148,7 +148,8 @@ class PlatformWalletServiceTest {
         Payment payment = Payment.builder()
                 .id(1L)
                 .status(Payment.PaymentStatus.COMPLETED)
-                .platformFee(new BigDecimal("50.00"))
+                .platformFee(new BigDecimal("5.00"))
+                .gatewayFee(new BigDecimal("1.99"))
                 .build();
 
         when(paymentRepository.lockById(1L)).thenReturn(Optional.of(payment));
@@ -159,8 +160,8 @@ class PlatformWalletServiceTest {
         boolean released = platformWalletService.releasePlatformFeeIfNeeded(payment);
 
         assertThat(released).isTrue();
-        assertThat(wallet.getAvailableBalance()).isEqualByComparingTo(new BigDecimal("150.00"));
-        assertThat(wallet.getTotalEarned()).isEqualByComparingTo(new BigDecimal("350.00"));
+        assertThat(wallet.getAvailableBalance()).isEqualByComparingTo(new BigDecimal("103.01"));
+        assertThat(wallet.getTotalEarned()).isEqualByComparingTo(new BigDecimal("303.01"));
         assertThat(wallet.getReservedBalance()).isEqualByComparingTo(new BigDecimal("20.00"));
         assertThat(payment.getPlatformFeeReleasedAt()).isNotNull();
         verify(platformWalletRepository).save(wallet);
