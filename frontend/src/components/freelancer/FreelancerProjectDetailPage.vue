@@ -453,7 +453,7 @@ const handleUploadFiles = async () => {
       </div>
 
       <div v-if="project" class="flex items-center gap-2 flex-wrap justify-end">
-        <Button v-if="canCompleteAdjustment" @click="showCompleteAdjustmentDialog = true" variant="warning">
+        <Button v-if="canCompleteAdjustment" @click="showCompleteAdjustmentDialog = true" variant="default">
           <CheckCircle class="h-4 w-4 mr-2" />
           Finalizar Ajustes
         </Button>
@@ -858,14 +858,13 @@ const handleUploadFiles = async () => {
             </template>
           </AlertDialogDescription>
         </AlertDialogHeader>
-        <AlertDialogFooter>
+        <AlertDialogFooter class="sm:justify-between">
           <AlertDialogCancel @click="showCompleteAdjustmentDialog = false" :disabled="isCompletingAdjustment">
             Cancelar
           </AlertDialogCancel>
           <AlertDialogAction
             @click="handleCompleteAdjustment"
             :disabled="isCompletingAdjustment"
-            class="bg-warning text-warning-foreground hover:bg-warning/90"
           >
             <Loader2 v-if="isCompletingAdjustment" class="h-4 w-4 mr-2 animate-spin" />
             <CheckCircle v-else class="h-4 w-4 mr-2" />

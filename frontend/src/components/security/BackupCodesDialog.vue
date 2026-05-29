@@ -41,7 +41,7 @@ function download() {
     <AlertDialogContent>
       <h3 class="text-lg font-semibold">Salve seus códigos de backup</h3>
       <AlertDialogDescription>
-        Estes códigos só serão exibidos uma vez. Guarde-os em um lugar seguro —
+        Estes códigos só serão exibidos uma vez. Guarde-os em um lugar seguro,
         cada código pode substituir o aplicativo autenticador uma única vez.
       </AlertDialogDescription>
 

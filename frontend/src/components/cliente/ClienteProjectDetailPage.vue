@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
+import { useRouter } from 'vue-router';
 import {
   ArrowLeft,
   Clock,
@@ -42,6 +43,7 @@ interface Props {
 }
 
 const props = defineProps<Props>();
+const router = useRouter();
 const store = useClientRequestStore();
 const adjustmentStore = useDeliveryAdjustmentStore();
 
@@ -208,7 +210,7 @@ const handleRequestAdjustments = async (reason: string) => {
 };
 
 const handleGoToChat = () => {
-  activeTab.value = 'messages';
+  router.push(`/chat/${props.requestId}`);
 };
 
 const resetProjectFileInput = () => {
@@ -526,7 +528,7 @@ const getStatusColor = (status: string) => {
             </div>
           </div>
 
-          <Button variant="outline" class="w-full mt-6 rounded-full border-primary text-primary" @click="activeTab = 'messages'">
+          <Button variant="outline" class="w-full mt-6 rounded-full border-primary text-primary" @click="handleGoToChat">
             <MessageSquare class="h-4 w-4 mr-2" />
             Abrir Chat
           </Button>

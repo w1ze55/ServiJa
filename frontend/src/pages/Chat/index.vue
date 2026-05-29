@@ -2,6 +2,9 @@
 import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import MainLayout from '@/components/layout/MainLayout.vue';
+import Avatar from '@/components/ui/avatar.vue';
+import AvatarImage from '@/components/ui/avatar-image.vue';
+import AvatarFallback from '@/components/ui/avatar-fallback.vue';
 import type { ChatMessage } from '@/components/shared/ChatBox.vue';
 import FileAttachment from '@/components/shared/FileAttachment.vue';
 import Textarea from '@/components/ui/textarea.vue';
@@ -28,6 +31,7 @@ import {
   ChevronRight,
   ChevronDown,
   CheckCircle2,
+  CheckCheck,
 } from 'lucide-vue-next';
 
 const IMAGE_EXT_RE = /\.(jpg|jpeg|png|gif|webp|bmp|svg)(\?.*)?$/i;
@@ -151,7 +155,28 @@ const showSidebarMobile = ref(false);
 
 const messagesContainer = ref<HTMLElement | null>(null);
 
-const { onMessage, connect, disconnect } = useChatWebSocket();
+const { onMessage, onReadReceipt, connect, disconnect } = useChatWebSocket();
+
+const pendingReadConversationIds = new Set<string>();
+
+async function markAsReadIfVisible(conversationId: string): Promise<void> {
+  if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
+    pendingReadConversationIds.add(conversationId);
+    return;
+  }
+  await chatService.markAsRead(conversationId);
+}
+
+function flushPendingReads() {
+  if (document.visibilityState !== 'visible') return;
+  const ids = Array.from(pendingReadConversationIds);
+  pendingReadConversationIds.clear();
+  for (const id of ids) {
+    chatService.markAsRead(id).catch(() => {
+      pendingReadConversationIds.add(id);
+    });
+  }
+}
 
 const cachedUser = (() => {
   try {
@@ -194,13 +219,51 @@ function displayName(email: string) {
   return email.split('@')[0].replace(/[._]/g, ' ');
 }
 
-function initials(email: string) {
-  const name = displayName(email);
-  return name.charAt(0).toUpperCase() || '?';
+function nameInitials(name: string) {
+  if (!name) return '?';
+  const parts = name
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (parts.length === 0) return '?';
+  if (parts.length === 1) return parts[0].charAt(0).toUpperCase() || '?';
+  return `${parts[0].charAt(0)}${parts[1].charAt(0)}`.toUpperCase();
+}
+
+const requestDetailPath = computed(() =>
+  user.value?.type === 'provider'
+    ? '/freelancer-proposal-detail'
+    : '/cliente-request-detail'
+);
+
+function goToRequestDetail() {
+  if (!activeConversation.value) return;
+  router.push({
+    path: requestDetailPath.value,
+    query: { requestId: activeConversation.value.serviceRequestId },
+  });
 }
 
 function otherParty(conv: ConversationDTO) {
   return user.value?.email === conv.contractorEmail ? conv.providerEmail : conv.contractorEmail;
+}
+
+function otherPartyName(conv: ConversationDTO) {
+  if (user.value?.email === conv.contractorEmail) {
+    return conv.providerName || displayName(conv.providerEmail) || conv.providerEmail;
+  }
+  return conv.contractorName || displayName(conv.contractorEmail) || conv.contractorEmail;
+}
+
+function otherPartyAvatarUrlForConversation(conv: ConversationDTO) {
+  if (user.value?.email === conv.contractorEmail) {
+    return conv.providerAvatarUrl || '';
+  }
+  return conv.contractorAvatarUrl || '';
+}
+
+function otherPartyInitials(conv: ConversationDTO) {
+  return nameInitials(otherPartyName(conv));
 }
 
 function unreadForMe(conv: ConversationDTO): number {
@@ -255,12 +318,15 @@ function formatHour(iso: string) {
 
 function toDisplay(msg: MessageDTO): ChatMessage {
   const isMe = msg.senderId === user.value?.email;
+  const counterpartyName = activeConversation.value ? otherPartyName(activeConversation.value) : '';
   return {
     id: msg.id,
     sender: msg.senderType === 'contractor' ? 'client' : 'freelancer',
-    senderName: isMe ? user.value.name : displayName(msg.senderId),
+    senderName: isMe ? user.value.name : counterpartyName || displayName(msg.senderId),
     message: msg.content,
     timestamp: msg.sentAt,
+    status: msg.status,
+    readAt: msg.readAt,
     attachments: msg.attachmentUrl
       ? [{ id: msg.id, name: 'Anexo', url: msg.attachmentUrl, size: '' }]
       : undefined,
@@ -277,7 +343,11 @@ const filteredConversations = computed(() => {
     return new Date(tb).getTime() - new Date(ta).getTime();
   });
   if (!q) return base;
-  return base.filter((c) => otherParty(c).toLowerCase().includes(q));
+  return base.filter((c) => {
+    const email = otherParty(c).toLowerCase();
+    const name = otherPartyName(c).toLowerCase();
+    return email.includes(q) || name.includes(q);
+  });
 });
 
 const activeConversations = computed(() =>
@@ -331,7 +401,7 @@ async function openConversation(serviceRequestId: number, opts: { pushRoute?: bo
     const page = await chatService.getMessages(conv.id);
     messages.value = page.content.map(toDisplay);
 
-    await chatService.markAsRead(conv.id);
+    await markAsReadIfVisible(conv.id);
     // Zera badge local
     const idx = conversations.value.findIndex((c) => c.id === conv.id);
     if (idx >= 0) {
@@ -350,7 +420,7 @@ async function openConversation(serviceRequestId: number, opts: { pushRoute?: bo
       if (incoming.conversationId !== activeConversation.value.id) return;
       if (messages.value.some((m) => m.id === incoming.id)) return;
       messages.value.push(toDisplay(incoming));
-      chatService.markAsRead(activeConversation.value.id).catch(() => {});
+      markAsReadIfVisible(activeConversation.value.id).catch(() => {});
       // Atualiza preview na lista
       const i = conversations.value.findIndex((c) => c.id === incoming.conversationId);
       if (i >= 0) {
@@ -363,6 +433,14 @@ async function openConversation(serviceRequestId: number, opts: { pushRoute?: bo
           },
         });
       }
+    };
+    onReadReceipt.value = (receipt) => {
+      if (!activeConversation.value) return;
+      if (receipt.conversationId !== activeConversation.value.id) return;
+      const ids = new Set(receipt.messageIds);
+      messages.value = messages.value.map((m) =>
+        ids.has(m.id) ? { ...m, status: 'read', readAt: receipt.readAt } : m
+      );
     };
     connect(conv.id);
     loadingChat.value = false;
@@ -420,10 +498,12 @@ onBeforeUnmount(() => {
   for (const url of Object.values(attachmentPreviews.value)) URL.revokeObjectURL(url);
   window.removeEventListener('keydown', onKeydown);
   window.removeEventListener('service-request-notification', handleServiceRequestNotification);
+  document.removeEventListener('visibilitychange', flushPendingReads);
 });
 
 onMounted(async () => {
   window.addEventListener('keydown', onKeydown);
+  document.addEventListener('visibilitychange', flushPendingReads);
   const userData = localStorage.getItem('user');
   if (!userData) {
     router.push('/login');
@@ -539,6 +619,18 @@ const otherPartyEmail = computed(() =>
   activeConversation.value ? otherParty(activeConversation.value) : ''
 );
 
+const otherPartyDisplayName = computed(() =>
+  activeConversation.value ? otherPartyName(activeConversation.value) : ''
+);
+
+const activeOtherPartyAvatarUrl = computed(() =>
+  activeConversation.value ? otherPartyAvatarUrlForConversation(activeConversation.value) : ''
+);
+
+const otherPartyAvatarInitials = computed(() =>
+  otherPartyDisplayName.value ? nameInitials(otherPartyDisplayName.value) : '?'
+);
+
 const handleNavigate = (page: string, params?: any) => {
   const userType = user.value?.type === 'provider' ? 'provider' : 'contractor';
   navigate(page, userType, params);
@@ -568,15 +660,19 @@ const handleSearch = (query: string) => router.push({ path: '/search', query: { 
             activeConversation && !showSidebarMobile ? 'hidden md:flex' : 'flex',
           ]"
         >
-          <div class="p-4 pl-16 md:pl-4 border-b border-gray-100">
-            <h1 class="text-lg font-semibold text-gray-900 mb-3">Mensagens</h1>
-            <div class="relative">
-              <Search class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <input
-                v-model="searchQuery"
-                placeholder="Buscar conversa..."
-                class="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+          <div class="border-b border-gray-100 pt-6">
+            <div class="px-6 pl-16 md:pl-6">
+            <h1 class="text-lg font-semibold text-gray-900">Mensagens</h1>
+            </div>
+            <div class="mt-5 border-t border-gray-100 px-6 pl-16 pt-4 pb-5 md:pl-6">
+              <div class="relative w-full">
+                <Search class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <input
+                  v-model="searchQuery"
+                  placeholder="Buscar conversa..."
+                  class="w-full rounded-lg border border-gray-200 py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
             </div>
           </div>
 
@@ -611,15 +707,19 @@ const handleSearch = (query: string) => router.push({ path: '/search', query: { 
                         : 'border-transparent',
                     ]"
                   >
-                    <div
-                      class="flex-shrink-0 h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-semibold text-sm"
-                    >
-                      {{ initials(otherParty(conv)) }}
-                    </div>
+                    <Avatar class="h-10 w-10 flex-shrink-0">
+                      <AvatarImage
+                        :src="otherPartyAvatarUrlForConversation(conv)"
+                        :alt="otherPartyName(conv)"
+                      />
+                      <AvatarFallback class="bg-blue-100 text-blue-600 font-semibold text-sm">
+                        {{ otherPartyInitials(conv) }}
+                      </AvatarFallback>
+                    </Avatar>
                     <div class="flex-1 min-w-0">
                       <div class="flex items-center justify-between gap-2">
                         <span class="font-medium text-sm text-gray-900 truncate capitalize">
-                          {{ displayName(otherParty(conv)) || otherParty(conv) }}
+                          {{ otherPartyName(conv) }}
                         </span>
                         <span class="text-[10px] text-gray-400 flex-shrink-0">
                           {{ formatTime(conv.lastMessage?.sentAt) }}
@@ -674,15 +774,19 @@ const handleSearch = (query: string) => router.push({ path: '/search', query: { 
                           : 'border-transparent',
                       ]"
                     >
-                      <div
-                        class="flex-shrink-0 h-10 w-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 font-semibold text-sm"
-                      >
-                        {{ initials(otherParty(conv)) }}
-                      </div>
+                      <Avatar class="h-10 w-10 flex-shrink-0">
+                        <AvatarImage
+                          :src="otherPartyAvatarUrlForConversation(conv)"
+                          :alt="otherPartyName(conv)"
+                        />
+                        <AvatarFallback class="bg-gray-100 text-gray-500 font-semibold text-sm">
+                          {{ otherPartyInitials(conv) }}
+                        </AvatarFallback>
+                      </Avatar>
                       <div class="flex-1 min-w-0">
                         <div class="flex items-center justify-between gap-2">
                           <span class="font-medium text-sm text-gray-700 truncate capitalize">
-                            {{ displayName(otherParty(conv)) || otherParty(conv) }}
+                            {{ otherPartyName(conv) }}
                           </span>
                           <span class="text-[10px] text-gray-400 flex-shrink-0">
                             {{ formatTime(conv.lastMessage?.sentAt) }}
@@ -748,7 +852,7 @@ const handleSearch = (query: string) => router.push({ path: '/search', query: { 
           <template v-else-if="activeConversation">
             <!-- Header da conversa -->
             <header
-              class="flex items-center gap-3 px-4 pl-16 md:pl-4 py-3 bg-white border-b border-gray-200 flex-shrink-0"
+              class="flex flex-shrink-0 items-center gap-3 border-b border-gray-200 bg-white px-6 py-4 pl-16 md:pl-6"
             >
               <button
                 @click="showSidebarMobile = true"
@@ -757,24 +861,30 @@ const handleSearch = (query: string) => router.push({ path: '/search', query: { 
               >
                 <ArrowLeft class="h-5 w-5 text-gray-600" />
               </button>
-              <div
-                class="flex-shrink-0 h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-semibold"
-              >
-                {{ initials(otherPartyEmail) }}
-              </div>
+              <Avatar class="h-10 w-10 flex-shrink-0">
+                <AvatarImage
+                  :src="activeOtherPartyAvatarUrl"
+                  :alt="otherPartyDisplayName || otherPartyEmail"
+                />
+                <AvatarFallback class="bg-blue-100 text-blue-600 font-semibold">
+                  {{ otherPartyAvatarInitials }}
+                </AvatarFallback>
+              </Avatar>
               <div class="flex-1 min-w-0">
                 <h2 class="font-semibold text-gray-900 truncate capitalize">
-                  {{ displayName(otherPartyEmail) || otherPartyEmail }}
+                  {{ otherPartyDisplayName || otherPartyEmail }}
                 </h2>
                 <p class="text-xs text-gray-500">
                   Solicitação #{{ activeConversation.serviceRequestId }}
                 </p>
               </div>
               <button
-                class="p-2 rounded-full hover:bg-gray-100 text-gray-500"
-                title="Mais opções"
+                @click="goToRequestDetail"
+                class="inline-flex items-center gap-2 rounded-full border border-gray-200 px-3 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 hover:text-gray-900"
+                title="Ver solicitação"
               >
-                <MoreVertical class="h-5 w-5" />
+                <ExternalLink class="h-4 w-4" />
+                <span class="hidden sm:inline">Ver solicitação</span>
               </button>
             </header>
 
@@ -790,7 +900,10 @@ const handleSearch = (query: string) => router.push({ path: '/search', query: { 
               class="flex-1 overflow-y-auto px-4 py-4 space-y-4"
               style="background-image: radial-gradient(circle at 1px 1px, rgba(0,0,0,0.04) 1px, transparent 0); background-size: 16px 16px;"
             >
-              <div v-if="messages.length === 0" class="text-center text-gray-400 py-16">
+              <div
+                v-if="messages.length === 0"
+                class="flex min-h-full flex-col items-center justify-center text-center text-gray-400"
+              >
                 <MessageSquare class="h-10 w-10 mx-auto mb-3 text-gray-200" />
                 <p class="text-sm">Nenhuma mensagem ainda. Diga olá!</p>
               </div>
@@ -857,14 +970,24 @@ const handleSearch = (query: string) => router.push({ path: '/search', query: { 
                         />
                       </template>
                     </div>
-                    <p
+                    <div
                       :class="[
-                        'text-[10px] mt-1 text-right',
+                        'text-[10px] mt-1 flex items-center justify-end gap-1',
                         msg.sender === currentUserRole ? 'text-white/70' : 'text-gray-400',
                       ]"
                     >
-                      {{ formatHour(msg.timestamp) }}
-                    </p>
+                      <span>{{ formatHour(msg.timestamp) }}</span>
+                      <CheckCheck
+                        v-if="msg.sender === currentUserRole && msg.status === 'read'"
+                        class="h-3.5 w-3.5 text-sky-300"
+                        aria-label="Visualizado"
+                      />
+                      <CheckCheck
+                        v-else-if="msg.sender === currentUserRole"
+                        class="h-3.5 w-3.5 text-white/50"
+                        aria-label="Enviado"
+                      />
+                    </div>
                   </div>
                 </div>
               </template>

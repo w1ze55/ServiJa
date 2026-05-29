@@ -66,6 +66,10 @@ public class AuditLogContentService {
         return serializeSanitized(snapshot);
     }
 
+    public String serializeResponse(Object response) {
+        return serializeSanitized(response);
+    }
+
     public Object sanitizeValue(Object value) {
         if (value == null) {
             return null;
@@ -89,9 +93,6 @@ public class AuditLogContentService {
             case "LOGIN" -> mapOf("method", firstPresent(data, "method"));
             case "LOGIN_FAILED" -> mapOf("reason", normalizeLoginFailureReason(firstPresent(data, "reason")));
             case "EMAIL_VERIFIED" -> mapOf("attempts", firstPresent(data, "attempts"));
-            case "BANK_ACCOUNT_ADDED" -> mapOf(
-                    "type", normalizeBankAccountType(firstPresent(data, "type", "accountType")),
-                    "keyType", firstPresent(data, "keyType", "pixKeyType"));
             case "WITHDRAWAL_REQUESTED" -> mapOf(
                     "amount", firstPresent(data, "amount"),
                     "method", firstPresent(data, "method", "withdrawalMethod"));
@@ -99,8 +100,15 @@ public class AuditLogContentService {
                     "fieldsChanged", normalizeFieldsChanged(data.get("fieldsChanged")));
             default -> data.containsKey("fieldsChanged")
                     ? mapOf("fieldsChanged", normalizeFieldsChanged(data.get("fieldsChanged")))
-                    : null;
+                    : isCreateAction(action) ? data : null;
         };
+    }
+
+    private boolean isCreateAction(String action) {
+        return action.endsWith("_CREATED")
+                || action.endsWith("_ADDED")
+                || action.endsWith("_REGISTERED")
+                || action.endsWith("_REQUESTED");
     }
 
     private String serializeSanitized(Object value) {
@@ -275,20 +283,6 @@ public class AuditLogContentService {
                     "credentialsinvalidas" -> "invalid_credentials";
             default -> "invalid_credentials";
         };
-    }
-
-    private String normalizeBankAccountType(Object rawType) {
-        if (rawType == null) {
-            return null;
-        }
-        String value = String.valueOf(rawType).trim().toUpperCase(Locale.ROOT);
-        if ("PIX_KEY".equals(value)) {
-            return "PIX";
-        }
-        if ("BANK_ACCOUNT".equals(value)) {
-            return "TED";
-        }
-        return value;
     }
 
     private String normalizeKey(String value) {

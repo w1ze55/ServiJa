@@ -429,7 +429,7 @@ const getStatusColor = (status: string) => {
           <!-- Description -->
           <Card class="p-6">
             <h3 class="font-semibold text-[#263238] mb-3">Descrição do Serviço</h3>
-            <p class="text-[#435574] whitespace-pre-line">{{ request.description }}</p>
+            <p class="text-[#435574] whitespace-pre-line break-words">{{ request.description }}</p>
           </Card>
 
           <!-- Freelancer Response -->
@@ -456,7 +456,7 @@ const getStatusColor = (status: string) => {
 
             <div class="mb-4">
               <p class="text-sm font-medium text-[#263238] mb-2">Escopo do trabalho</p>
-              <p class="text-sm text-[#435574] whitespace-pre-line">
+              <p class="text-sm text-[#435574] whitespace-pre-line break-words">
                 {{ request.freelancerResponse.scope }}
               </p>
             </div>

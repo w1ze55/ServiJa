@@ -63,8 +63,35 @@ class AuditLogContentServiceTest {
 
         assertEquals(
                 Map.of(
-                        "type", "TED",
-                        "keyType", "CPF"),
+                        "accountType", "BANK_ACCOUNT",
+                        "pixKeyType", "CPF",
+                        "pixKeyValue", "[REDACTED]",
+                        "holderCpfCnpj", "**901"),
+                readMap(payloadJson));
+    }
+
+    @Test
+    void serializesCreatedEntityPayloadWithSubmittedFields() throws Exception {
+        String payloadJson = auditLogContentService.serializePayload(
+                "ADDRESS_CREATED",
+                Map.of(
+                        "label", "Trabalho 2",
+                        "street", "Avenida Leoberto Leal",
+                        "number", "100",
+                        "city", "Sao Jose",
+                        "state", "SC",
+                        "zipCode", "88110-000",
+                        "isDefault", false));
+
+        assertEquals(
+                Map.of(
+                        "label", "Trabalho 2",
+                        "street", "Avenida Leoberto Leal",
+                        "number", "100",
+                        "city", "Sao Jose",
+                        "state", "SC",
+                        "zipCode", "88110-000",
+                        "isDefault", false),
                 readMap(payloadJson));
     }
 
@@ -125,6 +152,21 @@ class AuditLogContentServiceTest {
         assertEquals("*", sanitized.get("agency"));
         assertEquals("[REDACTED]", sanitized.get("bankCode"));
         assertEquals("**321", sanitized.get("holderCpfCnpj"));
+    }
+
+    @Test
+    void serializesResponseSnapshotWithSanitization() throws Exception {
+        String responseJson = auditLogContentService.serializeResponse(Map.of(
+                "id", 10,
+                "accountNumber", "12345678",
+                "holderCpfCnpj", "12345678901",
+                "label", "Conta removida"));
+
+        Map<String, Object> sanitized = readMap(responseJson);
+        assertEquals(10, sanitized.get("id"));
+        assertEquals("**5678", sanitized.get("accountNumber"));
+        assertEquals("**901", sanitized.get("holderCpfCnpj"));
+        assertEquals("Conta removida", sanitized.get("label"));
     }
 
     private Map<String, Object> readMap(String json) throws Exception {

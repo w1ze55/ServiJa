@@ -1,5 +1,6 @@
 package com.servija.servija.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.servija.servija.model.AuditLog;
 import com.servija.servija.model.User;
 import com.servija.servija.service.AuditLogger;
@@ -9,7 +10,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
+import org.springframework.web.util.ContentCachingRequestWrapper;
+import org.springframework.web.util.ContentCachingResponseWrapper;
 
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -100,6 +105,7 @@ public class AuditInterceptor implements HandlerInterceptor {
     );
 
     private final AuditLogger auditLogger;
+    private final ObjectMapper objectMapper;
 
     @Override
     public void afterCompletion(HttpServletRequest request,
@@ -122,6 +128,15 @@ public class AuditInterceptor implements HandlerInterceptor {
             String action = mapping != null ? mapping.action() : (request.getMethod() + "_" + bestEffortResource(request.getRequestURI()));
             String entityType = mapping != null ? mapping.entityType() : null;
             String entityId = mapping != null ? mapping.extractEntityId(request.getRequestURI()) : null;
+            Object requestPayload = shouldAttachRequestPayload(request, action, result, ex)
+                    ? parseCachedRequestBody(request)
+                    : null;
+            Object responsePayload = shouldAttachResponsePayload(request, action, result, ex)
+                    ? parseCachedResponseBody(response)
+                    : null;
+            if ((entityId == null || entityId.isBlank()) && responsePayload instanceof Map<?, ?> map && map.get("id") != null) {
+                entityId = String.valueOf(map.get("id"));
+            }
 
             String ip = auditLogger.extractIp(request);
             String ua = auditLogger.truncate(request.getHeader("User-Agent"), 512);
@@ -140,7 +155,10 @@ public class AuditInterceptor implements HandlerInterceptor {
                     .result(result)
                     .ipAddress(auditLogger.truncate(ip, 64))
                     .userAgent(ua)
-                    .payload(ex != null ? auditLogger.serializePayload(Map.of("error", ex.getClass().getSimpleName(), "message", ex.getMessage() == null ? "" : ex.getMessage())) : null)
+                    .payload(ex != null
+                            ? auditLogger.serializePayload(Map.of("error", ex.getClass().getSimpleName(), "message", ex.getMessage() == null ? "" : ex.getMessage()))
+                            : auditLogger.serializePayload(action, requestPayload))
+                    .response(auditLogger.serializeResponse(responsePayload))
                     .build();
 
             auditLogger.recordRaw(logEntry);
@@ -159,6 +177,88 @@ public class AuditInterceptor implements HandlerInterceptor {
             if (uri.startsWith(prefix)) return false;
         }
         return uri.startsWith("/api/");
+    }
+
+    private boolean shouldAttachRequestPayload(HttpServletRequest request, String action, AuditLog.Result result, Exception ex) {
+        return ex == null
+                && result == AuditLog.Result.SUCCESS
+                && "POST".equals(request.getMethod())
+                && action != null
+                && isCreateAction(action);
+    }
+
+    private boolean shouldAttachResponsePayload(HttpServletRequest request, String action, AuditLog.Result result, Exception ex) {
+        if (ex != null || result != AuditLog.Result.SUCCESS || action == null) {
+            return false;
+        }
+        return ("POST".equals(request.getMethod()) && isCreateAction(action))
+                || ("DELETE".equals(request.getMethod()) && isDeleteAction(action));
+    }
+
+    private boolean isCreateAction(String action) {
+        return action.endsWith("_CREATED")
+                || action.endsWith("_ADDED")
+                || action.endsWith("_REGISTERED")
+                || action.endsWith("_REQUESTED");
+    }
+
+    private boolean isDeleteAction(String action) {
+        return action.endsWith("_DELETED")
+                || action.endsWith("_REMOVED")
+                || action.endsWith("_CANCELLED");
+    }
+
+    private Object parseCachedRequestBody(HttpServletRequest request) {
+        if (!(request instanceof ContentCachingRequestWrapper wrapper)) {
+            return null;
+        }
+        return parseCachedBody(wrapper.getContentAsByteArray(), request.getCharacterEncoding(), request.getContentType());
+    }
+
+    private Object parseCachedResponseBody(HttpServletResponse response) {
+        if (!(response instanceof ContentCachingResponseWrapper wrapper)) {
+            return null;
+        }
+        return parseCachedBody(wrapper.getContentAsByteArray(), response.getCharacterEncoding(), response.getContentType());
+    }
+
+    private Object parseCachedBody(byte[] content, String encoding, String contentType) {
+        if (content == null || content.length == 0 || !isJsonLikeContent(content, contentType)) {
+            return null;
+        }
+        String raw = new String(content, resolveCharset(encoding)).trim();
+        if (raw.isBlank()) {
+            return null;
+        }
+        try {
+            return objectMapper.readValue(raw, Object.class);
+        } catch (Exception ignored) {
+            return raw;
+        }
+    }
+
+    private boolean isJsonLikeContent(byte[] content, String contentType) {
+        if (contentType != null && contentType.toLowerCase().contains("json")) {
+            return true;
+        }
+        for (byte item : content) {
+            char c = (char) item;
+            if (!Character.isWhitespace(c)) {
+                return c == '{' || c == '[';
+            }
+        }
+        return false;
+    }
+
+    private Charset resolveCharset(String encoding) {
+        if (encoding == null || encoding.isBlank()) {
+            return StandardCharsets.UTF_8;
+        }
+        try {
+            return Charset.forName(encoding);
+        } catch (Exception ignored) {
+            return StandardCharsets.UTF_8;
+        }
     }
 
     private Mapping matchMapping(String method, String uri) {

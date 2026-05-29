@@ -96,7 +96,18 @@ public class CategoryCatalogService {
                 .sortOrder(request.getSortOrder())
                 .active(true)
                 .build());
-        return toCategoryResponse(category);
+        ServiceCategoryResponse response = toCategoryResponse(category);
+        auditLogger.recordSemantic(
+                "CATEGORY_CREATED",
+                "CATEGORY",
+                String.valueOf(category.getId()),
+                category.getName(),
+                com.servija.servija.model.AuditLog.Result.SUCCESS,
+                request,
+                response,
+                null,
+                null);
+        return response;
     }
 
     @Transactional
@@ -119,15 +130,17 @@ public class CategoryCatalogService {
             category.getSubcategories().forEach(subcategory -> subcategory.setActive(false));
         }
         ServiceCategory saved = serviceCategoryRepository.save(category);
+        Map<String, Object> afterState = buildCategoryAuditState(saved);
+        List<String> changedFields = AuditStateDiffUtils.changedFields(beforeState, afterState);
         auditLogger.recordSemantic(
                 "CATEGORY_ARCHIVED",
                 "CATEGORY",
                 String.valueOf(saved.getId()),
                 saved.getName(),
                 com.servija.servija.model.AuditLog.Result.SUCCESS,
-                null,
-                beforeState,
-                buildCategoryAuditState(saved));
+                Map.of("fieldsChanged", changedFields),
+                AuditStateDiffUtils.filterFields(beforeState, changedFields),
+                AuditStateDiffUtils.filterFields(afterState, changedFields));
         return toCategoryResponse(saved);
     }
 
@@ -137,15 +150,17 @@ public class CategoryCatalogService {
         Map<String, Object> beforeState = buildCategoryAuditState(category);
         category.setActive(true);
         ServiceCategory saved = serviceCategoryRepository.save(category);
+        Map<String, Object> afterState = buildCategoryAuditState(saved);
+        List<String> changedFields = AuditStateDiffUtils.changedFields(beforeState, afterState);
         auditLogger.recordSemantic(
                 "CATEGORY_RESTORED",
                 "CATEGORY",
                 String.valueOf(saved.getId()),
                 saved.getName(),
                 com.servija.servija.model.AuditLog.Result.SUCCESS,
-                null,
-                beforeState,
-                buildCategoryAuditState(saved));
+                Map.of("fieldsChanged", changedFields),
+                AuditStateDiffUtils.filterFields(beforeState, changedFields),
+                AuditStateDiffUtils.filterFields(afterState, changedFields));
         return toCategoryResponse(saved);
     }
 
@@ -160,7 +175,18 @@ public class CategoryCatalogService {
                 .sortOrder(request.getSortOrder())
                 .active(true)
                 .build());
-        return toSubcategoryResponse(subcategory);
+        ServiceSubcategoryResponse response = toSubcategoryResponse(subcategory);
+        auditLogger.recordSemantic(
+                "SUBCATEGORY_CREATED",
+                "SUBCATEGORY",
+                String.valueOf(subcategory.getId()),
+                subcategory.getName(),
+                com.servija.servija.model.AuditLog.Result.SUCCESS,
+                request,
+                response,
+                null,
+                null);
+        return response;
     }
 
     @Transactional
@@ -186,15 +212,17 @@ public class CategoryCatalogService {
         Map<String, Object> beforeState = buildSubcategoryAuditState(subcategory);
         subcategory.setActive(false);
         ServiceSubcategory saved = serviceSubcategoryRepository.save(subcategory);
+        Map<String, Object> afterState = buildSubcategoryAuditState(saved);
+        List<String> changedFields = AuditStateDiffUtils.changedFields(beforeState, afterState);
         auditLogger.recordSemantic(
                 "SUBCATEGORY_ARCHIVED",
                 "SUBCATEGORY",
                 String.valueOf(saved.getId()),
                 saved.getName(),
                 com.servija.servija.model.AuditLog.Result.SUCCESS,
-                null,
-                beforeState,
-                buildSubcategoryAuditState(saved));
+                Map.of("fieldsChanged", changedFields),
+                AuditStateDiffUtils.filterFields(beforeState, changedFields),
+                AuditStateDiffUtils.filterFields(afterState, changedFields));
         return toSubcategoryResponse(saved);
     }
 
@@ -207,15 +235,17 @@ public class CategoryCatalogService {
         Map<String, Object> beforeState = buildSubcategoryAuditState(subcategory);
         subcategory.setActive(true);
         ServiceSubcategory saved = serviceSubcategoryRepository.save(subcategory);
+        Map<String, Object> afterState = buildSubcategoryAuditState(saved);
+        List<String> changedFields = AuditStateDiffUtils.changedFields(beforeState, afterState);
         auditLogger.recordSemantic(
                 "SUBCATEGORY_RESTORED",
                 "SUBCATEGORY",
                 String.valueOf(saved.getId()),
                 saved.getName(),
                 com.servija.servija.model.AuditLog.Result.SUCCESS,
-                null,
-                beforeState,
-                buildSubcategoryAuditState(saved));
+                Map.of("fieldsChanged", changedFields),
+                AuditStateDiffUtils.filterFields(beforeState, changedFields),
+                AuditStateDiffUtils.filterFields(afterState, changedFields));
         return toSubcategoryResponse(saved);
     }
 

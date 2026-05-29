@@ -26,4 +26,5 @@ public class Message {
     private String attachmentUrl;
     private String status;     // "sent" | "delivered" | "read"
     private Instant sentAt;
+    private Instant readAt;
 }

@@ -558,7 +558,7 @@ onMounted(() => {
             <!-- Description -->
             <Card class="p-6">
               <h2 class="text-lg font-bold text-[#263238] mb-4">Sobre o Serviço</h2>
-              <p class="text-[#435574] leading-relaxed whitespace-pre-line">{{ service.description }}</p>
+              <p class="text-[#435574] leading-relaxed whitespace-pre-line break-words">{{ service.description }}</p>
             </Card>
 
             <!-- What's included -->

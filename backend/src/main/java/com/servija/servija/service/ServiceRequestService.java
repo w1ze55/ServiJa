@@ -59,8 +59,10 @@ public class ServiceRequestService {
     private final WebSocketService webSocketService;
     private final NotificationService notificationService;
     private final FreelancerWalletService walletService;
+    private final PlatformWalletService platformWalletService;
     private final CategoryCatalogService categoryCatalogService;
     private final ChatService chatService;
+    private final AuditLogger auditLogger;
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private static final BigDecimal MIN_NEGOTIATED_AMOUNT = new BigDecimal("20.00");
@@ -695,9 +697,10 @@ public class ServiceRequestService {
                 throw new IllegalStateException("O serviço só pode ser concluído após a entrega pelo profissional");
             }
 
-            releaseFreelancerBalanceIfNeeded(request);
             request.setStatus(Status.COMPLETED);
             ServiceRequest saved = serviceRequestRepository.save(request);
+            Payment payment = releaseFreelancerBalanceIfNeeded(saved);
+            releasePlatformFeeIfNeeded(payment);
 
             chatService.lockConversationByServiceRequest(saved.getId());
 
@@ -725,11 +728,11 @@ public class ServiceRequestService {
         throw new IllegalStateException("Usuário não autorizado a realizar esta ação");
     }
 
-    private void releaseFreelancerBalanceIfNeeded(ServiceRequest request) {
+    private Payment releaseFreelancerBalanceIfNeeded(ServiceRequest request) {
         List<Payment> payments = paymentRepository.findByServiceRequestId(request.getId());
         if (payments.isEmpty()) {
             log.warn("Solicitacao {} concluida sem pagamento associado para liberar saldo", request.getId());
-            return;
+            return null;
         }
 
         Payment payment = payments.get(0);
@@ -739,10 +742,19 @@ public class ServiceRequestService {
                     request.getId(),
                     payment.getId(),
                     payment.getStatus());
-            return;
+            return payment;
         }
 
         walletService.releasePendingBalance(payment);
+        return payment;
+    }
+
+    private void releasePlatformFeeIfNeeded(Payment payment) {
+        if (payment == null) {
+            return;
+        }
+
+        platformWalletService.releasePlatformFeeIfNeeded(payment);
     }
 
     @Transactional
@@ -751,6 +763,7 @@ public class ServiceRequestService {
                 .orElseThrow(() -> new RuntimeException("Service request not found"));
 
         String attachments = request.getAttachments();
+        ServiceRequestResponse deletedRequest = toResponse(request);
         serviceRequestRepository.delete(request);
 
         // Deletar anexos do S3 se existirem
@@ -777,6 +790,17 @@ public class ServiceRequestService {
                 }
             }
         }
+
+        auditLogger.recordSemantic(
+                "SERVICE_REQUEST_DELETED",
+                "SERVICE_REQUEST",
+                String.valueOf(id),
+                deletedRequest.getServiceName(),
+                com.servija.servija.model.AuditLog.Result.SUCCESS,
+                null,
+                deletedRequest,
+                null,
+                null);
     }
 
     @Transactional

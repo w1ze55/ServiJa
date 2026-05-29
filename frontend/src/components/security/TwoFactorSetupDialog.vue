@@ -1,20 +1,21 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-import Button from '../ui/button.vue'
-import Input from '../ui/input.vue'
-import Label from '../ui/label.vue'
+import { AlertCircle, Check, Copy } from 'lucide-vue-next'
+import { twoFactorService, type TwoFactorSetup } from '@/api/services/twoFactorService'
 import Alert from '../ui/alert.vue'
 import AlertDescription from '../ui/alert-description.vue'
 import AlertDialog from '../ui/alert-dialog.vue'
 import AlertDialogContent from '../ui/alert-dialog-content.vue'
-import { AlertCircle, Copy, Check } from 'lucide-vue-next'
-import { twoFactorService, type TwoFactorSetup } from '@/api/services/twoFactorService'
+import Button from '../ui/button.vue'
+import Input from '../ui/input.vue'
+import Label from '../ui/label.vue'
 
 interface Props {
   open: boolean
   onClose: () => void
   onActivated: (backupCodes: string[]) => void
 }
+
 const props = defineProps<Props>()
 
 const setup = ref<TwoFactorSetup | null>(null)
@@ -33,8 +34,10 @@ watch(
       error.value = undefined
       return
     }
+
     isStarting.value = true
     error.value = undefined
+
     try {
       setup.value = await twoFactorService.setup()
     } catch (e: any) {
@@ -47,6 +50,7 @@ watch(
 
 async function copySecret() {
   if (!setup.value) return
+
   await navigator.clipboard.writeText(setup.value.secret)
   copied.value = true
   setTimeout(() => (copied.value = false), 2000)
@@ -54,11 +58,14 @@ async function copySecret() {
 
 async function confirm() {
   error.value = undefined
+
   if (!code.value.trim()) {
     error.value = 'Digite o código gerado pelo aplicativo'
     return
   }
+
   isConfirming.value = true
+
   try {
     const res = await twoFactorService.enable(code.value.trim())
     props.onActivated(res.backupCodes)
@@ -103,16 +110,16 @@ async function confirm() {
           </div>
         </div>
 
-        <div>
-          <Label for="setup-code">Código de 6 dígitos do app</Label>
+        <div class="space-y-2">
+          <Label for="setup-code" class="text-gray-600">Código de 6 digitos do app</Label>
           <Input
             id="setup-code"
+            v-model="code"
             type="text"
             inputmode="numeric"
             autocomplete="one-time-code"
             placeholder="000000"
             maxlength="6"
-            v-model="code"
             :disabled="isConfirming"
           />
         </div>

@@ -78,6 +78,10 @@ class AdminDashboardServiceTest {
         when(serviceRequestHistoryRepository.sumCompletedRevenueByOperationTypeAndCreatedAtBetween(
                 ServiceRequestHistory.OperationType.SERVICE_COMPLETED, previousStartDateTime, previousEndDateTime))
                 .thenReturn(new BigDecimal("500.00"));
+        when(paymentRepository.sumNetPlatformRevenueReleasedBetween(currentStart, currentEnd))
+                .thenReturn(new BigDecimal("31.52"));
+        when(paymentRepository.sumNetPlatformRevenueReleasedBetween(previousStartDateTime, previousEndDateTime))
+                .thenReturn(new BigDecimal("13.01"));
 
         when(serviceRequestRepository.countCreatedBetween(currentStart, currentEnd)).thenReturn(8L);
         when(serviceRequestRepository.countCreatedBetween(previousStartDateTime, previousEndDateTime)).thenReturn(4L);
@@ -119,7 +123,7 @@ class AdminDashboardServiceTest {
         assertThat(response.getPeriod().isAllTime()).isTrue();
         assertThat(response.getPeriod().getStartDate()).isEqualTo(expectedStart);
         assertThat(response.getSummary().getTotalRevenue().getCurrent()).isEqualByComparingTo("1000.00");
-        assertThat(response.getSummary().getServiJaFee().getCurrent()).isEqualByComparingTo("50.00");
+        assertThat(response.getSummary().getServiJaFee().getCurrent()).isEqualByComparingTo("31.52");
         assertThat(response.getSummary().getAverageTicket().getCurrent()).isEqualByComparingTo("200.00");
         assertThat(response.getSummary().getNewUsers().getChangePercent()).isEqualByComparingTo("100.0");
         assertThat(response.getSummary().getCompletedServices().getChangePercent()).isEqualByComparingTo("150.0");
@@ -170,6 +174,10 @@ class AdminDashboardServiceTest {
                 .thenReturn(null);
         when(serviceRequestHistoryRepository.sumCompletedRevenueByOperationTypeAndCreatedAtBetween(
                 ServiceRequestHistory.OperationType.SERVICE_COMPLETED, previousStart, previousEnd))
+                .thenReturn(null);
+        when(paymentRepository.sumNetPlatformRevenueReleasedBetween(currentStart, currentEnd))
+                .thenReturn(null);
+        when(paymentRepository.sumNetPlatformRevenueReleasedBetween(previousStart, previousEnd))
                 .thenReturn(null);
 
         when(serviceRequestRepository.countCreatedBetween(currentStart, currentEnd)).thenReturn(0L);

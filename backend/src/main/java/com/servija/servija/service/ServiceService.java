@@ -216,6 +216,7 @@ public class ServiceService {
 
         // Coletar URLs das imagens para deletar do S3
         List<String> imageUrls = fromJson(service.getImages());
+        ServiceResponse deletedService = toResponse(service);
 
         serviceRepository.delete(service);
         log.info("Serviço excluído: {}", id);
@@ -230,6 +231,17 @@ public class ServiceService {
                 }
             }
         }
+
+        auditLogger.recordSemantic(
+                "SERVICE_DELETED",
+                "SERVICE",
+                String.valueOf(id),
+                deletedService.getTitle(),
+                com.servija.servija.model.AuditLog.Result.SUCCESS,
+                null,
+                deletedService,
+                null,
+                null);
     }
 
     private boolean isS3Url(String url) {
@@ -260,7 +272,7 @@ public class ServiceService {
                 String.valueOf(service.getId()),
                 service.getTitle(),
                 com.servija.servija.model.AuditLog.Result.SUCCESS,
-                null,
+                java.util.Map.of("fieldsChanged", java.util.List.of("status")),
                 java.util.Map.of("status", statusLabel(previousStatus)),
                 java.util.Map.of("status", statusLabel(Boolean.TRUE.equals(service.getIsActive()))));
         log.info("Status do serviço {} alterado para: {}", id, service.getIsActive());

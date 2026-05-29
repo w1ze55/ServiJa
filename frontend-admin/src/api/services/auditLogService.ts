@@ -23,6 +23,7 @@ export interface AuditLogEntry {
   ipAddress: string | null;
   userAgent: string | null;
   payload: string | null;
+  response?: string | null;
   oldValue?: string | null;
   newValue?: string | null;
 }

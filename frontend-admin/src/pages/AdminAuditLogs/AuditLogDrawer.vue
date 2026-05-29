@@ -75,10 +75,12 @@ const entityLabel = computed(() => {
 });
 
 const payloadValue = computed(() => parseJsonValue(props.log?.payload));
+const responseValue = computed(() => parseJsonValue(props.log?.response));
 const oldValue = computed(() => parseJsonValue(props.log?.oldValue));
 const newValue = computed(() => parseJsonValue(props.log?.newValue));
 
 const showPayload = computed(() => !isEmptyJson(payloadValue.value));
+const showResponse = computed(() => !isEmptyJson(responseValue.value));
 const showDiff = computed(
   () => !isEmptyJson(oldValue.value) || !isEmptyJson(newValue.value),
 );
@@ -108,9 +110,20 @@ const formattedPayload = computed(() => {
   return JSON.stringify(payloadValue.value, null, 2);
 });
 
+const formattedResponse = computed(() => {
+  if (!showResponse.value) return "";
+  return JSON.stringify(responseValue.value, null, 2);
+});
+
 const copyPayload = () => {
   if (formattedPayload.value) {
     void navigator.clipboard.writeText(formattedPayload.value);
+  }
+};
+
+const copyResponse = () => {
+  if (formattedResponse.value) {
+    void navigator.clipboard.writeText(formattedResponse.value);
   }
 };
 
@@ -363,7 +376,7 @@ function formatStructured(value: Exclude<JsonValue, JsonPrimitive>): string {
 
             <div v-if="showPayload">
               <div class="mb-2 flex items-center justify-between">
-                <h3 class="text-sm font-semibold text-slate-900">Payload</h3>
+                <h3 class="text-sm font-semibold text-slate-900">Payload enviado</h3>
                 <button
                   type="button"
                   class="flex items-center gap-1.5 text-xs font-medium text-slate-500 transition hover:text-slate-900"
@@ -376,6 +389,23 @@ function formatStructured(value: Exclude<JsonValue, JsonPrimitive>): string {
               <pre
                 class="overflow-x-auto rounded-xl border border-slate-200 bg-slate-900 p-4 text-xs leading-relaxed text-slate-100"
               >{{ formattedPayload }}</pre>
+            </div>
+
+            <div v-if="showResponse">
+              <div class="mb-2 flex items-center justify-between">
+                <h3 class="text-sm font-semibold text-slate-900">Response</h3>
+                <button
+                  type="button"
+                  class="flex items-center gap-1.5 text-xs font-medium text-slate-500 transition hover:text-slate-900"
+                  @click="copyResponse"
+                >
+                  <Copy class="h-3.5 w-3.5" />
+                  Copiar JSON
+                </button>
+              </div>
+              <pre
+                class="overflow-x-auto rounded-xl border border-slate-200 bg-slate-900 p-4 text-xs leading-relaxed text-slate-100"
+              >{{ formattedResponse }}</pre>
             </div>
           </div>
         </div>

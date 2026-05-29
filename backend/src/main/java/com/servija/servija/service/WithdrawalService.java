@@ -109,6 +109,7 @@ public class WithdrawalService {
                 "Saque " + withdrawal.getWithdrawalMethod().name(),
                 com.servija.servija.model.AuditLog.Result.SUCCESS,
                 auditPayload,
+                buildWithdrawalAuditSnapshot(withdrawal),
                 null,
                 null);
 
@@ -206,6 +207,17 @@ public class WithdrawalService {
         walletService.addPendingBalance(freelancer, withdrawal.getAmount());
 
         log.info("Solicitacao de saque cancelada: {}", withdrawalId);
+
+        auditLogger.recordSemantic(
+                "WITHDRAWAL_CANCELLED",
+                "WITHDRAWAL",
+                String.valueOf(withdrawalId),
+                "Saque " + withdrawal.getWithdrawalMethod().name(),
+                com.servija.servija.model.AuditLog.Result.SUCCESS,
+                null,
+                buildWithdrawalAuditSnapshot(withdrawal),
+                null,
+                null);
     }
 
     private WithdrawalRequest.WithdrawalMethod parseWithdrawalMethod(String withdrawalMethodValue) {
@@ -263,5 +275,21 @@ public class WithdrawalService {
 
     private boolean isBlank(String value) {
         return value == null || value.isBlank();
+    }
+
+    private Map<String, Object> buildWithdrawalAuditSnapshot(WithdrawalRequest withdrawal) {
+        Map<String, Object> snapshot = new LinkedHashMap<>();
+        snapshot.put("id", withdrawal.getId());
+        snapshot.put("amount", withdrawal.getAmount());
+        snapshot.put("status", withdrawal.getStatus() != null ? withdrawal.getStatus().name() : null);
+        snapshot.put("withdrawalMethod", withdrawal.getWithdrawalMethod() != null ? withdrawal.getWithdrawalMethod().name() : null);
+        snapshot.put("bankAccountId", withdrawal.getBankAccount() != null ? withdrawal.getBankAccount().getId() : null);
+        snapshot.put("pixKey", withdrawal.getPixKey());
+        snapshot.put("pixKeyType", withdrawal.getPixKeyType());
+        snapshot.put("transactionId", withdrawal.getTransactionId());
+        snapshot.put("rejectionReason", withdrawal.getRejectionReason());
+        snapshot.put("processedAt", withdrawal.getProcessedAt());
+        snapshot.put("createdAt", withdrawal.getCreatedAt());
+        return snapshot;
     }
 }

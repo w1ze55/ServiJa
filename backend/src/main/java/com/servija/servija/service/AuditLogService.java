@@ -144,6 +144,7 @@ public class AuditLogService {
                 .ipAddress(log.getIpAddress())
                 .userAgent(log.getUserAgent())
                 .payload(log.getPayload())
+                .response(includeDetails ? log.getResponse() : null)
                 .oldValue(includeDetails ? log.getOldValue() : null)
                 .newValue(includeDetails ? log.getNewValue() : null)
                 .build();

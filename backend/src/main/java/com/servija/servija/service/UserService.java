@@ -182,6 +182,8 @@ public class UserService {
             throw new InvalidCredentialsException("Senha incorreta. A conta não foi excluída.");
         }
 
+        Map<String, Object> deletedUser = buildUserAuditState(user);
+
         // Deletar do repositório apropriado
         // Com JOINED inheritance, deletar do UserRepository deve deletar também a
         // entidade filha
@@ -193,6 +195,17 @@ public class UserService {
         // O Hibernate gerencia a exclusão da tabela pai (users) automaticamente
         // Mas para garantir, vamos deletar explicitamente do UserRepository também
         userRepository.delete(user);
+
+        auditLogger.recordSemantic(
+                "ACCOUNT_DELETED",
+                "USER",
+                String.valueOf(user.getId()),
+                user.getName(),
+                com.servija.servija.model.AuditLog.Result.SUCCESS,
+                null,
+                deletedUser,
+                null,
+                null);
     }
 
     private boolean isValidPassword(String password) {

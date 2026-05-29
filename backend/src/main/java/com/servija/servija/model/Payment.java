@@ -41,6 +41,10 @@ public class Payment {
     @Column(name = "platform_fee", nullable = false, precision = 10, scale = 2)
     private BigDecimal platformFee;
 
+    @Column(name = "installment_fee", nullable = false, precision = 10, scale = 2)
+    @Builder.Default
+    private BigDecimal installmentFee = BigDecimal.ZERO;
+
     @Column(name = "gateway_fee", precision = 10, scale = 2)
     @Builder.Default
     private BigDecimal gatewayFee = BigDecimal.ZERO;
@@ -50,6 +54,9 @@ public class Payment {
 
     @Column(name = "payment_method", nullable = false, length = 50)
     private String paymentMethod;
+
+    @Column(name = "installment_count")
+    private Integer installmentCount;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
@@ -88,6 +95,9 @@ public class Payment {
 
     @Column(name = "completed_at")
     private LocalDateTime completedAt;
+
+    @Column(name = "platform_fee_released_at")
+    private LocalDateTime platformFeeReleasedAt;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
