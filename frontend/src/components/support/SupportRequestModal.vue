@@ -134,7 +134,7 @@ watch(
 
 const handleSelectedFilesUpdate = (files: File[]) => {
   if (files.length > MAX_SUPPORT_ATTACHMENTS) {
-    toast.error('Voce pode enviar no maximo 5 anexos por solicitacao.');
+    toast.error('Você pode enviar no máximo 5 anexos por solicitação.');
     return;
   }
 
@@ -315,7 +315,7 @@ const handleSubmit = async () => {
         </Button>
         <Button type="button" :disabled="isSubmitting" @click="handleSubmit">
           <Loader2 v-if="isSubmitting" class="mr-2 h-4 w-4 animate-spin" />
-          {{ isSubmitting ? 'Enviando...' : 'Enviar solicitacao' }}
+          {{ isSubmitting ? 'Enviando...' : 'Enviar solicitação' }}
         </Button>
       </DialogFooter>
     </DialogContent>
