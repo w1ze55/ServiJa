@@ -12,7 +12,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -22,6 +24,7 @@ public class BankAccountService {
 
     private final FreelancerBankAccountRepository bankAccountRepository;
     private final UserRepository userRepository;
+    private final AuditLogger auditLogger;
 
     private static final int MAX_ACCOUNTS = 5;
 
@@ -82,7 +85,21 @@ public class BankAccountService {
 
         account = bankAccountRepository.save(account);
         log.info("Conta bancaria criada: {} para {}", account.getId(), email);
-        return mapToResponse(account);
+
+        BankAccountResponse response = mapToResponse(account);
+
+        auditLogger.recordSemantic(
+                "BANK_ACCOUNT_ADDED",
+                "BANK_ACCOUNT",
+                String.valueOf(account.getId()),
+                buildAuditEntityLabel(account),
+                com.servija.servija.model.AuditLog.Result.SUCCESS,
+                dto,
+                response,
+                null,
+                null);
+
+        return response;
     }
 
     @Transactional
@@ -95,6 +112,8 @@ public class BankAccountService {
             throw new IllegalStateException("Sem permissao para remover esta conta");
         }
 
+        String entityLabel = buildAuditEntityLabel(account);
+        Map<String, Object> deletedAccount = buildAuditSnapshot(account);
         bankAccountRepository.delete(account);
 
         if (Boolean.TRUE.equals(account.getIsDefault())) {
@@ -108,6 +127,17 @@ public class BankAccountService {
         }
 
         log.info("Conta bancaria removida: {}", accountId);
+
+        auditLogger.recordSemantic(
+                "BANK_ACCOUNT_DELETED",
+                "BANK_ACCOUNT",
+                String.valueOf(accountId),
+                entityLabel,
+                com.servija.servija.model.AuditLog.Result.SUCCESS,
+                null,
+                deletedAccount,
+                null,
+                null);
     }
 
     @Transactional
@@ -120,9 +150,23 @@ public class BankAccountService {
             throw new IllegalStateException("Sem permissao");
         }
 
+        Map<String, Object> beforeState = Map.of("default", Boolean.TRUE.equals(account.getIsDefault()));
         bankAccountRepository.clearDefaultForUser(user.getId());
         account.setIsDefault(true);
         bankAccountRepository.save(account);
+        Map<String, Object> afterState = Map.of("default", Boolean.TRUE.equals(account.getIsDefault()));
+        List<String> changedFields = AuditStateDiffUtils.changedFields(beforeState, afterState);
+        if (!changedFields.isEmpty()) {
+            auditLogger.recordSemantic(
+                    "BANK_ACCOUNT_DEFAULT",
+                    "BANK_ACCOUNT",
+                    String.valueOf(account.getId()),
+                    buildAuditEntityLabel(account),
+                    com.servija.servija.model.AuditLog.Result.SUCCESS,
+                    Map.of("fieldsChanged", changedFields),
+                    AuditStateDiffUtils.filterFields(beforeState, changedFields),
+                    AuditStateDiffUtils.filterFields(afterState, changedFields));
+        }
 
         log.info("Conta {} definida como padrao para {}", accountId, email);
         return mapToResponse(account);
@@ -203,5 +247,57 @@ public class BankAccountService {
             return "***." + digits.substring(3, 6) + ".***-**";
         }
         return "**.***.***/" + digits.substring(8, 12) + "-**";
+    }
+
+    private String maskAgency(String agency) {
+        if (agency == null || agency.isBlank()) {
+            return "*";
+        }
+        return "*";
+    }
+
+    private String buildAuditEntityLabel(FreelancerBankAccount account) {
+        if (account.getAccountType() == FreelancerBankAccount.AccountType.PIX_KEY) {
+            return "PIX • "
+                    + safeValue(account.getPixKeyType(), "CHAVE")
+                    + " • "
+                    + suffix(account.getPixKey(), 3);
+        }
+
+        return "TED • "
+                + safeValue(account.getBankName(), "Banco")
+                + " • Ag "
+                + maskAgency(account.getAgency())
+                + " • "
+                + suffix(account.getAccountNumber(), 4);
+    }
+
+    private Map<String, Object> buildAuditSnapshot(FreelancerBankAccount account) {
+        Map<String, Object> snapshot = new LinkedHashMap<>();
+        if (account.getAccountType() == FreelancerBankAccount.AccountType.PIX_KEY) {
+            snapshot.put("type", "PIX");
+            snapshot.put("keyType", account.getPixKeyType());
+            snapshot.put("keyMasked", suffix(account.getPixKey(), 3));
+        } else {
+            snapshot.put("type", "TED");
+            snapshot.put("bankName", account.getBankName());
+            snapshot.put("agencyMasked", maskAgency(account.getAgency()));
+            snapshot.put("accountMasked", suffix(account.getAccountNumber(), 4));
+        }
+        snapshot.put("default", account.getIsDefault());
+        return snapshot;
+    }
+
+    private String suffix(String value, int length) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        String digits = value.replaceAll("\\s+", "");
+        int start = Math.max(0, digits.length() - length);
+        return "**" + digits.substring(start);
+    }
+
+    private String safeValue(String value, String fallback) {
+        return value == null || value.isBlank() ? fallback : value;
     }
 }

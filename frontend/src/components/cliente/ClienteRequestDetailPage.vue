@@ -47,7 +47,7 @@ import AlertDialogHeader from '../ui/alert-dialog-header.vue';
 import AlertDialogTitle from '../ui/alert-dialog-title.vue';
 import { useClientRequestStore, type ServiceRequest } from '@/stores/clientRequestStore';
 import ServiceRequestTimeline from '../service/ServiceRequestTimeline.vue';
-import ChatBox from '../shared/ChatBox.vue';
+import ProjectChatPanel from '../shared/ProjectChatPanel.vue';
 import { formatApiDate } from '@/utils/apiDate';
 import { toast } from '@/utils/toast';
 import { getStatusLabel } from '@/utils/statusTranslations';
@@ -62,7 +62,6 @@ const props = defineProps<Props>();
 const store = useClientRequestStore();
 
 const request = ref<ServiceRequest | null>(null);
-const isSendingMessage = ref(false);
 const showCancelDialog = ref(false);
 const cancelReason = ref('');
 const showRejectDialog = ref(false);
@@ -185,23 +184,6 @@ const goBack = () => {
   props.onNavigate('requests');
 };
 
-const handleSendMessage = async (message: string, attachments: File[]) => {
-  if (!request.value) return;
-
-  isSendingMessage.value = true;
-  const success = await store.sendMessage(
-    request.value.id,
-    message,
-    attachments.length > 0 ? attachments : undefined
-  );
-  isSendingMessage.value = false;
-
-  if (success) {
-    toast.success('Mensagem enviada');
-  } else {
-    toast.error('Erro ao enviar mensagem');
-  }
-};
 
 const wasCounterProposalRejected = computed(() => {
   if (!request.value) return false;
@@ -405,12 +387,6 @@ const getStatusColor = (status: string) => {
             }`"
           >
             Mensagens
-            <Badge
-              v-if="request.messages && request.messages.length > 0"
-              class="ml-1 bg-primary text-white text-xs"
-            >
-              {{ request.messages.length }}
-            </Badge>
           </button>
           <button
             @click="activeSection = 'history'"
@@ -453,7 +429,7 @@ const getStatusColor = (status: string) => {
           <!-- Description -->
           <Card class="p-6">
             <h3 class="font-semibold text-[#263238] mb-3">Descrição do Serviço</h3>
-            <p class="text-[#435574] whitespace-pre-line">{{ request.description }}</p>
+            <p class="text-[#435574] whitespace-pre-line break-words">{{ request.description }}</p>
           </Card>
 
           <!-- Freelancer Response -->
@@ -480,7 +456,7 @@ const getStatusColor = (status: string) => {
 
             <div class="mb-4">
               <p class="text-sm font-medium text-[#263238] mb-2">Escopo do trabalho</p>
-              <p class="text-sm text-[#435574] whitespace-pre-line">
+              <p class="text-sm text-[#435574] whitespace-pre-line break-words">
                 {{ request.freelancerResponse.scope }}
               </p>
             </div>
@@ -618,13 +594,10 @@ const getStatusColor = (status: string) => {
       <Card v-if="activeSection === 'messages'" class="p-6">
         <h3 class="font-semibold text-[#263238] mb-4">Mensagens</h3>
 
-        <ChatBox
-          :messages="request.messages || []"
+        <ProjectChatPanel
+          :service-request-id="Number(request.id)"
           current-user-role="client"
-          :is-locked="request.status !== 'in_progress' && request.status !== 'delivered'"
           :service-status="request.status"
-          :is-sending="isSendingMessage"
-          @send-message="handleSendMessage"
         />
       </Card>
 

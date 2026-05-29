@@ -38,5 +38,6 @@ public class PaymentRequest {
         private String name;
         private String expiry;
         private String cvv;
+        private Integer installmentCount;
     }
 }

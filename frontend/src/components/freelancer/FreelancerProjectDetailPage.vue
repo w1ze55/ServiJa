@@ -16,7 +16,7 @@ import {
 } from 'lucide-vue-next';
 import AttachmentUploadField from '../shared/AttachmentUploadField.vue';
 import FileAttachment from '../shared/FileAttachment.vue';
-import ChatBox from '../shared/ChatBox.vue';
+import ProjectChatPanel from '../shared/ProjectChatPanel.vue';
 import ServiceRequestTimeline from '../service/ServiceRequestTimeline.vue';
 import Button from '../ui/button.vue';
 import Card from '../ui/card.vue';
@@ -73,7 +73,6 @@ const showUploadDialog = ref(false);
 const isCompleting = ref(false);
 const isCompletingAdjustment = ref(false);
 const isUploading = ref(false);
-const isSendingMessage = ref(false);
 const uploadProgress = ref(0);
 const uploadFiles = ref<File[]>([]);
 const uploadDescription = ref('');
@@ -293,21 +292,6 @@ const openMessagesTab = () => {
   activeTab.value = 'messages';
 };
 
-const handleSendMessage = async (message: string, attachments: File[]) => {
-  if (!project.value) return;
-
-  isSendingMessage.value = true;
-  const success = await proposalStore.sendMessage(project.value.id, message, attachments);
-  isSendingMessage.value = false;
-
-  if (success) {
-    toast.success('Mensagem enviada');
-    return;
-  }
-
-  toast.error('Erro ao enviar mensagem');
-};
-
 const handleMilestoneComplete = async (milestone: Milestone) => {
   if (!project.value) return;
 
@@ -469,7 +453,7 @@ const handleUploadFiles = async () => {
       </div>
 
       <div v-if="project" class="flex items-center gap-2 flex-wrap justify-end">
-        <Button v-if="canCompleteAdjustment" @click="showCompleteAdjustmentDialog = true" variant="warning">
+        <Button v-if="canCompleteAdjustment" @click="showCompleteAdjustmentDialog = true" variant="default">
           <CheckCircle class="h-4 w-4 mr-2" />
           Finalizar Ajustes
         </Button>
@@ -592,17 +576,12 @@ const handleUploadFiles = async () => {
             </TabsContent>
 
             <TabsContent value="messages" class="mt-4">
-              <Card class="p-6 min-h-[500px] flex flex-col">
-                <div class="mb-4 border-b pb-4">
-                  <h3 class="font-bold text-[#263238]">Conversa com {{ project.clientName }}</h3>
-                </div>
-                <ChatBox
-                  :messages="project.messages || []"
+              <Card class="p-4">
+                <h3 class="font-bold text-[#263238] mb-4">Conversa com {{ project.clientName }}</h3>
+                <ProjectChatPanel
+                  :service-request-id="Number(project.id)"
                   current-user-role="freelancer"
-                  :is-locked="project.status === 'completed'"
-                  :is-sending="isSendingMessage"
                   :service-status="project.status"
-                  @send-message="handleSendMessage"
                 />
               </Card>
             </TabsContent>
@@ -879,14 +858,13 @@ const handleUploadFiles = async () => {
             </template>
           </AlertDialogDescription>
         </AlertDialogHeader>
-        <AlertDialogFooter>
+        <AlertDialogFooter class="sm:justify-between">
           <AlertDialogCancel @click="showCompleteAdjustmentDialog = false" :disabled="isCompletingAdjustment">
             Cancelar
           </AlertDialogCancel>
           <AlertDialogAction
             @click="handleCompleteAdjustment"
             :disabled="isCompletingAdjustment"
-            class="bg-warning text-warning-foreground hover:bg-warning/90"
           >
             <Loader2 v-if="isCompletingAdjustment" class="h-4 w-4 mr-2 animate-spin" />
             <CheckCircle v-else class="h-4 w-4 mr-2" />

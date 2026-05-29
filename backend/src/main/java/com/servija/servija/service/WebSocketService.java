@@ -284,6 +284,24 @@ public class WebSocketService {
     }
 
     /**
+     * Broadcast de nova mensagem de chat para todos os participantes da conversa.
+     */
+    public void notifyChatMessage(String conversationId, Object messageDTO) {
+        String destination = "/topic/chat/" + conversationId;
+        messagingTemplate.convertAndSend(destination, messageDTO);
+        log.info("Mensagem de chat enviada para conversa {}", conversationId);
+    }
+
+    /**
+     * Broadcast de read receipt (mensagens visualizadas) para a conversa.
+     */
+    public void notifyChatRead(String conversationId, Object readReceiptDTO) {
+        String destination = "/topic/chat/" + conversationId + "/read";
+        messagingTemplate.convertAndSend(destination, readReceiptDTO);
+        log.info("Read receipt enviado para conversa {}", conversationId);
+    }
+
+    /**
      * Publica eventos do stream de notificações persistidas.
      */
     public void publishNotificationEvent(String userEmail, NotificationStreamEvent event) {

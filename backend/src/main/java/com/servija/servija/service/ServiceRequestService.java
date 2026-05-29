@@ -59,7 +59,10 @@ public class ServiceRequestService {
     private final WebSocketService webSocketService;
     private final NotificationService notificationService;
     private final FreelancerWalletService walletService;
+    private final PlatformWalletService platformWalletService;
     private final CategoryCatalogService categoryCatalogService;
+    private final ChatService chatService;
+    private final AuditLogger auditLogger;
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private static final BigDecimal MIN_NEGOTIATED_AMOUNT = new BigDecimal("20.00");
@@ -694,9 +697,12 @@ public class ServiceRequestService {
                 throw new IllegalStateException("O serviço só pode ser concluído após a entrega pelo profissional");
             }
 
-            releaseFreelancerBalanceIfNeeded(request);
             request.setStatus(Status.COMPLETED);
             ServiceRequest saved = serviceRequestRepository.save(request);
+            Payment payment = releaseFreelancerBalanceIfNeeded(saved);
+            releasePlatformFeeIfNeeded(payment);
+
+            chatService.lockConversationByServiceRequest(saved.getId());
 
             historyService.record(saved, user, OperationType.SERVICE_COMPLETED,
                     "Serviço marcado como concluído pelo cliente");
@@ -722,11 +728,11 @@ public class ServiceRequestService {
         throw new IllegalStateException("Usuário não autorizado a realizar esta ação");
     }
 
-    private void releaseFreelancerBalanceIfNeeded(ServiceRequest request) {
+    private Payment releaseFreelancerBalanceIfNeeded(ServiceRequest request) {
         List<Payment> payments = paymentRepository.findByServiceRequestId(request.getId());
         if (payments.isEmpty()) {
             log.warn("Solicitacao {} concluida sem pagamento associado para liberar saldo", request.getId());
-            return;
+            return null;
         }
 
         Payment payment = payments.get(0);
@@ -736,10 +742,19 @@ public class ServiceRequestService {
                     request.getId(),
                     payment.getId(),
                     payment.getStatus());
-            return;
+            return payment;
         }
 
         walletService.releasePendingBalance(payment);
+        return payment;
+    }
+
+    private void releasePlatformFeeIfNeeded(Payment payment) {
+        if (payment == null) {
+            return;
+        }
+
+        platformWalletService.releasePlatformFeeIfNeeded(payment);
     }
 
     @Transactional
@@ -748,6 +763,7 @@ public class ServiceRequestService {
                 .orElseThrow(() -> new RuntimeException("Service request not found"));
 
         String attachments = request.getAttachments();
+        ServiceRequestResponse deletedRequest = toResponse(request);
         serviceRequestRepository.delete(request);
 
         // Deletar anexos do S3 se existirem
@@ -774,6 +790,17 @@ public class ServiceRequestService {
                 }
             }
         }
+
+        auditLogger.recordSemantic(
+                "SERVICE_REQUEST_DELETED",
+                "SERVICE_REQUEST",
+                String.valueOf(id),
+                deletedRequest.getServiceName(),
+                com.servija.servija.model.AuditLog.Result.SUCCESS,
+                null,
+                deletedRequest,
+                null,
+                null);
     }
 
     @Transactional
@@ -812,13 +839,13 @@ public class ServiceRequestService {
     @Transactional
     public ServiceRequestResponse addContractorAttachments(Long id, ProjectAttachmentsRequest body, String contractorEmail) {
         ServiceRequest request = serviceRequestRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("SolicitaÃ§Ã£o nÃ£o encontrada"));
+                .orElseThrow(() -> new ResourceNotFoundException("Solicitação não encontrada"));
 
         User contractor = userRepository.findByEmail(contractorEmail)
-                .orElseThrow(() -> new ResourceNotFoundException("UsuÃ¡rio nÃ£o encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
 
         if (request.getContractor() == null || !request.getContractor().getId().equals(contractor.getId())) {
-            throw new IllegalStateException("Apenas o cliente da solicitaÃ§Ã£o pode enviar arquivos");
+            throw new IllegalStateException("Apenas o cliente da solicitação pode enviar arquivos");
         }
 
         List<String> attachmentsToAdd = resolveProjectAttachmentUrls(body);
@@ -838,7 +865,7 @@ public class ServiceRequestService {
 
         ServiceRequest saved = serviceRequestRepository.save(request);
         notificationService.notifyAttachmentAdded(saved, contractor, attachmentsToAdd.size());
-        log.info("Contractor attachments adicionados Ã  solicitaÃ§Ã£o {}: {} arquivos", id, attachmentsToAdd.size());
+        log.info("Contractor attachments adicionados à solicitação {}: {} arquivos", id, attachmentsToAdd.size());
         return toResponse(saved);
     }
 

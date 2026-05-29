@@ -11,6 +11,7 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.Collections;
@@ -39,6 +40,9 @@ public class User implements UserDetails {
 
     @Column(nullable = false, length = 20)
     private String phone;
+
+    @Column
+    private LocalDate birthDate;
 
     @Column(nullable = false, length = 256)
     private String password;
@@ -70,6 +74,12 @@ public class User implements UserDetails {
     @Column
     private LocalDateTime resetPasswordTokenExpiry;
 
+    @Column(length = 64)
+    private String adminResetPasswordTokenHash;
+
+    @Column
+    private LocalDateTime adminResetPasswordTokenExpiry;
+
     @Column(nullable = false)
     @lombok.Builder.Default
     private Integer resetPasswordAttempts = 0;
@@ -92,6 +102,33 @@ public class User implements UserDetails {
     @UpdateTimestamp
     @Column(nullable = false)
     private LocalDateTime updatedAt;
+
+    @Column
+    private LocalDateTime deletedAt;
+
+    // ---- 2FA (TOTP) ----
+    @Column(name = "totp_secret_encrypted")
+    private byte[] totpSecretEncrypted;
+
+    @Column(name = "pending_totp_secret_encrypted")
+    private byte[] pendingTotpSecretEncrypted;
+
+    @Column(name = "pending_totp_created_at")
+    private LocalDateTime pendingTotpCreatedAt;
+
+    @Column(name = "totp_enabled", nullable = false)
+    @lombok.Builder.Default
+    private Boolean totpEnabled = false;
+
+    @Column(name = "totp_enabled_at")
+    private LocalDateTime totpEnabledAt;
+
+    @Column(name = "totp_failed_attempts", nullable = false)
+    @lombok.Builder.Default
+    private Integer totpFailedAttempts = 0;
+
+    @Column(name = "totp_locked_until")
+    private LocalDateTime totpLockedUntil;
 
     public enum UserType {
         CONTRACTOR,

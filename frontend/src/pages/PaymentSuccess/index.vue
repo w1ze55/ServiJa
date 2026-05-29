@@ -97,7 +97,7 @@ const handleDownloadReceipt = async () => {
           
           <div class="flex justify-between text-sm">
             <span class="text-[#435574]">Valor Total:</span>
-            <span class="text-[#263238] font-semibold">R$ {{ paymentData.amount?.toFixed(2) || '0.00' }}</span>
+            <span class="text-[#263238] font-semibold">R$ {{ paymentData.totalAmount?.toFixed(2) || '0.00' }}</span>
           </div>
           
           <div class="flex justify-between text-sm">

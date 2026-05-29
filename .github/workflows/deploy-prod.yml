@@ -1,4 +1,4 @@
-name: Deploy Servija AWS (Prod)
+name: Deploy Servija (Prod)
 
 on:
   push:
@@ -6,30 +6,81 @@ on:
       - main
 
 jobs:
-  deploy:
+  build-and-deploy:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout do código
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Deploy via SSH no EC2 (Prod)
-        uses: appleboy/ssh-action@v1.0.3
+      # ── Frontend build (CI) ────────────────────────────────────
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
         with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ec2-user
-          key: ${{ secrets.EC2_SSH_KEY }}
-          port: 22
-          script: |
-            cd /var/www/ServiJa
+          node-version: '20'
 
-            git checkout main
-            git pull origin main
+      - name: Build frontend
+        run: npm ci && npm run build
+        working-directory: frontend
+        env:
+          VITE_API_URL: https://servija.app
 
-            # Para apenas os containers de produção (não afeta homolog)
-            docker compose -f docker-compose.prod.yml down
+      - name: Build frontend-admin
+        run: npm ci && npm run build
+        working-directory: frontend-admin
+        env:
+          VITE_API_URL: https://servija.app
 
-            # Rebuild e start produção
-            docker compose --env-file .env.prod -f docker-compose.prod.yml up --build -d
+      # ── Prepare SSH key ────────────────────────────────────────
+      - name: Write SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
 
-            # Reinicia o proxy para reconhecer as mudanças (se existir)
-            docker compose -f docker-compose.proxy.yml up -d --force-recreate
+      # ── Backend: sync source to EC2 and build there ────────────
+      - name: Ensure backend build dir exists on EC2
+        run: |
+          ssh -i ~/.ssh/deploy_key ubuntu@${{ secrets.EC2_HOST }} \
+            'mkdir -p /app/prod/build'
+
+      - name: Sync backend source to EC2
+        run: |
+          rsync -az --delete \
+            --exclude '.git/' \
+            --exclude 'target/' \
+            --exclude '.idea/' \
+            --exclude '*.iml' \
+            --exclude 'src/node_modules/' \
+            -e "ssh -i ~/.ssh/deploy_key" \
+            backend/ \
+            ubuntu@${{ secrets.EC2_HOST }}:/app/prod/build/
+
+      - name: Build backend JAR on EC2 (reuses ~/.m2 cache)
+        run: |
+          ssh -i ~/.ssh/deploy_key ubuntu@${{ secrets.EC2_HOST }} \
+            'set -e; \
+             cd /app/prod/build; \
+             chmod +x mvnw; \
+             ./mvnw -B -ntp clean package -DskipTests; \
+             cp target/servija-0.0.1-SNAPSHOT.jar /app/prod/app.jar'
+
+      # ── Deploy frontend artifacts ──────────────────────────────
+      - name: Copy Vue dist to server
+        run: |
+          scp -i ~/.ssh/deploy_key -r \
+            frontend/dist/* \
+            ubuntu@${{ secrets.EC2_HOST }}:/var/www/prod/
+
+      - name: Copy admin dist to server
+        run: |
+          scp -i ~/.ssh/deploy_key -r \
+            frontend-admin/dist/* \
+            ubuntu@${{ secrets.EC2_HOST }}:/var/www/prod-admin/
+
+      # ── Set permissions & restart ────────────────────────────
+      - name: Fix permissions and restart service
+        run: |
+          ssh -i ~/.ssh/deploy_key ubuntu@${{ secrets.EC2_HOST }} \
+            'sudo mkdir -p /var/www/prod-admin && sudo chown -R ubuntu:ubuntu /var/www/prod-admin && chmod -R o+rX /var/www/prod/ /var/www/prod-admin/ && sudo systemctl restart servija-prod'

@@ -1,5 +1,4 @@
 <script setup lang="ts">
-// Novo App.vue simplificado usando Vue Router
 </script>
 
 <template>

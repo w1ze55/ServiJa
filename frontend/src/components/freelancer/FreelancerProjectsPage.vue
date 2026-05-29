@@ -169,12 +169,14 @@ const getProjectStatusMeta = (project: Proposal) => {
 };
 
 const filteredProjects = computed(() => {
+  const normalizedSearchQuery = searchQuery.value.trim().toLowerCase();
+  const hasSearchQuery = normalizedSearchQuery.length > 0;
+
   return allProjects.value.filter((project) => {
     const matchesSearch =
-      project.service.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-      project.clientName
-        .toLowerCase()
-        .includes(searchQuery.value.toLowerCase());
+      !hasSearchQuery ||
+      project.service.toLowerCase().includes(normalizedSearchQuery) ||
+      project.clientName.toLowerCase().includes(normalizedSearchQuery);
 
     const matchesCategory =
       categoryFilter.value === "all" ||
@@ -187,7 +189,9 @@ const filteredProjects = computed(() => {
           ? hasPendingAdjustment(project)
           : project.status === "delivered" && !hasPendingAdjustment(project);
 
-    return matchesSearch && matchesCategory && matchesTab;
+    return hasSearchQuery
+      ? matchesSearch
+      : matchesSearch && matchesCategory && matchesTab;
   });
 });
 

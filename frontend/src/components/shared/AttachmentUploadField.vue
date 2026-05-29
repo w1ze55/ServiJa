@@ -205,7 +205,7 @@ const formatFileSize = (size: number) => {
         <p class="text-[#263238] mb-2">
           {{ emptyMessage }}
         </p>
-        <p class="text-sm text-[#435574] mb-4">
+        <p class="mx-auto mb-4 max-w-md text-sm leading-5 text-[#435574]">
           {{ helperText }}
         </p>
         <input

@@ -13,11 +13,10 @@ import {
   User,
   LogOut,
   MessageSquare,
-  Bell,
   Briefcase,
+  History,
 
   Images,
-  DollarSign,
   Wallet,
 
   Package,
@@ -87,6 +86,7 @@ interface Props {
   onNavigate: (page: string) => void;
   onLogout: () => void;
   onSearch?: (query: string) => void;
+  fullBleed?: boolean;
 }
 
 const props = defineProps<Props>();
@@ -125,6 +125,31 @@ const sidebarOpen = ref(false);
 const sidebarPinned = ref(false);
 const sidebarExpanded = ref(false);
 const professionalDropdownOpen = ref(false);
+
+// Estado dos dropdowns do topbar
+const topbarNotificationsOpen = ref(false);
+const topbarUserMenuOpen = ref(false);
+
+// Timer para fechamento da sidebar ao sair com o mouse
+let sidebarCloseTimer: ReturnType<typeof setTimeout> | null = null;
+const SIDEBAR_CLOSE_DELAY = 150;
+
+const cancelSidebarClose = () => {
+  if (sidebarCloseTimer !== null) {
+    clearTimeout(sidebarCloseTimer);
+    sidebarCloseTimer = null;
+  }
+};
+
+const scheduleSidebarClose = () => {
+  cancelSidebarClose();
+  sidebarCloseTimer = setTimeout(() => {
+    if (!sidebarPinned.value) {
+      sidebarExpanded.value = false;
+    }
+    sidebarCloseTimer = null;
+  }, SIDEBAR_CLOSE_DELAY);
+};
 
 // Localização do usuário
 const userLocation = ref("Carregando...");
@@ -314,12 +339,13 @@ const toggleSidebarPin = () => {
 };
 
 const handleMouseEnter = () => {
+  cancelSidebarClose();
   sidebarExpanded.value = true;
 };
 
 const handleMouseLeave = () => {
   if (!sidebarPinned.value) {
-    sidebarExpanded.value = false;
+    scheduleSidebarClose();
   }
 };
 
@@ -407,7 +433,7 @@ const handleNotificationStreamEvent = (event: Event) => {
         <!-- Logo -->
         <div
           :class="`py-2 border-b border-white/10 transition-all duration-300 ${
-            sidebarExpanded ? 'px-6 py-5' : 'px-0 py-5'
+            sidebarExpanded ? 'px-6 py-4' : 'px-0 py-4'
           }`"
         >
           <div :class="`flex items-center transition-all duration-300 ${sidebarExpanded ? 'justify-between px-4' : 'justify-center px-0'}`">
@@ -437,14 +463,14 @@ const handleNotificationStreamEvent = (event: Event) => {
 
         <!-- Location -->
         <div
-          :class="`py-4 border-b border-white/10 transition-all duration-300 ${
-            sidebarExpanded ? 'px-4' : 'px-0'
+          :class="`py-2 border-b border-white/10 transition-all duration-300 ${
+            sidebarExpanded ? 'px-4' : 'px-2'
           }`"
         >
           <button
             @click="openMap"
-            :class="`w-full flex items-center text-white/70 hover:text-white transition-colors ${
-              sidebarExpanded ? 'gap-2 text-left' : 'justify-center'
+            :class="`w-full flex items-center rounded-lg transition-all duration-200 text-white/70 hover:bg-white/10 hover:text-white ${
+              sidebarExpanded ? 'gap-3 px-4 py-3 text-left' : 'py-3 justify-center'
             }`"
             title="Ver mapa com profissionais próximos"
           >
@@ -538,6 +564,7 @@ const handleNotificationStreamEvent = (event: Event) => {
             </button>
           </template>
         </nav>
+
       </div>
     </aside>
 
@@ -656,38 +683,39 @@ const handleNotificationStreamEvent = (event: Event) => {
             </button>
           </template>
         </nav>
+
       </div>
     </aside>
 
     <!-- Main Content -->
     <div
-      :class="`transition-all duration-300 ${sidebarExpanded ? 'lg:ml-64' : 'lg:ml-20'}`"
+      :class="`transition-all duration-300 flex flex-col ${sidebarExpanded ? 'lg:ml-64' : 'lg:ml-20'} ${props.fullBleed ? 'h-screen' : ''}`"
     >
       <!-- Top Bar -->
       <header class="bg-white border-b border-gray-200 sticky top-0 z-30">
-        <div class="px-4 py-4">
+        <div class="px-4 py-3">
           <div class="flex items-center justify-between gap-4">
             <!-- Mobile Menu Button -->
             <button
               @click="sidebarOpen = true"
               class="lg:hidden text-[#263238] hover:text-[#435574]"
+              aria-label="Abrir menu"
             >
-              <Menu class="h-6 w-6"/>
+              <Menu class="h-6 w-6" />
             </button>
 
-            <!-- Spacer -->
-            <div class="flex-1"/>
+            <div class="flex-1" />
 
-            <!-- Notifications Dropdown -->
             <NotificationsDropdown
+              v-model:open="topbarNotificationsOpen"
               :user-type="currentUser.type === 'provider' ? 'provider' : 'contractor'"
             />
 
-            <!-- User Menu -->
-            <DropdownMenu>
+            <DropdownMenu v-model:open="topbarUserMenuOpen">
               <DropdownMenuTrigger>
                 <button
-                  class="flex items-center gap-2 hover:opacity-80 transition-opacity"
+                  class="flex items-center hover:opacity-80 transition-opacity"
+                  :title="currentUser.name"
                 >
                   <Avatar class="h-10 w-10 border-2 border-[#286AD8]">
                     <AvatarImage
@@ -701,7 +729,7 @@ const handleNotificationStreamEvent = (event: Event) => {
                   </Avatar>
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" class="w-56">
+              <DropdownMenuContent align="end" class="w-56 z-[70]">
                 <DropdownMenuLabel>Minha Conta</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
@@ -716,16 +744,19 @@ const handleNotificationStreamEvent = (event: Event) => {
                   <User class="mr-2 h-4 w-4" />
                   <span>Perfil</span>
                 </DropdownMenuItem>
-                <DropdownMenuItem @click="props.onNavigate('notifications')">
-                  <Bell class="mr-2 h-4 w-4" />
-                  <span>Notificações</span>
+                <DropdownMenuItem
+                  v-if="currentUser.type === 'contractor'"
+                  @click="props.onNavigate('favorites')"
+                >
+                  <Heart class="mr-2 h-4 w-4" />
+                  <span>Favoritos</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   v-if="currentUser.type === 'provider'"
-                  @click="props.onNavigate('freelancer-dashboard')"
+                  @click="props.onNavigate('freelancer-wallet')"
                 >
-                  <DollarSign class="mr-2 h-4 w-4" />
-                  <span>Dashboard</span>
+                  <History class="mr-2 h-4 w-4" />
+                  <span>Histórico de Transações</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem @click="props.onNavigate('settings')">
                   <Settings class="mr-2 h-4 w-4" />
@@ -746,7 +777,7 @@ const handleNotificationStreamEvent = (event: Event) => {
       <PendingReviewBanner />
 
       <!-- Page Content -->
-      <main class="p-6">
+      <main :class="props.fullBleed ? 'flex-1 min-h-0 overflow-hidden' : 'p-6'">
         <slot />
       </main>
     </div>

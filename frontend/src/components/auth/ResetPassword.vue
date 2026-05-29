@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import Button from "../ui/button.vue";
 import Input from "../ui/input.vue";
 import Label from "../ui/label.vue";
@@ -14,20 +15,33 @@ import {
   Eye,
   EyeOff,
   Lock,
+  TriangleAlert,
   X,
+  XCircle,
 } from "lucide-vue-next";
 import api from "@/api/config/axios";
 import { toast } from "@/utils/toast";
 
 interface ResetPasswordProps {
   email: string;
+  resetToken?: string;
   onSuccess: () => void;
   onBack: () => void;
 }
 
 type ResetStep = "code" | "password";
+type LinkResetState = "idle" | "ready" | "invalid" | "expired" | "used";
+type AdminResetUserType = "CONTRACTOR" | "FREELANCER" | "ADMIN";
+
+interface AdminResetPasswordLinkValidationResponse {
+  emailHint: string;
+  userType: AdminResetUserType;
+}
 
 const props = defineProps<ResetPasswordProps>();
+
+const router = useRouter();
+const route = useRoute();
 
 const currentStep = ref<ResetStep>("code");
 const code = ref<string[]>(["", "", "", "", "", ""]);
@@ -43,16 +57,25 @@ const errors = ref<{
   confirmPassword?: string;
 }>({});
 
+const isValidatingLink = ref(false);
 const isVerifyingCode = ref(false);
 const isSubmitting = ref(false);
 const success = ref(false);
 const canResend = ref(false);
 const timeLeft = ref(60);
 
+const linkResetState = ref<LinkResetState>("idle");
+const validatedLink = ref<AdminResetPasswordLinkValidationResponse | null>(null);
+
 const isLocked = ref(false);
 const lockEndTime = ref<Date | null>(null);
 const lockTimeRemaining = ref(0);
 let lockInterval: ReturnType<typeof setInterval> | null = null;
+
+const isLinkMode = computed(() => Boolean(props.resetToken?.trim()));
+const isLoading = computed(
+  () => isValidatingLink.value || isVerifyingCode.value || isSubmitting.value,
+);
 
 const passwordRequirements = computed(() => ({
   minLength: password.value.length >= 8,
@@ -66,7 +89,6 @@ const isPasswordValid = computed(() =>
   Object.values(passwordRequirements.value).every(Boolean),
 );
 
-const isLoading = computed(() => isVerifyingCode.value || isSubmitting.value);
 const fullCode = computed(() => code.value.join(""));
 const canVerifyCode = computed(
   () => fullCode.value.length === 6 && !isLocked.value && !isLoading.value,
@@ -79,6 +101,59 @@ const maskedEmail = computed(() => {
   return `${username.slice(0, 3)}***@${domain}`;
 });
 
+const linkEmailHint = computed(
+  () => validatedLink.value?.emailHint || "seu e-mail",
+);
+const currentResetUserType = computed<AdminResetUserType | null>(
+  () => validatedLink.value?.userType || null,
+);
+
+const adminLoginUrl = computed(() => {
+  const configuredUrl = import.meta.env.VITE_ADMIN_APP_URL?.trim();
+  if (!configuredUrl) {
+    return "http://localhost:5174/login";
+  }
+
+  const normalizedUrl = configuredUrl.replace(/\/+$/, "");
+  return normalizedUrl.endsWith("/login")
+    ? normalizedUrl
+    : `${normalizedUrl}/login`;
+});
+
+const successRedirectText = computed(() =>
+  currentResetUserType.value === "ADMIN"
+    ? "Você será redirecionado para o login administrativo em instantes..."
+    : "Você será redirecionado para o login em instantes...",
+);
+
+const successButtonLabel = computed(() =>
+  currentResetUserType.value === "ADMIN"
+    ? "Ir para o login administrativo"
+    : "Ir para o login",
+);
+
+const linkErrorTitle = computed(() => {
+  switch (linkResetState.value) {
+    case "expired":
+      return "Link expirado";
+    case "used":
+      return "Link já utilizado";
+    default:
+      return "Link inválido";
+  }
+});
+
+const linkErrorText = computed(() => {
+  switch (linkResetState.value) {
+    case "expired":
+      return "Solicite um novo link de redefinição com um administrador.";
+    case "used":
+      return "Este link já foi consumido e não pode ser reutilizado.";
+    default:
+      return "Não foi possível validar este link de redefinição.";
+  }
+});
+
 const lockTimeFormatted = computed(() => {
   const minutes = Math.floor(lockTimeRemaining.value / 60);
   const seconds = lockTimeRemaining.value % 60;
@@ -88,6 +163,10 @@ const lockTimeFormatted = computed(() => {
 watch(
   [timeLeft, canResend],
   ([currentTime, resendEnabled], _, onCleanup) => {
+    if (isLinkMode.value) {
+      return;
+    }
+
     if (currentTime > 0 && !resendEnabled) {
       const timer = setTimeout(() => (timeLeft.value -= 1), 1000);
       onCleanup(() => clearTimeout(timer));
@@ -99,6 +178,11 @@ watch(
 );
 
 onMounted(() => {
+  if (isLinkMode.value) {
+    void validateAdminResetLink();
+    return;
+  }
+
   focusCodeInput();
 });
 
@@ -202,9 +286,87 @@ function goToCodeStep(message?: string) {
   focusCodeInput();
 }
 
+function classifyLinkState(message: string): LinkResetState {
+  const normalizedMessage = message.toLowerCase();
+  if (normalizedMessage.includes("utiliz")) {
+    return "used";
+  }
+  if (normalizedMessage.includes("expir")) {
+    return "expired";
+  }
+  return "invalid";
+}
+
+async function clearResetTokenFromUrl() {
+  if (!("resetToken" in route.query)) {
+    return;
+  }
+
+  const nextQuery = { ...route.query };
+  delete nextQuery.resetToken;
+  await router.replace({ query: nextQuery });
+}
+
+function goToLoginDestination() {
+  if (currentResetUserType.value === "ADMIN") {
+    window.location.href = adminLoginUrl.value;
+    return;
+  }
+
+  props.onSuccess();
+}
+
+function scheduleSuccessNavigation() {
+  setTimeout(() => {
+    goToLoginDestination();
+  }, 2000);
+}
+
+async function handleBackAction() {
+  if (isLinkMode.value) {
+    props.onBack();
+    await clearResetTokenFromUrl();
+    return;
+  }
+
+  props.onBack();
+}
+
+async function handleLinkErrorExit() {
+  props.onBack();
+  await clearResetTokenFromUrl();
+}
+
+async function validateAdminResetLink() {
+  if (!props.resetToken) {
+    linkResetState.value = "invalid";
+    return;
+  }
+
+  isValidatingLink.value = true;
+  errors.value = {};
+
+  try {
+    const response = await api.post<AdminResetPasswordLinkValidationResponse>(
+      "/auth/admin-reset-link/validate",
+      { token: props.resetToken },
+    );
+
+    validatedLink.value = response.data;
+    linkResetState.value = "ready";
+    currentStep.value = "password";
+  } catch (err: any) {
+    const message =
+      err.response?.data?.message || "Link de redefinição inválido.";
+    linkResetState.value = classifyLinkState(message);
+  } finally {
+    isValidatingLink.value = false;
+  }
+}
+
 async function handleVerifyCode() {
   if (fullCode.value.length !== 6) {
-    errors.value.code = "Digite o código de 6 digitos";
+    errors.value.code = "Digite o código de 6 dígitos";
     return;
   }
 
@@ -219,7 +381,7 @@ async function handleVerifyCode() {
 
     resetLockoutState();
     currentStep.value = "password";
-    toast.success("código validado! Agora defina sua nova senha.");
+    toast.success("Código validado! Agora defina sua nova senha.");
   } catch (err: any) {
     const status = err.response?.status;
     const message =
@@ -270,15 +432,15 @@ function validatePassword(): boolean {
   const newErrors: { password?: string; confirmPassword?: string } = {};
 
   if (!password.value) {
-    newErrors.password = "Senha e obrigatoria";
+    newErrors.password = "Senha é obrigatória";
   } else if (password.value.length > 256) {
-    newErrors.password = "Senha deve ter no maximo 256 caracteres";
+    newErrors.password = "Senha deve ter no máximo 256 caracteres";
   } else if (!isPasswordValid.value) {
     newErrors.password = "Senha não atende aos requisitos";
   }
 
   if (!confirmPassword.value) {
-    newErrors.confirmPassword = "Confirmacao de senha e obrigatoria";
+    newErrors.confirmPassword = "Confirmação de senha é obrigatória";
   } else if (password.value !== confirmPassword.value) {
     newErrors.confirmPassword = "As senhas não coincidem";
   }
@@ -297,24 +459,35 @@ async function handleSubmit(event: Event) {
 
   if (!validatePassword()) return;
 
-  if (fullCode.value.length !== 6) {
-    goToCodeStep("Valide o código novamente para continuar");
-    return;
-  }
-
   isSubmitting.value = true;
 
   try {
-    await api.post("/auth/reset-password", {
-      email: props.email,
-      code: fullCode.value,
-      newPassword: password.value,
-      confirmPassword: confirmPassword.value,
-    });
+    if (isLinkMode.value && props.resetToken) {
+      await api.post("/auth/admin-reset-link/reset-password", {
+        token: props.resetToken,
+        newPassword: password.value,
+        confirmPassword: confirmPassword.value,
+      });
+    } else {
+      if (fullCode.value.length !== 6) {
+        goToCodeStep("Valide o código novamente para continuar");
+        return;
+      }
+
+      await api.post("/auth/reset-password", {
+        email: props.email,
+        code: fullCode.value,
+        newPassword: password.value,
+        confirmPassword: confirmPassword.value,
+      });
+    }
 
     success.value = true;
+    if (isLinkMode.value) {
+      await clearResetTokenFromUrl();
+    }
     toast.success("Senha redefinida com sucesso!");
-    setTimeout(() => props.onSuccess(), 2000);
+    scheduleSuccessNavigation();
   } catch (err: any) {
     const status = err.response?.status;
     const fieldErrors = err.response?.data?.errors || {};
@@ -327,10 +500,14 @@ async function handleSubmit(event: Event) {
       errors.value.confirmPassword = fieldErrors.confirmPassword;
     }
 
-    if (status === 429 && err.response?.data?.lockUntil) {
+    if (isLinkMode.value) {
+      if (/link/i.test(message)) {
+        linkResetState.value = classifyLinkState(message);
+      }
+    } else if (status === 429 && err.response?.data?.lockUntil) {
       startLockoutTimer(err.response.data.lockUntil);
       goToCodeStep(message);
-    } else if (fieldErrors.code || /código|expirad|inval/i.test(message)) {
+    } else if (fieldErrors.code || /c[oó]digo|expirad|inv[aá]l/i.test(message)) {
       goToCodeStep(fieldErrors.code || message);
     }
 
@@ -349,7 +526,7 @@ async function handleSubmit(event: Event) {
 <template>
   <div
     v-if="success"
-    class="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4"
+    class="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-4"
   >
     <div class="w-full max-w-md bg-white rounded-lg shadow-xl p-8">
       <div class="text-center">
@@ -359,7 +536,7 @@ async function handleSubmit(event: Event) {
         <h2 class="text-gray-900 mb-2">Senha redefinida!</h2>
         <p class="text-gray-600 mb-4">Sua senha foi alterada com sucesso.</p>
         <p class="text-sm text-gray-500 mb-6">
-          Você será redirecionado para o login em instantes...
+          {{ successRedirectText }}
         </p>
 
         <Alert class="mb-6 bg-blue-50 border-blue-200 text-left">
@@ -369,7 +546,63 @@ async function handleSubmit(event: Event) {
           </AlertDescription>
         </Alert>
 
-        <Button @click="props.onSuccess" class="w-full">
+        <Button @click="goToLoginDestination" class="w-full">
+          {{ successButtonLabel }}
+        </Button>
+      </div>
+    </div>
+  </div>
+
+  <div
+    v-else-if="isLinkMode && !isValidatingLink && linkResetState !== 'ready'"
+    class="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-4"
+  >
+    <div class="w-full max-w-md bg-white rounded-lg shadow-xl p-8">
+      <div class="text-center">
+        <div
+          class="inline-flex p-4 rounded-full mb-4"
+          :class="
+            linkResetState === 'expired'
+              ? 'bg-amber-100'
+              : 'bg-red-100'
+          "
+        >
+          <component
+            :is="linkResetState === 'expired' ? TriangleAlert : XCircle"
+            class="h-8 w-8"
+            :class="
+              linkResetState === 'expired'
+                ? 'text-amber-600'
+                : 'text-red-600'
+            "
+          />
+        </div>
+        <h2 class="text-gray-900 mb-2">{{ linkErrorTitle }}</h2>
+        <p class="text-gray-600 mb-6">{{ linkErrorText }}</p>
+
+        <Alert
+          class="mb-6 text-left"
+          :class="
+            linkResetState === 'expired'
+              ? 'bg-amber-50 border-amber-200'
+              : 'bg-red-50 border-red-200'
+          "
+        >
+          <AlertCircle
+            class="h-4 w-4"
+            :class="
+              linkResetState === 'expired'
+                ? 'text-amber-600'
+                : 'text-red-600'
+            "
+          />
+          <AlertDescription class="text-gray-700">
+            Se precisar redefinir a senha novamente, solicite um novo envio pelo
+            painel administrativo.
+          </AlertDescription>
+        </Alert>
+
+        <Button @click="handleLinkErrorExit" class="w-full">
           Ir para o login
         </Button>
       </div>
@@ -378,30 +611,40 @@ async function handleSubmit(event: Event) {
 
   <div
     v-else
-    class="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4"
+    class="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-4"
   >
     <div class="w-full max-w-md bg-white rounded-lg shadow-xl p-8">
       <div class="mb-6 flex items-center justify-between gap-4">
-        <Button variant="ghost" @click="props.onBack">
+        <Button variant="ghost" @click="handleBackAction">
           <ArrowLeft class="h-4 w-4" />
           Voltar
         </Button>
         <p class="text-sm font-medium text-gray-500">
-          {{ currentStep === "code" ? "Etapa 1 de 2" : "Etapa 2 de 2" }}
+          {{
+            isLinkMode
+              ? "Link único"
+              : currentStep === "code"
+                ? "Etapa 1 de 2"
+                : "Etapa 2 de 2"
+          }}
         </p>
       </div>
+
       <div class="text-center mb-6">
         <div class="inline-flex p-4 bg-red-100 rounded-full mb-4">
           <Lock class="h-8 w-8 text-red-600" />
         </div>
         <h1 class="text-3xl text-gray-900 mb-2 font-bold">Redefinir senha</h1>
-        <p class="text-gray-600">
+        <p class="text-gray-600" v-if="isLinkMode">
+          Defina uma nova senha para <strong>{{ linkEmailHint }}</strong>
+        </p>
+        <p class="text-gray-600" v-else>
           Digite o código enviado para <strong>{{ maskedEmail }}</strong>
         </p>
       </div>
 
       <div
-        v-if="isLocked"
+        v-if="!isLinkMode && isLocked"
         class="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg text-center"
       >
         <Clock class="h-6 w-6 text-amber-600 mx-auto mb-2" />
@@ -413,7 +656,7 @@ async function handleSubmit(event: Event) {
       </div>
 
       <Alert
-        v-if="errors.code && currentStep === 'code' && !isLocked"
+        v-if="!isLinkMode && errors.code && currentStep === 'code' && !isLocked"
         variant="destructive"
         class="mb-6"
       >
@@ -421,7 +664,7 @@ async function handleSubmit(event: Event) {
         <AlertDescription>{{ errors.code }}</AlertDescription>
       </Alert>
 
-      <div v-if="currentStep === 'code'">
+      <div v-if="!isLinkMode && currentStep === 'code'">
         <div class="mb-6">
           <p class="text-sm text-gray-600 text-center mb-4">
             Código de recuperação
@@ -489,11 +732,15 @@ async function handleSubmit(event: Event) {
             class="text-sm text-green-700 flex items-center justify-center gap-2"
           >
             <Check class="h-4 w-4" />
-            código verificado. Agora defina sua nova senha.
+            {{
+              isLinkMode
+                ? "Link validado. Agora defina sua nova senha."
+                : "Código verificado. Agora defina sua nova senha."
+            }}
           </p>
         </div>
 
-        <Alert v-if="errors.code && !isLocked" variant="destructive">
+        <Alert v-if="errors.code && !isLocked && !isLinkMode" variant="destructive">
           <AlertCircle class="h-4 w-4" />
           <AlertDescription>{{ errors.code }}</AlertDescription>
         </Alert>
@@ -535,7 +782,7 @@ async function handleSubmit(event: Event) {
                 :is="passwordRequirements.minLength ? Check : X"
                 class="h-3 w-3"
               />
-              <span>Minimo 8 caracteres</span>
+              <span>Mínimo 8 caracteres</span>
             </div>
             <div
               class="flex items-center gap-2 text-sm"
@@ -549,7 +796,7 @@ async function handleSubmit(event: Event) {
                 :is="passwordRequirements.hasUpperCase ? Check : X"
                 class="h-3 w-3"
               />
-              <span>1 letra maiuscula</span>
+              <span>1 letra maiúscula</span>
             </div>
             <div
               class="flex items-center gap-2 text-sm"
@@ -563,7 +810,7 @@ async function handleSubmit(event: Event) {
                 :is="passwordRequirements.hasLowerCase ? Check : X"
                 class="h-3 w-3"
               />
-              <span>1 letra minuscula</span>
+              <span>1 letra minúscula</span>
             </div>
             <div
               class="flex items-center gap-2 text-sm"
@@ -577,7 +824,7 @@ async function handleSubmit(event: Event) {
                 :is="passwordRequirements.hasNumber ? Check : X"
                 class="h-3 w-3"
               />
-              <span>1 numero</span>
+              <span>1 número</span>
             </div>
             <div
               class="flex items-center gap-2 text-sm"
@@ -650,7 +897,6 @@ async function handleSubmit(event: Event) {
         <Button type="submit" class="w-full" size="lg" :disabled="isLoading">
           {{ isSubmitting ? "Redefinindo..." : "Redefinir senha" }}
         </Button>
-
       </form>
     </div>
   </div>

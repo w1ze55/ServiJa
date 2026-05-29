@@ -7,6 +7,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Data
@@ -20,6 +21,7 @@ public class ProfileResponse {
     private String email;
     private String cpf;
     private String phone;
+    private LocalDate birthDate;
     private User.UserType userType;
     private Boolean emailVerified;
     private String avatarUrl;
@@ -39,6 +41,8 @@ public class ProfileResponse {
         private Integer totalContracts;
         private Integer activeContracts;
         private Integer completedContracts;
+        private BigDecimal contractorRating;
+        private Long contractorTotalReviews;
     }
     
     @Data
@@ -53,7 +57,6 @@ public class ProfileResponse {
         private Integer totalReviews;
         private Integer completedJobs;
         private Integer activeJobs;
-        private Boolean kycCompleted;
         private Boolean profileCompleted;
         private Boolean available;
     }

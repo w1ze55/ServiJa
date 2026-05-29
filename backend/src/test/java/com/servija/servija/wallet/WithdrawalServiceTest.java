@@ -7,6 +7,7 @@ import com.servija.servija.model.WithdrawalRequest;
 import com.servija.servija.repository.UserRepository;
 import com.servija.servija.repository.WithdrawalRequestRepository;
 import com.servija.servija.service.AsaasService;
+import com.servija.servija.service.AuditLogger;
 import com.servija.servija.service.BankAccountService;
 import com.servija.servija.service.FreelancerWalletService;
 import com.servija.servija.service.WithdrawalService;
@@ -28,7 +29,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -51,6 +51,9 @@ class WithdrawalServiceTest {
 
     @Mock
     private BankAccountService bankAccountService;
+
+    @Mock
+    private AuditLogger auditLogger;
 
     @InjectMocks
     private WithdrawalService withdrawalService;

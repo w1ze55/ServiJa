@@ -9,6 +9,7 @@ import com.servija.servija.dto.NearbyFreelancerResponse;
 import com.servija.servija.dto.ProfessionalLinkResponse;
 import com.servija.servija.dto.ServiceCityRequest;
 import com.servija.servija.dto.ServiceCityResponse;
+import com.servija.servija.exception.ResourceNotFoundException;
 import com.servija.servija.model.Address;
 import com.servija.servija.model.Freelancer;
 import com.servija.servija.model.ProfessionalLink;
@@ -19,8 +20,10 @@ import com.servija.servija.model.User;
 import com.servija.servija.repository.AddressRepository;
 import com.servija.servija.repository.FreelancerRepository;
 import com.servija.servija.repository.ReviewRepository;
+import com.servija.servija.repository.ServiceRepository;
 import com.servija.servija.repository.ServiceRequestRepository;
 import com.servija.servija.repository.UserRepository;
+import com.servija.servija.util.PublicVisibilityRules;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
@@ -32,6 +35,7 @@ import org.springframework.util.StringUtils;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -46,6 +50,7 @@ import java.util.stream.Collectors;
 public class FreelancerService {
 
     private final FreelancerRepository freelancerRepository;
+    private final ServiceRepository serviceRepository;
     private final UserRepository userRepository;
     private final AddressRepository addressRepository;
     private final ServiceRequestRepository serviceRequestRepository;
@@ -53,6 +58,8 @@ public class FreelancerService {
     private final ObjectMapper objectMapper;
     private final CategoryCatalogService categoryCatalogService;
     private final IbgeLocationService ibgeLocationService;
+    private final GeocodingService geocodingService;
+    private final AuditLogger auditLogger;
 
     @Transactional(readOnly = true)
     public FreelancerProfileResponse getProfile() {
@@ -78,6 +85,7 @@ public class FreelancerService {
     @Transactional
     public FreelancerProfileResponse updateProfile(FreelancerProfileRequest request) {
         Freelancer freelancer = getCurrentFreelancer();
+        Map<String, Object> beforeState = buildFreelancerAuditState(freelancer);
 
         // Atualizar campos básicos
         if (request.getName() != null) {
@@ -142,12 +150,19 @@ public class FreelancerService {
 
             // Adicionar as novas cidades
             for (NormalizedServiceCity cityDto : normalizedCities) {
-                ServiceCity serviceCity = ServiceCity.builder()
+                var builder = ServiceCity.builder()
                         .freelancer(freelancer)
                         .city(cityDto.getCity())
-                        .state(cityDto.getState())
-                        .build();
-                freelancer.getServiceCities().add(serviceCity);
+                        .state(cityDto.getState());
+
+                if (cityDto.getLatitude() != null && cityDto.getLongitude() != null) {
+                    builder.latitude(cityDto.getLatitude()).longitude(cityDto.getLongitude());
+                } else {
+                    geocodingService.geocodeCity(cityDto.getCity(), cityDto.getState())
+                            .ifPresent(coords -> builder.latitude(coords.latitude()).longitude(coords.longitude()));
+                }
+
+                freelancer.getServiceCities().add(builder.build());
             }
         }
 
@@ -178,6 +193,19 @@ public class FreelancerService {
         }
 
         freelancer = freelancerRepository.save(freelancer);
+        Map<String, Object> afterState = buildFreelancerAuditState(freelancer);
+        List<String> changedFields = AuditStateDiffUtils.changedFields(beforeState, afterState);
+        if (!changedFields.isEmpty()) {
+            auditLogger.recordSemantic(
+                    "FREELANCER_PROFILE_UPDATED",
+                    "USER",
+                    String.valueOf(freelancer.getId()),
+                    freelancer.getName(),
+                    com.servija.servija.model.AuditLog.Result.SUCCESS,
+                    Map.of("fieldsChanged", changedFields),
+                    AuditStateDiffUtils.filterFields(beforeState, changedFields),
+                    AuditStateDiffUtils.filterFields(afterState, changedFields));
+        }
         return mapToResponse(freelancer);
     }
 
@@ -234,6 +262,8 @@ public class FreelancerService {
                             .id(sc.getId())
                             .city(sc.getCity())
                             .state(sc.getState())
+                            .latitude(sc.getLatitude())
+                            .longitude(sc.getLongitude())
                             .build())
                     .collect(Collectors.toList());
         }
@@ -316,32 +346,72 @@ public class FreelancerService {
      * @param category  Categoria opcional para filtrar
      * @return Lista de profissionais próximos ordenados por distância
      */
-    @Transactional(readOnly = true)
+    @Transactional
     public List<NearbyFreelancerResponse> findNearbyFreelancers(
             BigDecimal latitude,
             BigDecimal longitude,
             Double radiusKm,
-            String category) {
-        List<Freelancer> freelancers;
+            String category,
+            String query,
+            Long categoryId,
+            String categorySlug,
+            Long subcategoryId,
+            String subcategorySlug,
+            BigDecimal minRating,
+            Boolean available,
+            String city,
+            String state) {
 
-        if (category != null && !category.isEmpty()) {
-            freelancers = freelancerRepository.findAllWithLocation().stream()
-                    .filter(freelancer -> matchesCategoryFilter(freelancer, category))
-                    .collect(Collectors.toList());
-        } else {
-            freelancers = freelancerRepository.findAllWithLocation();
-        }
+        NearbyFreelancerFilters filters = new NearbyFreelancerFilters(
+                normalizeSearchToken(query),
+                normalizeSearchToken(category),
+                categoryId,
+                normalizeSearchToken(categorySlug),
+                subcategoryId,
+                normalizeSearchToken(subcategorySlug),
+                minRating,
+                available,
+                normalizeSearchToken(city),
+                normalizeState(state));
 
-        return freelancers.stream()
-                .map(f -> {
-                    Double distance = calculateDistance(
-                            latitude.doubleValue(),
-                            longitude.doubleValue(),
-                            f.getLatitude().doubleValue(),
-                            f.getLongitude().doubleValue());
-                    return mapToNearbyResponse(f, distance);
-                })
-                .filter(f -> f.getDistance() <= radiusKm)
+        // serviceCities define a area atendida; endereco padrao define a posicao real no mapa.
+        List<Freelancer> withServiceCities = freelancerRepository.findAllWithServiceCities();
+
+        double userLat = latitude.doubleValue();
+        double userLon = longitude.doubleValue();
+
+        List<Freelancer> serviceableFreelancers = withServiceCities.stream()
+                .filter(this::isPubliclyVisible)
+                .filter(freelancer -> servesSearchRegion(freelancer, filters))
+                .toList();
+
+        Map<Long, Address> defaultAddressesByFreelancerId = loadDefaultAddressesByFreelancerId(
+                serviceableFreelancers.stream().map(Freelancer::getId).toList());
+        Map<Long, Integer> completedJobsByFreelancerId = loadCompletedJobsByFreelancerId(
+                serviceableFreelancers.stream().map(Freelancer::getId).toList());
+
+        java.util.Map<Long, NearbyFreelancerResponse> results = serviceableFreelancers.stream()
+                .map(freelancer -> mapToNearbyResponseFromDefaultAddress(
+                        freelancer,
+                        defaultAddressesByFreelancerId.get(freelancer.getId()),
+                        completedJobsByFreelancerId.getOrDefault(freelancer.getId(), 0),
+                        userLat,
+                        userLon,
+                        radiusKm))
+                .filter(Objects::nonNull)
+                .collect(Collectors.toMap(
+                        NearbyFreelancerResponse::getId,
+                        response -> response,
+                        (r1, r2) -> r1.getDistance() <= r2.getDistance() ? r1 : r2));
+
+        Map<Long, List<com.servija.servija.model.Service>> activeServicesByFreelancerId = loadActiveServicesByFreelancerId(
+                new ArrayList<>(results.keySet()));
+
+        return results.values().stream()
+                .map(response -> enrichNearbyResponseFromServices(
+                        response,
+                        activeServicesByFreelancerId.getOrDefault(response.getId(), List.of())))
+                .filter(response -> matchesNearbyFilters(response, activeServicesByFreelancerId, filters))
                 .sorted(Comparator.comparingDouble(NearbyFreelancerResponse::getDistance))
                 .collect(Collectors.toList());
     }
@@ -352,9 +422,40 @@ public class FreelancerService {
     @Transactional
     public void updateLocation(BigDecimal latitude, BigDecimal longitude) {
         Freelancer freelancer = getCurrentFreelancer();
+        Map<String, Object> beforeState = new LinkedHashMap<>();
+        beforeState.put("latitude", freelancer.getLatitude());
+        beforeState.put("longitude", freelancer.getLongitude());
         freelancer.setLatitude(latitude);
         freelancer.setLongitude(longitude);
-        freelancerRepository.save(freelancer);
+        freelancer = freelancerRepository.save(freelancer);
+        Map<String, Object> afterState = new LinkedHashMap<>();
+        afterState.put("latitude", freelancer.getLatitude());
+        afterState.put("longitude", freelancer.getLongitude());
+        List<String> changedFields = AuditStateDiffUtils.changedFields(beforeState, afterState);
+        if (!changedFields.isEmpty()) {
+            auditLogger.recordSemantic(
+                    "FREELANCER_LOCATION_UPDATED",
+                    "USER",
+                    String.valueOf(freelancer.getId()),
+                    freelancer.getName(),
+                    com.servija.servija.model.AuditLog.Result.SUCCESS,
+                    Map.of("fieldsChanged", changedFields),
+                    AuditStateDiffUtils.filterFields(beforeState, changedFields),
+                    AuditStateDiffUtils.filterFields(afterState, changedFields));
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public FreelancerProfileResponse getVisiblePublicProfile(Long freelancerId) {
+        Freelancer freelancer = freelancerRepository.findByIdWithServiceCities(freelancerId)
+                .orElseThrow(() -> new ResourceNotFoundException("Freelancer não encontrado"));
+
+        if (!isPubliclyVisible(freelancer)) {
+            throw new ResourceNotFoundException("Freelancer não encontrado");
+        }
+
+        freelancerRepository.findByIdWithProfessionalLinks(freelancerId);
+        return mapToResponse(freelancer);
     }
 
     /**
@@ -417,7 +518,9 @@ public class FreelancerService {
                         "A cidade '" + cityToPersist + "/" + normalizedState + "' já foi informada.");
             }
 
-            normalizedCities.add(new NormalizedServiceCity(cityToPersist, normalizedState));
+            BigDecimal lat = existingCity != null ? existingCity.getLatitude() : null;
+            BigDecimal lng = existingCity != null ? existingCity.getLongitude() : null;
+            normalizedCities.add(new NormalizedServiceCity(cityToPersist, normalizedState, lat, lng));
         }
 
         return normalizedCities;
@@ -455,10 +558,103 @@ public class FreelancerService {
         return R * c;
     }
 
-    private NearbyFreelancerResponse mapToNearbyResponse(Freelancer freelancer, Double distance) {
-        // Calcular média das avaliações e total de reviews a partir da tabela reviews
+    private boolean servesSearchRegion(Freelancer freelancer, NearbyFreelancerFilters filters) {
+        if (!StringUtils.hasText(filters.city()) || !StringUtils.hasText(filters.state())) {
+            return true;
+        }
+
+        return freelancer.getServiceCities().stream()
+                .anyMatch(serviceCity -> filters.city().equals(normalizeSearchToken(serviceCity.getCity()))
+                        && filters.state().equals(normalizeState(serviceCity.getState())));
+    }
+
+    private Map<Long, Address> loadDefaultAddressesByFreelancerId(List<Long> freelancerIds) {
+        if (freelancerIds == null || freelancerIds.isEmpty()) {
+            return Map.of();
+        }
+
+        return addressRepository.findByUserIdInOrderByUserIdAscIsDefaultDescCreatedAtDesc(freelancerIds)
+                .stream()
+                .collect(Collectors.toMap(
+                        address -> address.getUser().getId(),
+                        address -> address,
+                        (existing, ignored) -> existing));
+    }
+
+    private NearbyFreelancerResponse mapToNearbyResponseFromDefaultAddress(
+            Freelancer freelancer,
+            Address defaultAddress,
+            Integer completedJobs,
+            double userLat,
+            double userLon,
+            Double radiusKm) {
+
+        if (defaultAddress == null) {
+            return null;
+        }
+
+        Optional<GeocodingService.Coordinates> coordinates = resolveAddressCoordinates(defaultAddress);
+
+        if (coordinates.isEmpty()) {
+            return null;
+        }
+
+        double distance = calculateDistance(
+                userLat,
+                userLon,
+                coordinates.get().latitude().doubleValue(),
+                coordinates.get().longitude().doubleValue());
+
+        if (distance > radiusKm) {
+            return null;
+        }
+
+        return mapToNearbyResponse(
+                freelancer,
+                defaultAddress,
+                coordinates.get().latitude(),
+                coordinates.get().longitude(),
+                distance,
+                completedJobs);
+    }
+
+    private Optional<GeocodingService.Coordinates> resolveAddressCoordinates(Address address) {
+        if (address.getLatitude() != null && address.getLongitude() != null) {
+            return Optional.of(new GeocodingService.Coordinates(address.getLatitude(), address.getLongitude()));
+        }
+
+        Optional<GeocodingService.Coordinates> coordinates = geocodingService.geocodeAddress(
+                address.getStreet(),
+                address.getNumber(),
+                address.getNeighborhood(),
+                address.getCity(),
+                address.getState());
+
+        coordinates.ifPresent(value -> {
+            address.setLatitude(value.latitude());
+            address.setLongitude(value.longitude());
+            addressRepository.save(address);
+        });
+
+        return coordinates;
+    }
+
+    private NearbyFreelancerResponse mapToNearbyResponse(
+            Freelancer freelancer,
+            Address address,
+            BigDecimal latitude,
+            BigDecimal longitude,
+            Double distance,
+            Integer completedJobs) {
         Double averageRating = reviewRepository.findAverageRatingByReviewedId(freelancer.getId());
         long totalReviewsCount = reviewRepository.countByReviewedId(freelancer.getId());
+        List<ServiceSubcategory> freelancerSubcategories = getResolvedFreelancerSubcategories(freelancer);
+        ServiceSubcategory primarySubcategory = freelancer.getServiceSubcategory() != null
+                ? freelancer.getServiceSubcategory()
+                : (!freelancerSubcategories.isEmpty() ? freelancerSubcategories.get(0) : null);
+        String location = address != null
+                ? address.getCity() + ", " + address.getState()
+                : freelancer.getLocation();
 
         return NearbyFreelancerResponse.builder()
                 .id(freelancer.getId())
@@ -467,13 +663,247 @@ public class FreelancerService {
                 .professionalTitle(freelancer.getProfessionalTitle())
                 .rating(averageRating != null ? BigDecimal.valueOf(averageRating) : null)
                 .totalReviews((int) totalReviewsCount)
-                .location(freelancer.getLocation())
-                .latitude(freelancer.getLatitude())
-                .longitude(freelancer.getLongitude())
-                .distance(Math.round(distance * 100.0) / 100.0) // Arredondar para 2 casas decimais
+                .location(location)
+                .latitude(latitude)
+                .longitude(longitude)
+                .distance(Math.round(distance * 100.0) / 100.0)
                 .available(freelancer.getAvailable())
                 .category(freelancer.getCategory())
+                .completedJobs(completedJobs != null ? completedJobs : 0)
+                .categoryId(freelancer.getServiceCategory() != null ? freelancer.getServiceCategory().getId() : null)
+                .categorySlug(freelancer.getServiceCategory() != null ? freelancer.getServiceCategory().getSlug() : null)
+                .categoryLabel(freelancer.getServiceCategory() != null ? freelancer.getServiceCategory().getName()
+                        : freelancer.getCategory())
+                .subcategoryId(primarySubcategory != null ? primarySubcategory.getId() : null)
+                .subcategorySlug(primarySubcategory != null ? primarySubcategory.getSlug() : null)
+                .subcategoryLabel(primarySubcategory != null ? primarySubcategory.getName() : null)
+                .subcategoryIds(freelancerSubcategories.stream().map(ServiceSubcategory::getId).toList())
+                .subcategoryLabels(freelancerSubcategories.stream().map(ServiceSubcategory::getName).toList())
                 .build();
+    }
+
+    private Map<Long, Integer> loadCompletedJobsByFreelancerId(List<Long> freelancerIds) {
+        if (freelancerIds == null || freelancerIds.isEmpty()) {
+            return Map.of();
+        }
+
+        return Optional.ofNullable(serviceRequestRepository.countCompletedJobsByFreelancerIds(
+                freelancerIds,
+                ServiceRequest.Status.COMPLETED))
+                .orElseGet(List::of)
+                .stream()
+                .collect(Collectors.toMap(
+                        ServiceRequestRepository.CompletedJobsCountProjection::getFreelancerId,
+                        projection -> Math.toIntExact(projection.getCompletedJobs())));
+    }
+
+    private Map<Long, List<com.servija.servija.model.Service>> loadActiveServicesByFreelancerId(List<Long> freelancerIds) {
+        if (freelancerIds == null || freelancerIds.isEmpty()) {
+            return Map.of();
+        }
+
+        return serviceRepository.findByFreelancerIdInAndIsActiveOrderByCreatedAtDesc(freelancerIds, true)
+                .stream()
+                .filter(PublicVisibilityRules::isServicePublic)
+                .filter(service -> service.getFreelancer() != null && service.getFreelancer().getId() != null)
+                .collect(Collectors.groupingBy(service -> service.getFreelancer().getId()));
+    }
+
+    boolean isPubliclyVisible(Freelancer freelancer) {
+        return PublicVisibilityRules.isFreelancerPublic(freelancer);
+    }
+
+    private NearbyFreelancerResponse enrichNearbyResponseFromServices(
+            NearbyFreelancerResponse response,
+            List<com.servija.servija.model.Service> services) {
+
+        if (services == null || services.isEmpty()) {
+            return response;
+        }
+
+        com.servija.servija.model.Service service = services.get(0);
+
+        if (response.getCategoryId() == null && service.getServiceCategory() != null) {
+            response.setCategoryId(service.getServiceCategory().getId());
+            response.setCategorySlug(service.getServiceCategory().getSlug());
+            response.setCategoryLabel(service.getServiceCategory().getName());
+        }
+        if (!StringUtils.hasText(response.getCategoryLabel())) {
+            response.setCategoryLabel(StringUtils.hasText(service.getCategory()) ? service.getCategory() : response.getCategory());
+        }
+        if (!StringUtils.hasText(response.getCategory())) {
+            response.setCategory(response.getCategoryLabel());
+        }
+
+        if (response.getSubcategoryId() == null && service.getServiceSubcategory() != null) {
+            response.setSubcategoryId(service.getServiceSubcategory().getId());
+            response.setSubcategorySlug(service.getServiceSubcategory().getSlug());
+            response.setSubcategoryLabel(service.getServiceSubcategory().getName());
+        }
+        if ((response.getSubcategoryIds() == null || response.getSubcategoryIds().isEmpty())
+                && response.getSubcategoryId() != null) {
+            response.setSubcategoryIds(List.of(response.getSubcategoryId()));
+        }
+        if ((response.getSubcategoryLabels() == null || response.getSubcategoryLabels().isEmpty())
+                && StringUtils.hasText(response.getSubcategoryLabel())) {
+            response.setSubcategoryLabels(List.of(response.getSubcategoryLabel()));
+        }
+
+        return response;
+    }
+
+    private boolean matchesNearbyFilters(
+            NearbyFreelancerResponse response,
+            Map<Long, List<com.servija.servija.model.Service>> activeServicesByFreelancerId,
+            NearbyFreelancerFilters filters) {
+
+        if (filters.available() != null && !Objects.equals(response.getAvailable(), filters.available())) {
+            return false;
+        }
+
+        if (filters.minRating() != null) {
+            BigDecimal rating = response.getRating() != null ? response.getRating() : BigDecimal.ZERO;
+            if (rating.compareTo(filters.minRating()) < 0) {
+                return false;
+            }
+        }
+
+        List<com.servija.servija.model.Service> services = activeServicesByFreelancerId.getOrDefault(
+                response.getId(),
+                List.of());
+
+        if (!matchesCategoryFilter(response, services, filters)) {
+            return false;
+        }
+
+        if (!matchesSubcategoryFilter(response, services, filters)) {
+            return false;
+        }
+
+        return !StringUtils.hasText(filters.query()) || matchesSearchQuery(response, services, filters.query());
+    }
+
+    private boolean matchesCategoryFilter(
+            NearbyFreelancerResponse response,
+            List<com.servija.servija.model.Service> services,
+            NearbyFreelancerFilters filters) {
+
+        boolean hasCategoryFilter = filters.categoryId() != null
+                || StringUtils.hasText(filters.categorySlug())
+                || StringUtils.hasText(filters.categoryText());
+
+        if (!hasCategoryFilter) {
+            return true;
+        }
+
+        if (filters.categoryId() != null && Objects.equals(response.getCategoryId(), filters.categoryId())) {
+            return true;
+        }
+
+        if (matchesNormalizedExact(filters.categorySlug(), response.getCategorySlug())
+                || matchesNormalizedExact(filters.categorySlug(), response.getCategoryLabel())
+                || matchesNormalizedExact(filters.categoryText(), response.getCategorySlug())
+                || matchesNormalizedExact(filters.categoryText(), response.getCategoryLabel())
+                || matchesNormalizedExact(filters.categoryText(), response.getCategory())) {
+            return true;
+        }
+
+        return services.stream().anyMatch(service -> {
+            if (filters.categoryId() != null
+                    && service.getServiceCategory() != null
+                    && Objects.equals(service.getServiceCategory().getId(), filters.categoryId())) {
+                return true;
+            }
+            return matchesNormalizedExact(filters.categorySlug(),
+                    service.getServiceCategory() != null ? service.getServiceCategory().getSlug() : null)
+                    || matchesNormalizedExact(filters.categorySlug(),
+                            service.getServiceCategory() != null ? service.getServiceCategory().getName() : null)
+                    || matchesNormalizedExact(filters.categoryText(),
+                            service.getServiceCategory() != null ? service.getServiceCategory().getSlug() : null)
+                    || matchesNormalizedExact(filters.categoryText(),
+                            service.getServiceCategory() != null ? service.getServiceCategory().getName() : null)
+                    || matchesNormalizedExact(filters.categoryText(), service.getCategory());
+        });
+    }
+
+    private boolean matchesSubcategoryFilter(
+            NearbyFreelancerResponse response,
+            List<com.servija.servija.model.Service> services,
+            NearbyFreelancerFilters filters) {
+
+        boolean hasSubcategoryFilter = filters.subcategoryId() != null || StringUtils.hasText(filters.subcategorySlug());
+
+        if (!hasSubcategoryFilter) {
+            return true;
+        }
+
+        if (filters.subcategoryId() != null
+                && (Objects.equals(response.getSubcategoryId(), filters.subcategoryId())
+                        || (response.getSubcategoryIds() != null
+                                && response.getSubcategoryIds().contains(filters.subcategoryId())))) {
+            return true;
+        }
+
+        if (matchesNormalizedExact(filters.subcategorySlug(), response.getSubcategorySlug())
+                || matchesNormalizedExact(filters.subcategorySlug(), response.getSubcategoryLabel())
+                || (response.getSubcategoryLabels() != null
+                        && response.getSubcategoryLabels().stream()
+                                .anyMatch(label -> matchesNormalizedExact(filters.subcategorySlug(), label)))) {
+            return true;
+        }
+
+        return services.stream().anyMatch(service -> {
+            if (filters.subcategoryId() != null
+                    && service.getServiceSubcategory() != null
+                    && Objects.equals(service.getServiceSubcategory().getId(), filters.subcategoryId())) {
+                return true;
+            }
+            return matchesNormalizedExact(filters.subcategorySlug(),
+                    service.getServiceSubcategory() != null ? service.getServiceSubcategory().getSlug() : null)
+                    || matchesNormalizedExact(filters.subcategorySlug(),
+                            service.getServiceSubcategory() != null ? service.getServiceSubcategory().getName() : null);
+        });
+    }
+
+    private boolean matchesSearchQuery(
+            NearbyFreelancerResponse response,
+            List<com.servija.servija.model.Service> services,
+            String query) {
+
+        if (containsNormalized(response.getName(), query)
+                || containsNormalized(response.getProfessionalTitle(), query)
+                || containsNormalized(response.getCategory(), query)
+                || containsNormalized(response.getCategoryLabel(), query)
+                || containsNormalized(response.getCategorySlug(), query)
+                || containsNormalized(response.getSubcategoryLabel(), query)
+                || containsNormalized(response.getSubcategorySlug(), query)
+                || (response.getSubcategoryLabels() != null
+                        && response.getSubcategoryLabels().stream().anyMatch(label -> containsNormalized(label, query)))) {
+            return true;
+        }
+
+        return services.stream().anyMatch(service -> containsNormalized(service.getTitle(), query)
+                || containsNormalized(service.getDescription(), query)
+                || containsNormalized(service.getCategory(), query)
+                || containsNormalized(service.getTags(), query)
+                || containsNormalized(service.getServiceCategory() != null ? service.getServiceCategory().getName() : null, query)
+                || containsNormalized(service.getServiceCategory() != null ? service.getServiceCategory().getSlug() : null, query)
+                || containsNormalized(service.getServiceSubcategory() != null ? service.getServiceSubcategory().getName() : null, query)
+                || containsNormalized(service.getServiceSubcategory() != null ? service.getServiceSubcategory().getSlug() : null, query));
+    }
+
+    private String normalizeSearchToken(String value) {
+        return StringUtils.hasText(value) ? normalizeLocationValue(value) : "";
+    }
+
+    private boolean containsNormalized(String value, String query) {
+        return StringUtils.hasText(value) && normalizeLocationValue(value).contains(query);
+    }
+
+    private boolean matchesNormalizedExact(String filter, String value) {
+        return StringUtils.hasText(filter)
+                && StringUtils.hasText(value)
+                && normalizeLocationValue(value).equals(filter);
     }
 
     private boolean hasCategorySelection(FreelancerProfileRequest request) {
@@ -482,26 +912,6 @@ public class FreelancerService {
                 || (request.getSubcategoryIds() != null && !request.getSubcategoryIds().isEmpty())
                 || StringUtils.hasText(request.getCategory())
                 || StringUtils.hasText(request.getSubcategory());
-    }
-
-    private boolean matchesCategoryFilter(Freelancer freelancer, String filter) {
-        if (!StringUtils.hasText(filter)) {
-            return true;
-        }
-
-        String normalizedFilter = filter.trim().toLowerCase();
-        return (freelancer.getServiceCategory() != null
-                && (freelancer.getServiceCategory().getSlug().equalsIgnoreCase(filter)
-                        || freelancer.getServiceCategory().getName().equalsIgnoreCase(filter)))
-                || (freelancer.getServiceSubcategory() != null
-                        && (freelancer.getServiceSubcategory().getSlug().equalsIgnoreCase(filter)
-                                || freelancer.getServiceSubcategory().getName().equalsIgnoreCase(filter)))
-                || getResolvedFreelancerSubcategories(freelancer).stream()
-                        .anyMatch(subcategory -> subcategory.getSlug().equalsIgnoreCase(filter)
-                                || subcategory.getName().equalsIgnoreCase(filter))
-                || (freelancer.getCategory() != null && freelancer.getCategory().toLowerCase().equals(normalizedFilter))
-                || (freelancer.getServiceType() != null
-                        && freelancer.getServiceType().toLowerCase().equals(normalizedFilter));
     }
 
     private List<Long> normalizeSubcategoryIds(FreelancerProfileRequest request) {
@@ -571,13 +981,51 @@ public class FreelancerService {
         }
     }
 
+    private Map<String, Object> buildFreelancerAuditState(Freelancer freelancer) {
+        FreelancerProfileResponse response = mapToResponse(freelancer);
+        Map<String, Object> state = new LinkedHashMap<>();
+        state.put("name", response.getName());
+        state.put("profession", response.getProfession());
+        state.put("bio", response.getBio());
+        state.put("category", response.getCategoryLabel());
+        state.put("subcategories", response.getSubcategoryLabels());
+        state.put("serviceType", response.getServiceType());
+        state.put("cities", response.getCities());
+        state.put("serviceCities", response.getServiceCities() == null
+                ? List.of()
+                : response.getServiceCities().stream()
+                .map(city -> city.getCity() + ", " + city.getState())
+                .toList());
+        state.put("professionalLinks", response.getProfessionalLinks() == null
+                ? List.of()
+                : response.getProfessionalLinks().stream()
+                .map(link -> {
+                    Map<String, Object> linkState = new LinkedHashMap<>();
+                    linkState.put("type", link.getType());
+                    linkState.put("url", link.getUrl());
+                    linkState.put("label", link.getLabel());
+                    return linkState;
+                })
+                .toList());
+        state.put("socialLinks", response.getSocialLinks());
+        return state;
+    }
+
     private static final class NormalizedServiceCity {
         private final String city;
         private final String state;
+        private final BigDecimal latitude;
+        private final BigDecimal longitude;
 
         private NormalizedServiceCity(String city, String state) {
+            this(city, state, null, null);
+        }
+
+        private NormalizedServiceCity(String city, String state, BigDecimal latitude, BigDecimal longitude) {
             this.city = city;
             this.state = state;
+            this.latitude = latitude;
+            this.longitude = longitude;
         }
 
         public String getCity() {
@@ -587,5 +1035,26 @@ public class FreelancerService {
         public String getState() {
             return state;
         }
+
+        public BigDecimal getLatitude() {
+            return latitude;
+        }
+
+        public BigDecimal getLongitude() {
+            return longitude;
+        }
+    }
+
+    private record NearbyFreelancerFilters(
+            String query,
+            String categoryText,
+            Long categoryId,
+            String categorySlug,
+            Long subcategoryId,
+            String subcategorySlug,
+            BigDecimal minRating,
+            Boolean available,
+            String city,
+            String state) {
     }
 }

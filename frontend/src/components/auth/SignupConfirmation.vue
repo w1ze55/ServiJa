@@ -15,7 +15,7 @@
       <div v-if="!props.inline" class="mb-6 sm:mb-8">
         <div class="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <h2 class="text-gray-900">Criar conta</h2>
-          <span class="text-sm text-gray-500">Passo 3 de 3</span>
+          <span class="text-sm text-gray-500">Passo 4 de 4</span>
         </div>
         <Progress :value="100" class="h-2" />
       </div>
@@ -116,7 +116,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import Button from '../ui/button.vue'
-
 import Alert from '../ui/alert.vue'
 import AlertDescription from '../ui/alert-description.vue'
 import Progress from '../ui/progress.vue'
@@ -124,9 +123,11 @@ import api from '@/api/config/axios'
 import {
   AlertCircle,
   ArrowLeft,
+  Calendar,
   Check,
   CreditCard,
   Mail,
+  MapPin,
   Phone,
   ShieldCheck,
   User,
@@ -136,13 +137,27 @@ interface PersonalData {
   name: string
   email: string
   phone: string
+  birthDate: string
   cpf: string
   password: string
+}
+
+interface AddressData {
+  label: string
+  zipCode: string
+  street: string
+  number: string
+  complement: string
+  neighborhood: string
+  city: string
+  state: string
+  isDefault: boolean
 }
 
 interface Props {
   accountType: 'contractor' | 'provider'
   personalData: PersonalData
+  addressData: AddressData
   onConfirm: () => void
   onBack: () => void
   inline?: boolean
@@ -151,10 +166,6 @@ interface Props {
 const props = defineProps<Props>()
 const isLoading = ref(false)
 const error = ref('')
-
-const accountTypeLabel = computed(() =>
-  props.accountType === 'contractor' ? 'Conta de contratante' : 'Conta de freelancer'
-)
 
 const summaryItems = computed(() => [
   {
@@ -186,11 +197,25 @@ const summaryItems = computed(() => [
     layoutClass: '',
   },
   {
+    label: 'Data de nascimento',
+    value: formatBirthDate(props.personalData.birthDate),
+    icon: Calendar,
+    accentClass: 'bg-blue-100 text-blue-600',
+    layoutClass: '',
+  },
+  {
     label: 'CPF',
     value: maskCPF(props.personalData.cpf),
     icon: CreditCard,
     accentClass: 'bg-blue-100 text-blue-600',
     layoutClass: '',
+  },
+  {
+    label: 'Endereço principal',
+    value: formatAddress(props.addressData),
+    icon: MapPin,
+    accentClass: 'bg-blue-100 text-blue-600',
+    layoutClass: 'col-span-full',
   },
 ])
 
@@ -222,16 +247,19 @@ const handleConfirm = async () => {
   try {
     const userType = props.accountType === 'provider' ? 'FREELANCER' : 'CONTRACTOR'
 
-    const cpfClean = props.personalData.cpf.replace(/\D/g, '')
-    const phoneClean = props.personalData.phone.replace(/\D/g, '')
-
     await api.post('/auth/register', {
-      name: props.personalData.name,
-      email: props.personalData.email,
-      cpf: cpfClean,
-      phone: phoneClean,
+      name: props.personalData.name.trim(),
+      email: props.personalData.email.trim(),
+      cpf: props.personalData.cpf.replace(/\D/g, ''),
+      phone: props.personalData.phone.replace(/\D/g, ''),
+      birthDate: props.personalData.birthDate,
       password: props.personalData.password,
       userType,
+      address: {
+        ...props.addressData,
+        zipCode: props.addressData.zipCode,
+        state: props.addressData.state.toUpperCase(),
+      },
       acceptTerms: true,
     })
 
@@ -256,5 +284,21 @@ const maskEmail = (email: string) => {
   const [username, domain] = email.split('@')
   if (username.length <= 3) return email
   return `${username.slice(0, 3)}***@${domain}`
+}
+
+const formatBirthDate = (birthDate: string) => {
+  if (!birthDate) {
+    return '-'
+  }
+
+  const [year, month, day] = birthDate.split('-').map(Number)
+  const date = new Date(Date.UTC(year, month - 1, day))
+
+  return new Intl.DateTimeFormat('pt-BR', { timeZone: 'UTC' }).format(date)
+}
+
+const formatAddress = (address: AddressData) => {
+  const complement = address.complement ? `, ${address.complement}` : ''
+  return `${address.street}, ${address.number}${complement} - ${address.neighborhood}, ${address.city}/${address.state} - CEP ${address.zipCode}`
 }
 </script>

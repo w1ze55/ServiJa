@@ -19,6 +19,21 @@ services:
       timeout: 5s
       retries: 5
 
+  mongo:
+    image: mongo:7
+    container_name: servija_mongo
+    ports:
+      - "37017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - frontend_network
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   backend:
     build:
       context: ./backend
@@ -27,6 +42,8 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+      mongo:
+        condition: service_healthy
     environment:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-local}
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-servija_db}?useSSL=false&serverTimezone=America/Sao_Paulo&allowPublicKeyRetrieval=true
@@ -34,10 +51,13 @@ services:
       SPRING_DATASOURCE_PASSWORD: ${LOCAL_DB_PASS:-servija_pass}
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRATION: ${JWT_EXPIRATION:-86400000}
+      APP_CRYPTO_KEY: ${APP_CRYPTO_KEY}
+      TOTP_ISSUER: ${TOTP_ISSUER:-ServiJa}
       MAIL_HOST: ${MAIL_HOST}
       MAIL_PORT: ${MAIL_PORT}
       MAIL_USERNAME: ${MAIL_USERNAME}
       MAIL_PASSWORD: ${MAIL_PASSWORD}
+      SERVIJA_FRONTEND_PUBLIC_URL: ${SERVIJA_FRONTEND_PUBLIC_URL:-http://localhost:5173}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
       SERVIJA_ADMIN_BOOTSTRAP_ENABLED: ${SERVIJA_ADMIN_BOOTSTRAP_ENABLED:-false}
       SERVIJA_ADMIN_BOOTSTRAP_NAME: ${SERVIJA_ADMIN_BOOTSTRAP_NAME:-}
@@ -59,6 +79,14 @@ services:
       GOOGLE_PROJECT_NAME: ${GOOGLE_PROJECT_NAME:-Servija}
       GOOGLE_PROJECT_ID: ${GOOGLE_PROJECT_ID}
       GOOGLE_PROJECT_NUMBER: ${GOOGLE_PROJECT_NUMBER}
+      # Perfil local lê MONGODB_URI_LOCAL (default = container "mongo"). Perfis prod/default leem MONGODB_URI (Atlas).
+      # NÃO definir SPRING_MONGODB_URI aqui: env vars desse formato sobrescrevem o property file e quebram o perfil local.
+      MONGODB_URI_LOCAL: ${MONGODB_URI_LOCAL:-mongodb://mongo:27017/servija_chat}
+      MONGODB_URI: ${MONGODB_URI:-mongodb://mongo:27017/servija_chat}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-local}
+      SENTRY_TRACES_SAMPLE_RATE: ${SENTRY_TRACES_SAMPLE_RATE:-0.01}
+      SENTRY_RELEASE: ${SENTRY_RELEASE:-}
     ports:
       - "8080:8080"
     networks:
@@ -80,9 +108,27 @@ services:
     networks:
       - frontend_network
 
+  frontend-admin:
+    build:
+      context: ./frontend-admin
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL}
+    container_name: servija_frontend_admin
+    environment:
+      BACKEND_URL: http://backend:8080
+      SERVER_NAME: ${ADMIN_SERVER_NAME:-admin.servija.app}
+    depends_on:
+      - backend
+    ports:
+      - "3001:80"
+    networks:
+      - frontend_network
+
 networks:
   frontend_network:
     driver: bridge
 
 volumes:
   mysql_data:
+  mongo_data:

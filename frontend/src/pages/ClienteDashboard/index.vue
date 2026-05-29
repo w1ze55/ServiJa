@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import {
   ArrowRight,
   Briefcase,
+  ChevronLeft,
+  ChevronRight,
   Compass,
   FolderKanban,
   Heart,
@@ -39,6 +41,10 @@ const homeData = ref<ClientHomeResponse | null>(null);
 const isLoading = ref(false);
 const error = ref('');
 const favoritesTab = ref<'services' | 'professionals'>('services');
+const featuredProfessionalsPage = ref(0);
+const featuredServicesPage = ref(0);
+
+const CAROUSEL_ITEMS_PER_PAGE = 3;
 
 const regionLabel = computed(() => homeData.value?.region?.displayName || 'toda a plataforma');
 const isRegionalized = computed(() => Boolean(homeData.value?.region?.localized));
@@ -56,6 +62,40 @@ const totalFavorites = computed(
 const favoritePreviewItems = computed(() =>
   favoritesTab.value === 'services' ? favoriteServices.value : favoriteProfessionals.value
 );
+
+const chunkItems = <T,>(items: T[], size: number) => {
+  const pages: T[][] = [];
+  for (let index = 0; index < items.length; index += size) {
+    pages.push(items.slice(index, index + size));
+  }
+  return pages;
+};
+
+const featuredProfessionalsPages = computed(() =>
+  chunkItems(featuredProfessionals.value, CAROUSEL_ITEMS_PER_PAGE)
+);
+
+const featuredServicesPages = computed(() =>
+  chunkItems(featuredServices.value, CAROUSEL_ITEMS_PER_PAGE)
+);
+
+const featuredProfessionalsTotalPages = computed(() => featuredProfessionalsPages.value.length);
+const featuredServicesTotalPages = computed(() => featuredServicesPages.value.length);
+
+const clampCarouselPage = (page: number, totalPages: number) => {
+  if (totalPages <= 0) {
+    return 0;
+  }
+  return Math.min(page, totalPages - 1);
+};
+
+watch(featuredProfessionalsTotalPages, totalPages => {
+  featuredProfessionalsPage.value = clampCarouselPage(featuredProfessionalsPage.value, totalPages);
+});
+
+watch(featuredServicesTotalPages, totalPages => {
+  featuredServicesPage.value = clampCarouselPage(featuredServicesPage.value, totalPages);
+});
 
 const handleNavigate = (page: string, params?: Record<string, any>) => {
   navigate(page, 'contractor', params);
@@ -130,6 +170,28 @@ const handleToggleFavoriteService = async (id: number) => {
 const handleToggleFavoriteFreelancer = async (id: string | number) => {
   await favoritesStore.toggleFavoriteFreelancer(id);
   await loadHome();
+};
+
+const goToPreviousFeaturedProfessionalsPage = () => {
+  featuredProfessionalsPage.value = Math.max(featuredProfessionalsPage.value - 1, 0);
+};
+
+const goToNextFeaturedProfessionalsPage = () => {
+  featuredProfessionalsPage.value = Math.min(
+    featuredProfessionalsPage.value + 1,
+    Math.max(featuredProfessionalsTotalPages.value - 1, 0)
+  );
+};
+
+const goToPreviousFeaturedServicesPage = () => {
+  featuredServicesPage.value = Math.max(featuredServicesPage.value - 1, 0);
+};
+
+const goToNextFeaturedServicesPage = () => {
+  featuredServicesPage.value = Math.min(
+    featuredServicesPage.value + 1,
+    Math.max(featuredServicesTotalPages.value - 1, 0)
+  );
 };
 
 const mapServiceForCard = (service: ClientHomeServiceItem) => ({
@@ -299,7 +361,6 @@ onMounted(async () => {
                     {{ getStatusLabel(request.status) }}
                   </Badge>
                 </div>
-                <p class="line-clamp-2 text-sm text-[#435574]">{{ request.description }}</p>
                 <div class="mt-3 flex items-center justify-between gap-3 text-xs text-[#435574]">
                   <span>{{ formatApiDate(request.createdAt, { day: '2-digit', month: '2-digit', year: 'numeric' }) }}</span>
                   <span>{{ formatTimeAgoFromApiDate(request.updatedAt || request.createdAt) }}</span>
@@ -384,29 +445,43 @@ onMounted(async () => {
                   </p>
                 </div>
               </div>
-              <Button variant="ghost" class="text-[#286AD8]" @click="handleNavigate('favorites')">
-                Ver tudo
-                <ArrowRight class="ml-2 h-4 w-4" />
-              </Button>
+              <div class="flex items-center gap-2 sm:gap-3">
+                <Tabs v-model="favoritesTab" class="shrink-0">
+                  <TabsList class="grid h-10 grid-cols-2 rounded-2xl bg-slate-100 p-1">
+                    <TabsTrigger
+                      value="services"
+                      class="h-8 w-8 rounded-xl p-0 text-[#435574] data-[state=active]:text-[#286AD8]"
+                      aria-label="Serviços favoritos"
+                      title="Serviços"
+                    >
+                      <Briefcase class="h-4 w-4" />
+                      <span class="sr-only">Serviços</span>
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="professionals"
+                      class="h-8 w-8 rounded-xl p-0 text-[#435574] data-[state=active]:text-[#286AD8]"
+                      aria-label="Profissionais favoritos"
+                      title="Profissionais"
+                    >
+                      <User class="h-4 w-4" />
+                      <span class="sr-only">Profissionais</span>
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
+
+                <Button variant="ghost" class="text-[#286AD8]" @click="handleNavigate('favorites')">
+                  Ver tudo
+                  <ArrowRight class="ml-2 h-4 w-4" />
+                </Button>
+              </div>
             </div>
 
-            <Tabs v-model="favoritesTab" class="w-full">
-              <TabsList class="inline-grid h-auto w-auto min-w-[260px] grid-cols-2 rounded-2xl bg-slate-100 p-1">
-                <TabsTrigger value="services" class="rounded-xl px-5">
-                  Serviços
-                </TabsTrigger>
-                <TabsTrigger value="professionals" class="rounded-xl px-5">
-                  Profissionais
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
-
-            <div v-if="favoritePreviewItems.length" class="mt-4 space-y-3">
+            <div v-if="favoritePreviewItems.length" class="space-y-3">
               <template v-if="favoritesTab === 'services'">
                 <button
                   v-for="service in favoriteServices"
                   :key="service.id"
-                  class="w-full rounded-2xl border border-slate-100 p-4 text-left transition-colors hover:border-[#286AD8]/25 hover:bg-slate-50"
+                  class="flex min-h-[112px] w-full flex-col justify-between rounded-2xl border border-slate-100 p-4 text-left transition-colors hover:border-[#286AD8]/25 hover:bg-slate-50"
                   @click="handleViewService({ providerId: service.freelancerId, serviceId: service.id })"
                 >
                   <div class="mb-2 flex items-start justify-between gap-3">
@@ -429,7 +504,7 @@ onMounted(async () => {
                 <button
                   v-for="freelancer in favoriteProfessionals"
                   :key="freelancer.id"
-                  class="w-full rounded-2xl border border-slate-100 p-4 text-left transition-colors hover:border-[#286AD8]/25 hover:bg-slate-50"
+                  class="flex min-h-[112px] w-full flex-col justify-between rounded-2xl border border-slate-100 p-4 text-left transition-colors hover:border-[#286AD8]/25 hover:bg-slate-50"
                   @click="handleViewProfile(freelancer.id)"
                 >
                   <div class="mb-2 flex items-start justify-between gap-3">
@@ -446,7 +521,7 @@ onMounted(async () => {
                       <Heart class="h-4 w-4 fill-current" />
                     </button>
                   </div>
-                  <div class="flex items-center justify-between gap-3 text-xs text-[#435574]">
+                  <div class="mt-3 flex items-center justify-between gap-3 text-xs text-[#435574]">
                     <span class="truncate">{{ freelancer.location || 'Localização não informada' }}</span>
                     <span>{{ Number(freelancer.rating || 0).toFixed(1) }} ★</span>
                   </div>
@@ -469,33 +544,70 @@ onMounted(async () => {
         <section class="space-y-4">
           <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <div class="mb-2 flex items-center gap-2">
-                <User class="h-4 w-4 text-[#286AD8]" />
-                <span class="text-sm font-semibold uppercase tracking-[0.14em] text-[#435574]">
-                  Profissionais em destaque
-                </span>
+              <div class="flex items-center gap-2">
+                <User class="h-5 w-5 text-[#286AD8]" />
+                <h2 class="text-2xl font-bold text-[#263238]">
+                  {{ isRegionalized ? `Profissionais em destaque em ${regionLabel}` : 'Profissionais em destaque na plataforma' }}
+                </h2>
               </div>
-              <h2 class="text-2xl font-bold text-[#263238]">
-                {{ isRegionalized ? `Melhores avaliados em ${regionLabel}` : 'Melhores avaliados na plataforma' }}
-              </h2>
               <p class="mt-1 text-sm text-[#435574]">
                 Priorizados pelas categorias contratadas recentemente e pela qualidade das avaliações mais atuais.
               </p>
             </div>
-            <Button variant="outline" class="bg-white" @click="handleNavigate('explore')">
-              Ver mais opções
-            </Button>
+            <div class="flex items-center gap-3 self-start sm:self-auto">
+              <div class="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  class="bg-white"
+                  :disabled="featuredProfessionalsPage === 0"
+                  @click="goToPreviousFeaturedProfessionalsPage"
+                >
+                  <ChevronLeft class="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  class="bg-white"
+                  :disabled="featuredProfessionalsPage >= featuredProfessionalsTotalPages - 1"
+                  @click="goToNextFeaturedProfessionalsPage"
+                >
+                  <ChevronRight class="h-4 w-4" />
+                </Button>
+              </div>
+              <Button variant="outline" class="bg-white" @click="handleNavigate('explore')">
+                Ver mais opções
+              </Button>
+            </div>
           </div>
 
-          <div v-if="featuredProfessionals.length" class="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
-            <FreelancerCard
-              v-for="freelancer in featuredProfessionals"
-              :key="freelancer.id"
-              :freelancer="mapFreelancerForCard(freelancer)"
-              :is-favorite="favoritesStore.isFavoriteFreelancer(freelancer.id)"
-              @view-profile="handleViewProfile"
-              @toggle-favorite="handleToggleFavoriteFreelancer"
-            />
+          <div v-if="featuredProfessionals.length" class="space-y-3">
+            <div class="overflow-hidden">
+              <div
+                class="flex transition-transform duration-300 ease-out"
+                :style="{ transform: `translateX(-${featuredProfessionalsPage * 100}%)` }"
+              >
+                <div
+                  v-for="(professionalPage, pageIndex) in featuredProfessionalsPages"
+                  :key="`featured-professionals-page-${pageIndex}`"
+                  class="w-full shrink-0"
+                >
+                  <div class="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+                    <FreelancerCard
+                      v-for="freelancer in professionalPage"
+                      :key="freelancer.id"
+                      :freelancer="mapFreelancerForCard(freelancer)"
+                      :is-favorite="favoritesStore.isFavoriteFreelancer(freelancer.id)"
+                      @view-profile="handleViewProfile"
+                      @toggle-favorite="handleToggleFavoriteFreelancer"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+            <p v-if="featuredProfessionalsTotalPages > 1" class="text-sm text-[#435574]">
+              {{ featuredProfessionalsPage + 1 }} / {{ featuredProfessionalsTotalPages }}
+            </p>
           </div>
 
           <div v-else class="rounded-3xl border border-dashed border-slate-200 bg-white p-8 text-center">
@@ -512,33 +624,70 @@ onMounted(async () => {
         <section class="space-y-4">
           <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <div class="mb-2 flex items-center gap-2">
-                <Briefcase class="h-4 w-4 text-[#286AD8]" />
-                <span class="text-sm font-semibold uppercase tracking-[0.14em] text-[#435574]">
-                  Serviços em destaque
-                </span>
+              <div class="flex items-center gap-2">
+                <Briefcase class="h-5 w-5 text-[#286AD8]" />
+                <h2 class="text-2xl font-bold text-[#263238]">
+                  {{ isRegionalized ? `Serviços em destaque em ${regionLabel}` : 'Serviços em destaque na plataforma' }}
+                </h2>
               </div>
-              <h2 class="text-2xl font-bold text-[#263238]">
-                {{ isRegionalized ? `Serviços mais fortes em ${regionLabel}` : 'Serviços mais fortes na plataforma' }}
-              </h2>
               <p class="mt-1 text-sm text-[#435574]">
                 Seleção de serviços ativos com melhor desempenho recente e aderência ao seu histórico.
               </p>
             </div>
-            <Button variant="outline" class="bg-white" @click="handleNavigate('explore')">
-              Abrir catálogo
-            </Button>
+            <div class="flex items-center gap-3 self-start sm:self-auto">
+              <div class="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  class="bg-white"
+                  :disabled="featuredServicesPage === 0"
+                  @click="goToPreviousFeaturedServicesPage"
+                >
+                  <ChevronLeft class="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  class="bg-white"
+                  :disabled="featuredServicesPage >= featuredServicesTotalPages - 1"
+                  @click="goToNextFeaturedServicesPage"
+                >
+                  <ChevronRight class="h-4 w-4" />
+                </Button>
+              </div>
+              <Button variant="outline" class="bg-white" @click="handleNavigate('explore')">
+                Abrir catálogo
+              </Button>
+            </div>
           </div>
 
-          <div v-if="featuredServices.length" class="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
-            <ServiceCard
-              v-for="service in featuredServices"
-              :key="service.id"
-              :service="mapServiceForCard(service)"
-              :is-favorite="favoritesStore.isFavoriteService(service.id)"
-              @navigate="handleViewService"
-              @toggle-favorite="handleToggleFavoriteService"
-            />
+          <div v-if="featuredServices.length" class="space-y-3">
+            <div class="overflow-hidden">
+              <div
+                class="flex transition-transform duration-300 ease-out"
+                :style="{ transform: `translateX(-${featuredServicesPage * 100}%)` }"
+              >
+                <div
+                  v-for="(servicePage, pageIndex) in featuredServicesPages"
+                  :key="`featured-services-page-${pageIndex}`"
+                  class="w-full shrink-0"
+                >
+                  <div class="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+                    <ServiceCard
+                      v-for="service in servicePage"
+                      :key="service.id"
+                      :service="mapServiceForCard(service)"
+                      :is-favorite="favoritesStore.isFavoriteService(service.id)"
+                      @navigate="handleViewService"
+                      @toggle-favorite="handleToggleFavoriteService"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+            <p v-if="featuredServicesTotalPages > 1" class="text-sm text-[#435574]">
+              {{ featuredServicesPage + 1 }} / {{ featuredServicesTotalPages }}
+            </p>
           </div>
 
           <div v-else class="rounded-3xl border border-dashed border-slate-200 bg-white p-8 text-center">

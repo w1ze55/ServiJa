@@ -25,7 +25,6 @@ import DropdownMenu from '@/components/ui/dropdown-menu.vue';
 import DropdownMenuContent from '@/components/ui/dropdown-menu-content.vue';
 import DropdownMenuItem from '@/components/ui/dropdown-menu-item.vue';
 import DropdownMenuSeparator from '@/components/ui/dropdown-menu-separator.vue';
-import DropdownMenuTrigger from '@/components/ui/dropdown-menu-trigger.vue';
 import AlertDialog from '@/components/ui/alert-dialog.vue';
 import AlertDialogAction from '@/components/ui/alert-dialog-action.vue';
 import AlertDialogCancel from '@/components/ui/alert-dialog-cancel.vue';
@@ -85,6 +84,9 @@ const showServiceForm = ref(false);
 const editingService = ref<ServiceFormData | null>(null);
 const showPreviewModal = ref(false);
 const previewService = ref<Service | null>(null);
+type ServiceMenuContext = 'desktop' | 'mobile';
+
+const activeServiceMenuKey = ref<string | null>(null);
 const itemsPerPage = 8;
 const isLoading = ref(false);
 
@@ -201,12 +203,16 @@ const loadStats = async () => {
 
 // Filtrar e ordenar serviços
 const filteredServices = computed(() => {
+  const normalizedSearchQuery = searchQuery.value.trim().toLowerCase();
+  const hasSearchQuery = normalizedSearchQuery.length > 0;
+
   let filtered = services.value.filter((service) => {
     const matchesSearch =
-      service.title.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-      service.description.toLowerCase().includes(searchQuery.value.toLowerCase());
+      !hasSearchQuery ||
+      service.title.toLowerCase().includes(normalizedSearchQuery) ||
+      service.description.toLowerCase().includes(normalizedSearchQuery);
     const matchesCategory = categoryFilter.value === 'Todos' || service.category === categoryFilter.value;
-    return matchesSearch && matchesCategory;
+    return hasSearchQuery ? matchesSearch : matchesSearch && matchesCategory;
   });
 
   // Ordenar
@@ -406,7 +412,23 @@ const handleSearchChange = (value: string) => {
   currentPage.value = 1;
 };
 
+const getServiceMenuKey = (serviceId: string, context: ServiceMenuContext) => `${context}:${serviceId}`;
+
+const isServiceMenuOpen = (serviceId: string, context: ServiceMenuContext) =>
+  activeServiceMenuKey.value === getServiceMenuKey(serviceId, context);
+
+const setServiceMenuOpen = (serviceId: string, context: ServiceMenuContext, isOpen: boolean) => {
+  activeServiceMenuKey.value = isOpen ? getServiceMenuKey(serviceId, context) : null;
+};
+
+const toggleServiceMenu = (serviceId: string, context: ServiceMenuContext) => {
+  activeServiceMenuKey.value = isServiceMenuOpen(serviceId, context)
+    ? null
+    : getServiceMenuKey(serviceId, context);
+};
+
 const handlePreviewService = (serviceId: string) => {
+  activeServiceMenuKey.value = null;
   const service = services.value.find((s) => s.id === serviceId);
   if (service) {
     previewService.value = service;
@@ -648,13 +670,21 @@ onMounted(() => {
                     </Badge>
                   </td>
                   <td class="px-6 py-4 whitespace-nowrap">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger as-child>
-                        <Button variant="ghost" size="icon">
-                          <MoreVertical class="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
+                    <DropdownMenu
+                      :open="isServiceMenuOpen(service.id, 'desktop')"
+                      @update:open="(isOpen: boolean) => setServiceMenuOpen(service.id, 'desktop', isOpen)"
+                    >
+                      <button
+                        type="button"
+                        class="inline-flex h-10 w-10 items-center justify-center rounded-md text-[#435574] transition-colors hover:bg-gray-100 hover:text-[#263238] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#286AD8]"
+                        aria-haspopup="menu"
+                        :aria-expanded="isServiceMenuOpen(service.id, 'desktop')"
+                        aria-label="Abrir menu de ações"
+                        @click.stop="toggleServiceMenu(service.id, 'desktop')"
+                      >
+                        <MoreVertical class="h-4 w-4" />
+                      </button>
+                      <DropdownMenuContent align="end" class="z-[9999] min-w-[12rem] bg-white text-[#263238]">
                         <DropdownMenuItem @click="handlePreviewService(service.id)">
                           <Eye class="h-4 w-4 mr-2" />
                           Visualizar Preview
@@ -709,17 +739,21 @@ onMounted(() => {
                   </Badge>
                 </div>
               </div>
-              <DropdownMenu>
-                <DropdownMenuTrigger as-child>
-                  <Button 
-                    variant="ghost" 
-                    size="icon"
-                    @click.stop
-                  >
-                    <MoreVertical class="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
+              <DropdownMenu
+                :open="isServiceMenuOpen(service.id, 'mobile')"
+                @update:open="(isOpen: boolean) => setServiceMenuOpen(service.id, 'mobile', isOpen)"
+              >
+                <button
+                  type="button"
+                  class="inline-flex h-10 w-10 items-center justify-center rounded-md text-[#435574] transition-colors hover:bg-gray-100 hover:text-[#263238] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#286AD8]"
+                  aria-haspopup="menu"
+                  :aria-expanded="isServiceMenuOpen(service.id, 'mobile')"
+                  aria-label="Abrir menu de ações"
+                  @click.stop="toggleServiceMenu(service.id, 'mobile')"
+                >
+                  <MoreVertical class="h-4 w-4" />
+                </button>
+                <DropdownMenuContent align="end" class="z-[9999] min-w-[12rem] bg-white text-[#263238]">
                   <DropdownMenuItem @click="handlePreviewService(service.id)">
                     <Eye class="h-4 w-4 mr-2" />
                     Visualizar Preview

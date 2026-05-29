@@ -11,12 +11,17 @@ import com.servija.servija.exception.ResourceNotFoundException;
 import com.servija.servija.model.Contractor;
 import com.servija.servija.model.Freelancer;
 import com.servija.servija.model.User;
+import com.servija.servija.model.ServiceRequest;
 import com.servija.servija.repository.ContractorRepository;
 import com.servija.servija.repository.FreelancerRepository;
 import com.servija.servija.repository.ReviewRepository;
+import com.servija.servija.repository.ServiceRequestRepository;
 import com.servija.servija.repository.UserRepository;
 
 import java.math.BigDecimal;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,10 +38,12 @@ public class UserService {
     private final ContractorRepository contractorRepository;
     private final FreelancerRepository freelancerRepository;
     private final ReviewRepository reviewRepository;
+    private final ServiceRequestRepository serviceRequestRepository;
     private final PasswordEncoder passwordEncoder;
     private final EntityManager entityManager;
     private final FileStorageService fileStorageService;
     private final WebSocketService webSocketService;
+    private final AuditLogger auditLogger;
 
     @Transactional
     public void changePassword(String email, ChangePasswordRequest request) {
@@ -44,6 +51,8 @@ public class UserService {
                 .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
 
         // Validar senha atual
+        var previousUpdatedAt = user.getUpdatedAt();
+
         if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
             throw new InvalidCredentialsException("Senha atual incorreta");
         }
@@ -66,12 +75,22 @@ public class UserService {
 
         // Salvar no repositório apropriado
         if (user instanceof Contractor) {
-            contractorRepository.save((Contractor) user);
+            user = contractorRepository.save((Contractor) user);
         } else if (user instanceof Freelancer) {
-            freelancerRepository.save((Freelancer) user);
+            user = freelancerRepository.save((Freelancer) user);
         } else {
-            userRepository.save(user);
+            user = userRepository.save(user);
         }
+
+        auditLogger.recordSemantic(
+                "PASSWORD_CHANGED",
+                "USER",
+                String.valueOf(user.getId()),
+                user.getName(),
+                com.servija.servija.model.AuditLog.Result.SUCCESS,
+                Map.of("fieldsChanged", List.of("updatedAt")),
+                singleFieldState("updatedAt", previousUpdatedAt),
+                singleFieldState("updatedAt", user.getUpdatedAt()));
     }
 
     @Transactional
@@ -138,6 +157,17 @@ public class UserService {
                 .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado após atualização"));
 
         webSocketService.notifyProfileImageUpdate(email, finalAvatarUrl);
+        if (!java.util.Objects.equals(summarizeAvatarValue(oldAvatarUrl), summarizeAvatarValue(updatedUser.getAvatarUrl()))) {
+            auditLogger.recordSemantic(
+                    "AVATAR_UPDATED",
+                    "USER",
+                    String.valueOf(updatedUser.getId()),
+                    updatedUser.getName(),
+                    com.servija.servija.model.AuditLog.Result.SUCCESS,
+                    java.util.Map.of("fieldsChanged", java.util.List.of("avatarUrl")),
+                    singleFieldState("avatarUrl", summarizeAvatarValue(oldAvatarUrl)),
+                    singleFieldState("avatarUrl", summarizeAvatarValue(updatedUser.getAvatarUrl())));
+        }
 
         return buildUserDto(updatedUser);
     }
@@ -152,6 +182,8 @@ public class UserService {
             throw new InvalidCredentialsException("Senha incorreta. A conta não foi excluída.");
         }
 
+        Map<String, Object> deletedUser = buildUserAuditState(user);
+
         // Deletar do repositório apropriado
         // Com JOINED inheritance, deletar do UserRepository deve deletar também a
         // entidade filha
@@ -163,6 +195,17 @@ public class UserService {
         // O Hibernate gerencia a exclusão da tabela pai (users) automaticamente
         // Mas para garantir, vamos deletar explicitamente do UserRepository também
         userRepository.delete(user);
+
+        auditLogger.recordSemantic(
+                "ACCOUNT_DELETED",
+                "USER",
+                String.valueOf(user.getId()),
+                user.getName(),
+                com.servija.servija.model.AuditLog.Result.SUCCESS,
+                null,
+                deletedUser,
+                null,
+                null);
     }
 
     private boolean isValidPassword(String password) {
@@ -191,6 +234,7 @@ public class UserService {
                 .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
 
         // Atualizar dados básicos
+        Map<String, Object> beforeState = buildUserAuditState(user);
         user.setName(request.getName());
         user.setPhone(request.getPhone());
         if (request.getCpf() != null && !request.getCpf().isEmpty()) {
@@ -206,6 +250,20 @@ public class UserService {
             user = userRepository.save(user);
         }
 
+        Map<String, Object> afterState = buildUserAuditState(user);
+        List<String> changedFields = AuditStateDiffUtils.changedFields(beforeState, afterState);
+        if (!changedFields.isEmpty()) {
+            auditLogger.recordSemantic(
+                    "PROFILE_UPDATED",
+                    "USER",
+                    String.valueOf(user.getId()),
+                    user.getName(),
+                    com.servija.servija.model.AuditLog.Result.SUCCESS,
+                    Map.of("fieldsChanged", changedFields),
+                    AuditStateDiffUtils.filterFields(beforeState, changedFields),
+                    AuditStateDiffUtils.filterFields(afterState, changedFields));
+        }
+
         return buildUserDto(user);
     }
 
@@ -219,6 +277,7 @@ public class UserService {
                 .email(user.getEmail())
                 .cpf(user.getCpf())
                 .phone(user.getPhone())
+                .birthDate(user.getBirthDate())
                 .userType(user.getUserType())
                 .emailVerified(user.getEmailVerified())
                 .avatarUrl(user.getAvatarUrl())
@@ -229,11 +288,19 @@ public class UserService {
         // Adicionar dados específicos baseado no tipo
         if (user instanceof Contractor) {
             Contractor contractor = (Contractor) user;
+            Double contractorAvg = reviewRepository.findAverageRatingByReviewedId(contractor.getId());
+            long contractorReviewCount = reviewRepository.countByReviewedId(contractor.getId());
+            long completed = serviceRequestRepository.countByContractorIdAndStatus(contractor.getId(), ServiceRequest.Status.COMPLETED);
+            long active = serviceRequestRepository.countByContractorIdAndStatusIn(contractor.getId(),
+                    List.of(ServiceRequest.Status.ACCEPTED, ServiceRequest.Status.IN_PROGRESS, ServiceRequest.Status.DELIVERED));
+            long total = active + completed;
             builder.contractorProfile(ProfileResponse.ContractorProfile.builder()
                     .preferredLocation(contractor.getPreferredLocation())
-                    .totalContracts(contractor.getTotalContracts())
-                    .activeContracts(contractor.getActiveContracts())
-                    .completedContracts(contractor.getCompletedContracts())
+                    .totalContracts((int) total)
+                    .activeContracts((int) active)
+                    .completedContracts((int) completed)
+                    .contractorRating(contractorAvg != null ? BigDecimal.valueOf(contractorAvg) : null)
+                    .contractorTotalReviews(contractorReviewCount)
                     .build());
         } else if (user instanceof Freelancer) {
             Freelancer freelancer = (Freelancer) user;
@@ -250,7 +317,6 @@ public class UserService {
                     .totalReviews((int) totalReviewsCount)
                     .completedJobs(freelancer.getCompletedJobs())
                     .activeJobs(freelancer.getActiveJobs())
-                    .kycCompleted(freelancer.getKycCompleted())
                     .profileCompleted(freelancer.getProfileCompleted())
                     .available(freelancer.getAvailable())
                     .build());
@@ -266,6 +332,7 @@ public class UserService {
                 .email(user.getEmail())
                 .cpf(user.getCpf())
                 .phone(user.getPhone())
+                .birthDate(user.getBirthDate())
                 .userType(user.getUserType())
                 .emailVerified(user.getEmailVerified())
                 .avatarUrl(user.getAvatarUrl())
@@ -276,5 +343,29 @@ public class UserService {
 
     private boolean isS3Url(String url) {
         return url != null && url.contains(".s3.") && url.contains("amazonaws.com");
+    }
+
+    private Map<String, Object> buildUserAuditState(User user) {
+        Map<String, Object> state = new LinkedHashMap<>();
+        state.put("name", user.getName());
+        state.put("phone", user.getPhone());
+        state.put("cpf", user.getCpf());
+        return state;
+    }
+
+    private String summarizeAvatarValue(String avatarUrl) {
+        if (avatarUrl == null || avatarUrl.isBlank()) {
+            return null;
+        }
+        if (avatarUrl.startsWith("data:image")) {
+            return "[INLINE_IMAGE]";
+        }
+        return avatarUrl.length() <= 120 ? avatarUrl : avatarUrl.substring(0, 117) + "...";
+    }
+
+    private Map<String, Object> singleFieldState(String fieldName, Object value) {
+        Map<String, Object> state = new LinkedHashMap<>();
+        state.put(fieldName, value);
+        return state;
     }
 }

@@ -12,6 +12,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import org.springframework.security.access.prepost.PreAuthorize;
+
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Map;
@@ -38,8 +40,8 @@ public class PaymentController {
     @GetMapping("/{id}")
     @Operation(summary = "Obter detalhes do pagamento", description = "Retorna os detalhes de um pagamento específico")
     @SecurityRequirement(name = "bearerAuth")
-    public ResponseEntity<PaymentResponse> getPayment(@PathVariable Long id) {
-        PaymentResponse response = paymentService.getPaymentById(id);
+    public ResponseEntity<PaymentResponse> getPayment(@PathVariable Long id, Authentication authentication) {
+        PaymentResponse response = paymentService.getPaymentById(id, authentication.getName());
         return ResponseEntity.ok(response);
     }
 
@@ -55,12 +57,13 @@ public class PaymentController {
     @GetMapping("/{id}/status")
     @Operation(summary = "Verificar status do pagamento", description = "Verifica o status atual de um pagamento e atualiza com dados do Asaas")
     @SecurityRequirement(name = "bearerAuth")
-    public ResponseEntity<PaymentResponse> checkPaymentStatus(@PathVariable Long id) {
-        PaymentResponse response = paymentService.checkAsaasPaymentStatus(id);
+    public ResponseEntity<PaymentResponse> checkPaymentStatus(@PathVariable Long id, Authentication authentication) {
+        PaymentResponse response = paymentService.checkAsaasPaymentStatus(id, authentication.getName());
         return ResponseEntity.ok(response);
     }
 
     @PatchMapping("/{id}/status")
+    @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Atualizar status do pagamento", description = "Atualiza o status de um pagamento")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<PaymentResponse> updatePaymentStatus(
@@ -74,32 +77,32 @@ public class PaymentController {
     @GetMapping("/{id}/pix-qrcode")
     @Operation(summary = "Obter QR Code PIX", description = "Retorna o QR Code PIX para um pagamento")
     @SecurityRequirement(name = "bearerAuth")
-    public ResponseEntity<Map<String, Object>> getPixQrCode(@PathVariable Long id) {
-        Map<String, Object> qrCodeData = paymentService.getPixQrCode(id);
+    public ResponseEntity<Map<String, Object>> getPixQrCode(@PathVariable Long id, Authentication authentication) {
+        Map<String, Object> qrCodeData = paymentService.getPixQrCode(id, authentication.getName());
         return ResponseEntity.ok(qrCodeData);
     }
 
     @GetMapping("/service-request/{serviceRequestId}")
     @Operation(summary = "Obter pagamento por solicitação", description = "Retorna o pagamento de uma solicitação específica")
     @SecurityRequirement(name = "bearerAuth")
-    public ResponseEntity<PaymentResponse> getPaymentByServiceRequest(@PathVariable Long serviceRequestId) {
-        PaymentResponse response = paymentService.getPaymentByServiceRequestId(serviceRequestId);
+    public ResponseEntity<PaymentResponse> getPaymentByServiceRequest(@PathVariable Long serviceRequestId, Authentication authentication) {
+        PaymentResponse response = paymentService.getPaymentByServiceRequestId(serviceRequestId, authentication.getName());
         return ResponseEntity.ok(response);
     }
 
     @GetMapping("/{id}/history")
     @Operation(summary = "Obter histórico de status", description = "Retorna o histórico de mudanças de status de um pagamento")
     @SecurityRequirement(name = "bearerAuth")
-    public ResponseEntity<List<Map<String, Object>>> getPaymentHistory(@PathVariable Long id) {
-        List<Map<String, Object>> history = paymentService.getPaymentHistory(id);
+    public ResponseEntity<List<Map<String, Object>>> getPaymentHistory(@PathVariable Long id, Authentication authentication) {
+        List<Map<String, Object>> history = paymentService.getPaymentHistory(id, authentication.getName());
         return ResponseEntity.ok(history);
     }
 
     @GetMapping("/{id}/receipt-url")
     @Operation(summary = "Obter URL do recibo", description = "Retorna a URL do comprovante/recibo de um pagamento via Asaas")
     @SecurityRequirement(name = "bearerAuth")
-    public ResponseEntity<Map<String, String>> getReceiptUrl(@PathVariable Long id) {
-        Map<String, String> receiptData = paymentService.getReceiptUrl(id);
+    public ResponseEntity<Map<String, String>> getReceiptUrl(@PathVariable Long id, Authentication authentication) {
+        Map<String, String> receiptData = paymentService.getReceiptUrl(id, authentication.getName());
         return ResponseEntity.ok(receiptData);
     }
 

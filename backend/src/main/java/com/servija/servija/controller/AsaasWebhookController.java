@@ -150,8 +150,10 @@ public class AsaasWebhookController {
     }
 
     private boolean isValidToken(String accessToken) {
-        return webhookToken == null
-                || webhookToken.isEmpty()
-                || (accessToken != null && accessToken.equals(webhookToken));
+        if (webhookToken == null || webhookToken.isEmpty()) {
+            log.error("ASAAS_WEBHOOK_TOKEN não configurado — rejeitando requisição de webhook");
+            return false;
+        }
+        return accessToken != null && accessToken.equals(webhookToken);
     }
 }

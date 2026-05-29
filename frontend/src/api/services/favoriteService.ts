@@ -11,6 +11,7 @@ export interface Favorite {
         professionalTitle: string;
         category: string;
         avatarUrl?: string;
+        location?: string;
     };
     createdAt: string;
 }

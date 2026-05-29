@@ -335,17 +335,19 @@ defineExpose({ reset });
 
       <!-- Comment Section -->
       <div class="space-y-3">
-        <h4 class="text-[#263238]">Comentário (opcional)</h4>
-        <p class="text-sm text-[#435574] mb-4">{{ commentDescription }}</p>
-
-        <div v-if="rating >= 1" class="flex justify-end mb-2">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+            <h4 class="text-[#263238]">Comentário (opcional)</h4>
+            <p class="mt-1 text-sm text-[#435574]">{{ commentDescription }}</p>
+        </div>
+        <div v-if="rating >= 1" class="sm:shrink-0">
           <Button
             @click="handleSuggestComment"
             :disabled="isSuggestingComment"
             variant="outline"
             size="sm"
             type="button"
-            class="text-[#286AD8] border-[#286AD8] hover:bg-blue-50"
+              class="border-[#286AD8] text-[#286AD8] hover:bg-blue-50 hover:text-[#286AD8]"
           >
             <span v-if="isSuggestingComment" class="flex items-center gap-1.5">
               <span class="animate-spin h-3.5 w-3.5 border-2 border-[#286AD8] border-t-transparent rounded-full" />
@@ -356,6 +358,7 @@ defineExpose({ reset });
               {{ comment.trim() ? 'Refinar com IA' : 'Sugerir com IA' }}
             </span>
           </Button>
+        </div>
         </div>
 
         <Textarea

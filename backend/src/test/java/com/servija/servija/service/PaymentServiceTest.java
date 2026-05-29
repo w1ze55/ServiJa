@@ -17,11 +17,13 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -65,9 +67,7 @@ class PaymentServiceTest {
         User contractor = buildUser(1L, "cliente@servija.com", User.UserType.CONTRACTOR);
         ServiceRequest serviceRequest = buildAcceptedRequest(contractor, new BigDecimal("50.00"), false);
 
-        when(userRepository.findByEmail("cliente@servija.com")).thenReturn(Optional.of(contractor));
-        when(serviceRequestRepository.findById(10L)).thenReturn(Optional.of(serviceRequest));
-        when(paymentRepository.existsByServiceRequest(serviceRequest)).thenReturn(false);
+        mockBaseLookups(contractor, serviceRequest);
 
         PaymentRequest request = PaymentRequest.builder()
                 .serviceRequestId(10L)
@@ -77,44 +77,44 @@ class PaymentServiceTest {
 
         assertThatThrownBy(() -> paymentService.createPayment("cliente@servija.com", request))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("O valor do pagamento não confere");
+                .hasMessageContaining("O valor do pagamento");
 
         verify(asaasService, never()).getOrCreateCustomer(any(), any(), any());
     }
 
     @Test
-    @DisplayName("Deve bloquear pagamento novo abaixo de R$ 20,00 quando nao for legado")
-    void createPayment_rejectsLowValueWhenNotLegacy() {
+    @DisplayName("Deve bloquear pagamento abaixo de R$ 40,00")
+    void createPayment_rejectsLowValue() {
         User contractor = buildUser(1L, "cliente@servija.com", User.UserType.CONTRACTOR);
-        ServiceRequest serviceRequest = buildAcceptedRequest(contractor, new BigDecimal("19.99"), false);
+        ServiceRequest serviceRequest = buildAcceptedRequest(contractor, new BigDecimal("39.99"), true);
 
-        when(userRepository.findByEmail("cliente@servija.com")).thenReturn(Optional.of(contractor));
-        when(serviceRequestRepository.findById(10L)).thenReturn(Optional.of(serviceRequest));
-        when(paymentRepository.existsByServiceRequest(serviceRequest)).thenReturn(false);
+        mockBaseLookups(contractor, serviceRequest);
 
         PaymentRequest request = PaymentRequest.builder()
                 .serviceRequestId(10L)
                 .paymentMethod("wallet")
-                .amount(new BigDecimal("19.99"))
+                .amount(new BigDecimal("39.99"))
                 .build();
 
         assertThatThrownBy(() -> paymentService.createPayment("cliente@servija.com", request))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessage("O valor mínimo para pagamento é R$ 20,00");
+                .hasMessage("O valor minimo para pagamento e R$ 40,00");
 
         verify(asaasService, never()).getOrCreateCustomer(any(), any(), any());
     }
 
     @Test
-    @DisplayName("Deve permitir pagamento legado abaixo de R$ 20,00")
-    void createPayment_allowsLegacyLowValue() {
+    @DisplayName("Deve criar pagamento PIX com taxa fixa da Asaas e ignorar parcelas")
+    void createPayment_createsPixPaymentWithFixedGatewayFee() {
         User contractor = buildUser(1L, "cliente@servija.com", User.UserType.CONTRACTOR);
-        ServiceRequest serviceRequest = buildAcceptedRequest(contractor, new BigDecimal("19.99"), true);
+        ServiceRequest serviceRequest = buildAcceptedRequest(contractor, new BigDecimal("100.00"), false);
 
-        when(userRepository.findByEmail("cliente@servija.com")).thenReturn(Optional.of(contractor));
-        when(serviceRequestRepository.findById(10L)).thenReturn(Optional.of(serviceRequest));
-        when(paymentRepository.existsByServiceRequest(serviceRequest)).thenReturn(false);
-        when(asaasService.getOrCreateCustomer(any(), any(), any())).thenReturn("cus_123");
+        mockBaseLookups(contractor, serviceRequest);
+        when(asaasService.getOrCreateCustomer(anyString(), anyString(), anyString())).thenReturn("cus_123");
+        when(asaasService.createPayment(anyString(), any(BigDecimal.class), any(), anyString(), anyString()))
+                .thenReturn(Map.of("id", "pay_123"));
+        when(asaasService.getPixQrCode("pay_123"))
+                .thenReturn(Map.of("encodedImage", "qr-image", "payload", "pix-copy-paste"));
         when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> {
             Payment payment = invocation.getArgument(0);
             payment.setId(77L);
@@ -123,17 +123,185 @@ class PaymentServiceTest {
 
         PaymentRequest request = PaymentRequest.builder()
                 .serviceRequestId(10L)
-                .paymentMethod("wallet")
-                .amount(new BigDecimal("19.99"))
+                .paymentMethod("pix")
+                .amount(new BigDecimal("100.00"))
                 .cpf("12345678901")
+                .cardData(PaymentRequest.CardData.builder().installmentCount(6).build())
                 .build();
 
         PaymentResponse response = paymentService.createPayment("cliente@servija.com", request);
 
         assertThat(response.getId()).isEqualTo(77L);
-        assertThat(response.getTotalAmount()).isEqualByComparingTo("19.99");
+        assertThat(response.getAmount()).isEqualByComparingTo("95.00");
+        assertThat(response.getPlatformFee()).isEqualByComparingTo("5.00");
+        assertThat(response.getInstallmentFee()).isEqualByComparingTo("0.00");
+        assertThat(response.getGatewayFee()).isEqualByComparingTo("1.99");
+        assertThat(response.getTotalAmount()).isEqualByComparingTo("100.00");
+        assertThat(response.getInstallmentCount()).isNull();
+        assertThat(response.getPaymentMethod()).isEqualTo("pix");
         assertThat(response.getStatus()).isEqualTo("PROCESSING");
-        verify(asaasService).getOrCreateCustomer(contractor.getEmail(), contractor.getName(), "12345678901");
+        verify(walletService, never()).addPendingBalance(any(), any());
+    }
+
+    @Test
+    @DisplayName("Deve criar pagamento no cartao a vista com taxa de 2,99 por cento")
+    void createPayment_createsOneTimeCreditCardPayment() {
+        User contractor = buildUser(1L, "cliente@servija.com", User.UserType.CONTRACTOR);
+        ServiceRequest serviceRequest = buildAcceptedRequest(contractor, new BigDecimal("100.00"), false);
+
+        mockBaseLookups(contractor, serviceRequest);
+        when(asaasService.getOrCreateCustomer(anyString(), anyString(), anyString())).thenReturn("cus_123");
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> {
+            Payment payment = invocation.getArgument(0);
+            payment.setId(78L);
+            return payment;
+        });
+
+        PaymentRequest request = PaymentRequest.builder()
+                .serviceRequestId(10L)
+                .paymentMethod("credit-card")
+                .amount(new BigDecimal("100.00"))
+                .cardData(buildCardData(1))
+                .build();
+
+        PaymentResponse response = paymentService.createPayment("cliente@servija.com", request);
+
+        assertThat(response.getId()).isEqualTo(78L);
+        assertThat(response.getAmount()).isEqualByComparingTo("95.00");
+        assertThat(response.getPlatformFee()).isEqualByComparingTo("5.00");
+        assertThat(response.getInstallmentFee()).isEqualByComparingTo("0.00");
+        assertThat(response.getGatewayFee()).isEqualByComparingTo("3.48");
+        assertThat(response.getTotalAmount()).isEqualByComparingTo("100.00");
+        assertThat(response.getInstallmentCount()).isEqualTo(1);
+        assertThat(response.getStatus()).isEqualTo("COMPLETED");
+        verify(walletService).addPendingBalance(serviceRequest.getFreelancer(), new BigDecimal("95.00"));
+    }
+
+    @Test
+    @DisplayName("Deve criar pagamento parcelado em 2x com acrescimo de 1,2 por cento")
+    void createPayment_createsTwoInstallmentCreditCardPaymentWithSurcharge() {
+        User contractor = buildUser(1L, "cliente@servija.com", User.UserType.CONTRACTOR);
+        ServiceRequest serviceRequest = buildAcceptedRequest(contractor, new BigDecimal("100.00"), false);
+
+        mockBaseLookups(contractor, serviceRequest);
+        when(asaasService.getOrCreateCustomer(anyString(), anyString(), anyString())).thenReturn("cus_123");
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> {
+            Payment payment = invocation.getArgument(0);
+            payment.setId(79L);
+            return payment;
+        });
+
+        PaymentRequest request = PaymentRequest.builder()
+                .serviceRequestId(10L)
+                .paymentMethod("credit-card")
+                .amount(new BigDecimal("100.00"))
+                .cardData(buildCardData(2))
+                .build();
+
+        PaymentResponse response = paymentService.createPayment("cliente@servija.com", request);
+
+        assertThat(response.getAmount()).isEqualByComparingTo("95.00");
+        assertThat(response.getPlatformFee()).isEqualByComparingTo("5.00");
+        assertThat(response.getInstallmentFee()).isEqualByComparingTo("1.20");
+        assertThat(response.getGatewayFee()).isEqualByComparingTo("4.02");
+        assertThat(response.getTotalAmount()).isEqualByComparingTo("101.20");
+        assertThat(response.getInstallmentCount()).isEqualTo(2);
+        assertThat(response.getStatus()).isEqualTo("COMPLETED");
+        verify(walletService).addPendingBalance(serviceRequest.getFreelancer(), new BigDecimal("95.00"));
+    }
+
+    @Test
+    @DisplayName("Deve criar pagamento parcelado no cartao com taxa de 3,49 por cento")
+    void createPayment_createsInstallmentCreditCardPayment() {
+        User contractor = buildUser(1L, "cliente@servija.com", User.UserType.CONTRACTOR);
+        ServiceRequest serviceRequest = buildAcceptedRequest(contractor, new BigDecimal("100.00"), false);
+
+        mockBaseLookups(contractor, serviceRequest);
+        when(asaasService.getOrCreateCustomer(anyString(), anyString(), anyString())).thenReturn("cus_123");
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> {
+            Payment payment = invocation.getArgument(0);
+            payment.setId(80L);
+            return payment;
+        });
+
+        PaymentRequest request = PaymentRequest.builder()
+                .serviceRequestId(10L)
+                .paymentMethod("credit-card")
+                .amount(new BigDecimal("100.00"))
+                .cardData(buildCardData(6))
+                .build();
+
+        PaymentResponse response = paymentService.createPayment("cliente@servija.com", request);
+
+        assertThat(response.getAmount()).isEqualByComparingTo("95.00");
+        assertThat(response.getPlatformFee()).isEqualByComparingTo("5.00");
+        assertThat(response.getInstallmentFee()).isEqualByComparingTo("2.00");
+        assertThat(response.getGatewayFee()).isEqualByComparingTo("4.05");
+        assertThat(response.getTotalAmount()).isEqualByComparingTo("102.00");
+        assertThat(response.getInstallmentCount()).isEqualTo(6);
+        assertThat(response.getStatus()).isEqualTo("COMPLETED");
+        verify(walletService).addPendingBalance(serviceRequest.getFreelancer(), new BigDecimal("95.00"));
+    }
+
+    @Test
+    @DisplayName("Deve rejeitar cartao sem quantidade de parcelas")
+    void createPayment_rejectsCreditCardWithoutInstallmentCount() {
+        User contractor = buildUser(1L, "cliente@servija.com", User.UserType.CONTRACTOR);
+        ServiceRequest serviceRequest = buildAcceptedRequest(contractor, new BigDecimal("100.00"), false);
+
+        mockBaseLookups(contractor, serviceRequest);
+
+        PaymentRequest request = PaymentRequest.builder()
+                .serviceRequestId(10L)
+                .paymentMethod("credit-card")
+                .amount(new BigDecimal("100.00"))
+                .cardData(PaymentRequest.CardData.builder()
+                        .number("4111111111111111")
+                        .name("Cliente Teste")
+                        .expiry("12/30")
+                        .cvv("123")
+                        .build())
+                .build();
+
+        assertThatThrownBy(() -> paymentService.createPayment("cliente@servija.com", request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("parcelas");
+    }
+
+    @Test
+    @DisplayName("Deve rejeitar cartao com parcelamento acima de 6x")
+    void createPayment_rejectsCreditCardWithUnsupportedInstallments() {
+        User contractor = buildUser(1L, "cliente@servija.com", User.UserType.CONTRACTOR);
+        ServiceRequest serviceRequest = buildAcceptedRequest(contractor, new BigDecimal("100.00"), false);
+
+        mockBaseLookups(contractor, serviceRequest);
+
+        PaymentRequest request = PaymentRequest.builder()
+                .serviceRequestId(10L)
+                .paymentMethod("credit-card")
+                .amount(new BigDecimal("100.00"))
+                .cardData(buildCardData(7))
+                .build();
+
+        assertThatThrownBy(() -> paymentService.createPayment("cliente@servija.com", request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("1x e 6x");
+    }
+
+    private void mockBaseLookups(User contractor, ServiceRequest serviceRequest) {
+        when(userRepository.findByEmail("cliente@servija.com")).thenReturn(Optional.of(contractor));
+        when(serviceRequestRepository.findById(10L)).thenReturn(Optional.of(serviceRequest));
+        when(paymentRepository.existsByServiceRequest(serviceRequest)).thenReturn(false);
+    }
+
+    private PaymentRequest.CardData buildCardData(int installmentCount) {
+        return PaymentRequest.CardData.builder()
+                .number("4111 1111 1111 1111")
+                .name("Cliente Teste")
+                .expiry("12/30")
+                .cvv("123")
+                .installmentCount(installmentCount)
+                .build();
     }
 
     private ServiceRequest buildAcceptedRequest(User contractor, BigDecimal responseValue, boolean legacyAllowed) {

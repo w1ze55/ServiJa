@@ -1,0 +1,163 @@
+<script setup lang="ts">
+import { computed } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
+import { FolderTree, Headset, LayoutDashboard, LockKeyhole, LogOut, ScrollText, Shield, Users, Wallet } from 'lucide-vue-next'
+import { useUserStore } from '@/stores/userStore'
+
+const router = useRouter()
+const route = useRoute()
+const userStore = useUserStore()
+
+const currentUser = computed(() => userStore.user)
+
+const isDashboardActive = computed(() => route.path.startsWith('/dashboard'))
+const isCategoriesActive = computed(() => route.path.startsWith('/categories'))
+const isUsersActive = computed(() => route.path.startsWith('/users'))
+const isSupportActive = computed(() => route.path.startsWith('/support'))
+const isAuditLogsActive = computed(() => route.path.startsWith('/audit-logs'))
+const isWalletActive = computed(() => route.path.startsWith('/wallet'))
+const isSecurityActive = computed(() => route.path.startsWith('/settings/security'))
+
+const logout = () => {
+  userStore.clearUser()
+  router.push('/login')
+}
+</script>
+
+<template>
+  <div class="min-h-screen bg-slate-50">
+    <aside
+      class="fixed inset-y-0 left-0 hidden w-64 border-r border-slate-200 bg-[#10243d] text-white lg:flex lg:flex-col"
+    >
+      <div class="flex h-20 shrink-0 items-center border-b border-white/10 px-6">
+        <div class="flex items-center gap-3">
+          <div class="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10">
+            <Shield class="h-5 w-5" />
+          </div>
+          <div>
+            <h1 class="text-lg font-semibold">Servi Já</h1>
+            <p class="text-xs uppercase tracking-[0.24em] text-slate-300">Admin</p>
+          </div>
+        </div>
+      </div>
+
+      <nav class="flex-1 space-y-1 px-4 py-6">
+        <button
+          :class="[
+            'flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-base font-medium transition-colors',
+            isDashboardActive
+              ? 'bg-white/20 text-white'
+              : 'text-white/70 hover:bg-white/10 hover:text-white',
+          ]"
+          type="button"
+          @click="router.push('/dashboard')"
+        >
+          <LayoutDashboard class="h-5 w-5" />
+          Dashboard
+        </button>
+        <button
+          :class="[
+            'flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-base font-medium transition-colors',
+            isCategoriesActive
+              ? 'bg-white/20 text-white'
+              : 'text-white/70 hover:bg-white/10 hover:text-white',
+          ]"
+          type="button"
+          @click="router.push('/categories')"
+        >
+          <FolderTree class="h-5 w-5" />
+          Catálogo de categorias
+        </button>
+        <button
+          :class="[
+            'flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-base font-medium transition-colors',
+            isUsersActive
+              ? 'bg-white/20 text-white'
+              : 'text-white/70 hover:bg-white/10 hover:text-white',
+          ]"
+          type="button"
+          @click="router.push('/users')"
+        >
+          <Users class="h-5 w-5" />
+          Usuários
+        </button>
+        <button
+          :class="[
+            'flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-base font-medium transition-colors',
+            isSupportActive
+              ? 'bg-white/20 text-white'
+              : 'text-white/70 hover:bg-white/10 hover:text-white',
+          ]"
+          type="button"
+          @click="router.push('/support')"
+        >
+          <Headset class="h-5 w-5" />
+          Suporte
+        </button>
+        <button
+          :class="[
+            'flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-base font-medium transition-colors',
+            isAuditLogsActive
+              ? 'bg-white/20 text-white'
+              : 'text-white/70 hover:bg-white/10 hover:text-white',
+          ]"
+          type="button"
+          @click="router.push('/audit-logs')"
+        >
+          <ScrollText class="h-5 w-5" />
+          Logs de auditoria
+        </button>
+        <button
+          :class="[
+            'flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-base font-medium transition-colors',
+            isWalletActive
+              ? 'bg-white/20 text-white'
+              : 'text-white/70 hover:bg-white/10 hover:text-white',
+          ]"
+          type="button"
+          @click="router.push('/wallet')"
+        >
+          <Wallet class="h-5 w-5" />
+          Carteira
+        </button>
+        <button
+          :class="[
+            'flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-base font-medium transition-colors',
+            isSecurityActive
+              ? 'bg-white/20 text-white'
+              : 'text-white/70 hover:bg-white/10 hover:text-white',
+          ]"
+          type="button"
+          @click="router.push('/settings/security')"
+        >
+          <LockKeyhole class="h-5 w-5" />
+          Segurança
+        </button>
+      </nav>
+
+      <div class="border-t border-white/10 px-6 py-4 text-sm text-slate-300">
+        <p class="font-medium text-white">{{ currentUser?.name }}</p>
+        <p>{{ currentUser?.email }}</p>
+      </div>
+    </aside>
+
+    <div class="lg:pl-64">
+      <header class="sticky top-0 z-30 border-b border-slate-200 bg-white/90 backdrop-blur">
+        <div class="mx-auto flex h-20 max-w-7xl items-center justify-end px-4 sm:px-6">
+          <button
+            type="button"
+            class="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+            @click="logout"
+          >
+            <LogOut class="h-4 w-4" />
+            Sair
+          </button>
+        </div>
+      </header>
+
+      <main class="mx-auto max-w-7xl px-4 py-6 sm:px-6">
+        <slot />
+      </main>
+    </div>
+  </div>
+</template>

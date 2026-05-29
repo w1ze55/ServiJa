@@ -1,35 +1,705 @@
-name: Deploy Servija AWS (Homolog)
+name: Deploy ServiJa (Homolog)
 
 on:
   push:
     branches:
       - homolog
 
+# Default least-privilege para todos os jobs. Jobs específicos elevam quando necessário.
+permissions:
+  contents: read
+
 jobs:
-  deploy:
+  # ─────────────────────────────────────────────────────────────────
+  # Lint: detecta mojibake (UTF-8 corrompido) no fonte do backend.
+  # Falha rápida em pares Ã+latin1 que indicam dupla decodificação
+  # UTF-8 → Latin-1 → UTF-8.
+  # ─────────────────────────────────────────────────────────────────
+  lint:
+    name: Lint (encoding)
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout do código
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Deploy via SSH no EC2 (Homolog)
-        uses: appleboy/ssh-action@v1.0.3
+      - name: Detect mojibake (UTF-8 double-encoding)
+        run: |
+          set +e
+          PATTERN='Ã£|Ã§|Ã©|Ã­|Ã³|Ãº|Ã¡|Ãª|Ã´|Ã€|Ã‡|Ã‰|Ã“|ÃŠ|Ã‘|Ãƒ'
+          MATCHES=$(grep -RnE \
+            --include='*.java' \
+            --include='*.properties' \
+            --include='*.xml' \
+            --include='*.json' \
+            --include='*.yml' \
+            --include='*.yaml' \
+            "$PATTERN" backend/)
+          if [ -n "$MATCHES" ]; then
+            echo "::error::Mojibake (UTF-8 corrompido) detectado:"
+            echo "$MATCHES" | while IFS=: read -r file line content; do
+              echo "::error file=$file,line=$line::Mojibake: ${content#"${content%%[![:space:]]*}"}"
+            done
+            echo ""
+            echo "Total de ocorrências: $(echo "$MATCHES" | wc -l)"
+            exit 1
+          fi
+          echo "OK: nenhum mojibake encontrado"
+
+  # ─────────────────────────────────────────────────────────────────
+  # Security - SAST (back + front): análise estática do código-fonte
+  # Java (backend) e Vue/JS (frontend + frontend-admin) buscando bugs
+  # de segurança (SQLi, XSS, secrets, eval, etc.). Não checa deps —
+  # isso é o job `security-deps`. SNYK_TOKEN é secret.
+  # ─────────────────────────────────────────────────────────────────
+  security-sast:
+    name: Security scan - SAST (back + front)
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Snyk CLI
+        uses: snyk/actions/setup@master
+
+      - name: Verify Snyk token configured
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          if [ -z "$SNYK_TOKEN" ]; then
+            echo "::error::Secret SNYK_TOKEN não configurado."
+            exit 1
+          fi
+
+      - name: Snyk Code - Backend (Java SAST)
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        working-directory: backend
+        run: |
+          snyk code test \
+            --severity-threshold=high \
+            --sarif-file-output=../snyk-code-backend.sarif || EXIT=$?
+          exit ${EXIT:-0}
+
+      - name: Snyk Code - Frontend (Vue/JS SAST)
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        working-directory: frontend
+        run: |
+          snyk code test \
+            --severity-threshold=high \
+            --sarif-file-output=../snyk-code-frontend.sarif || EXIT=$?
+          exit ${EXIT:-0}
+
+      - name: Snyk Code - Frontend-admin (Vue/JS SAST)
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        working-directory: frontend-admin
+        run: |
+          snyk code test \
+            --severity-threshold=high \
+            --sarif-file-output=../snyk-code-frontend-admin.sarif || EXIT=$?
+          exit ${EXIT:-0}
+
+      - name: Upload Snyk Code SARIF reports
+        if: always()
+        uses: actions/upload-artifact@v4
         with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ec2-user
-          key: ${{ secrets.EC2_SSH_KEY }}
-          port: 22
-          script: |
-            cd /var/www/ServiJa
+          name: snyk-code-reports
+          path: |
+            snyk-code-backend.sarif
+            snyk-code-frontend.sarif
+            snyk-code-frontend-admin.sarif
+          retention-days: 14
+          if-no-files-found: ignore
 
-            git checkout homolog
-            git pull origin homolog
+  # ─────────────────────────────────────────────────────────────────
+  # Security - Dependencies (back + front): OWASP Dependency-Check
+  # nas deps do backend (Maven/NVD) e Snyk Open Source nas deps npm
+  # de frontend e frontend-admin. NVD_API_KEY é opcional; SNYK_TOKEN
+  # é secret obrigatório.
+  # ─────────────────────────────────────────────────────────────────
+  security-deps:
+    name: Security scan - Dependencies (back + front)
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-            # Para apenas os containers de homolog (não afeta produção)
-            docker compose -f docker-compose.homolog.yml down
+      # ── OWASP: backend (Maven) ─────────────────────────────────
+      - name: OWASP Dependency-Check (backend)
+        uses: dependency-check/Dependency-Check_Action@main
+        with:
+          project: servija-backend
+          path: backend
+          format: HTML
+          out: dependency-check-report
+          args: >-
+            --failOnCVSS 3
+            --enableRetired
+            ${{ secrets.NVD_API_KEY && format('--nvdApiKey {0}', secrets.NVD_API_KEY) || '' }}
 
-            # Rebuild e start homolog
-            docker compose --env-file .env.homolog -f docker-compose.homolog.yml up --build -d
+      - name: Upload OWASP report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-check-report
+          path: dependency-check-report
+          retention-days: 14
+          if-no-files-found: ignore
 
-            # Reinicia o proxy para reconhecer as mudanças (se existir)
-            docker compose -f docker-compose.proxy.yml up -d --force-recreate
+      # ── Snyk: frontends (npm) ──────────────────────────────────
+      - name: Set up Node 20 (for Snyk npm scan)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: |
+            frontend/package-lock.json
+            frontend-admin/package-lock.json
+
+      - name: Setup Snyk CLI
+        uses: snyk/actions/setup@master
+
+      - name: Verify Snyk token configured
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          if [ -z "$SNYK_TOKEN" ]; then
+            echo "::error::Secret SNYK_TOKEN não configurado."
+            exit 1
+          fi
+
+      - name: Install frontend deps
+        working-directory: frontend
+        run: npm ci
+
+      - name: Snyk - Frontend deps (npm)
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        working-directory: frontend
+        run: |
+          snyk test \
+            --severity-threshold=high \
+            --sarif-file-output=../snyk-frontend.sarif || EXIT=$?
+          exit ${EXIT:-0}
+
+      - name: Install frontend-admin deps
+        working-directory: frontend-admin
+        run: npm ci
+
+      - name: Snyk - Frontend-admin deps (npm)
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        working-directory: frontend-admin
+        run: |
+          snyk test \
+            --severity-threshold=high \
+            --sarif-file-output=../snyk-frontend-admin.sarif || EXIT=$?
+          exit ${EXIT:-0}
+
+      - name: Upload Snyk frontend SARIF reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: snyk-frontend-reports
+          path: |
+            snyk-frontend.sarif
+            snyk-frontend-admin.sarif
+          retention-days: 14
+          if-no-files-found: ignore
+
+  # ─────────────────────────────────────────────────────────────────
+  # Compile: builda frontends no runner e o JAR do backend na EC2
+  # (reusa ~/.m2 local). Roda em paralelo com `tests` e os jobs de
+  # security.
+  # ─────────────────────────────────────────────────────────────────
+  compile:
+    name: Compile
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── Frontend builds ────────────────────────────────────────
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: |
+            frontend/package-lock.json
+            frontend-admin/package-lock.json
+
+      - name: Build frontend
+        run: npm ci && npm run build
+        working-directory: frontend
+        env:
+          VITE_API_URL: https://homolog.servija.app
+
+      - name: Build frontend-admin
+        run: npm ci && npm run build
+        working-directory: frontend-admin
+        env:
+          VITE_API_URL: https://homolog.servija.app
+
+      - name: Upload frontend dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist
+          retention-days: 7
+
+      - name: Upload frontend-admin dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-admin-dist
+          path: frontend-admin/dist
+          retention-days: 7
+
+      # ── Backend build on EC2 (reusa ~/.m2 cache) ───────────────
+      - name: Setup SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.EC2_SSH_KEY }}
+
+      - name: Pin EC2 host fingerprint
+        run: |
+          mkdir -p ~/.ssh
+          if [ -z "${{ secrets.EC2_KNOWN_HOSTS }}" ]; then
+            echo "::error::Secret EC2_KNOWN_HOSTS não configurado. Gere em uma máquina trusted com 'ssh-keyscan -H <host>'."
+            exit 1
+          fi
+          echo "${{ secrets.EC2_KNOWN_HOSTS }}" >> ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Ensure backend build dir exists on EC2
+        run: |
+          ssh ubuntu@${{ secrets.EC2_HOST }} 'mkdir -p /app/homolog/build'
+
+      - name: Sync backend source to EC2
+        run: |
+          rsync -az --delete \
+            --exclude '.git/' \
+            --exclude 'target/' \
+            --exclude '.idea/' \
+            --exclude '*.iml' \
+            --exclude 'src/node_modules/' \
+            backend/ \
+            ubuntu@${{ secrets.EC2_HOST }}:/app/homolog/build/
+
+      - name: Build backend JAR on EC2 (skip tests)
+        run: |
+          ssh ubuntu@${{ secrets.EC2_HOST }} \
+            'set -e
+             cd /app/homolog/build
+             chmod +x mvnw
+             ./mvnw -B -ntp clean package -DskipTests'
+
+  # ─────────────────────────────────────────────────────────────────
+  # Tests: roda a suite JUnit do backend no runner com cache do Maven
+  # e gera relatório de cobertura JaCoCo. Paralelo a `compile` e aos
+  # jobs de security. Falha aqui bloqueia o deploy.
+  # ─────────────────────────────────────────────────────────────────
+  tests:
+    name: Tests (JUnit + Mockito + JaCoCo)
+    needs: lint
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Run backend tests with JaCoCo coverage
+        run: |
+          chmod +x mvnw
+          ./mvnw -B -ntp \
+            org.jacoco:jacoco-maven-plugin:0.8.12:prepare-agent \
+            test \
+            org.jacoco:jacoco-maven-plugin:0.8.12:report
+        working-directory: backend
+
+      - name: Publish JUnit report
+        if: always()
+        uses: mikepenz/action-junit-report@v4
+        with:
+          report_paths: backend/target/surefire-reports/TEST-*.xml
+          check_name: JUnit + Mockito Report
+          fail_on_failure: true
+          require_tests: true
+          detailed_summary: true
+          include_passed: false
+
+      - name: Upload surefire reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-reports
+          path: backend/target/surefire-reports
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Upload JaCoCo coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-coverage
+          path: backend/target/site/jacoco
+          retention-days: 14
+          if-no-files-found: warn
+
+  # ─────────────────────────────────────────────────────────────────
+  # Diagnose: roda APENAS se security-sast, security-deps ou tests
+  # falharem. Baixa os artefatos relevantes (SARIF do Snyk, surefire
+  # XMLs, OWASP report) e envia um embed extra no Discord com o
+  # detalhamento das falhas. O `notify` geral continua independente.
+  # ─────────────────────────────────────────────────────────────────
+  diagnose:
+    name: Diagnose failures (Discord)
+    needs: [security-sast, security-deps, tests]
+    if: |
+      always() && (
+        needs.security-sast.result == 'failure' ||
+        needs.security-deps.result == 'failure' ||
+        needs.tests.result == 'failure'
+      )
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Snyk Code SARIF (SAST)
+        if: needs.security-sast.result == 'failure'
+        uses: actions/download-artifact@v4
+        with:
+          name: snyk-code-reports
+          path: artifacts/snyk-code
+        continue-on-error: true
+
+      - name: Download Snyk frontend SARIF (deps)
+        if: needs.security-deps.result == 'failure'
+        uses: actions/download-artifact@v4
+        with:
+          name: snyk-frontend-reports
+          path: artifacts/snyk-frontend
+        continue-on-error: true
+
+      - name: Download OWASP report (deps)
+        if: needs.security-deps.result == 'failure'
+        uses: actions/download-artifact@v4
+        with:
+          name: dependency-check-report
+          path: artifacts/owasp
+        continue-on-error: true
+
+      - name: Download surefire reports (tests)
+        if: needs.tests.result == 'failure'
+        uses: actions/download-artifact@v4
+        with:
+          name: surefire-reports
+          path: artifacts/surefire
+        continue-on-error: true
+
+      - name: Build and send Discord diagnostic
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          SAST_RESULT: ${{ needs.security-sast.result }}
+          DEPS_RESULT: ${{ needs.security-deps.result }}
+          TESTS_RESULT: ${{ needs.tests.result }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -e
+          if [ -z "$DISCORD_WEBHOOK_URL" ]; then
+            echo "DISCORD_WEBHOOK_URL não configurado; pulando diagnóstico."
+            exit 0
+          fi
+
+          # Newline literal usado para concatenar linhas em strings bash sem
+          # quebrar o bloco `run: |` do YAML.
+          NL=$'\n'
+
+          # Discord field value limit: 1024 chars. Deixamos folga p/ o code-fence.
+          truncate_field() {
+            local s="$1"
+            if [ "${#s}" -gt 950 ]; then
+              printf '%s%s... [truncado — ver artefatos do run]' "${s:0:950}" "$NL"
+            else
+              printf '%s' "$s"
+            fi
+          }
+
+          FIELDS_JSON='[]'
+
+          # ── SAST (Snyk Code SARIF) ────────────────────────────
+          if [ "$SAST_RESULT" = "failure" ]; then
+            SAST_BODY=""
+            shopt -s nullglob
+            for f in artifacts/snyk-code/*.sarif; do
+              NAME=$(basename "$f" .sarif)
+              COUNT=$(jq '[.runs[]?.results[]?] | length' "$f" 2>/dev/null || echo "?")
+              TOP=$(jq -r '.runs[]?.results[]? | "  - [\(.level // "warning")] \(.ruleId // "?"): \((.message.text // "") | gsub("\n"; " ") | .[0:140])"' "$f" 2>/dev/null | head -5)
+              SAST_BODY="${SAST_BODY}• ${NAME}: ${COUNT} issues${NL}${TOP}${NL}"
+            done
+            shopt -u nullglob
+            [ -z "$SAST_BODY" ] && SAST_BODY="(sem SARIF disponível — ver logs do job)"
+            SAST_BODY=$(truncate_field "$SAST_BODY")
+            FIELDS_JSON=$(echo "$FIELDS_JSON" | jq --arg v "$SAST_BODY" '. + [{name: "❌ SAST (Snyk Code)", value: ("```\n" + $v + "\n```"), inline: false}]')
+          fi
+
+          # ── Dependencies (OWASP + Snyk Open Source) ───────────
+          if [ "$DEPS_RESULT" = "failure" ]; then
+            DEPS_BODY=""
+            shopt -s nullglob
+            for f in artifacts/snyk-frontend/*.sarif; do
+              NAME=$(basename "$f" .sarif)
+              COUNT=$(jq '[.runs[]?.results[]?] | length' "$f" 2>/dev/null || echo "?")
+              TOP=$(jq -r '.runs[]?.results[]? | "  - [\(.level // "warning")] \(.ruleId // "?")"' "$f" 2>/dev/null | sort -u | head -5)
+              DEPS_BODY="${DEPS_BODY}• ${NAME}: ${COUNT} vulns${NL}${TOP}${NL}"
+            done
+            shopt -u nullglob
+            if [ -d artifacts/owasp ]; then
+              OWASP_HTML=$(find artifacts/owasp -maxdepth 3 -name '*.html' | head -1)
+              if [ -n "$OWASP_HTML" ]; then
+                # Extrai contagem de severidades do HTML (best-effort).
+                HIGH=$(grep -oE 'High[^<]*<[^>]*>[^<]*[0-9]+' "$OWASP_HTML" 2>/dev/null | grep -oE '[0-9]+' | head -1)
+                CRIT=$(grep -oE 'Critical[^<]*<[^>]*>[^<]*[0-9]+' "$OWASP_HTML" 2>/dev/null | grep -oE '[0-9]+' | head -1)
+                DEPS_BODY="${DEPS_BODY}• OWASP (backend): Critical=${CRIT:-?}, High=${HIGH:-?} — ver dependency-check-report nos artefatos${NL}"
+              fi
+            fi
+            [ -z "$DEPS_BODY" ] && DEPS_BODY="(sem artefatos disponíveis — ver logs do job)"
+            DEPS_BODY=$(truncate_field "$DEPS_BODY")
+            FIELDS_JSON=$(echo "$FIELDS_JSON" | jq --arg v "$DEPS_BODY" '. + [{name: "❌ Dependencies (OWASP + Snyk OS)", value: ("```\n" + $v + "\n```"), inline: false}]')
+          fi
+
+          # ── Tests (surefire XML) ──────────────────────────────
+          if [ "$TESTS_RESULT" = "failure" ]; then
+            TESTS_BODY=""
+            if [ -d artifacts/surefire ]; then
+              TOTALS=$(grep -h '<testsuite ' artifacts/surefire/*.xml 2>/dev/null \
+                | grep -oE '(tests|failures|errors|skipped)="[0-9]+"' \
+                | awk -F'"' '{a[$1]+=$2} END{ printf "tests=%d, failures=%d, errors=%d, skipped=%d", a["tests="]+0, a["failures="]+0, a["errors="]+0, a["skipped="]+0 }')
+              FAILED=$(awk '/<testcase /{tc=$0} /<(failure|error)[ >]/{cn="";n="";if(match(tc,/classname="[^"]*"/))cn=substr(tc,RSTART+11,RLENGTH-12);if(match(tc,/name="[^"]*"/))n=substr(tc,RSTART+6,RLENGTH-7);print "  - "cn"."n} /<\/testcase>/{tc=""}' artifacts/surefire/*.xml 2>/dev/null | sort -u | head -10)
+              TESTS_BODY="totais: ${TOTALS}${NL}${NL}falhas/erros:${NL}${FAILED}"
+            fi
+            [ -z "$TESTS_BODY" ] && TESTS_BODY="(sem surefire-reports disponível — ver logs do job)"
+            TESTS_BODY=$(truncate_field "$TESTS_BODY")
+            FIELDS_JSON=$(echo "$FIELDS_JSON" | jq --arg v "$TESTS_BODY" '. + [{name: "❌ Tests (JUnit + Mockito)", value: ("```\n" + $v + "\n```"), inline: false}]')
+          fi
+
+          PAYLOAD=$(jq -n \
+            --arg title "🔍 Diagnóstico de falhas — homolog" \
+            --arg url "$RUN_URL" \
+            --arg branch "${{ github.ref_name }}" \
+            --arg sha "${{ github.sha }}" \
+            --arg runn "#${{ github.run_number }}" \
+            --argjson fields "$FIELDS_JSON" \
+            '{
+              username: "ServiJá Pipeline",
+              embeds: [{
+                title: $title,
+                url: $url,
+                color: 15158332,
+                description: ("Pipeline interrompido por falha em jobs de qualidade/segurança.\nBranch `" + $branch + "` · Run " + $runn + " · `" + $sha + "`"),
+                fields: $fields
+              }]
+            }')
+
+          curl -X POST "$DISCORD_WEBHOOK_URL" \
+            -H 'Content-Type: application/json' \
+            --data-binary "$PAYLOAD"
+
+  # ─────────────────────────────────────────────────────────────────
+  # Deploy: gated por SAST (back+front) + Dependencies (back+front) +
+  # compile + tests. Baixa dists dos frontends, promove o JAR (com
+  # backup), reinicia, faz health-check e rollback automático se o
+  # health falhar.
+  # ─────────────────────────────────────────────────────────────────
+  deploy:
+    name: Deploy to EC2
+    needs: [lint, security-sast, security-deps, compile, tests]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download frontend dist
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend-dist
+
+      - name: Download frontend-admin dist
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-admin-dist
+          path: frontend-admin-dist
+
+      - name: Setup SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.EC2_SSH_KEY }}
+
+      - name: Pin EC2 host fingerprint
+        run: |
+          mkdir -p ~/.ssh
+          if [ -z "${{ secrets.EC2_KNOWN_HOSTS }}" ]; then
+            echo "::error::Secret EC2_KNOWN_HOSTS não configurado."
+            exit 1
+          fi
+          echo "${{ secrets.EC2_KNOWN_HOSTS }}" >> ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Prepare target dirs on EC2
+        run: |
+          ssh ubuntu@${{ secrets.EC2_HOST }} \
+            'sudo mkdir -p /var/www/homolog /var/www/homolog-admin
+             sudo chown -R ubuntu:ubuntu /var/www/homolog /var/www/homolog-admin'
+
+      - name: Upload Vue dist to EC2
+        run: |
+          rsync -az --delete \
+            frontend-dist/ \
+            ubuntu@${{ secrets.EC2_HOST }}:/var/www/homolog/
+
+      - name: Upload admin dist to EC2
+        run: |
+          rsync -az --delete \
+            frontend-admin-dist/ \
+            ubuntu@${{ secrets.EC2_HOST }}:/var/www/homolog-admin/
+
+      - name: Backup current JAR
+        run: |
+          ssh ubuntu@${{ secrets.EC2_HOST }} \
+            'if [ -f /app/homolog/app.jar ]; then
+               cp /app/homolog/app.jar /app/homolog/app.jar.previous
+               echo "Backup criado: $(ls -la /app/homolog/app.jar.previous)"
+             else
+               echo "Sem JAR anterior (primeiro deploy?); nada a backupar."
+             fi'
+
+      - name: Promote JAR and restart service
+        id: promote
+        run: |
+          ssh ubuntu@${{ secrets.EC2_HOST }} \
+            'set -e
+             JAR=$(ls /app/homolog/build/target/servija-*.jar 2>/dev/null | head -n1)
+             if [ -z "$JAR" ]; then
+               echo "::error::Nenhum JAR servija-*.jar encontrado em /app/homolog/build/target/"
+               exit 1
+             fi
+             echo "Promovendo: $JAR"
+             cp "$JAR" /app/homolog/app.jar
+             chmod -R o+rX /var/www/homolog/ /var/www/homolog-admin/
+             sudo systemctl restart servija-homolog'
+
+      - name: Health check
+        id: health
+        run: |
+          set +e
+          for i in 1 2 3 4 5 6 7 8 9 10; do
+            STATUS=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 5 https://homolog.servija.app/actuator/health || echo "000")
+            if [ "$STATUS" = "200" ]; then
+              echo "Health OK na tentativa $i (HTTP $STATUS)"
+              exit 0
+            fi
+            echo "Tentativa $i: HTTP $STATUS — aguardando 10s..."
+            sleep 10
+          done
+          echo "::error::Health check falhou após 10 tentativas"
+          exit 1
+
+      - name: Rollback on failure
+        if: failure() && steps.promote.outcome == 'success'
+        run: |
+          ssh ubuntu@${{ secrets.EC2_HOST }} \
+            'set -e
+             if [ -f /app/homolog/app.jar.previous ]; then
+               echo "Restaurando JAR anterior..."
+               cp /app/homolog/app.jar.previous /app/homolog/app.jar
+               sudo systemctl restart servija-homolog
+               echo "Rollback aplicado."
+             else
+               echo "::error::Sem /app/homolog/app.jar.previous — rollback impossível"
+               exit 1
+             fi'
+
+  # ─────────────────────────────────────────────────────────────────
+  # Notify: roda sempre. Detecta success/failure/cancelled olhando
+  # needs.*.result e posta no Discord com cor/emoji apropriados.
+  # Pula silenciosamente se DISCORD_WEBHOOK_URL não estiver setado.
+  # ─────────────────────────────────────────────────────────────────
+  notify:
+    name: Notify Discord
+    needs: [lint, security-sast, security-deps, compile, tests, deploy]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Discord notification
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          LINT_RESULT: ${{ needs.lint.result }}
+          SAST_RESULT: ${{ needs.security-sast.result }}
+          DEPS_RESULT: ${{ needs.security-deps.result }}
+          COMPILE_RESULT: ${{ needs.compile.result }}
+          TESTS_RESULT: ${{ needs.tests.result }}
+          DEPLOY_RESULT: ${{ needs.deploy.result }}
+          ANY_FAILURE: ${{ contains(needs.*.result, 'failure') }}
+          ANY_CANCELLED: ${{ contains(needs.*.result, 'cancelled') }}
+        run: |
+          if [ -z "$DISCORD_WEBHOOK_URL" ]; then
+            echo "DISCORD_WEBHOOK_URL não configurado; pulando notificação."
+            exit 0
+          fi
+
+          if [ "$ANY_FAILURE" = "true" ]; then
+            STATUS_TITLE="❌ FALHOU"
+            COLOR=15158332
+          elif [ "$ANY_CANCELLED" = "true" ]; then
+            STATUS_TITLE="⚠️ CANCELADO"
+            COLOR=15844367
+          else
+            STATUS_TITLE="✅ SUCESSO"
+            COLOR=3066993
+          fi
+
+          status_emoji() {
+            case "$1" in
+              success)   echo "✅" ;;
+              failure)   echo "❌" ;;
+              cancelled) echo "⚠️" ;;
+              skipped)   echo "⏭️" ;;
+              *)         echo "❓" ;;
+            esac
+          }
+
+          JOBS_LINE="$(status_emoji $LINT_RESULT) Lint · $(status_emoji $SAST_RESULT) SAST · $(status_emoji $DEPS_RESULT) Deps · $(status_emoji $COMPILE_RESULT) Compile · $(status_emoji $TESTS_RESULT) Tests · $(status_emoji $DEPLOY_RESULT) Deploy"
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+          curl -X POST "$DISCORD_WEBHOOK_URL" \
+            -H 'Content-Type: application/json' \
+            -d "$(cat <<EOF
+          {
+            "username": "ServiJá Pipeline",
+            "embeds": [{
+              "title": "${STATUS_TITLE} — Deploy homolog",
+              "url": "${RUN_URL}",
+              "color": ${COLOR},
+              "fields": [
+                {"name": "Branch", "value": "${{ github.ref_name }}", "inline": true},
+                {"name": "Autor", "value": "${{ github.actor }}", "inline": true},
+                {"name": "Run", "value": "#${{ github.run_number }}", "inline": true},
+                {"name": "Commit", "value": "\`${{ github.sha }}\`", "inline": false},
+                {"name": "Jobs", "value": "${JOBS_LINE}", "inline": false}
+              ],
+              "timestamp": "${TIMESTAMP}"
+            }]
+          }
+          EOF
+          )"

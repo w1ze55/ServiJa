@@ -1,7 +1,9 @@
 package com.servija.servija.service;
 
 import com.servija.servija.dto.AuthResponse;
+import com.servija.servija.dto.AddressRequest;
 import com.servija.servija.dto.LoginRequest;
+import com.servija.servija.dto.RegistrationValidationRequest;
 import com.servija.servija.dto.RegisterRequest;
 import com.servija.servija.exception.DuplicateResourceException;
 import com.servija.servija.exception.InvalidCredentialsException;
@@ -23,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -33,6 +36,8 @@ public class AuthService {
     private static final int VERIFICATION_CODE_EXPIRY_MINUTES = 10;
     private static final int RESET_PASSWORD_CODE_EXPIRY_MINUTES = 30;
 
+    private static final long TOTP_CHALLENGE_TTL_MS = 5 * 60 * 1000L;
+
     private final UserRepository userRepository;
     private final ContractorRepository contractorRepository;
     private final FreelancerRepository freelancerRepository;
@@ -41,20 +46,15 @@ public class AuthService {
     private final AuthenticationManager authenticationManager;
     private final CustomUserDetailsService userDetailsService;
     private final EmailService emailService;
+    private final AuditLogger auditLogger;
+    private final AddressService addressService;
+    private final PasswordPolicyService passwordPolicyService;
+    private final AdminResetPasswordLinkService adminResetPasswordLinkService;
+    private final TotpService totpService;
 
     @Transactional
     public AuthResponse register(RegisterRequest request) {
-        if (request.getUserType() == User.UserType.ADMIN) {
-            throw new IllegalArgumentException("Cadastro publico de admin nao e permitido");
-        }
-
-        if (userRepository.existsByEmail(request.getEmail())) {
-            throw new DuplicateResourceException("E-mail ja cadastrado");
-        }
-
-        if (userRepository.existsByCpf(request.getCpf())) {
-            throw new DuplicateResourceException("CPF ja cadastrado");
-        }
+        validateRegistrationData(request);
 
         User user = request.getUserType() == User.UserType.CONTRACTOR
                 ? createContractor(request)
@@ -70,23 +70,126 @@ public class AuthService {
             user = freelancerRepository.save((Freelancer) user);
         }
 
+        addressService.createAddressForUser(user, request.getAddress());
+
         emailService.sendVerificationEmail(user.getEmail(), user.getName(), verificationCode);
 
         UserDetails userDetails = userDetailsService.loadUserByUsername(user.getEmail());
         String token = jwtService.generateToken(userDetails);
 
+        auditLogger.recordFor(
+                user,
+                "USER_REGISTERED",
+                "USER",
+                "#USR-" + user.getId(),
+                user.getName(),
+                com.servija.servija.model.AuditLog.Result.SUCCESS,
+                Map.of("userType", user.getUserType()));
+
         return buildAuthResponse(user, token);
     }
 
+    public void validateRegistrationData(RegisterRequest request) {
+        validateRegistrationData(request.getUserType(), request.getEmail(), request.getCpf());
+    }
+
+    public void validateRegistrationData(RegistrationValidationRequest request) {
+        validateRegistrationData(request.getUserType(), request.getEmail(), request.getCpf());
+    }
+
+    private void validateRegistrationData(User.UserType userType, String email, String cpf) {
+        if (userType == User.UserType.ADMIN) {
+            throw new IllegalArgumentException("Cadastro público de admin não é permitido");
+        }
+
+        if (userRepository.existsByEmail(email)) {
+            throw new DuplicateResourceException("E-mail ja cadastrado");
+        }
+
+        if (userRepository.existsByCpf(cpf)) {
+            throw new DuplicateResourceException("CPF ja cadastrado");
+        }
+    }
+
+    public void validateAddressData(AddressRequest request) {
+        addressService.validateAddressData(request);
+    }
+
     public AuthResponse login(LoginRequest request) {
+        try {
+            authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword()));
+
+            User user = userRepository.findByEmail(request.getEmail())
+                    .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
+
+            if (user.getUserType() == User.UserType.ADMIN) {
+                throw new InvalidCredentialsException("Credenciais invalidas");
+            }
+
+            if (!user.getActive()) {
+                throw new InvalidCredentialsException("Conta suspensa");
+            }
+
+            if (Boolean.TRUE.equals(user.getTotpEnabled())) {
+                return buildChallengeResponse(user);
+            }
+
+            UserDetails userDetails = userDetailsService.loadUserByUsername(user.getEmail());
+            String token = jwtService.generateToken(userDetails);
+
+            auditLogger.recordFor(
+                    user,
+                    "LOGIN",
+                    "AUTH",
+                    null,
+                    user.getEmail(),
+                    com.servija.servija.model.AuditLog.Result.SUCCESS,
+                    Map.of("method", "password"));
+
+            return buildAuthResponse(user, token);
+        } catch (Exception e) {
+            User attempted = userRepository.findByEmail(request.getEmail()).orElse(null);
+            if (attempted != null && attempted.getUserType() != User.UserType.ADMIN) {
+                auditLogger.recordFor(
+                        attempted,
+                        "LOGIN_FAILED",
+                        "AUTH",
+                        null,
+                        attempted.getEmail(),
+                        com.servija.servija.model.AuditLog.Result.FAILURE,
+                        Map.of("reason", resolveLoginFailureReason(e, false)));
+            } else if (attempted == null) {
+                auditLogger.recordGuest(
+                        request.getEmail(),
+                        "LOGIN_FAILED",
+                        "AUTH",
+                        null,
+                        request.getEmail(),
+                        com.servija.servija.model.AuditLog.Result.FAILURE,
+                        Map.of("reason", resolveLoginFailureReason(e, true)));
+            }
+            throw e;
+        }
+    }
+
+    public AuthResponse loginAdmin(LoginRequest request) {
         authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword()));
 
         User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new ResourceNotFoundException("Usuario nao encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
+
+        if (user.getUserType() != User.UserType.ADMIN) {
+            throw new InvalidCredentialsException("Credenciais invalidas");
+        }
 
         if (!user.getActive()) {
-            throw new InvalidCredentialsException("Conta desativada");
+            throw new InvalidCredentialsException("Conta suspensa");
+        }
+
+        if (Boolean.TRUE.equals(user.getTotpEnabled())) {
+            return buildChallengeResponse(user);
         }
 
         UserDetails userDetails = userDetailsService.loadUserByUsername(user.getEmail());
@@ -95,13 +198,118 @@ public class AuthService {
         return buildAuthResponse(user, token);
     }
 
+    /**
+     * Completes a 2FA login by verifying the TOTP/backup code presented with a valid challenge token.
+     */
+    @Transactional
+    public AuthResponse verifyTwoFactorChallenge(String challengeToken, String code) {
+        String email;
+        try {
+            email = jwtService.extractUsername(challengeToken);
+        } catch (Exception e) {
+            throw new InvalidCredentialsException("Token de desafio inválido ou expirado");
+        }
+
+        Boolean pending = safeBoolClaim(challengeToken, "totp_pending");
+        if (!Boolean.TRUE.equals(pending)) {
+            throw new InvalidCredentialsException("Token de desafio inválido");
+        }
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
+
+        if (!user.getActive() || !Boolean.TRUE.equals(user.getTotpEnabled())) {
+            throw new InvalidCredentialsException("Credenciais invalidas");
+        }
+
+        // Validate the challenge token itself against the user (signature + non-expired).
+        UserDetails userDetails = userDetailsService.loadUserByUsername(user.getEmail());
+        if (!jwtService.isTokenValid(challengeToken, userDetails)) {
+            throw new InvalidCredentialsException("Token de desafio inválido ou expirado");
+        }
+
+        TotpService.VerifyResult result = totpService.verifyChallenge(user, code);
+        if (result == TotpService.VerifyResult.LOCKED) {
+            auditLogger.recordFor(
+                    user,
+                    "2FA_FAILED",
+                    "AUTH",
+                    null,
+                    user.getEmail(),
+                    com.servija.servija.model.AuditLog.Result.FAILURE,
+                    Map.of("reason", "locked"));
+            throw new TooManyAttemptsException(
+                    "Muitas tentativas. Aguarde para tentar novamente.",
+                    0,
+                    user.getTotpLockedUntil());
+        }
+        if (result == TotpService.VerifyResult.INVALID) {
+            auditLogger.recordFor(
+                    user,
+                    "2FA_FAILED",
+                    "AUTH",
+                    null,
+                    user.getEmail(),
+                    com.servija.servija.model.AuditLog.Result.FAILURE,
+                    Map.of("reason", "invalid_code"));
+            throw new InvalidCredentialsException("Código inválido");
+        }
+
+        String token = jwtService.generateToken(userDetails);
+
+        String method = result == TotpService.VerifyResult.OK_BACKUP ? "password+backup" : "password+totp";
+        auditLogger.recordFor(
+                user,
+                "LOGIN",
+                "AUTH",
+                null,
+                user.getEmail(),
+                com.servija.servija.model.AuditLog.Result.SUCCESS,
+                Map.of("method", method));
+
+        if (result == TotpService.VerifyResult.OK_BACKUP) {
+            auditLogger.recordFor(
+                    user,
+                    "2FA_BACKUP_USED",
+                    "AUTH",
+                    null,
+                    user.getEmail(),
+                    com.servija.servija.model.AuditLog.Result.SUCCESS,
+                    Map.of());
+        }
+
+        return buildAuthResponse(user, token);
+    }
+
+    private Boolean safeBoolClaim(String token, String name) {
+        try {
+            return jwtService.extractClaim(token, c -> c.get(name, Boolean.class));
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private AuthResponse buildChallengeResponse(User user) {
+        UserDetails userDetails = userDetailsService.loadUserByUsername(user.getEmail());
+        Map<String, Object> claims = new java.util.HashMap<>();
+        claims.put("totp_pending", true);
+        String challenge = jwtService.generateToken(userDetails, claims, TOTP_CHALLENGE_TTL_MS);
+        return AuthResponse.builder()
+                .token(challenge)
+                .tokenType("Bearer")
+                .requires2fa(true)
+                .build();
+    }
+
     @Transactional(noRollbackFor = { IllegalArgumentException.class, TooManyAttemptsException.class })
     public AuthResponse verifyEmail(String email, String code) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("Usuario nao encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
+
+        int attemptsUsed = safeAttempts(user.getVerificationAttempts()) + 1;
 
         if (Boolean.TRUE.equals(user.getEmailVerified())) {
-            throw new IllegalStateException("E-mail ja verificado");
+            throw new IllegalStateException("E-mail já verificado");
         }
 
         if (user.getVerificationLockUntil() != null && user.getVerificationLockUntil().isAfter(LocalDateTime.now())) {
@@ -136,7 +344,7 @@ public class AuthService {
         }
 
         if (user.getVerificationCodeExpiry() == null || user.getVerificationCodeExpiry().isBefore(LocalDateTime.now())) {
-            throw new IllegalArgumentException("Codigo de verificacao expirado, solicite um novo");
+            throw new IllegalArgumentException("Código de verificação expirado, solicite um novo");
         }
 
         user.setEmailVerified(true);
@@ -149,16 +357,25 @@ public class AuthService {
         UserDetails userDetails = userDetailsService.loadUserByUsername(user.getEmail());
         String token = jwtService.generateToken(userDetails);
 
+        auditLogger.recordFor(
+                user,
+                "EMAIL_VERIFIED",
+                "AUTH",
+                null,
+                user.getEmail(),
+                com.servija.servija.model.AuditLog.Result.SUCCESS,
+                Map.of("attempts", attemptsUsed));
+
         return buildAuthResponse(user, token);
     }
 
     @Transactional
     public void resendVerificationCode(String email) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("Usuario nao encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
 
         if (Boolean.TRUE.equals(user.getEmailVerified())) {
-            throw new IllegalStateException("E-mail ja verificado");
+            throw new IllegalStateException("E-mail já verificado");
         }
 
         String verificationCode = generateVerificationCode();
@@ -186,13 +403,13 @@ public class AuthService {
         user.setResetPasswordLockUntil(null);
         userRepository.save(user);
 
-        emailService.sendPasswordResetEmail(user.getEmail(), user.getName(), resetCode);
+        emailService.sendPasswordResetCodeEmail(user.getEmail(), user.getName(), resetCode);
     }
 
     @Transactional(noRollbackFor = { IllegalArgumentException.class, TooManyAttemptsException.class })
     public void verifyResetPasswordCode(String email, String code) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("Usuario nao encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
 
         validateResetPasswordCode(user, code, true);
         user.setResetPasswordAttempts(0);
@@ -203,23 +420,32 @@ public class AuthService {
     @Transactional(noRollbackFor = { IllegalArgumentException.class, TooManyAttemptsException.class })
     public void resetPassword(String email, String code, String newPassword, String confirmPassword) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("Usuario nao encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
 
         validateResetPasswordCode(user, code, false);
 
-        if (!newPassword.equals(confirmPassword)) {
-            throw new IllegalArgumentException("As senhas nao coincidem");
-        }
-
-        if (!isValidPassword(newPassword)) {
-            throw new IllegalArgumentException(
-                    "A senha deve ter no minimo 8 caracteres e conter pelo menos: "
-                            + "1 letra maiuscula, 1 letra minuscula, 1 numero e 1 caractere especial");
-        }
+        passwordPolicyService.validateNewPassword(newPassword, confirmPassword);
 
         user.setPassword(passwordEncoder.encode(newPassword));
+        adminResetPasswordLinkService.clearAdminResetLink(user);
         clearResetPasswordChallenge(user);
+
+        boolean had2fa = Boolean.TRUE.equals(user.getTotpEnabled());
+        if (had2fa) {
+            totpService.disable(user);
+        }
         saveUser(user);
+
+        if (had2fa) {
+            auditLogger.recordFor(
+                    user,
+                    "2FA_DISABLED",
+                    "AUTH",
+                    null,
+                    user.getEmail(),
+                    com.servija.servija.model.AuditLog.Result.SUCCESS,
+                    Map.of("reason", "password_reset"));
+        }
     }
 
     private void validateResetPasswordCode(User user, String code, boolean consumeAttemptsOnFailure) {
@@ -240,7 +466,7 @@ public class AuthService {
 
         if (user.getResetPasswordToken() == null || !user.getResetPasswordToken().equals(code)) {
             if (!consumeAttemptsOnFailure) {
-                throw new IllegalArgumentException("Codigo de recuperacao invalido");
+                throw new IllegalArgumentException("Código de recuperação inválido");
             }
 
             int attempts = safeAttempts(user.getResetPasswordAttempts()) + 1;
@@ -262,7 +488,7 @@ public class AuthService {
         }
 
         if (user.getResetPasswordTokenExpiry() == null || user.getResetPasswordTokenExpiry().isBefore(now)) {
-            throw new IllegalArgumentException("Codigo de recuperacao expirado. Solicite um novo.");
+            throw new IllegalArgumentException("Código de recuperação expirado. Solicite um novo.");
         }
     }
 
@@ -277,6 +503,19 @@ public class AuthService {
         return attempts == null ? 0 : attempts;
     }
 
+    private String resolveLoginFailureReason(Exception exception, boolean userNotFound) {
+        if (userNotFound || exception instanceof ResourceNotFoundException) {
+            return "user_not_found";
+        }
+        if (exception instanceof TooManyAttemptsException) {
+            return "too_many_attempts";
+        }
+        if (exception instanceof InvalidCredentialsException && "Conta suspensa".equalsIgnoreCase(exception.getMessage())) {
+            return "account_suspended";
+        }
+        return "invalid_credentials";
+    }
+
     private User saveUser(User user) {
         if (user instanceof Contractor contractor) {
             return contractorRepository.save(contractor);
@@ -287,25 +526,13 @@ public class AuthService {
         return userRepository.save(user);
     }
 
-    private boolean isValidPassword(String password) {
-        if (password == null || password.length() < 8 || password.length() > 256) {
-            return false;
-        }
-
-        boolean hasUpperCase = password.chars().anyMatch(Character::isUpperCase);
-        boolean hasLowerCase = password.chars().anyMatch(Character::isLowerCase);
-        boolean hasDigit = password.chars().anyMatch(Character::isDigit);
-        boolean hasSpecial = password.chars().anyMatch(ch -> "!@#$%^&*(),.?\":{}|<>".indexOf(ch) >= 0);
-
-        return hasUpperCase && hasLowerCase && hasDigit && hasSpecial;
-    }
-
     private Contractor createContractor(RegisterRequest request) {
         return Contractor.builder()
                 .name(request.getName())
                 .email(request.getEmail())
                 .cpf(request.getCpf())
                 .phone(request.getPhone())
+                .birthDate(request.getBirthDate())
                 .password(passwordEncoder.encode(request.getPassword()))
                 .userType(User.UserType.CONTRACTOR)
                 .emailVerified(false)
@@ -322,6 +549,7 @@ public class AuthService {
                 .email(request.getEmail())
                 .cpf(request.getCpf())
                 .phone(request.getPhone())
+                .birthDate(request.getBirthDate())
                 .password(passwordEncoder.encode(request.getPassword()))
                 .userType(User.UserType.FREELANCER)
                 .emailVerified(false)
@@ -329,7 +557,6 @@ public class AuthService {
                 .totalReviews(0)
                 .completedJobs(0)
                 .activeJobs(0)
-                .kycCompleted(false)
                 .profileCompleted(false)
                 .available(true)
                 .build();
@@ -348,6 +575,7 @@ public class AuthService {
                 .email(user.getEmail())
                 .cpf(user.getCpf())
                 .phone(user.getPhone())
+                .birthDate(user.getBirthDate())
                 .userType(user.getUserType())
                 .emailVerified(user.getEmailVerified())
                 .avatarUrl(user.getAvatarUrl())

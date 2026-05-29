@@ -23,6 +23,7 @@ const displayValue = computed(() => {
 
 <template>
   <span
+    class="block min-w-0 overflow-hidden text-ellipsis whitespace-nowrap"
     data-slot="select-value"
     :data-placeholder="!select?.value.value"
     v-bind="$attrs"
@@ -30,7 +31,6 @@ const displayValue = computed(() => {
     {{ displayValue }}
   </span>
 </template>
-
 
 
 

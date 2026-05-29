@@ -57,7 +57,7 @@ import Separator from '../ui/separator.vue';
 import WorkModelBadge from '../shared/WorkModelBadge.vue';
 import { useProposalStore, type Proposal, type Milestone } from '@/stores/proposalStore';
 import ServiceRequestTimeline from '../service/ServiceRequestTimeline.vue';
-import ChatBox from '../shared/ChatBox.vue';
+import ProjectChatPanel from '../shared/ProjectChatPanel.vue';
 import { useRouter } from 'vue-router';
 import { useServiceRequestWebSocket } from '@/composables/useServiceRequestWebSocket';
 import { toast } from '@/utils/toast';
@@ -106,7 +106,6 @@ const milestoneForm = ref({
 });
 const showAddMilestone = ref(false);
 
-const isSendingMessage = ref(false);
 
 // WebSocket
 let wsConnection: any = null;
@@ -429,25 +428,6 @@ const handleRemoveMilestone = (id: string) => {
 
 const handleProposalAttachmentReject = (message: string) => {
   toast.error(message);
-};
-
-const handleSendMessage = async (message: string, attachments: File[]) => {
-  if (!proposal.value) return;
-
-  isSendingMessage.value = true;
-  const success = await proposalStore.sendMessage(
-    proposal.value.id,
-    message,
-    attachments.length > 0 ? attachments : undefined
-  );
-  isSendingMessage.value = false;
-
-  if (success) {
-    proposal.value = proposalStore.getProposalById(proposal.value.id) || null;
-    toast.success('Mensagem enviada');
-  } else {
-    toast.error('Erro ao enviar mensagem');
-  }
 };
 
 const handlePrepareProposal = () => {
@@ -800,7 +780,7 @@ const getStatusBadge = (currentProposal: Proposal) => {
           <!-- Description -->
           <Card class="p-6">
             <h3 class="font-semibold text-[#263238] mb-3">Descrição do Serviço</h3>
-            <p class="text-[#435574] whitespace-pre-line">{{ proposal.description }}</p>
+            <p class="text-[#435574] whitespace-pre-line break-words">{{ proposal.description }}</p>
           </Card>
 
           <!-- Counter Proposal from Client -->
@@ -880,7 +860,7 @@ const getStatusBadge = (currentProposal: Proposal) => {
 
             <div class="mb-4">
               <p class="text-sm font-medium text-[#263238] mb-2">Escopo do trabalho</p>
-              <p class="text-sm text-[#435574] whitespace-pre-line">
+              <p class="text-sm text-[#435574] whitespace-pre-line break-words">
                 {{ proposal.freelancerResponse.scope }}
               </p>
             </div>
@@ -1002,13 +982,10 @@ const getStatusBadge = (currentProposal: Proposal) => {
       <Card v-if="activeSection === 'messages'" class="p-6">
         <h3 class="font-semibold text-[#263238] mb-4">Mensagens</h3>
 
-        <ChatBox
-          :messages="proposal.messages || []"
+        <ProjectChatPanel
+          :service-request-id="Number(proposal.id)"
           current-user-role="freelancer"
-          :is-locked="proposal.status !== 'in_progress' && proposal.status !== 'delivered'"
           :service-status="proposal.status"
-          :is-sending="isSendingMessage"
-          @send-message="handleSendMessage"
         />
       </Card>
 

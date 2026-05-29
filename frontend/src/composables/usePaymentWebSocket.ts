@@ -31,14 +31,10 @@ export function usePaymentWebSocket(userEmail: string) {
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080';
     const wsUrl = `${apiUrl}/ws`;
 
-    console.log('🔌 Conectando WebSocket de pagamentos em:', wsUrl);
-    console.log('📧 Email do usuário:', userEmail);
-
     const stompClient = new Client({
       webSocketFactory: () => new SockJS(wsUrl),
       debug: (str) => {
         if (str.includes('ERROR') || str.includes('CONNECTED') || str.includes('DISCONNECT') || str.includes('SUBSCRIBE')) {
-          console.log('STOMP (Pagamentos):', str);
         }
       },
       reconnectDelay: 5000,
@@ -47,16 +43,13 @@ export function usePaymentWebSocket(userEmail: string) {
     });
 
     stompClient.onConnect = () => {
-      console.log('✅ WebSocket de pagamentos conectado');
       connected.value = true;
       connectionError.value = null;
 
       // Subscrever ao tópico de pagamentos do usuário (mesmo padrão das solicitações)
       const destination = `/topic/payment/${userEmail}`;
-      console.log('📡 Inscrevendo em:', destination);
       
       stompClient.subscribe(destination, (message) => {
-        console.log('📨 Notificação de pagamento recebida:', message.body);
         
         try {
           const notification: PaymentNotification = JSON.parse(message.body);
@@ -67,24 +60,19 @@ export function usePaymentWebSocket(userEmail: string) {
             new CustomEvent('payment-notification', { detail: notification })
           );
 
-          console.log('🔔 Notificação de pagamento processada:', notification.type);
         } catch (error) {
           console.error('❌ Erro ao processar notificação de pagamento:', error);
         }
       });
 
-      console.log('📡 Inscrito em', destination);
     };
 
     stompClient.onStompError = (frame) => {
-      console.error('❌ Erro STOMP (Pagamentos):', frame.headers['message']);
-      console.error('Detalhes:', frame.body);
       connectionError.value = frame.headers['message'] || 'Erro STOMP';
       connected.value = false;
     };
 
     stompClient.onWebSocketClose = () => {
-      console.log('🔌 WebSocket de pagamentos desconectado');
       connected.value = false;
     };
 
@@ -97,7 +85,6 @@ export function usePaymentWebSocket(userEmail: string) {
       client.value.deactivate();
       client.value = null;
       connected.value = false;
-      console.log('🔌 WebSocket de pagamentos desconectado manualmente');
     }
   };
 

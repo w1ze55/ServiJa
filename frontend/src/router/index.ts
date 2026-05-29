@@ -2,6 +2,7 @@ import { createRouter, createWebHistory, RouteRecordRaw } from "vue-router";
 
 // Importar as páginas
 import LandingPage from "@/pages/LandingPage/index.vue";
+import PoliticasTermosPage from "@/pages/PoliticasTermos/index.vue";
 import Login from "@/pages/Login/index.vue";
 import Perfil from "@/pages/Perfil/index.vue";
 import Dashboard from "@/pages/Dashboard/index.vue";
@@ -12,8 +13,9 @@ import FreelancerProfessionalProfile from "@/pages/FreelancerProfessionalProfile
 import FreelancerPortfolio from "@/pages/FreelancerPortfolio/index.vue";
 import ClienteProfileSettings from "@/pages/ClienteProfileSettings/index.vue";
 import ClienteRequestDetailPage from "@/pages/ClienteRequestDetail/index.vue";
-import MapPage from "@/pages/Map/index.vue";
+import MapPage from "@/pages/Map/map.vue";
 import SettingsPage from "@/pages/Settings/index.vue";
+import SecuritySettingsPage from "@/pages/SecuritySettings/index.vue";
 import FreelancerServicesPage from "@/pages/FreelancerServices/index.vue";
 import FreelancerProposalsPage from "@/pages/FreelancerProposals/index.vue";
 import FreelancerRequestDetailPage from "@/pages/FreelancerRequestDetail/index.vue";
@@ -22,13 +24,12 @@ import FreelancerProjectDetailPage from "@/pages/FreelancerProjectDetail/index.v
 import FreelancerWalletPage from "@/pages/FreelancerWallet/index.vue";
 
 
-import MessagesPage from "@/pages/Messages/index.vue";
+import ChatPage from "@/pages/Chat/index.vue";
 import NotificationsPage from "@/pages/Notifications/index.vue";
 import ExplorePage from "@/pages/Explore/index.vue";
 import SearchPage from "@/pages/Search/index.vue";
 import MyRequestsPage from "@/pages/MyRequests/index.vue";
 import FavoritesPage from "@/pages/Favorites/index.vue";
-import FreelancerKYCPage from "@/pages/FreelancerKYC/index.vue";
 import ProviderProfilePage from "@/pages/ProviderProfile/index.vue";
 import ServiceDetailPage from "@/pages/ServiceDetail/index.vue";
 import NotFoundPage from "@/pages/NotFound/index.vue";
@@ -39,7 +40,6 @@ import ClienteProjectsPage from "@/pages/ClienteProjects/index.vue";
 import ClienteDeliveryApprovalPage from "@/pages/ClienteDeliveryApproval/index.vue";
 import ClienteProjectDetailPage from "@/pages/ClienteProjectDetail/index.vue";
 import RateFreelancerPage from "@/pages/RateFreelancer/index.vue";
-import AdminCategoriesPage from "@/pages/AdminCategories/index.vue";
 
 const routes: RouteRecordRaw[] = [
   // ============ ROTAS PÚBLICAS ============
@@ -59,6 +59,12 @@ const routes: RouteRecordRaw[] = [
     path: "/cadastro",
     name: "cadastro",
     component: RegisterPage,
+    meta: { requiresAuth: false },
+  },
+  {
+    path: "/politicas",
+    name: "politicas",
+    component: PoliticasTermosPage,
     meta: { requiresAuth: false },
   },
 
@@ -94,12 +100,6 @@ const routes: RouteRecordRaw[] = [
   {
     path: "/cliente-dashboard",
     redirect: { name: "cliente-home" },
-  },
-  {
-    path: "/admin/categories",
-    name: "admin-categories",
-    component: AdminCategoriesPage,
-    meta: { requiresAuth: true, userType: "admin" },
   },
 
   // ============ PROFILE SETTINGS ESPECÍFICOS ============
@@ -212,8 +212,15 @@ const routes: RouteRecordRaw[] = [
   {
     path: "/messages",
     name: "messages",
-    component: MessagesPage,
+    redirect: "/chat",
     meta: { requiresAuth: true },
+  },
+  {
+    path: "/chat/:serviceRequestId?",
+    name: "chat",
+    component: ChatPage,
+    meta: { requiresAuth: true },
+    props: true,
   },
 
   // ============ CONFIGURAÇÕES ============
@@ -221,6 +228,12 @@ const routes: RouteRecordRaw[] = [
     path: "/settings",
     name: "settings",
     component: SettingsPage,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: "/settings/security",
+    name: "settings-security",
+    component: SecuritySettingsPage,
     meta: { requiresAuth: true },
   },
 
@@ -264,14 +277,6 @@ const routes: RouteRecordRaw[] = [
     name: "favorites",
     component: FavoritesPage,
     meta: { requiresAuth: true, userType: "contractor" },
-  },
-
-  // Freelancer KYC
-  {
-    path: "/freelancer-kyc",
-    name: "freelancer-kyc",
-    component: FreelancerKYCPage,
-    meta: { requiresAuth: true, userType: "provider" },
   },
 
   // Provider Profile (público)
@@ -339,21 +344,14 @@ router.beforeEach((to, from, next) => {
   // Se a rota requer autenticação e o usuário não está logado
   if (to.meta.requiresAuth && !user) {
     next("/login");
-  }
-  // Se o usuário está logado e tenta acessar login
-  else if (to.name === "login" && user) {
-    next("/dashboard");
-  }
-  else if (
+  } else if (
     user &&
     requiredUserType &&
     requiredUserType !== "both" &&
     user.type !== requiredUserType
   ) {
     next("/dashboard");
-  }
-  // Caso contrário, prosseguir
-  else {
+  } else {
     next();
   }
 });

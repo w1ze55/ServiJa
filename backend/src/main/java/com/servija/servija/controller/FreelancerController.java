@@ -2,8 +2,9 @@ package com.servija.servija.controller;
 
 import com.servija.servija.dto.FreelancerProfileRequest;
 import com.servija.servija.dto.FreelancerProfileResponse;
-import com.servija.servija.dto.NearbyFreelancerResponse;
 import com.servija.servija.dto.MessageResponse;
+import com.servija.servija.dto.NearbyFreelancerResponse;
+import com.servija.servija.exception.ResourceNotFoundException;
 import com.servija.servija.service.FreelancerService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -51,8 +52,10 @@ public class FreelancerController {
     })
     public ResponseEntity<FreelancerProfileResponse> getFreelancerPublicProfile(@PathVariable Long id) {
         try {
-            FreelancerProfileResponse profile = freelancerService.getPublicProfile(id);
+            FreelancerProfileResponse profile = freelancerService.getVisiblePublicProfile(id);
             return ResponseEntity.ok(profile);
+        } catch (ResourceNotFoundException e) {
+            return ResponseEntity.notFound().build();
         } catch (Exception e) {
             return ResponseEntity.internalServerError().build();
         }
@@ -149,11 +152,22 @@ public class FreelancerController {
             @RequestParam(defaultValue = "10") Double radius,
             
             @Parameter(description = "Categoria de serviço para filtrar (opcional)")
-            @RequestParam(required = false) String category
+            @RequestParam(required = false) String category,
+
+            @RequestParam(required = false, name = "q") String query,
+            @RequestParam(required = false) Long categoryId,
+            @RequestParam(required = false) String categorySlug,
+            @RequestParam(required = false) Long subcategoryId,
+            @RequestParam(required = false) String subcategorySlug,
+            @RequestParam(required = false) BigDecimal minRating,
+            @RequestParam(required = false) Boolean available,
+            @RequestParam(required = false) String city,
+            @RequestParam(required = false) String state
     ) {
         try {
             List<NearbyFreelancerResponse> nearbyFreelancers = freelancerService.findNearbyFreelancers(
-                    latitude, longitude, radius, category
+                    latitude, longitude, radius, category, query, categoryId, categorySlug,
+                    subcategoryId, subcategorySlug, minRating, available, city, state
             );
             return ResponseEntity.ok(nearbyFreelancers);
         } catch (Exception e) {

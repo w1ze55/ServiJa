@@ -32,6 +32,21 @@ const props = defineProps<Props>();
 const getInitials = (name: string) =>
   name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
 
+const getDisplayLocation = (freelancer: Freelancer) => {
+  if (freelancer.location?.trim()) {
+    return freelancer.location.trim();
+  }
+
+  const city = freelancer.city?.trim();
+  const state = freelancer.state?.trim();
+
+  if (city && state) {
+    return `${city}, ${state}`;
+  }
+
+  return city || state || 'Localização não informada';
+};
+
 const handleCardClick = () => {
   props.onViewProfile(props.freelancer.id);
 };
@@ -93,7 +108,7 @@ const handleToggleFavorite = (e: MouseEvent) => {
       <div class="flex items-center gap-1 text-[#435574]">
         <MapPin class="h-3 w-3" />
         <span class="text-xs truncate">
-          {{ freelancer.location || `${freelancer.city || 'Local'}, ${freelancer.state || ''}` }}
+          {{ getDisplayLocation(freelancer) }}
         </span>
       </div>
 

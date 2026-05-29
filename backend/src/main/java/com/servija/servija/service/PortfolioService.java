@@ -10,6 +10,7 @@ import com.servija.servija.model.PortfolioImage;
 import com.servija.servija.model.PortfolioProject;
 import com.servija.servija.repository.PortfolioImageRepository;
 import com.servija.servija.repository.PortfolioProjectRepository;
+import com.servija.servija.util.PublicVisibilityRules;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -17,7 +18,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -31,6 +34,7 @@ public class PortfolioService {
     private final FileStorageService fileStorageService;
     private final ObjectMapper objectMapper;
     private final CategoryCatalogService categoryCatalogService;
+    private final AuditLogger auditLogger;
 
     @Transactional(readOnly = true)
     public List<PortfolioProjectResponse> getProjects() {
@@ -45,6 +49,7 @@ public class PortfolioService {
     public List<PortfolioProjectResponse> getPublicProjects(Long freelancerId) {
         List<PortfolioProject> projects = projectRepository.findByFreelancerIdOrderByCreatedAtDesc(freelancerId);
         return projects.stream()
+                .filter(project -> PublicVisibilityRules.isFreelancerPublic(project.getFreelancer()))
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
@@ -118,6 +123,7 @@ public class PortfolioService {
                 });
 
         log.info("Projeto encontrado: {}", project.getTitle());
+        Map<String, Object> beforeState = buildPortfolioAuditState(project);
 
         // Atualizar campos
         if (request.getTitle() != null) {
@@ -195,6 +201,7 @@ public class PortfolioService {
         }
 
         project = projectRepository.save(project);
+        recordPortfolioAudit(project, beforeState);
         log.info("Projeto atualizado com sucesso: {}", project.getId());
         return mapToResponse(project);
     }
@@ -209,6 +216,7 @@ public class PortfolioService {
         List<String> imageUrls = project.getImages().stream()
                 .map(PortfolioImage::getImageUrl)
                 .collect(Collectors.toList());
+        PortfolioProjectResponse deletedProject = mapToResponse(project);
 
         projectRepository.delete(project);
 
@@ -222,6 +230,17 @@ public class PortfolioService {
                 }
             }
         }
+
+        auditLogger.recordSemantic(
+                "PORTFOLIO_DELETED",
+                "PORTFOLIO",
+                String.valueOf(projectId),
+                deletedProject.getTitle(),
+                com.servija.servija.model.AuditLog.Result.SUCCESS,
+                null,
+                deletedProject,
+                null,
+                null);
     }
 
     private boolean isS3Url(String url) {
@@ -291,5 +310,49 @@ public class PortfolioService {
                 true,
                 false,
                 false);
+    }
+
+    private void recordPortfolioAudit(PortfolioProject project, Map<String, Object> beforeState) {
+        Map<String, Object> afterState = buildPortfolioAuditState(project);
+        List<String> changedFields = AuditStateDiffUtils.changedFields(beforeState, afterState);
+        if (changedFields.isEmpty()) {
+            return;
+        }
+        auditLogger.recordSemantic(
+                "PORTFOLIO_UPDATED",
+                "PORTFOLIO",
+                String.valueOf(project.getId()),
+                project.getTitle(),
+                com.servija.servija.model.AuditLog.Result.SUCCESS,
+                Map.of("fieldsChanged", changedFields),
+                AuditStateDiffUtils.filterFields(beforeState, changedFields),
+                AuditStateDiffUtils.filterFields(afterState, changedFields));
+    }
+
+    private Map<String, Object> buildPortfolioAuditState(PortfolioProject project) {
+        PortfolioProjectResponse response = mapToResponse(project);
+        Map<String, Object> state = new LinkedHashMap<>();
+        state.put("title", response.getTitle());
+        state.put("description", response.getDescription());
+        state.put("category", response.getCategoryLabel());
+        state.put("subcategory", response.getSubcategoryLabel());
+        state.put("tags", response.getTags());
+        state.put("videoUrl", response.getVideoUrl());
+        state.put("projectUrl", response.getProjectUrl());
+        state.put("completedDate", response.getCompletedDate());
+        state.put("client", response.getClient());
+        state.put("featured", response.getFeatured());
+        state.put("images", response.getImages() == null
+                ? List.of()
+                : response.getImages().stream()
+                .map(image -> {
+                    Map<String, Object> imageState = new LinkedHashMap<>();
+                    imageState.put("imageUrl", image.getImageUrl());
+                    imageState.put("caption", image.getCaption());
+                    imageState.put("displayOrder", image.getDisplayOrder());
+                    return imageState;
+                })
+                .toList());
+        return state;
     }
 }

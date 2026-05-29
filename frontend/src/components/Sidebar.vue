@@ -47,7 +47,6 @@ export type Page =
 
   | 'freelancer-portfolio'
 
-  | 'freelancer-kyc'
   | 'freelancer-account-settings'
   | 'add-address'
   | 'request-quote'

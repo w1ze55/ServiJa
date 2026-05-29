@@ -18,7 +18,6 @@ export const freelancerRoutes: Record<string, string> = {
 
   'freelancer-portfolio': '/freelancer-portfolio',
 
-  'freelancer-kyc': '/freelancer-kyc',
   'freelancer-account-settings': '/freelancer-account-settings',
   'my-account': '/freelancer-profile-settings',
   'messages': '/messages',
@@ -52,6 +51,8 @@ export const clientRoutes: Record<string, string> = {
 export const adminRoutes: Record<string, string> = {
   'home': '/admin/categories',
   'admin-categories': '/admin/categories',
+  'admin-users': '/admin/users',
+  'users': '/admin/users',
 };
 
 // Função para obter a rota baseada no tipo de usuário

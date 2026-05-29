@@ -262,6 +262,10 @@ const goBack = () => {
   router.push({ name: 'provider-profile', params: { providerId: props.providerId } });
 };
 
+const goToProviderProfile = () => {
+  router.push(`/provider-profile/${props.providerId}`);
+};
+
 const handleShare = () => {
   const url = window.location.href;
   if (navigator.share) {
@@ -554,7 +558,7 @@ onMounted(() => {
             <!-- Description -->
             <Card class="p-6">
               <h2 class="text-lg font-bold text-[#263238] mb-4">Sobre o Serviço</h2>
-              <p class="text-[#435574] leading-relaxed whitespace-pre-line">{{ service.description }}</p>
+              <p class="text-[#435574] leading-relaxed whitespace-pre-line break-words">{{ service.description }}</p>
             </Card>
 
             <!-- What's included -->
@@ -593,7 +597,7 @@ onMounted(() => {
             </div>
 
             <!-- ── Reviews Section ──────────────────────────── -->
-            <ReviewList :reviews="reviews" :is-loading="isLoadingReviews" />
+            <ReviewList :reviews="reviews" :is-loading="isLoadingReviews" :freelancer-id="props.providerId" />
           </div>
 
           <!-- ── Right sidebar (sticky) ───────────────────────── -->
@@ -660,7 +664,7 @@ onMounted(() => {
                   <Badge v-else variant="secondary">Indisponível</Badge>
                 </div>
 
-                <Button variant="outline" class="w-full text-primary border-primary/30" @click="goBack">
+                <Button variant="outline" class="w-full text-primary border-primary/30" @click="goToProviderProfile">
                   Ver perfil completo
                 </Button>
               </Card>

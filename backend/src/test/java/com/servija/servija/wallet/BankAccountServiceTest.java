@@ -6,6 +6,7 @@ import com.servija.servija.model.FreelancerBankAccount;
 import com.servija.servija.model.User;
 import com.servija.servija.repository.FreelancerBankAccountRepository;
 import com.servija.servija.repository.UserRepository;
+import com.servija.servija.service.AuditLogger;
 import com.servija.servija.service.BankAccountService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -30,6 +31,9 @@ class BankAccountServiceTest {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private AuditLogger auditLogger;
 
     @InjectMocks
     private BankAccountService bankAccountService;
@@ -145,7 +149,7 @@ class BankAccountServiceTest {
 
             assertThatThrownBy(() -> bankAccountService.createAccount("freelancer@test.com", dto))
                     .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessageContaining("bancários");
+                    .hasMessageContaining("bancarios");
         }
     }
 

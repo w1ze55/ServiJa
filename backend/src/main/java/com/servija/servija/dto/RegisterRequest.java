@@ -1,11 +1,20 @@
 package com.servija.servija.dto;
 
 import com.servija.servija.model.User;
-import jakarta.validation.constraints.*;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.AssertTrue;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Past;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
+import java.time.LocalDate;
 
 @Data
 @Builder
@@ -30,6 +39,10 @@ public class RegisterRequest {
     @Pattern(regexp = "\\d{10,11}", message = "Telefone deve conter 10 ou 11 dígitos")
     private String phone;
 
+    @NotNull(message = "Data de nascimento é obrigatória")
+    @Past(message = "Data de nascimento inválida")
+    private LocalDate birthDate;
+
     @NotBlank(message = "Senha é obrigatória")
     @Size(min = 8, max = 256, message = "Senha deve ter entre 8 e 256 caracteres")
     @Pattern(
@@ -41,8 +54,15 @@ public class RegisterRequest {
     @NotNull(message = "Tipo de usuário é obrigatório")
     private User.UserType userType;
 
+    @Valid
+    @NotNull(message = "Endereço é obrigatório")
+    private AddressRequest address;
+
+    @AssertTrue(message = "Você deve ter pelo menos 18 anos para se cadastrar")
+    public boolean isMinimumAgeValid() {
+        return birthDate != null && !birthDate.isAfter(LocalDate.now().minusYears(18));
+    }
+
     @AssertTrue(message = "Você deve aceitar os termos e condições")
     private Boolean acceptTerms;
 }
-
-

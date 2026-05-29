@@ -9,6 +9,7 @@ export interface PaymentRequest {
     name: string;
     expiry: string;
     cvv: string;
+    installmentCount: number;
   };
 }
 
@@ -16,7 +17,12 @@ export interface Payment {
   id: string;
   serviceRequestId: string;
   amount: number;
+  platformFee?: number;
+  installmentFee?: number;
+  gatewayFee?: number;
+  totalAmount?: number;
   paymentMethod: string;
+  installmentCount?: number;
   status: 'pending' | 'processing' | 'completed' | 'failed' | 'refunded';
   transactionId?: string;
   pixQrCode?: string;

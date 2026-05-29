@@ -24,7 +24,6 @@ import Button from '../ui/button.vue';
 import DropdownMenu from '../ui/dropdown-menu.vue';
 import DropdownMenuContent from '../ui/dropdown-menu-content.vue';
 import DropdownMenuItem from '../ui/dropdown-menu-item.vue';
-import DropdownMenuTrigger from '../ui/dropdown-menu-trigger.vue';
 import Input from '../ui/input.vue';
 import Label from '../ui/label.vue';
 import Separator from '../ui/separator.vue';
@@ -76,6 +75,7 @@ const customDateTo = ref('');
 const showWithdrawModal = ref(false);
 const showAddAccountModal = ref(false);
 const isProcessing = ref(false);
+const reportMenuOpen = ref(false);
 
 // Withdraw form
 const withdrawAmount = ref('');
@@ -826,14 +826,17 @@ onMounted(loadData);
           <p class="text-[#435574]">Gerencie seus ganhos, contas e saques</p>
         </div>
         <div class="flex gap-3">
-          <DropdownMenu>
-            <DropdownMenuTrigger>
-              <Button variant="outline" size="sm">
-            <Download class="h-4 w-4 mr-2" />
-            Exportar Relatório
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" class="min-w-[12rem]">
+          <DropdownMenu :open="reportMenuOpen" @update:open="reportMenuOpen = $event">
+            <Button
+              variant="outline"
+              size="sm"
+              type="button"
+              @click.stop="reportMenuOpen = !reportMenuOpen"
+            >
+              <Download class="h-4 w-4 mr-2" />
+              Exportar Relatório
+            </Button>
+            <DropdownMenuContent align="end" class="z-[9999] min-w-[12rem] bg-white text-[#263238]">
               <DropdownMenuItem @click="handleDownloadReport('PDF')">
                 Exportar em PDF
               </DropdownMenuItem>

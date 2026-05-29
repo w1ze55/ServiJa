@@ -30,6 +30,7 @@ public class DeliveryAdjustmentService {
     private final ServiceRequestHistoryService historyService;
     private final WebSocketService notificationService;
     private final NotificationService persistedNotificationService;
+    private final AuditLogger auditLogger;
 
     @Transactional
     public DeliveryAdjustmentResponse requestAdjustment(Long serviceRequestId, DeliveryAdjustmentRequest request, String contractorEmail) {
@@ -190,6 +191,8 @@ public class DeliveryAdjustmentService {
             throw new RuntimeException("Só é possível deletar ajustes pendentes");
         }
 
+        DeliveryAdjustmentResponse deletedAdjustment = toResponse(adjustment);
+
         // Notificar freelancer via WebSocket antes de deletar
         if (adjustment.getServiceRequest().getFreelancer() != null) {
             notificationService.notifyServiceRequestUpdate(
@@ -203,6 +206,17 @@ public class DeliveryAdjustmentService {
         adjustmentRepository.delete(adjustment);
 
         log.info("Ajuste {} deletado por {}", adjustmentId, userEmail);
+
+        auditLogger.recordSemantic(
+                "ADJUSTMENT_DELETED",
+                "ADJUSTMENT",
+                String.valueOf(adjustmentId),
+                "Ajuste " + adjustmentId,
+                com.servija.servija.model.AuditLog.Result.SUCCESS,
+                null,
+                deletedAdjustment,
+                null,
+                null);
     }
 
     private DeliveryAdjustmentResponse toResponse(DeliveryAdjustment adjustment) {

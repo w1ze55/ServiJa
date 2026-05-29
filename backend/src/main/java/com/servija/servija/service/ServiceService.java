@@ -5,6 +5,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.servija.servija.dto.ServiceRequest;
 import com.servija.servija.dto.ServiceResponse;
+import com.servija.servija.exception.ResourceNotFoundException;
 import com.servija.servija.model.Freelancer;
 import com.servija.servija.model.Service;
 import com.servija.servija.model.User;
@@ -13,6 +14,7 @@ import com.servija.servija.repository.ReviewRepository;
 import com.servija.servija.repository.ServiceRepository;
 import com.servija.servija.repository.ServiceRequestRepository;
 import com.servija.servija.repository.UserRepository;
+import com.servija.servija.util.PublicVisibilityRules;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
@@ -40,6 +42,7 @@ public class ServiceService {
     private final ReviewRepository reviewRepository;
     private final ObjectMapper objectMapper;
     private final CategoryCatalogService categoryCatalogService;
+    private final AuditLogger auditLogger;
     private static final BigDecimal AVERAGE_PRICE_RANGE_SPREAD = new BigDecimal("0.20");
 
     /**
@@ -128,6 +131,8 @@ public class ServiceService {
             throw new RuntimeException("Você não tem permissão para editar este serviço");
         }
 
+        java.util.Map<String, Object> beforeState = buildServiceAuditState(service);
+
         // Atualizar campos
         if (request.getTitle() != null) {
             service.setTitle(request.getTitle());
@@ -188,6 +193,7 @@ public class ServiceService {
         }
 
         service = serviceRepository.save(service);
+        recordServiceUpdateAudit(beforeState, service);
         log.info("Serviço atualizado: {}", service.getId());
 
         return toResponse(service);
@@ -210,6 +216,7 @@ public class ServiceService {
 
         // Coletar URLs das imagens para deletar do S3
         List<String> imageUrls = fromJson(service.getImages());
+        ServiceResponse deletedService = toResponse(service);
 
         serviceRepository.delete(service);
         log.info("Serviço excluído: {}", id);
@@ -224,6 +231,17 @@ public class ServiceService {
                 }
             }
         }
+
+        auditLogger.recordSemantic(
+                "SERVICE_DELETED",
+                "SERVICE",
+                String.valueOf(id),
+                deletedService.getTitle(),
+                com.servija.servija.model.AuditLog.Result.SUCCESS,
+                null,
+                deletedService,
+                null,
+                null);
     }
 
     private boolean isS3Url(String url) {
@@ -245,8 +263,18 @@ public class ServiceService {
             throw new RuntimeException("Você não tem permissão para alterar este serviço");
         }
 
+        boolean previousStatus = Boolean.TRUE.equals(service.getIsActive());
         service.setIsActive(!service.getIsActive());
         service = serviceRepository.save(service);
+        auditLogger.recordSemantic(
+                Boolean.TRUE.equals(service.getIsActive()) ? "SERVICE_ACTIVATED" : "SERVICE_DEACTIVATED",
+                "SERVICE",
+                String.valueOf(service.getId()),
+                service.getTitle(),
+                com.servija.servija.model.AuditLog.Result.SUCCESS,
+                java.util.Map.of("fieldsChanged", java.util.List.of("status")),
+                java.util.Map.of("status", statusLabel(previousStatus)),
+                java.util.Map.of("status", statusLabel(Boolean.TRUE.equals(service.getIsActive()))));
         log.info("Status do serviço {} alterado para: {}", id, service.getIsActive());
 
         return toResponse(service);
@@ -450,8 +478,36 @@ public class ServiceService {
         return response;
     }
 
+    @Transactional(readOnly = true)
+    public ServiceResponse getVisiblePublicServiceById(Long id) {
+        return toResponse(requirePublicService(id));
+    }
+
+    @Transactional(readOnly = true)
+    public ServiceResponse getVisiblePublicServiceByIdWithPricing(Long id) {
+        return toPublicResponse(requirePublicService(id));
+    }
+
+    private Service requirePublicService(Long id) {
+        Service service = serviceRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Serviço não encontrado"));
+
+        if (!isPubliclyVisible(service)) {
+            throw new ResourceNotFoundException("Serviço não encontrado");
+        }
+
+        return service;
+    }
+
     private List<ServiceResponse> toPublicResponses(List<Service> services) {
-        return services.stream().map(this::toPublicResponse).collect(Collectors.toList());
+        return services.stream()
+                .filter(this::isPubliclyVisible)
+                .map(this::toPublicResponse)
+                .collect(Collectors.toList());
+    }
+
+    boolean isPubliclyVisible(Service service) {
+        return PublicVisibilityRules.isServicePublic(service);
     }
 
     private void populateServiceReviewSummary(Long serviceId, ServiceResponse response) {
@@ -522,5 +578,47 @@ public class ServiceService {
         private Long total;
         private Long active;
         private Long inactive;
+    }
+
+    private java.util.Map<String, Object> buildServiceAuditState(Service service) {
+        java.util.Map<String, Object> state = new java.util.LinkedHashMap<>();
+        state.put("title", service.getTitle());
+        state.put("category", service.getServiceCategory() != null
+                ? service.getServiceCategory().getName()
+                : service.getCategory());
+        state.put("subcategory", service.getServiceSubcategory() != null
+                ? service.getServiceSubcategory().getName()
+                : null);
+        state.put("description", service.getDescription());
+        state.put("price", service.getPrice());
+        state.put("priceType", service.getPriceType() != null ? service.getPriceType().name() : null);
+        state.put("deliveryTime", service.getDeliveryTime());
+        state.put("deliveryUnit", service.getDeliveryUnit() != null ? service.getDeliveryUnit().name() : null);
+        state.put("workModel", service.getWorkModel() != null ? service.getWorkModel().name() : null);
+        state.put("tags", fromJson(service.getTags()));
+        state.put("images", fromJson(service.getImages()));
+        state.put("status", statusLabel(Boolean.TRUE.equals(service.getIsActive())));
+        return state;
+    }
+
+    private void recordServiceUpdateAudit(java.util.Map<String, Object> beforeState, Service service) {
+        java.util.Map<String, Object> afterState = buildServiceAuditState(service);
+        List<String> changedFields = AuditStateDiffUtils.changedFields(beforeState, afterState);
+        if (changedFields.isEmpty()) {
+            return;
+        }
+        auditLogger.recordSemantic(
+                "SERVICE_UPDATED",
+                "SERVICE",
+                String.valueOf(service.getId()),
+                service.getTitle(),
+                com.servija.servija.model.AuditLog.Result.SUCCESS,
+                java.util.Map.of("fieldsChanged", changedFields),
+                AuditStateDiffUtils.filterFields(beforeState, changedFields),
+                AuditStateDiffUtils.filterFields(afterState, changedFields));
+    }
+
+    private String statusLabel(boolean active) {
+        return active ? "ACTIVE" : "INACTIVE";
     }
 }

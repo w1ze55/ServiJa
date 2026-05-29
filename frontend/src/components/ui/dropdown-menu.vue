@@ -2,11 +2,24 @@
 import { ref, provide, computed } from 'vue';
 
 interface Props {
+  open?: boolean;
   [key: string]: any;
 }
 
 const props = defineProps<Props>();
-const isOpen = ref(false);
+const emit = defineEmits<{ 'update:open': [value: boolean] }>();
+
+const internalOpen = ref(false);
+const isOpen = computed({
+  get: () => (props.open !== undefined ? props.open : internalOpen.value),
+  set: (val: boolean) => {
+    if (props.open !== undefined) {
+      emit('update:open', val);
+    } else {
+      internalOpen.value = val;
+    }
+  },
+});
 const triggerRef = ref<HTMLElement | null>(null);
 
 provide('dropdownMenu', {

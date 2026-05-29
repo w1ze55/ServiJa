@@ -121,10 +121,17 @@ const loadServices = async () => {
   isLoading.value = true;
   error.value = '';
   try {
+    const hasSearchQuery = !!searchQuery.value.trim();
     const response = await api.get('/services/public/all', {
       params: {
-        categorySlug: selectedCategory.value !== 'all' ? selectedCategory.value : undefined,
-        subcategorySlug: selectedSubcategory.value !== 'all' ? selectedSubcategory.value : undefined,
+        categorySlug:
+          !hasSearchQuery && selectedCategory.value !== 'all'
+            ? selectedCategory.value
+            : undefined,
+        subcategorySlug:
+          !hasSearchQuery && selectedSubcategory.value !== 'all'
+            ? selectedSubcategory.value
+            : undefined,
         q: searchQuery.value.trim() || undefined,
       },
     });
