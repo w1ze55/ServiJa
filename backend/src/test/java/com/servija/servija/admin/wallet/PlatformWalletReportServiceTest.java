@@ -100,13 +100,13 @@ class PlatformWalletReportServiceTest {
             assertThat(workbook.getSheetAt(0).getRow(6).getCell(0).getStringCellValue())
                     .isEqualTo("Receita liquida acumulada");
             assertThat(workbook.getSheetAt(0).getRow(6).getCell(1).getStringCellValue())
-                    .isEqualTo("R$ 504.81");
+                    .isEqualTo("R$ 504,81");
             assertThat(workbook.getSheetAt(0).getRow(9).getCell(1).getStringCellValue())
-                    .isEqualTo("R$ 80.00");
+                    .isEqualTo("R$ 80,00");
             assertThat(workbook.getSheetAt(1).getRow(1).getCell(0).getStringCellValue())
                     .isEqualTo("Receita liquida");
             assertThat(workbook.getSheetAt(1).getRow(1).getCell(4).getStringCellValue())
-                    .isEqualTo("R$ 4.81");
+                    .isEqualTo("R$ 4,81");
         }
     }
 
