@@ -10,24 +10,26 @@ import com.servija.servija.exception.InvalidCredentialsException;
 import com.servija.servija.exception.ResourceNotFoundException;
 import com.servija.servija.model.Contractor;
 import com.servija.servija.model.Freelancer;
-import com.servija.servija.model.User;
 import com.servija.servija.model.ServiceRequest;
+import com.servija.servija.model.User;
 import com.servija.servija.repository.ContractorRepository;
 import com.servija.servija.repository.FreelancerRepository;
 import com.servija.servija.repository.ReviewRepository;
 import com.servija.servija.repository.ServiceRequestRepository;
 import com.servija.servija.repository.UserRepository;
-
-import java.math.BigDecimal;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 
 @Service
 @Slf4j
@@ -48,39 +50,27 @@ public class UserService {
     @Transactional
     public void changePassword(String email, ChangePasswordRequest request) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Usuario nao encontrado"));
 
-        // Validar senha atual
-        var previousUpdatedAt = user.getUpdatedAt();
+        LocalDateTime previousUpdatedAt = user.getUpdatedAt();
 
         if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
             throw new InvalidCredentialsException("Senha atual incorreta");
         }
 
-        // Validar que as senhas coincidem
         if (!request.getNewPassword().equals(request.getConfirmPassword())) {
-            throw new IllegalArgumentException("As senhas não coincidem");
+            throw new IllegalArgumentException("As senhas nao coincidem");
         }
 
-        // Validar força da senha (mesmas regras do registro)
         String newPassword = request.getNewPassword();
         if (!isValidPassword(newPassword)) {
             throw new IllegalArgumentException(
-                    "A senha deve ter no mínimo 8 caracteres e conter pelo menos: " +
-                            "1 letra maiúscula, 1 letra minúscula, 1 número e 1 caractere especial");
+                    "A senha deve ter no minimo 8 caracteres e conter pelo menos: "
+                            + "1 letra maiuscula, 1 letra minuscula, 1 numero e 1 caractere especial");
         }
 
-        // Atualizar senha
         user.setPassword(passwordEncoder.encode(newPassword));
-
-        // Salvar no repositório apropriado
-        if (user instanceof Contractor) {
-            user = contractorRepository.save((Contractor) user);
-        } else if (user instanceof Freelancer) {
-            user = freelancerRepository.save((Freelancer) user);
-        } else {
-            user = userRepository.save(user);
-        }
+        user = userRepository.save(user);
 
         auditLogger.recordSemantic(
                 "PASSWORD_CHANGED",
@@ -96,30 +86,23 @@ public class UserService {
     @Transactional
     public AuthResponse.UserDto updateAvatar(String email, UpdateAvatarRequest request) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Usuario nao encontrado"));
 
         String oldAvatarUrl = user.getAvatarUrl();
         String finalAvatarUrl = null;
 
-        // Prioridade 1: URL S3 (se fornecida)
         if (request.getAvatarUrl() != null && !request.getAvatarUrl().isEmpty()) {
             finalAvatarUrl = request.getAvatarUrl();
-        }
-        // Prioridade 2: Base64 (se fornecida e URL não existir)
-        else if (request.getAvatarBase64() != null && !request.getAvatarBase64().isEmpty()) {
+        } else if (request.getAvatarBase64() != null && !request.getAvatarBase64().isEmpty()) {
             String base64 = request.getAvatarBase64();
-
-            // Remover prefixo data:image se existir
             if (base64.contains(",")) {
                 base64 = base64.substring(base64.indexOf(",") + 1);
             }
 
-            // Validar tamanho (limite de 5MB em base64 = ~3.75MB original)
-            if (base64.length() > 6_700_000) { // ~5MB em base64
-                throw new IllegalArgumentException("Imagem muito grande. Tamanho máximo: 5MB");
+            if (base64.length() > 6_700_000) {
+                throw new IllegalArgumentException("Imagem muito grande. Tamanho maximo: 5MB");
             }
 
-            // Adicionar prefixo data:image/jpeg para facilitar exibição no frontend
             if (!request.getAvatarBase64().startsWith("data:image")) {
                 finalAvatarUrl = "data:image/jpeg;base64," + base64;
             } else {
@@ -132,14 +115,11 @@ public class UserService {
         }
 
         entityManager.createNativeQuery(
-                "UPDATE users SET avatar_url = :avatarUrl, updated_at = NOW() WHERE id = :userId")
+                        "UPDATE users SET avatar_url = :avatarUrl, updated_at = NOW() WHERE id = :userId")
                 .setParameter("avatarUrl", finalAvatarUrl)
                 .setParameter("userId", user.getId())
                 .executeUpdate();
 
-        // Se o avatar antigo era um arquivo no S3 e for diferente do novo, deletamos o
-        // antigo
-        // Isso evita acumular arquivos órfãos no S3
         if (oldAvatarUrl != null && !oldAvatarUrl.equals(finalAvatarUrl) && isS3Url(oldAvatarUrl)) {
             try {
                 fileStorageService.deleteFile(oldAvatarUrl);
@@ -148,23 +128,21 @@ public class UserService {
             }
         }
 
-        // Forçar flush para garantir que foi salvo
         entityManager.flush();
-        entityManager.clear(); // Limpar cache do Hibernate
+        entityManager.clear();
 
-        // Recarregar o usuário atualizado do banco
         User updatedUser = userRepository.findById(user.getId())
-                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado após atualização"));
+                .orElseThrow(() -> new ResourceNotFoundException("Usuario nao encontrado apos atualizacao"));
 
         webSocketService.notifyProfileImageUpdate(email, finalAvatarUrl);
-        if (!java.util.Objects.equals(summarizeAvatarValue(oldAvatarUrl), summarizeAvatarValue(updatedUser.getAvatarUrl()))) {
+        if (!Objects.equals(summarizeAvatarValue(oldAvatarUrl), summarizeAvatarValue(updatedUser.getAvatarUrl()))) {
             auditLogger.recordSemantic(
                     "AVATAR_UPDATED",
                     "USER",
                     String.valueOf(updatedUser.getId()),
                     updatedUser.getName(),
                     com.servija.servija.model.AuditLog.Result.SUCCESS,
-                    java.util.Map.of("fieldsChanged", java.util.List.of("avatarUrl")),
+                    Map.of("fieldsChanged", List.of("avatarUrl")),
                     singleFieldState("avatarUrl", summarizeAvatarValue(oldAvatarUrl)),
                     singleFieldState("avatarUrl", summarizeAvatarValue(updatedUser.getAvatarUrl())));
         }
@@ -175,25 +153,13 @@ public class UserService {
     @Transactional
     public void deleteAccount(String email, DeleteAccountRequest request) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Usuario nao encontrado"));
 
-        // Validar senha antes de excluir
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            throw new InvalidCredentialsException("Senha incorreta. A conta não foi excluída.");
+            throw new InvalidCredentialsException("Senha incorreta. A conta nao foi excluida.");
         }
 
         Map<String, Object> deletedUser = buildUserAuditState(user);
-
-        // Deletar do repositório apropriado
-        // Com JOINED inheritance, deletar do UserRepository deve deletar também a
-        // entidade filha
-        if (user instanceof Contractor) {
-            contractorRepository.delete((Contractor) user);
-        } else if (user instanceof Freelancer) {
-            freelancerRepository.delete((Freelancer) user);
-        }
-        // O Hibernate gerencia a exclusão da tabela pai (users) automaticamente
-        // Mas para garantir, vamos deletar explicitamente do UserRepository também
         userRepository.delete(user);
 
         auditLogger.recordSemantic(
@@ -208,32 +174,17 @@ public class UserService {
                 null);
     }
 
-    private boolean isValidPassword(String password) {
-        if (password == null || password.length() < 8 || password.length() > 256) {
-            return false;
-        }
-
-        boolean hasUpperCase = password.chars().anyMatch(Character::isUpperCase);
-        boolean hasLowerCase = password.chars().anyMatch(Character::isLowerCase);
-        boolean hasDigit = password.chars().anyMatch(Character::isDigit);
-        boolean hasSpecial = password.chars().anyMatch(ch -> "!@#$%^&*(),.?\":{}|<>".indexOf(ch) >= 0);
-
-        return hasUpperCase && hasLowerCase && hasDigit && hasSpecial;
-    }
-
     public AuthResponse.UserDto getCurrentUser(String email) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
-
+                .orElseThrow(() -> new ResourceNotFoundException("Usuario nao encontrado"));
         return buildUserDto(user);
     }
 
     @Transactional
     public AuthResponse.UserDto updateUser(String email, UpdateUserRequest request) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Usuario nao encontrado"));
 
-        // Atualizar dados básicos
         Map<String, Object> beforeState = buildUserAuditState(user);
         user.setName(request.getName());
         user.setPhone(request.getPhone());
@@ -241,14 +192,7 @@ public class UserService {
             user.setCpf(request.getCpf());
         }
 
-        // Salvar no repositório apropriado
-        if (user instanceof com.servija.servija.model.Contractor) {
-            user = contractorRepository.save((com.servija.servija.model.Contractor) user);
-        } else if (user instanceof com.servija.servija.model.Freelancer) {
-            user = freelancerRepository.save((com.servija.servija.model.Freelancer) user);
-        } else {
-            user = userRepository.save(user);
-        }
+        user = userRepository.save(user);
 
         Map<String, Object> afterState = buildUserAuditState(user);
         List<String> changedFields = AuditStateDiffUtils.changedFields(beforeState, afterState);
@@ -269,8 +213,45 @@ public class UserService {
 
     public ProfileResponse getCurrentUserProfile(String email) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Usuario nao encontrado"));
+        return buildProfileResponse(user);
+    }
 
+    @Transactional
+    public ProfileResponse activateProfile(String email, User.UserType role) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("Usuario nao encontrado"));
+
+        if (role == null || role == User.UserType.ADMIN) {
+            throw new IllegalArgumentException("Perfil invalido para ativacao");
+        }
+
+        if (role == User.UserType.CONTRACTOR) {
+            contractorRepository.findById(user.getId()).orElseGet(() -> contractorRepository.save(
+                    Contractor.builder()
+                            .user(user)
+                            .totalContracts(0)
+                            .activeContracts(0)
+                            .completedContracts(0)
+                            .build()));
+        } else {
+            freelancerRepository.findById(user.getId()).orElseGet(() -> freelancerRepository.save(
+                    Freelancer.builder()
+                            .user(user)
+                            .totalReviews(0)
+                            .completedJobs(0)
+                            .activeJobs(0)
+                            .profileCompleted(false)
+                            .available(true)
+                            .build()));
+        }
+
+        user.addRole(role);
+        userRepository.save(user);
+        return buildProfileResponse(user);
+    }
+
+    private ProfileResponse buildProfileResponse(User user) {
         ProfileResponse.ProfileResponseBuilder builder = ProfileResponse.builder()
                 .id(user.getId())
                 .name(user.getName())
@@ -279,21 +260,28 @@ public class UserService {
                 .phone(user.getPhone())
                 .birthDate(user.getBirthDate())
                 .userType(user.getUserType())
+                .activeRole(user.getActiveRole())
+                .roles(user.getRoles())
                 .emailVerified(user.getEmailVerified())
                 .avatarUrl(user.getAvatarUrl())
                 .active(user.getActive())
                 .createdAt(user.getCreatedAt())
                 .updatedAt(user.getUpdatedAt());
 
-        // Adicionar dados específicos baseado no tipo
-        if (user instanceof Contractor) {
-            Contractor contractor = (Contractor) user;
+        contractorRepository.findById(user.getId()).ifPresent(contractor -> {
             Double contractorAvg = reviewRepository.findAverageRatingByReviewedId(contractor.getId());
             long contractorReviewCount = reviewRepository.countByReviewedId(contractor.getId());
-            long completed = serviceRequestRepository.countByContractorIdAndStatus(contractor.getId(), ServiceRequest.Status.COMPLETED);
-            long active = serviceRequestRepository.countByContractorIdAndStatusIn(contractor.getId(),
-                    List.of(ServiceRequest.Status.ACCEPTED, ServiceRequest.Status.IN_PROGRESS, ServiceRequest.Status.DELIVERED));
+            long completed = serviceRequestRepository.countByContractorIdAndStatus(
+                    contractor.getId(),
+                    ServiceRequest.Status.COMPLETED);
+            long active = serviceRequestRepository.countByContractorIdAndStatusIn(
+                    contractor.getId(),
+                    List.of(
+                            ServiceRequest.Status.ACCEPTED,
+                            ServiceRequest.Status.IN_PROGRESS,
+                            ServiceRequest.Status.DELIVERED));
             long total = active + completed;
+
             builder.contractorProfile(ProfileResponse.ContractorProfile.builder()
                     .preferredLocation(contractor.getPreferredLocation())
                     .totalContracts((int) total)
@@ -302,13 +290,12 @@ public class UserService {
                     .contractorRating(contractorAvg != null ? BigDecimal.valueOf(contractorAvg) : null)
                     .contractorTotalReviews(contractorReviewCount)
                     .build());
-        } else if (user instanceof Freelancer) {
-            Freelancer freelancer = (Freelancer) user;
-            
-            // Calcular média das avaliações e total de reviews a partir da tabela reviews
+        });
+
+        freelancerRepository.findById(user.getId()).ifPresent(freelancer -> {
             Double averageRating = reviewRepository.findAverageRatingByReviewedId(freelancer.getId());
             long totalReviewsCount = reviewRepository.countByReviewedId(freelancer.getId());
-            
+
             builder.freelancerProfile(ProfileResponse.FreelancerProfile.builder()
                     .bio(freelancer.getBio())
                     .professionalTitle(freelancer.getProfessionalTitle())
@@ -320,7 +307,7 @@ public class UserService {
                     .profileCompleted(freelancer.getProfileCompleted())
                     .available(freelancer.getAvailable())
                     .build());
-        }
+        });
 
         return builder.build();
     }
@@ -334,11 +321,26 @@ public class UserService {
                 .phone(user.getPhone())
                 .birthDate(user.getBirthDate())
                 .userType(user.getUserType())
+                .activeRole(user.getActiveRole())
+                .roles(user.getRoles())
                 .emailVerified(user.getEmailVerified())
                 .avatarUrl(user.getAvatarUrl())
                 .active(user.getActive())
                 .createdAt(user.getCreatedAt())
                 .build();
+    }
+
+    private boolean isValidPassword(String password) {
+        if (password == null || password.length() < 8 || password.length() > 256) {
+            return false;
+        }
+
+        boolean hasUpperCase = password.chars().anyMatch(Character::isUpperCase);
+        boolean hasLowerCase = password.chars().anyMatch(Character::isLowerCase);
+        boolean hasDigit = password.chars().anyMatch(Character::isDigit);
+        boolean hasSpecial = password.chars().anyMatch(ch -> "!@#$%^&*(),.?\":{}|<>".indexOf(ch) >= 0);
+
+        return hasUpperCase && hasLowerCase && hasDigit && hasSpecial;
     }
 
     private boolean isS3Url(String url) {

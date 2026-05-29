@@ -37,7 +37,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             @Nonnull FilterChain filterChain
     ) throws ServletException, IOException {
         String path = request.getServletPath();
-        if (path != null && path.startsWith("/api/auth/")) {
+        if (isPublicAuthPath(path)) {
             filterChain.doFilter(request, response);
             return;
         }
@@ -86,6 +86,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    private boolean isPublicAuthPath(String path) {
+        return path != null
+                && path.startsWith("/api/auth/")
+                && !"/api/auth/switch-role".equals(path);
     }
 
     private void handleBlockedAccount(HttpServletResponse response) throws IOException {

@@ -15,13 +15,41 @@ const api = axios.create({
   },
 });
 
+const PUBLIC_AUTH_ENDPOINTS = [
+  '/auth/login',
+  '/auth/admin/login',
+  '/auth/register',
+  '/auth/validate-registration',
+  '/auth/validate-address',
+  '/auth/verify-email',
+  '/auth/resend-verification',
+  '/auth/forgot-password',
+  '/auth/verify-reset-code',
+  '/auth/reset-password',
+  '/auth/resend-reset-code',
+  '/auth/admin-reset-link/validate',
+  '/auth/admin-reset-link/reset-password',
+  '/auth/2fa/verify',
+];
+
+const normalizeUrlPath = (url: string) => {
+  if (!url) {
+    return '';
+  }
+
+  const withoutQuery = url.split('?')[0];
+  return withoutQuery.startsWith('/api/')
+    ? withoutQuery.substring(4)
+    : withoutQuery;
+};
+
 // Interceptor para adicionar token de autenticação
 api.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    const url = config.url || '';
-    const isAuthEndpoint = url.startsWith('/auth/') || url.includes('/api/auth/');
+    const normalizedPath = normalizeUrlPath(config.url || '');
+    const isPublicAuthEndpoint = PUBLIC_AUTH_ENDPOINTS.includes(normalizedPath);
 
-    if (isAuthEndpoint) {
+    if (isPublicAuthEndpoint) {
       return config;
     }
 
@@ -71,4 +99,3 @@ api.interceptors.response.use(
 );
 
 export default api;
-

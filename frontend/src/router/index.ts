@@ -40,6 +40,7 @@ import ClienteProjectsPage from "@/pages/ClienteProjects/index.vue";
 import ClienteDeliveryApprovalPage from "@/pages/ClienteDeliveryApproval/index.vue";
 import ClienteProjectDetailPage from "@/pages/ClienteProjectDetail/index.vue";
 import RateFreelancerPage from "@/pages/RateFreelancer/index.vue";
+import { getLandingRouteForRole, isOwnFreelancerProfile, normalizeStoredUser } from "@/utils/userRoles";
 
 const routes: RouteRecordRaw[] = [
   // ============ ROTAS PÚBLICAS ============
@@ -338,22 +339,42 @@ const router = createRouter({
 // Guard de navegação para verificar autenticação
 router.beforeEach((to, from, next) => {
   const userString = localStorage.getItem("user");
-  const user = userString ? JSON.parse(userString) : null;
+  const rawUser = userString ? JSON.parse(userString) : null;
+  const user = normalizeStoredUser(rawUser);
   const requiredUserType = to.meta.userType;
+
+  if (user && JSON.stringify(user) !== userString) {
+    localStorage.setItem("user", JSON.stringify(user));
+  }
 
   // Se a rota requer autenticação e o usuário não está logado
   if (to.meta.requiresAuth && !user) {
     next("/login");
-  } else if (
+    return;
+  }
+
+  if (
     user &&
     requiredUserType &&
     requiredUserType !== "both" &&
     user.type !== requiredUserType
   ) {
-    next("/dashboard");
-  } else {
-    next();
+    next(getLandingRouteForRole(user.activeRole));
+    return;
   }
+
+  const providerId = Number(to.params.providerId);
+  if (
+    user &&
+    Number.isFinite(providerId) &&
+    (to.name === "provider-profile" || to.name === "service-detail") &&
+    isOwnFreelancerProfile(user, providerId)
+  ) {
+    next("/explore");
+    return;
+  }
+
+  next();
 });
 
 export default router;

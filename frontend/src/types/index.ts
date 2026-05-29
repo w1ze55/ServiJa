@@ -1,17 +1,20 @@
-// Tipos globais da aplicação
+export type UserRole = 'contractor' | 'freelancer' | 'admin';
+export type LegacyUserType = 'contractor' | 'provider' | 'admin';
 
 export interface User {
   id: string;
   name: string;
   email: string;
-  type: 'contractor' | 'provider' | 'admin';
+  type: LegacyUserType;
+  activeRole: UserRole;
+  roles: UserRole[];
   avatar?: string;
   token?: string;
 }
 
 export interface RouterMeta {
   requiresAuth?: boolean;
-  userType?: 'contractor' | 'provider' | 'admin' | 'both';
+  userType?: LegacyUserType | 'both';
 }
 
 declare module 'vue-router' {

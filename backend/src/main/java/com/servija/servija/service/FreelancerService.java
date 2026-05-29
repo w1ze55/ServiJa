@@ -60,6 +60,7 @@ public class FreelancerService {
     private final IbgeLocationService ibgeLocationService;
     private final GeocodingService geocodingService;
     private final AuditLogger auditLogger;
+    private final CurrentUserContextService currentUserContextService;
 
     @Transactional(readOnly = true)
     public FreelancerProfileResponse getProfile() {
@@ -382,6 +383,9 @@ public class FreelancerService {
 
         List<Freelancer> serviceableFreelancers = withServiceCities.stream()
                 .filter(this::isPubliclyVisible)
+                .filter(freelancer -> currentUserContextService.getOptionalAuthenticatedUser()
+                        .map(user -> user.getUserType() != User.UserType.CONTRACTOR || !user.getId().equals(freelancer.getId()))
+                        .orElse(true))
                 .filter(freelancer -> servesSearchRegion(freelancer, filters))
                 .toList();
 
@@ -447,6 +451,7 @@ public class FreelancerService {
 
     @Transactional(readOnly = true)
     public FreelancerProfileResponse getVisiblePublicProfile(Long freelancerId) {
+        currentUserContextService.denyOwnFreelancerPublicAccess(freelancerId);
         Freelancer freelancer = freelancerRepository.findByIdWithServiceCities(freelancerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Freelancer não encontrado"));
 

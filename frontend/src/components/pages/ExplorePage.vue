@@ -32,9 +32,11 @@ import FreelancerCard from '../freelancer/FreelancerCard.vue';
 import api from '@/api/config/axios';
 import { toast } from '@/utils/toast';
 import { useFavoritesStore } from '@/stores/favorites';
+import { useUserStore } from '@/stores/userStore';
 import { useCategoryCatalogStore } from '@/stores/categoryCatalogStore';
 import { getServicePriceDisplay, getServicePriceSortValue, type ServicePriceRangeData } from '@/utils/servicePricing';
 import { formatServiceRatingDisplay, hasServiceRating, type ServiceReviewSummary } from '@/utils/serviceReviews';
+import { isOwnFreelancerProfile } from '@/utils/userRoles';
 
 interface ServiceItem extends ServicePriceRangeData, ServiceReviewSummary {
   id: number;
@@ -83,6 +85,7 @@ const viewMode = ref<'grid' | 'list'>('grid');
 const freelancerProfiles = ref<Record<number, FreelancerProfileData>>({});
 
 const favoritesStore = useFavoritesStore();
+const userStore = useUserStore();
 const categoryCatalogStore = useCategoryCatalogStore();
 
 const categories = computed(() => [
@@ -150,14 +153,18 @@ const loadServices = async () => {
 };
 
 const loadFreelancerProfiles = async (freelancerIds: number[]) => {
-  if (freelancerIds.length === 0) {
+  const visibleFreelancerIds = freelancerIds.filter(
+    (freelancerId) => !isOwnFreelancerProfile(userStore.user, freelancerId),
+  );
+
+  if (visibleFreelancerIds.length === 0) {
     freelancerProfiles.value = {};
     return;
   }
 
   try {
     const profiles = await Promise.all(
-      freelancerIds.map(async (freelancerId) => {
+      visibleFreelancerIds.map(async (freelancerId) => {
         const response = await api.get(`/freelancer/${freelancerId}/profile`);
         return response.data as FreelancerProfileData;
       })
@@ -200,7 +207,9 @@ watch(selectedSubcategory, () => {
 });
 
 const filteredServices = computed(() => {
-  let result = [...services.value];
+  let result = services.value.filter(
+    (service) => !isOwnFreelancerProfile(userStore.user, service.freelancerId),
+  );
 
   switch (sortBy.value) {
     case 'price-asc':
@@ -270,10 +279,20 @@ const isFavoriteService = (id: number | string) => favoritesStore.isFavoriteServ
 const isFavoriteFreelancer = (id: number | string) => favoritesStore.isFavoriteFreelancer(id);
 
 const handleViewProfile = (providerId: string | number) => {
+  if (isOwnFreelancerProfile(userStore.user, providerId)) {
+    toast.error('Voce nao pode acessar o proprio perfil publico como cliente');
+    return;
+  }
+
   props.onNavigate('provider-profile', { providerId: Number(providerId) });
 };
 
 const handleViewService = (params: { providerId: number; serviceId: number }) => {
+  if (isOwnFreelancerProfile(userStore.user, params.providerId)) {
+    toast.error('Voce nao pode acessar o proprio servico publico como cliente');
+    return;
+  }
+
   props.onNavigate('service-detail', params);
 };
 

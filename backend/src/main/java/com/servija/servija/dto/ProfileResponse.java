@@ -9,6 +9,7 @@ import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Set;
 
 @Data
 @Builder
@@ -23,6 +24,8 @@ public class ProfileResponse {
     private String phone;
     private LocalDate birthDate;
     private User.UserType userType;
+    private User.UserType activeRole;
+    private Set<User.UserType> roles;
     private Boolean emailVerified;
     private String avatarUrl;
     private Boolean active;

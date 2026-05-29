@@ -81,7 +81,9 @@ public class ServiceRequestService {
         if (dto.getServiceId() != null) {
             selectedService = serviceRepository.findById(dto.getServiceId())
                     .orElseThrow(() -> new RuntimeException("Service not found"));
-            freelancer = selectedService.getFreelancer();
+            freelancer = selectedService.getFreelancer() != null
+                    ? selectedService.getFreelancer().getUser()
+                    : null;
         } else if (dto.getFreelancerId() != null) {
             freelancer = userRepository.findById(dto.getFreelancerId())
                     .orElseThrow(() -> new RuntimeException("Freelancer not found"));
@@ -90,6 +92,10 @@ public class ServiceRequestService {
         if (selectedService != null && dto.getFreelancerId() != null
                 && !selectedService.getFreelancer().getId().equals(dto.getFreelancerId())) {
             throw new IllegalArgumentException("O serviço selecionado não pertence ao freelancer informado");
+        }
+
+        if (freelancer != null && contractor.getId().equals(freelancer.getId())) {
+            throw new IllegalStateException("Voce nao pode enviar uma solicitacao para si mesmo");
         }
 
         String normalizedAddress = StringUtils.hasText(dto.getAddress()) ? dto.getAddress().trim() : null;

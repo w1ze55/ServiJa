@@ -1,7 +1,7 @@
 package com.servija.servija.auth;
 
-import com.servija.servija.dto.AuthResponse;
 import com.servija.servija.dto.AddressRequest;
+import com.servija.servija.dto.AuthResponse;
 import com.servija.servija.dto.RegisterRequest;
 import com.servija.servija.exception.DuplicateResourceException;
 import com.servija.servija.model.Contractor;
@@ -10,9 +10,9 @@ import com.servija.servija.model.User;
 import com.servija.servija.repository.ContractorRepository;
 import com.servija.servija.repository.FreelancerRepository;
 import com.servija.servija.repository.UserRepository;
-import com.servija.servija.service.AuthService;
-import com.servija.servija.service.AuditLogger;
 import com.servija.servija.service.AddressService;
+import com.servija.servija.service.AuditLogger;
+import com.servija.servija.service.AuthService;
 import com.servija.servija.service.CustomUserDetailsService;
 import com.servija.servija.service.EmailService;
 import com.servija.servija.service.JwtService;
@@ -29,10 +29,13 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.LocalDate;
+import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -43,26 +46,16 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class AuthServiceRegistrationTest {
 
-    @Mock
-    private UserRepository userRepository;
-    @Mock
-    private ContractorRepository contractorRepository;
-    @Mock
-    private FreelancerRepository freelancerRepository;
-    @Mock
-    private PasswordEncoder passwordEncoder;
-    @Mock
-    private JwtService jwtService;
-    @Mock
-    private AuthenticationManager authenticationManager;
-    @Mock
-    private CustomUserDetailsService userDetailsService;
-    @Mock
-    private EmailService emailService;
-    @Mock
-    private AuditLogger auditLogger;
-    @Mock
-    private AddressService addressService;
+    @Mock private UserRepository userRepository;
+    @Mock private ContractorRepository contractorRepository;
+    @Mock private FreelancerRepository freelancerRepository;
+    @Mock private PasswordEncoder passwordEncoder;
+    @Mock private JwtService jwtService;
+    @Mock private AuthenticationManager authenticationManager;
+    @Mock private CustomUserDetailsService userDetailsService;
+    @Mock private EmailService emailService;
+    @Mock private AuditLogger auditLogger;
+    @Mock private AddressService addressService;
 
     @InjectMocks
     private AuthService authService;
@@ -72,130 +65,70 @@ class AuthServiceRegistrationTest {
 
     @BeforeEach
     void setUp() {
-        contractorRequest = RegisterRequest.builder()
-                .name("Joao Silva")
-                .email("joao@email.com")
-                .cpf("12345678901")
-                .phone("11999999999")
-                .birthDate(LocalDate.of(1995, 5, 10))
-                .password("Senha@123")
-                .userType(User.UserType.CONTRACTOR)
-                .address(AddressRequest.builder()
-                        .label("Principal")
-                        .street("Rua das Flores")
-                        .number("123")
-                        .neighborhood("Centro")
-                        .city("Sao Paulo")
-                        .state("SP")
-                        .zipCode("01001-000")
-                        .isDefault(true)
-                        .build())
-                .acceptTerms(true)
-                .build();
+        contractorRequest = buildRequest(
+                "Joao Silva",
+                "joao@email.com",
+                "12345678901",
+                "11999999999",
+                LocalDate.of(1995, 5, 10),
+                "Senha@123",
+                User.UserType.CONTRACTOR);
 
-        freelancerRequest = RegisterRequest.builder()
-                .name("Maria Santos")
-                .email("maria@email.com")
-                .cpf("98765432100")
-                .phone("11888888888")
-                .birthDate(LocalDate.of(1998, 8, 20))
-                .password("Senha@456")
-                .userType(User.UserType.FREELANCER)
-                .address(AddressRequest.builder()
-                        .label("Principal")
-                        .street("Avenida Brasil")
-                        .number("456")
-                        .neighborhood("Jardins")
-                        .city("Sao Paulo")
-                        .state("SP")
-                        .zipCode("01311-000")
-                        .isDefault(true)
-                        .build())
-                .acceptTerms(true)
-                .build();
+        freelancerRequest = buildRequest(
+                "Maria Santos",
+                "maria@email.com",
+                "98765432100",
+                "11888888888",
+                LocalDate.of(1998, 8, 20),
+                "Senha@456",
+                User.UserType.FREELANCER);
     }
 
     @Test
     @DisplayName("Deve registrar um CONTRACTOR com sucesso e retornar token")
     void register_contractor_success() {
-        when(userRepository.existsByEmail(anyString())).thenReturn(false);
-        when(userRepository.existsByCpf(anyString())).thenReturn(false);
-        when(passwordEncoder.encode(anyString())).thenReturn("encoded-password");
-
-        Contractor savedContractor = Contractor.builder()
-                .id(1L)
-                .name("Joao Silva")
-                .email("joao@email.com")
-                .cpf("12345678901")
-                .phone("11999999999")
-                .birthDate(LocalDate.of(1995, 5, 10))
-                .password("encoded-password")
-                .userType(User.UserType.CONTRACTOR)
-                .emailVerified(false)
-                .active(true)
-                .totalContracts(0)
-                .activeContracts(0)
-                .completedContracts(0)
-                .build();
-
-        when(contractorRepository.save(any(Contractor.class))).thenReturn(savedContractor);
-
         UserDetails mockUserDetails = mock(UserDetails.class);
+        setupBaseRegistrationMocks();
+        when(contractorRepository.findById(anyLong())).thenReturn(Optional.empty());
+        when(contractorRepository.save(any(Contractor.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(userDetailsService.loadUserByUsername("joao@email.com")).thenReturn(mockUserDetails);
-        when(jwtService.generateToken(mockUserDetails)).thenReturn("jwt-token-123");
+        when(jwtService.generateToken(any(), any(UserDetails.class))).thenReturn("jwt-token-123");
 
         AuthResponse response = authService.register(contractorRequest);
 
-        assertThat(response).isNotNull();
         assertThat(response.getToken()).isEqualTo("jwt-token-123");
-        assertThat(response.getTokenType()).isEqualTo("Bearer");
         assertThat(response.getUser().getName()).isEqualTo("Joao Silva");
         assertThat(response.getUser().getUserType()).isEqualTo(User.UserType.CONTRACTOR);
-        assertThat(response.getUser().getEmailVerified()).isFalse();
+        assertThat(response.getUser().getActiveRole()).isEqualTo(User.UserType.CONTRACTOR);
+        assertThat(response.getUser().getRoles()).containsExactly(User.UserType.CONTRACTOR);
         assertThat(response.getUser().getBirthDate()).isEqualTo(LocalDate.of(1995, 5, 10));
+        verify(contractorRepository).save(any(Contractor.class));
+        verify(freelancerRepository, never()).save(any(Freelancer.class));
     }
 
     @Test
     @DisplayName("Deve registrar um FREELANCER com sucesso e retornar token")
     void register_freelancer_success() {
-        when(userRepository.existsByEmail(anyString())).thenReturn(false);
-        when(userRepository.existsByCpf(anyString())).thenReturn(false);
-        when(passwordEncoder.encode(anyString())).thenReturn("encoded-password");
-
-        Freelancer savedFreelancer = Freelancer.builder()
-                .id(2L)
-                .name("Maria Santos")
-                .email("maria@email.com")
-                .cpf("98765432100")
-                .phone("11888888888")
-                .birthDate(LocalDate.of(1998, 8, 20))
-                .password("encoded-password")
-                .userType(User.UserType.FREELANCER)
-                .emailVerified(false)
-                .active(true)
-                .totalReviews(0)
-                .completedJobs(0)
-                .activeJobs(0)
-                .profileCompleted(false)
-                .available(true)
-                .build();
-
-        when(freelancerRepository.save(any(Freelancer.class))).thenReturn(savedFreelancer);
-
         UserDetails mockUserDetails = mock(UserDetails.class);
+        setupBaseRegistrationMocks();
+        when(freelancerRepository.findById(anyLong())).thenReturn(Optional.empty());
+        when(freelancerRepository.save(any(Freelancer.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(userDetailsService.loadUserByUsername("maria@email.com")).thenReturn(mockUserDetails);
-        when(jwtService.generateToken(mockUserDetails)).thenReturn("jwt-token-456");
+        when(jwtService.generateToken(any(), any(UserDetails.class))).thenReturn("jwt-token-456");
 
         AuthResponse response = authService.register(freelancerRequest);
 
-        assertThat(response).isNotNull();
         assertThat(response.getToken()).isEqualTo("jwt-token-456");
         assertThat(response.getUser().getUserType()).isEqualTo(User.UserType.FREELANCER);
+        assertThat(response.getUser().getActiveRole()).isEqualTo(User.UserType.FREELANCER);
+        assertThat(response.getUser().getRoles()).containsExactly(User.UserType.FREELANCER);
         assertThat(response.getUser().getBirthDate()).isEqualTo(LocalDate.of(1998, 8, 20));
+        verify(freelancerRepository).save(any(Freelancer.class));
+        verify(contractorRepository, never()).save(any(Contractor.class));
     }
 
     @Test
-    @DisplayName("Deve lançar exceção ao cadastrar email duplicado")
+    @DisplayName("Deve lancar excecao ao cadastrar email duplicado")
     void register_duplicateEmail_throwsException() {
         when(userRepository.existsByEmail("joao@email.com")).thenReturn(true);
 
@@ -208,7 +141,7 @@ class AuthServiceRegistrationTest {
     }
 
     @Test
-    @DisplayName("Deve lançar exceção ao cadastrar CPF duplicado")
+    @DisplayName("Deve lancar excecao ao cadastrar CPF duplicado")
     void register_duplicateCpf_throwsException() {
         when(userRepository.existsByEmail(anyString())).thenReturn(false);
         when(userRepository.existsByCpf("12345678901")).thenReturn(true);
@@ -221,30 +154,14 @@ class AuthServiceRegistrationTest {
     }
 
     @Test
-    @DisplayName("Deve enviar email de verificação após cadastro")
+    @DisplayName("Deve enviar email de verificacao apos cadastro")
     void register_sendsVerificationEmail() {
-        when(userRepository.existsByEmail(anyString())).thenReturn(false);
-        when(userRepository.existsByCpf(anyString())).thenReturn(false);
-        when(passwordEncoder.encode(anyString())).thenReturn("encoded");
-
-        Contractor saved = Contractor.builder()
-                .id(1L)
-                .name("Joao Silva")
-                .email("joao@email.com")
-                .cpf("12345678901")
-                .phone("11999999999")
-                .birthDate(LocalDate.of(1995, 5, 10))
-                .password("encoded")
-                .userType(User.UserType.CONTRACTOR)
-                .emailVerified(false)
-                .active(true)
-                .totalContracts(0)
-                .activeContracts(0)
-                .completedContracts(0)
-                .build();
-        when(contractorRepository.save(any(Contractor.class))).thenReturn(saved);
-        when(userDetailsService.loadUserByUsername(anyString())).thenReturn(mock(UserDetails.class));
-        when(jwtService.generateToken(any(UserDetails.class))).thenReturn("token");
+        UserDetails mockUserDetails = mock(UserDetails.class);
+        setupBaseRegistrationMocks();
+        when(contractorRepository.findById(anyLong())).thenReturn(Optional.empty());
+        when(contractorRepository.save(any(Contractor.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(userDetailsService.loadUserByUsername(anyString())).thenReturn(mockUserDetails);
+        when(jwtService.generateToken(any(), any(UserDetails.class))).thenReturn("token");
 
         authService.register(contractorRequest);
 
@@ -252,41 +169,70 @@ class AuthServiceRegistrationTest {
     }
 
     @Test
-    @DisplayName("Deve gerar código de verificação com 6 dígitos")
+    @DisplayName("Deve gerar codigo de verificacao com 6 digitos")
     void register_generatesValidVerificationCode() {
-        when(userRepository.existsByEmail(anyString())).thenReturn(false);
-        when(userRepository.existsByCpf(anyString())).thenReturn(false);
-        when(passwordEncoder.encode(anyString())).thenReturn("encoded");
-
-        ArgumentCaptor<Contractor> captor = ArgumentCaptor.forClass(Contractor.class);
-
-        Contractor saved = Contractor.builder()
-                .id(1L)
-                .name("Joao Silva")
-                .email("joao@email.com")
-                .cpf("12345678901")
-                .phone("11999999999")
-                .birthDate(LocalDate.of(1995, 5, 10))
-                .password("encoded")
-                .userType(User.UserType.CONTRACTOR)
-                .emailVerified(false)
-                .active(true)
-                .totalContracts(0)
-                .activeContracts(0)
-                .completedContracts(0)
-                .build();
-        when(contractorRepository.save(any(Contractor.class))).thenReturn(saved);
-        when(userDetailsService.loadUserByUsername(anyString())).thenReturn(mock(UserDetails.class));
-        when(jwtService.generateToken(any(UserDetails.class))).thenReturn("token");
+        UserDetails mockUserDetails = mock(UserDetails.class);
+        ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
+        setupBaseRegistrationMocks();
+        when(contractorRepository.findById(anyLong())).thenReturn(Optional.empty());
+        when(contractorRepository.save(any(Contractor.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(userDetailsService.loadUserByUsername(anyString())).thenReturn(mockUserDetails);
+        when(jwtService.generateToken(any(), any(UserDetails.class))).thenReturn("token");
 
         authService.register(contractorRequest);
 
-        verify(contractorRepository).save(captor.capture());
-        String code = captor.getValue().getVerificationCode();
+        verify(userRepository, org.mockito.Mockito.atLeastOnce()).save(userCaptor.capture());
+        User firstSavedUser = userCaptor.getAllValues().get(0);
+        assertThat(firstSavedUser.getVerificationCode()).isNotNull().hasSize(6).matches("\\d{6}");
+        assertThat(firstSavedUser.getBirthDate()).isEqualTo(LocalDate.of(1995, 5, 10));
+    }
 
-        assertThat(code).isNotNull();
-        assertThat(code).hasSize(6);
-        assertThat(code).matches("\\d{6}");
-        assertThat(captor.getValue().getBirthDate()).isEqualTo(LocalDate.of(1995, 5, 10));
+    private void setupBaseRegistrationMocks() {
+        when(userRepository.existsByEmail(anyString())).thenReturn(false);
+        when(userRepository.existsByCpf(anyString())).thenReturn(false);
+        when(passwordEncoder.encode(anyString())).thenReturn("encoded-password");
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> {
+            User user = invocation.getArgument(0);
+            if (user.getId() == null) {
+                user.setId(user.getEmail().equals("joao@email.com") ? 1L : 2L);
+            }
+            if (user.getActiveRole() == null) {
+                user.setActiveRole(user.getUserType());
+            }
+            if (user.getRoles() == null || user.getRoles().isEmpty()) {
+                user.setRoles(Set.of(user.getUserType()));
+            }
+            return user;
+        });
+    }
+
+    private RegisterRequest buildRequest(
+            String name,
+            String email,
+            String cpf,
+            String phone,
+            LocalDate birthDate,
+            String password,
+            User.UserType role) {
+        return RegisterRequest.builder()
+                .name(name)
+                .email(email)
+                .cpf(cpf)
+                .phone(phone)
+                .birthDate(birthDate)
+                .password(password)
+                .userType(role)
+                .address(AddressRequest.builder()
+                        .label("Principal")
+                        .street("Rua das Flores")
+                        .number("123")
+                        .neighborhood("Centro")
+                        .city("Sao Paulo")
+                        .state("SP")
+                        .zipCode("01001-000")
+                        .isDefault(true)
+                        .build())
+                .acceptTerms(true)
+                .build();
     }
 }

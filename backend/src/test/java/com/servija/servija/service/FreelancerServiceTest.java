@@ -37,6 +37,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
@@ -73,6 +74,9 @@ class FreelancerServiceTest {
     @Mock
     private AuditLogger auditLogger;
 
+    @Mock
+    private CurrentUserContextService currentUserContextService;
+
     private FreelancerService freelancerService;
 
     @BeforeEach
@@ -88,7 +92,9 @@ class FreelancerServiceTest {
                 categoryCatalogService,
                 ibgeLocationService,
                 geocodingService,
-                auditLogger));
+                auditLogger,
+                currentUserContextService));
+        lenient().when(currentUserContextService.getOptionalAuthenticatedUser()).thenReturn(Optional.empty());
     }
 
     @Test
@@ -438,7 +444,7 @@ class FreelancerServiceTest {
 
     private Address buildAddress(Freelancer freelancer, String city, String state) {
         return Address.builder()
-                .user(freelancer)
+                .user(freelancer.getUser())
                 .label("Principal")
                 .street("Rua Teste")
                 .number("123")

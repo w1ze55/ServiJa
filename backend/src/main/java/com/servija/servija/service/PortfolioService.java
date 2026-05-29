@@ -35,6 +35,7 @@ public class PortfolioService {
     private final ObjectMapper objectMapper;
     private final CategoryCatalogService categoryCatalogService;
     private final AuditLogger auditLogger;
+    private final CurrentUserContextService currentUserContextService;
 
     @Transactional(readOnly = true)
     public List<PortfolioProjectResponse> getProjects() {
@@ -47,6 +48,7 @@ public class PortfolioService {
 
     @Transactional(readOnly = true)
     public List<PortfolioProjectResponse> getPublicProjects(Long freelancerId) {
+        currentUserContextService.denyOwnFreelancerPublicAccess(freelancerId);
         List<PortfolioProject> projects = projectRepository.findByFreelancerIdOrderByCreatedAtDesc(freelancerId);
         return projects.stream()
                 .filter(project -> PublicVisibilityRules.isFreelancerPublic(project.getFreelancer()))

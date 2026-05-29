@@ -43,6 +43,7 @@ public class ServiceService {
     private final ObjectMapper objectMapper;
     private final CategoryCatalogService categoryCatalogService;
     private final AuditLogger auditLogger;
+    private final CurrentUserContextService currentUserContextService;
     private static final BigDecimal AVERAGE_PRICE_RANGE_SPREAD = new BigDecimal("0.20");
 
     /**
@@ -59,7 +60,7 @@ public class ServiceService {
      * Obter o freelancer do usuário atual
      */
     private Freelancer getCurrentFreelancer() {
-        User user = getCurrentUser();
+        User user = currentUserContextService.requireActiveRole(User.UserType.FREELANCER);
         return freelancerRepository.findById(user.getId())
                 .orElseThrow(() -> new RuntimeException("Perfil de freelancer não encontrado"));
     }
@@ -489,9 +490,11 @@ public class ServiceService {
     }
 
     private Service requirePublicService(Long id) {
+        // own-profile guard applied after resolving the service owner
         Service service = serviceRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Serviço não encontrado"));
 
+        currentUserContextService.denyOwnFreelancerPublicAccess(service.getFreelancer().getId());
         if (!isPubliclyVisible(service)) {
             throw new ResourceNotFoundException("Serviço não encontrado");
         }
@@ -502,6 +505,10 @@ public class ServiceService {
     private List<ServiceResponse> toPublicResponses(List<Service> services) {
         return services.stream()
                 .filter(this::isPubliclyVisible)
+                .filter(service -> currentUserContextService.getOptionalAuthenticatedUser()
+                        .map(user -> user.getUserType() != User.UserType.CONTRACTOR
+                                || !user.getId().equals(service.getFreelancer().getId()))
+                        .orElse(true))
                 .map(this::toPublicResponse)
                 .collect(Collectors.toList());
     }

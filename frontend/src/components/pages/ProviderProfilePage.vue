@@ -64,8 +64,10 @@ import AvatarFallback from '../ui/avatar-fallback.vue';
 import api from '@/api/config/axios';
 import { toast } from '@/utils/toast';
 import { useFavoritesStore } from '@/stores/favorites';
+import { useUserStore } from '@/stores/userStore';
 import { getServicePriceDisplay, type ServicePriceRangeData } from '@/utils/servicePricing';
 import { formatServiceRatingDisplay, hasServiceRating, type ServiceReviewSummary } from '@/utils/serviceReviews';
+import { isOwnFreelancerProfile } from '@/utils/userRoles';
 
 interface FreelancerData {
   id: number;
@@ -267,6 +269,7 @@ const quoteServiceAddress = ref<QuoteServiceAddress>(createEmptyQuoteAddress());
 const quoteAddressErrors = ref<QuoteAddressErrors>(createEmptyQuoteAddressErrors());
 const isLoadingQuoteCEP = ref(false);
 const favoritesStore = useFavoritesStore();
+const userStore = useUserStore();
 const router = useRouter();
 const fileInputRef = ref<HTMLInputElement | null>(null);
 const selectedProject = ref<PortfolioProject | null>(null);
@@ -312,6 +315,12 @@ const loadFreelancerData = async () => {
   error.value = '';
 
   try {
+    if (isOwnFreelancerProfile(userStore.user, props.providerId)) {
+      toast.error('Voce nao pode acessar o proprio perfil publico como cliente');
+      await router.replace('/explore');
+      return;
+    }
+
     // Buscar dados do freelancer
     const freelancerResponse = await api.get(`/freelancer/${props.providerId}/profile`);
     freelancer.value = freelancerResponse.data;

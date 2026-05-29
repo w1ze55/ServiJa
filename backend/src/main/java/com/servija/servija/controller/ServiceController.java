@@ -14,6 +14,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -169,6 +170,8 @@ public class ServiceController {
         try {
             List<ServiceResponse> services = serviceService.getActiveServices(categorySlug, subcategorySlug, query);
             return ResponseEntity.ok(services);
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(403).build();
         } catch (Exception e) {
             return ResponseEntity.internalServerError().build();
         }
@@ -185,6 +188,8 @@ public class ServiceController {
         try {
             List<ServiceResponse> services = serviceService.getServicesByCategory(category);
             return ResponseEntity.ok(services);
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(403).build();
         } catch (Exception e) {
             return ResponseEntity.badRequest().build();
         }
@@ -201,6 +206,8 @@ public class ServiceController {
         try {
             ServiceResponse service = serviceService.getVisiblePublicServiceByIdWithPricing(id);
             return ResponseEntity.ok(service);
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(403).build();
         } catch (Exception e) {
             return ResponseEntity.notFound().build();
         }
@@ -216,6 +223,8 @@ public class ServiceController {
         try {
             List<ServiceResponse> services = serviceService.getPublicServicesByFreelancer(id);
             return ResponseEntity.ok(services);
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(403).build();
         } catch (Exception e) {
             return ResponseEntity.internalServerError().build();
         }
@@ -232,6 +241,8 @@ public class ServiceController {
         try {
             List<ServiceResponse> services = serviceService.searchPublicServices(q);
             return ResponseEntity.ok(services);
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(403).build();
         } catch (Exception e) {
             return ResponseEntity.badRequest().build();
         }

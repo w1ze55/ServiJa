@@ -6,7 +6,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { computed, ref } from 'vue'
 import AuthCard from './AuthCard.vue'
 import EmailVerification from './EmailVerification.vue'
 import ForgotPassword from './ForgotPassword.vue'
@@ -15,6 +15,8 @@ import TwoFactorChallenge from './TwoFactorChallenge.vue'
 import type { PersonalData } from './SignupPersonalData.vue'
 import type { User } from '@/types'
 import api from '@/api/config/axios'
+import { useUserStore } from '@/stores/userStore'
+import { buildUserFromApi } from '@/utils/userRoles'
 
 type AuthPage =
   | 'auth-card'
@@ -33,7 +35,6 @@ interface AuthFlowProps {
 const props = defineProps<AuthFlowProps>()
 const hasResetToken = computed(() => Boolean(props.resetToken?.trim()))
 
-// estado principal
 const currentPage = ref<AuthPage>(
   hasResetToken.value ? 'reset-password' : 'auth-card'
 )
@@ -41,14 +42,9 @@ const accountType = ref<'contractor' | 'provider' | null>(null)
 const personalData = ref<PersonalData | null>(null)
 const recoveryEmail = ref('')
 
-// Armazena o callback de erro para comunicação com AuthCard
 let loginErrorCallback: ((error: string) => void) | null = null
 
-import { useUserStore } from '@/stores/userStore'
-
 const userStore = useUserStore()
-
-// Challenge token vive só em memória — nunca em localStorage
 const pendingChallengeToken = ref<string | null>(null)
 
 function finalizeLogin(userData: any, fallbackEmail = '') {
@@ -56,21 +52,7 @@ function finalizeLogin(userData: any, fallbackEmail = '') {
     localStorage.setItem('token', userData.token)
   }
 
-  const apiUserType = userData.user?.userType
-  const userType = apiUserType === 'ADMIN'
-    ? 'admin'
-    : apiUserType === 'FREELANCER'
-      ? 'provider'
-      : 'contractor'
-
-  const user: User = {
-    id: userData.user?.id?.toString() || '',
-    name: userData.user?.name || '',
-    email: userData.user?.email || fallbackEmail,
-    type: userType,
-    avatar: userData.user?.avatarUrl || undefined,
-  }
-
+  const user = buildUserFromApi(userData, userData.token, fallbackEmail)
   userStore.setUser(user)
   props.onLogin(user)
 }
@@ -78,7 +60,6 @@ function finalizeLogin(userData: any, fallbackEmail = '') {
 async function handleLogin(email: string, password: string) {
   try {
     const response = await api.post('/auth/login', { email, password })
-
     const userData = response.data
 
     if (userData.requires2fa && userData.token) {
@@ -90,8 +71,9 @@ async function handleLogin(email: string, password: string) {
     finalizeLogin(userData, email)
   } catch (error: any) {
     const errorMessage = error.response?.data?.message ||
-                         error.response?.data?.error ||
-                         'Email ou senha incorretos'
+      error.response?.data?.error ||
+      'Email ou senha incorretos'
+
     if (loginErrorCallback) {
       loginErrorCallback(errorMessage)
     }
@@ -108,7 +90,6 @@ function handleTwoFactorBack() {
   currentPage.value = 'auth-card'
 }
 
-// Wrapper que permite passar callback de erro
 function handleLoginWithError(email: string, password: string, onError?: (error: string) => void) {
   loginErrorCallback = onError || null
   handleLogin(email, password)
@@ -124,35 +105,17 @@ function handleSignupComplete(
 }
 
 function handleEmailVerified(token: string, userData: any) {
-  // Salvar token no localStorage
   if (token) {
     localStorage.setItem('token', token)
   }
-  
-  // Mapear tipo de usuário da API para o formato do frontend
-  const userType = userData.userType === 'ADMIN'
-    ? 'admin'
-    : userData.userType === 'FREELANCER'
-      ? 'provider'
-      : 'contractor'
-  
-  const user: User = {
-    id: userData.id?.toString() || '',
-    name: userData.name || '',
-    email: userData.email || '',
-    type: userType,
-    avatar: userData.avatarUrl || undefined,
-  }
 
-  // Atualizar store global
+  const user = buildUserFromApi(userData, token)
   userStore.setUser(user)
-
   props.onLogin(user)
 }
 
 function handleForgotPasswordSuccess(email: string) {
   recoveryEmail.value = email
-  // Ir para a página de reset de senha com código
   currentPage.value = 'reset-password'
 }
 
@@ -164,7 +127,6 @@ function handleResetPasswordBack() {
   currentPage.value = hasResetToken.value ? 'auth-card' : 'forgot-password'
 }
 
-// --- renderização dinâmica ---
 const currentComponent = computed(() => {
   switch (currentPage.value) {
     case 'auth-card':
