@@ -2,10 +2,13 @@ package com.servija.servija.wallet;
 
 import com.servija.servija.model.Payment;
 import com.servija.servija.model.ServiceRequest;
+import com.servija.servija.model.ServiceRequestHistory.OperationType;
 import com.servija.servija.model.User;
 import com.servija.servija.repository.PaymentRepository;
 import com.servija.servija.scheduler.WalletScheduler;
 import com.servija.servija.service.FreelancerWalletService;
+import com.servija.servija.service.PlatformWalletService;
+import com.servija.servija.service.ServiceRequestHistoryService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -18,6 +21,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -28,6 +32,12 @@ class WalletSchedulerTest {
 
     @Mock
     private FreelancerWalletService walletService;
+
+    @Mock
+    private PlatformWalletService platformWalletService;
+
+    @Mock
+    private ServiceRequestHistoryService historyService;
 
     @InjectMocks
     private WalletScheduler walletScheduler;
@@ -65,8 +75,13 @@ class WalletSchedulerTest {
         walletScheduler.autoReleaseExpiredPendingBalances();
 
         verify(walletService).releasePendingToAvailable("freelancer@test.com", new BigDecimal("950.00"));
-        // service request should be marked as COMPLETED
-        assert sr.getStatus() == ServiceRequest.Status.COMPLETED;
+        verify(platformWalletService).releasePlatformFeeIfNeeded(payment);
+        verify(historyService).record(
+                sr,
+                freelancer,
+                OperationType.SERVICE_COMPLETED,
+                "Servico concluido automaticamente apos 7 dias sem aprovacao do cliente");
+        assertThat(sr.getStatus()).isEqualTo(ServiceRequest.Status.COMPLETED);
     }
 
     @Test
