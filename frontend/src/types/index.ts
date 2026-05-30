@@ -10,6 +10,7 @@ export interface User {
   roles: UserRole[];
   avatar?: string;
   token?: string;
+  emailVerified?: boolean;
 }
 
 export interface RouterMeta {

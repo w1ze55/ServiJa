@@ -7,6 +7,7 @@ import com.servija.servija.dto.RegistrationValidationRequest;
 import com.servija.servija.dto.RegisterRequest;
 import com.servija.servija.dto.UserRoleRequest;
 import com.servija.servija.exception.DuplicateResourceException;
+import com.servija.servija.exception.EmailVerificationRequiredException;
 import com.servija.servija.exception.InvalidCredentialsException;
 import com.servija.servija.exception.ResourceNotFoundException;
 import com.servija.servija.exception.TooManyAttemptsException;
@@ -72,8 +73,6 @@ public class AuthService {
 
         emailService.sendVerificationEmail(user.getEmail(), user.getName(), verificationCode);
 
-        String token = generateAccessToken(user);
-
         auditLogger.recordFor(
                 user,
                 "USER_REGISTERED",
@@ -83,7 +82,7 @@ public class AuthService {
                 com.servija.servija.model.AuditLog.Result.SUCCESS,
                 Map.of("userType", user.getUserType()));
 
-        return buildAuthResponse(user, token);
+        return buildAuthResponse(user, null);
     }
 
     public void validateRegistrationData(RegisterRequest request) {
@@ -127,6 +126,10 @@ public class AuthService {
 
             if (!user.getActive()) {
                 throw new InvalidCredentialsException("Conta suspensa");
+            }
+
+            if (!Boolean.TRUE.equals(user.getEmailVerified())) {
+                throw new EmailVerificationRequiredException(user.getEmail());
             }
 
             if (Boolean.TRUE.equals(user.getTotpEnabled())) {
@@ -184,6 +187,10 @@ public class AuthService {
 
         if (!user.getActive()) {
             throw new InvalidCredentialsException("Conta suspensa");
+        }
+
+        if (!Boolean.TRUE.equals(user.getEmailVerified())) {
+            throw new EmailVerificationRequiredException(user.getEmail());
         }
 
         if (Boolean.TRUE.equals(user.getTotpEnabled())) {
@@ -505,6 +512,9 @@ public class AuthService {
         }
         if (exception instanceof TooManyAttemptsException) {
             return "too_many_attempts";
+        }
+        if (exception instanceof EmailVerificationRequiredException) {
+            return "email_not_verified";
         }
         if (exception instanceof InvalidCredentialsException && "Conta suspensa".equalsIgnoreCase(exception.getMessage())) {
             return "account_suspended";

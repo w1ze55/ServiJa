@@ -56,6 +56,7 @@ export const normalizeStoredUser = (rawUser: Partial<User> | null | undefined): 
     activeRole,
     roles,
     type: mapFrontendRoleToLegacyType(activeRole),
+    emailVerified: rawUser.emailVerified ?? true,
   };
 };
 
@@ -80,6 +81,7 @@ export const buildUserFromApi = (
     token,
     activeRole,
     roles,
+    emailVerified: rawUser.emailVerified,
   }) as User;
 };
 

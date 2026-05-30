@@ -3,6 +3,17 @@
     class="min-h-screen bg-gray-50 flex items-center justify-center p-4"
   >
     <div class="w-full max-w-md bg-white rounded-lg shadow-xl p-8">
+      <div v-if="props.onBack" class="mb-6">
+        <Button
+          variant="ghost"
+          class="px-0 text-gray-600 hover:text-gray-900"
+          @click="props.onBack"
+          :disabled="isVerifying"
+        >
+          <ArrowLeft class="mr-2 h-4 w-4" />
+          Voltar para login
+        </Button>
+      </div>
       <!-- Cabeçalho -->
       <div class="text-center mb-8">
         <div class="inline-flex p-4 bg-blue-100 rounded-full mb-4">
@@ -97,12 +108,13 @@ import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import Button from "../ui/button.vue";
 import Alert from "../ui/alert.vue";
 import AlertDescription from "../ui/alert-description.vue";
-import { AlertCircle, CheckCircle, Mail, Clock } from "lucide-vue-next";
+import { AlertCircle, CheckCircle, Mail, Clock, ArrowLeft } from "lucide-vue-next";
 import { API_ENDPOINTS } from "../../utils/api";
 
 interface EmailVerificationProps {
   email: string;
   onVerified: (token: string, userData: any) => void;
+  onBack?: () => void;
 }
 const props = defineProps<EmailVerificationProps>();
 

@@ -1,6 +1,7 @@
 package com.servija.servija.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.servija.servija.model.User;
 import com.servija.servija.service.JwtService;
 import io.jsonwebtoken.ExpiredJwtException;
 import jakarta.annotation.Nonnull;
@@ -60,6 +61,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
                 if (!userDetails.isEnabled()) {
                     handleBlockedAccount(response);
+                    return;
+                }
+
+                if (userDetails instanceof User user && !Boolean.TRUE.equals(user.getEmailVerified())) {
+                    handleUnverifiedEmail(response, user.getEmail());
                     return;
                 }
 
@@ -124,6 +130,23 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         errorDetails.put("expired", true);
         errorDetails.put("path", "");
         
+        response.getWriter().write(objectMapper.writeValueAsString(errorDetails));
+    }
+
+    private void handleUnverifiedEmail(HttpServletResponse response, String email) throws IOException {
+        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+        response.setContentType("application/json");
+        response.setCharacterEncoding("UTF-8");
+
+        Map<String, Object> errorDetails = new HashMap<>();
+        errorDetails.put("timestamp", LocalDateTime.now().toString());
+        errorDetails.put("status", 403);
+        errorDetails.put("error", "Forbidden");
+        errorDetails.put("message", "E-mail nao verificado. Confirme seu e-mail para concluir o acesso.");
+        errorDetails.put("emailVerificationRequired", true);
+        errorDetails.put("email", email);
+        errorDetails.put("path", "");
+
         response.getWriter().write(objectMapper.writeValueAsString(errorDetails));
     }
 

@@ -17,6 +17,11 @@ import type { User } from '@/types'
 import api from '@/api/config/axios'
 import { useUserStore } from '@/stores/userStore'
 import { buildUserFromApi } from '@/utils/userRoles'
+import {
+  clearPendingEmailVerification,
+  getPendingEmailVerification,
+  setPendingEmailVerification,
+} from '@/utils/pendingEmailVerification'
 
 type AuthPage =
   | 'auth-card'
@@ -34,9 +39,14 @@ interface AuthFlowProps {
 
 const props = defineProps<AuthFlowProps>()
 const hasResetToken = computed(() => Boolean(props.resetToken?.trim()))
+const pendingEmailVerification = ref(getPendingEmailVerification())
 
 const currentPage = ref<AuthPage>(
-  hasResetToken.value ? 'reset-password' : 'auth-card'
+  hasResetToken.value
+    ? 'reset-password'
+    : pendingEmailVerification.value?.email
+      ? 'email-verification'
+      : 'auth-card'
 )
 const accountType = ref<'contractor' | 'provider' | null>(null)
 const personalData = ref<PersonalData | null>(null)
@@ -48,6 +58,9 @@ const userStore = useUserStore()
 const pendingChallengeToken = ref<string | null>(null)
 
 function finalizeLogin(userData: any, fallbackEmail = '') {
+  clearPendingEmailVerification()
+  pendingEmailVerification.value = null
+
   if (userData.token) {
     localStorage.setItem('token', userData.token)
   }
@@ -73,6 +86,12 @@ async function handleLogin(email: string, password: string) {
     const errorMessage = error.response?.data?.message ||
       error.response?.data?.error ||
       'Email ou senha incorretos'
+
+    if (error.response?.data?.emailVerificationRequired) {
+      pendingEmailVerification.value = { email }
+      setPendingEmailVerification(pendingEmailVerification.value)
+      currentPage.value = 'email-verification'
+    }
 
     if (loginErrorCallback) {
       loginErrorCallback(errorMessage)
@@ -101,10 +120,19 @@ function handleSignupComplete(
 ) {
   accountType.value = type
   personalData.value = data
+  pendingEmailVerification.value = {
+    email: data.email,
+    accountType: type,
+    name: data.name,
+  }
+  setPendingEmailVerification(pendingEmailVerification.value)
   currentPage.value = 'email-verification'
 }
 
 function handleEmailVerified(token: string, userData: any) {
+  clearPendingEmailVerification()
+  pendingEmailVerification.value = null
+
   if (token) {
     localStorage.setItem('token', token)
   }
@@ -112,6 +140,10 @@ function handleEmailVerified(token: string, userData: any) {
   const user = buildUserFromApi(userData, token)
   userStore.setUser(user)
   props.onLogin(user)
+}
+
+function handleEmailVerificationBack() {
+  currentPage.value = 'auth-card'
 }
 
 function handleForgotPasswordSuccess(email: string) {
@@ -157,8 +189,9 @@ const currentProps = computed(() => {
 
     case 'email-verification':
       return {
-        email: personalData.value?.email || '',
+        email: personalData.value?.email || pendingEmailVerification.value?.email || '',
         onVerified: handleEmailVerified,
+        onBack: handleEmailVerificationBack,
       }
 
     case 'forgot-password':

@@ -41,6 +41,7 @@ import ClienteDeliveryApprovalPage from "@/pages/ClienteDeliveryApproval/index.v
 import ClienteProjectDetailPage from "@/pages/ClienteProjectDetail/index.vue";
 import RateFreelancerPage from "@/pages/RateFreelancer/index.vue";
 import { getLandingRouteForRole, isOwnFreelancerProfile, normalizeStoredUser } from "@/utils/userRoles";
+import { setPendingEmailVerification } from "@/utils/pendingEmailVerification";
 
 const routes: RouteRecordRaw[] = [
   // ============ ROTAS PÚBLICAS ============
@@ -349,6 +350,14 @@ router.beforeEach((to, from, next) => {
 
   // Se a rota requer autenticação e o usuário não está logado
   if (to.meta.requiresAuth && !user) {
+    next("/login");
+    return;
+  }
+
+  if (user?.emailVerified === false) {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    setPendingEmailVerification({ email: user.email });
     next("/login");
     return;
   }

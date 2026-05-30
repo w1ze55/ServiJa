@@ -1,4 +1,5 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
+import { setPendingEmailVerification } from '@/utils/pendingEmailVerification';
 
 // VITE_API_URL deve ser a URL base sem /api no final.
 // Exemplo: http://localhost:8080
@@ -90,6 +91,22 @@ api.interceptors.response.use(
         window.location.href = '/login?expired=true';
       }
     }
+
+    if (error.response?.status === 403 && (error.response.data as any)?.emailVerificationRequired) {
+      const email = (error.response.data as any)?.email;
+
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+
+      if (typeof email === 'string' && email.trim()) {
+        setPendingEmailVerification({ email: email.trim() });
+      }
+
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
+    }
+
     return Promise.reject(error);
   }
 );

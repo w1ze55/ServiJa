@@ -82,6 +82,19 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(error, HttpStatus.TOO_MANY_REQUESTS);
     }
 
+    @ExceptionHandler(EmailVerificationRequiredException.class)
+    public ResponseEntity<ErrorResponse> handleEmailVerificationRequired(EmailVerificationRequiredException ex) {
+        ErrorResponse error = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.FORBIDDEN.value())
+                .error("Forbidden")
+                .message(ex.getMessage())
+                .emailVerificationRequired(true)
+                .email(ex.getEmail())
+                .build();
+        return new ResponseEntity<>(error, HttpStatus.FORBIDDEN);
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ErrorResponse> handleIllegalArgument(IllegalArgumentException ex) {
         ErrorResponse error = ErrorResponse.builder()
@@ -190,6 +203,8 @@ public class GlobalExceptionHandler {
         private String message;
         private Integer remainingAttempts;
         private LocalDateTime lockUntil;
+        private Boolean emailVerificationRequired;
+        private String email;
     }
 
     @Data
