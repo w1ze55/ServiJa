@@ -129,15 +129,15 @@ const handleAction = () => {
         <component :is="getFileIcon(name, type)" class="h-5 w-5" />
       </div>
       <div class="min-w-0">
-        <p class="text-sm font-semibold text-[#263238] truncate" :title="name">
+        <p class="text-sm font-semibold text-current truncate" :title="name">
           {{ name }}
         </p>
         <div class="flex items-center gap-2 mt-0.5">
-          <span v-if="size" class="text-xs text-[#435574]">{{ size }}</span>
+          <span v-if="size" class="text-xs text-current">{{ size }}</span>
           <span v-if="size && senderInfo" class="w-1 h-1 rounded-full bg-gray-300"></span>
-          <span v-if="senderInfo" class="text-xs text-[#435574]">{{ senderInfo }}</span>
+          <span v-if="senderInfo" class="text-xs text-current">{{ senderInfo }}</span>
         </div>
-        <p v-if="description" class="text-xs text-[#435574] mt-1 whitespace-pre-line break-words">
+        <p v-if="description" class="text-xs text-current mt-1 whitespace-pre-line break-words">
           {{ description }}
         </p>
       </div>
