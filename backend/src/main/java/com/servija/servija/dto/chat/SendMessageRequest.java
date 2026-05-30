@@ -6,5 +6,6 @@ import jakarta.validation.constraints.Pattern;
 public record SendMessageRequest(
     @NotBlank String content,
     @Pattern(regexp = "text|image|file") String type,
-    String attachmentUrl
+    String attachmentUrl,
+    String attachmentName
 ) {}

@@ -97,6 +97,7 @@ public class ChatService {
                 .type(request.type() != null ? request.type() : "text")
                 .content(request.content())
                 .attachmentUrl(request.attachmentUrl())
+                .attachmentName(request.attachmentName())
                 .status("sent")
                 .sentAt(Instant.now())
                 .build();
@@ -202,6 +203,6 @@ public class ChatService {
     private MessageDTO toDTO(Message m) {
         return new MessageDTO(m.getId(), m.getConversationId(), m.getSenderId(),
                 m.getSenderType(), m.getType(), m.getContent(),
-                m.getAttachmentUrl(), m.getStatus(), m.getSentAt(), m.getReadAt());
+                m.getAttachmentUrl(), m.getAttachmentName(), m.getStatus(), m.getSentAt(), m.getReadAt());
     }
 }

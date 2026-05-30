@@ -24,6 +24,7 @@ public class Message {
     private String type;       // "text" | "image" | "file" | "system"
     private String content;
     private String attachmentUrl;
+    private String attachmentName;
     private String status;     // "sent" | "delivered" | "read"
     private Instant sentAt;
     private Instant readAt;

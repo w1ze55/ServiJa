@@ -10,6 +10,7 @@ public record MessageDTO(
     String type,
     String content,
     String attachmentUrl,
+    String attachmentName,
     String status,
     Instant sentAt,
     Instant readAt

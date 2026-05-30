@@ -19,7 +19,7 @@ interface Props {
   type?: string;
   description?: string;
   senderInfo?: string;
-  variant?: 'default' | 'amber' | 'blue' | 'compact';
+  variant?: 'default' | 'amber' | 'blue' | 'compact' | 'chat';
   mode?: 'display' | 'picker';
   actionLabel?: string;
 }
@@ -89,6 +89,7 @@ const variantClasses = {
   amber: 'bg-blue-50 border-blue-100 hover:bg-white',
   blue: 'bg-blue-50 border-blue-100 hover:bg-white',
   compact: 'bg-transparent border-transparent p-0 shadow-none hover:bg-gray-50',
+  chat: 'bg-white border-gray-200',
 };
 
 const iconClasses = {
@@ -96,6 +97,7 @@ const iconClasses = {
   amber: 'bg-blue-100 text-blue-600',
   blue: 'bg-blue-100 text-blue-600',
   compact: 'bg-gray-100 text-gray-500',
+  chat: 'bg-white text-black',
 };
 
 const rootClasses = {
@@ -145,7 +147,11 @@ const handleAction = () => {
       <Button 
         variant="ghost" 
         size="icon" 
-        class="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-blue-50"
+        :class="
+          variant === 'chat'
+            ? 'h-8 w-8 text-black hover:bg-transparent hover:text-black'
+            : 'h-8 w-8 text-muted-foreground hover:text-primary hover:bg-blue-50'
+        "
         title="Visualizar"
         @click="handleView"
       >
@@ -154,7 +160,11 @@ const handleAction = () => {
       <Button 
         variant="ghost" 
         size="icon" 
-        class="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-blue-50"
+        :class="
+          variant === 'chat'
+            ? 'h-8 w-8 text-black hover:bg-transparent hover:text-black'
+            : 'h-8 w-8 text-muted-foreground hover:text-primary hover:bg-blue-50'
+        "
         title="Baixar"
         @click="handleDownload"
       >

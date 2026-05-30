@@ -45,6 +45,24 @@ function displayName(email: string) {
   return email.split('@')[0].replace(/[._]/g, ' ');
 }
 
+function resolveAttachmentName(msg: MessageDTO) {
+  if (msg.attachmentName?.trim()) {
+    return msg.attachmentName.trim();
+  }
+
+  if (!msg.attachmentUrl) {
+    return 'Anexo';
+  }
+
+  try {
+    const lastSegment = new URL(msg.attachmentUrl).pathname.split('/').pop();
+    return lastSegment ? decodeURIComponent(lastSegment) : 'Anexo';
+  } catch {
+    const lastSegment = msg.attachmentUrl.split('/').pop();
+    return lastSegment ? decodeURIComponent(lastSegment) : 'Anexo';
+  }
+}
+
 function toDisplay(msg: MessageDTO): ChatMessage {
   const isMe = msg.senderId === userEmail.value;
   return {
@@ -54,7 +72,7 @@ function toDisplay(msg: MessageDTO): ChatMessage {
     message: msg.content,
     timestamp: msg.sentAt,
     attachments: msg.attachmentUrl
-      ? [{ id: msg.id, name: 'Anexo', url: msg.attachmentUrl, size: '' }]
+      ? [{ id: msg.id, name: resolveAttachmentName(msg), url: msg.attachmentUrl, size: '' }]
       : undefined,
   };
 }
@@ -99,13 +117,15 @@ async function handleSend(messageText: string, attachments: File[]) {
     }
     if (attachments.length > 0) {
       const urls = await uploadFiles(attachments);
-      for (const url of urls) {
+      for (const [index, url] of urls.entries()) {
+        const fileName = attachments[index]?.name || 'Anexo';
         const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(url);
         const msg = await chatService.sendMessage(
           conversation.value.id,
           isImage ? 'Imagem' : 'Arquivo',
           isImage ? 'image' : 'file',
-          url
+          url,
+          fileName
         );
         if (!messages.value.some((m) => m.id === msg.id)) {
           messages.value.push(toDisplay(msg));
@@ -121,7 +141,7 @@ async function handleSend(messageText: string, attachments: File[]) {
 </script>
 
 <template>
-  <div class="min-h-[500px] flex flex-col">
+  <div class="flex h-[32rem] min-h-[32rem] flex-col">
     <div v-if="loading" class="flex-1 flex items-center justify-center text-gray-400 py-16">
       Carregando chat...
     </div>
