@@ -63,6 +63,7 @@ public class ServiceRequestService {
     private final CategoryCatalogService categoryCatalogService;
     private final ChatService chatService;
     private final AuditLogger auditLogger;
+    private final CurrentUserContextService currentUserContextService;
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private static final BigDecimal MIN_NEGOTIATED_AMOUNT = new BigDecimal("20.00");
@@ -72,8 +73,7 @@ public class ServiceRequestService {
 
     @Transactional
     public ServiceRequestResponse create(String contractorEmail, ServiceRequestDTO dto) {
-        User contractor = userRepository.findByEmail(contractorEmail)
-                .orElseThrow(() -> new RuntimeException("Contractor not found"));
+        User contractor = currentUserContextService.requireContractorMarketplaceAccess();
 
         com.servija.servija.model.Service selectedService = null;
         User freelancer = null;

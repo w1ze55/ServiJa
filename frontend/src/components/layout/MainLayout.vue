@@ -104,6 +104,7 @@ const currentActiveRole = computed<UserRole>(() =>
   userStore.user?.activeRole || (currentUser.value.type === "provider" ? "freelancer" : "contractor"),
 );
 const currentLegacyType = computed(() => mapFrontendRoleToLegacyType(currentActiveRole.value));
+const canAccessMap = computed(() => currentActiveRole.value === "contractor");
 const interactiveRoles = computed(() =>
   (userStore.user?.roles || []).filter((role) => role !== "admin"),
 );
@@ -304,6 +305,11 @@ const getStateAbbreviation = (stateName: string): string => {
 
 // Abrir mapa (navegar para a página do mapa)
 const openMap = () => {
+  if (!canAccessMap.value) {
+    toast.error("Mapa disponivel apenas no perfil cliente");
+    return;
+  }
+
   router.push("/map");
 };
 
@@ -574,10 +580,14 @@ const handleNotificationStreamEvent = (event: Event) => {
         >
           <button
             @click="openMap"
-            :class="`w-full flex items-center rounded-lg transition-all duration-200 text-white/70 hover:bg-white/10 hover:text-white ${
+            :class="`w-full flex items-center rounded-lg transition-all duration-200 ${
               sidebarExpanded ? 'gap-3 px-4 py-3 text-left' : 'py-3 justify-center'
+            } ${
+              canAccessMap
+                ? 'text-white/70 hover:bg-white/10 hover:text-white'
+                : 'cursor-default text-white/70'
             }`"
-            title="Ver mapa com profissionais próximos"
+            :title="canAccessMap ? 'Ver mapa com profissionais próximos' : 'Disponível apenas no perfil cliente'"
           >
             <MapPin class="h-5 w-5 flex-shrink-0" />
             <div v-show="sidebarExpanded" class="flex-1 min-w-0">
@@ -703,7 +713,9 @@ const handleNotificationStreamEvent = (event: Event) => {
               openMap();
               sidebarOpen = false;
             "
-            class="w-full flex items-center gap-2 text-white/70 hover:text-white transition-colors text-left"
+            :class="`w-full flex items-center gap-2 transition-colors text-left ${
+              canAccessMap ? 'text-white/70 hover:text-white' : 'cursor-default text-white/70'
+            }`"
           >
             <MapPin class="h-4 w-4 flex-shrink-0" />
             <div class="flex-1 min-w-0">

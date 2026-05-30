@@ -9,6 +9,7 @@ import com.servija.servija.repository.FreelancerRepository;
 import com.servija.servija.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -61,12 +62,31 @@ public class CurrentUserContextService {
                 .orElseThrow(() -> new IllegalStateException("Perfil de freelancer nao encontrado"));
     }
 
+    public User requireContractorMarketplaceAccess() {
+        User user = getOptionalAuthenticatedUser()
+                .orElseThrow(() -> new AccessDeniedException(
+                        "Marketplace disponivel apenas para clientes autenticados"));
+        if (user.getUserType() != User.UserType.CONTRACTOR) {
+            throw new AccessDeniedException("Marketplace disponivel apenas no contexto de cliente");
+        }
+        return user;
+    }
+
+    public void denyFreelancerMarketplaceAccessIfAuthenticated() {
+        getOptionalAuthenticatedUser()
+                .filter(user -> user.getUserType() == User.UserType.FREELANCER)
+                .ifPresent(user -> {
+                    throw new AccessDeniedException(
+                            "Marketplace indisponivel no contexto de freelancer");
+                });
+    }
+
     public void denyOwnFreelancerPublicAccess(Long freelancerUserId) {
         getOptionalAuthenticatedUser()
                 .filter(user -> user.getId().equals(freelancerUserId))
                 .filter(user -> user.getUserType() == User.UserType.CONTRACTOR)
                 .ifPresent(user -> {
-                    throw new org.springframework.security.access.AccessDeniedException(
+                    throw new AccessDeniedException(
                             "Voce nao pode acessar o proprio perfil publico de freelancer neste contexto");
                 });
     }

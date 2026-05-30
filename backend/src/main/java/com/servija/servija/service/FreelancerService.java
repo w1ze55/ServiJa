@@ -362,6 +362,7 @@ public class FreelancerService {
             Boolean available,
             String city,
             String state) {
+        currentUserContextService.requireContractorMarketplaceAccess();
 
         NearbyFreelancerFilters filters = new NearbyFreelancerFilters(
                 normalizeSearchToken(query),
@@ -451,6 +452,7 @@ public class FreelancerService {
 
     @Transactional(readOnly = true)
     public FreelancerProfileResponse getVisiblePublicProfile(Long freelancerId) {
+        currentUserContextService.denyFreelancerMarketplaceAccessIfAuthenticated();
         currentUserContextService.denyOwnFreelancerPublicAccess(freelancerId);
         Freelancer freelancer = freelancerRepository.findByIdWithServiceCities(freelancerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Freelancer não encontrado"));

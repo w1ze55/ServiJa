@@ -1,12 +1,15 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 
-// VITE_API_URL deve ser a URL base SEM /api no final
-// Exemplo: http://3.131.85.191 (não http://3.131.85.191/api)
-// O código abaixo adiciona /api automaticamente
+// VITE_API_URL deve ser a URL base sem /api no final.
+// Exemplo: http://localhost:8080
 const API_BASE_URL = import.meta.env.VITE_API_URL;
+const cleanBaseURL = (API_BASE_URL ?? 'http://localhost:8080').replace(/\/api\/?$/, '');
 
-// Remove /api ou /api/ do final se existir para evitar duplicação
-const cleanBaseURL = API_BASE_URL.replace(/\/api\/?$/, '');
+if (!API_BASE_URL) {
+  console.warn(
+    'VITE_API_URL is not defined for frontend. Falling back to "http://localhost:8080".'
+  );
+}
 
 const api = axios.create({
   baseURL: `${cleanBaseURL}/api`,
@@ -43,7 +46,6 @@ const normalizeUrlPath = (url: string) => {
     : withoutQuery;
 };
 
-// Interceptor para adicionar token de autenticação
 api.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     const normalizedPath = normalizeUrlPath(config.url || '');
@@ -53,10 +55,8 @@ api.interceptors.request.use(
       return config;
     }
 
-    // Primeiro tenta pegar o token direto
     let token = localStorage.getItem('token');
 
-    // Se não encontrar, tenta pegar do objeto user (compatibilidade)
     if (!token) {
       const user = localStorage.getItem('user');
       if (user) {
@@ -64,7 +64,7 @@ api.interceptors.request.use(
           const userData = JSON.parse(user);
           token = userData.token;
         } catch (e) {
-          // Ignora erro de parse
+          // Ignore invalid cached payloads.
         }
       }
     }
@@ -79,17 +79,13 @@ api.interceptors.request.use(
   }
 );
 
-// Interceptor para tratamento de erros
 api.interceptors.response.use(
   (response: any) => response,
   (error: AxiosError) => {
     if (error.response?.status === 401) {
-      // Token inválido ou expirado
       localStorage.removeItem('token');
       localStorage.removeItem('user');
 
-      // Se não estiver na página principal ou de login, redireciona 
-      // para forçar a limpeza do estado da aplicação (ex: store do Pinia)
       if (window.location.pathname !== '/login' && window.location.pathname !== '/') {
         window.location.href = '/login?expired=true';
       }

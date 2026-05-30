@@ -152,7 +152,7 @@ const routes: RouteRecordRaw[] = [
     path: "/map",
     name: "map",
     component: MapPage,
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, userType: "contractor" },
   },
 
   // ============ FREELANCER SERVICES ============
@@ -285,7 +285,7 @@ const routes: RouteRecordRaw[] = [
     path: "/provider-profile/:providerId",
     name: "provider-profile",
     component: ProviderProfilePage,
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, userType: "contractor" },
     props: true,
   },
 
@@ -294,7 +294,7 @@ const routes: RouteRecordRaw[] = [
     path: "/provider-profile/:providerId/service/:serviceId",
     name: "service-detail",
     component: ServiceDetailPage,
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, userType: "contractor" },
     props: true,
   },
 

@@ -301,6 +301,7 @@ public class ServiceService {
      */
     @Transactional(readOnly = true)
     public List<ServiceResponse> getPublicServicesByFreelancer(Long freelancerId) {
+        currentUserContextService.denyFreelancerMarketplaceAccessIfAuthenticated();
         List<Service> services = serviceRepository.findByFreelancerIdAndIsActiveOrderByCreatedAtDesc(freelancerId,
                 true);
         return toPublicResponses(services);
@@ -494,6 +495,7 @@ public class ServiceService {
         Service service = serviceRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Serviço não encontrado"));
 
+        currentUserContextService.denyFreelancerMarketplaceAccessIfAuthenticated();
         currentUserContextService.denyOwnFreelancerPublicAccess(service.getFreelancer().getId());
         if (!isPubliclyVisible(service)) {
             throw new ResourceNotFoundException("Serviço não encontrado");

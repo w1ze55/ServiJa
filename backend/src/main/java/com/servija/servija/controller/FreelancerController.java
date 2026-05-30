@@ -173,6 +173,8 @@ public class FreelancerController {
                     subcategoryId, subcategorySlug, minRating, available, city, state
             );
             return ResponseEntity.ok(nearbyFreelancers);
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(403).build();
         } catch (Exception e) {
             return ResponseEntity.internalServerError().build();
         }
