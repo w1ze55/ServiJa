@@ -155,9 +155,17 @@ watch(
   { immediate: true },
 );
 
+const getInitialSidebarPinned = () => {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  return window.localStorage.getItem("sidebarPinned") === "true";
+};
+
 const sidebarOpen = ref(false);
-const sidebarPinned = ref(false);
-const sidebarExpanded = ref(false);
+const sidebarPinned = ref(getInitialSidebarPinned());
+const sidebarExpanded = ref(sidebarPinned.value);
 const professionalDropdownOpen = ref(false);
 
 // Estado dos dropdowns do topbar
@@ -351,13 +359,6 @@ onMounted(() => {
 
   window.addEventListener("notification-stream-event", handleNotificationStreamEvent as EventListener);
   window.addEventListener(userLocationUpdatedEventName, handleUserLocationUpdated as EventListener);
-
-  // Carregar estado do pin da sidebar
-  const pinnedState = localStorage.getItem("sidebarPinned");
-  if (pinnedState === "true") {
-    sidebarPinned.value = true;
-    sidebarExpanded.value = true;
-  }
 });
 
 onUnmounted(() => {
