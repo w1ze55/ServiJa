@@ -85,18 +85,15 @@ class AuthServiceRegistrationTest {
     }
 
     @Test
-    @DisplayName("Deve registrar um CONTRACTOR com sucesso e retornar token")
+    @DisplayName("Deve registrar um CONTRACTOR com sucesso")
     void register_contractor_success() {
-        UserDetails mockUserDetails = mock(UserDetails.class);
         setupBaseRegistrationMocks();
         when(contractorRepository.findById(anyLong())).thenReturn(Optional.empty());
         when(contractorRepository.save(any(Contractor.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(userDetailsService.loadUserByUsername("joao@email.com")).thenReturn(mockUserDetails);
-        when(jwtService.generateToken(any(), any(UserDetails.class))).thenReturn("jwt-token-123");
 
         AuthResponse response = authService.register(contractorRequest);
 
-        assertThat(response.getToken()).isEqualTo("jwt-token-123");
+        assertThat(response.getToken()).isNull();
         assertThat(response.getUser().getName()).isEqualTo("Joao Silva");
         assertThat(response.getUser().getUserType()).isEqualTo(User.UserType.CONTRACTOR);
         assertThat(response.getUser().getActiveRole()).isEqualTo(User.UserType.CONTRACTOR);
@@ -107,18 +104,15 @@ class AuthServiceRegistrationTest {
     }
 
     @Test
-    @DisplayName("Deve registrar um FREELANCER com sucesso e retornar token")
+    @DisplayName("Deve registrar um FREELANCER com sucesso")
     void register_freelancer_success() {
-        UserDetails mockUserDetails = mock(UserDetails.class);
         setupBaseRegistrationMocks();
         when(freelancerRepository.findById(anyLong())).thenReturn(Optional.empty());
         when(freelancerRepository.save(any(Freelancer.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(userDetailsService.loadUserByUsername("maria@email.com")).thenReturn(mockUserDetails);
-        when(jwtService.generateToken(any(), any(UserDetails.class))).thenReturn("jwt-token-456");
 
         AuthResponse response = authService.register(freelancerRequest);
 
-        assertThat(response.getToken()).isEqualTo("jwt-token-456");
+        assertThat(response.getToken()).isNull();
         assertThat(response.getUser().getUserType()).isEqualTo(User.UserType.FREELANCER);
         assertThat(response.getUser().getActiveRole()).isEqualTo(User.UserType.FREELANCER);
         assertThat(response.getUser().getRoles()).containsExactly(User.UserType.FREELANCER);
@@ -156,12 +150,9 @@ class AuthServiceRegistrationTest {
     @Test
     @DisplayName("Deve enviar email de verificacao apos cadastro")
     void register_sendsVerificationEmail() {
-        UserDetails mockUserDetails = mock(UserDetails.class);
         setupBaseRegistrationMocks();
         when(contractorRepository.findById(anyLong())).thenReturn(Optional.empty());
         when(contractorRepository.save(any(Contractor.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(userDetailsService.loadUserByUsername(anyString())).thenReturn(mockUserDetails);
-        when(jwtService.generateToken(any(), any(UserDetails.class))).thenReturn("token");
 
         authService.register(contractorRequest);
 
@@ -171,13 +162,10 @@ class AuthServiceRegistrationTest {
     @Test
     @DisplayName("Deve gerar codigo de verificacao com 6 digitos")
     void register_generatesValidVerificationCode() {
-        UserDetails mockUserDetails = mock(UserDetails.class);
         ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
         setupBaseRegistrationMocks();
         when(contractorRepository.findById(anyLong())).thenReturn(Optional.empty());
         when(contractorRepository.save(any(Contractor.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(userDetailsService.loadUserByUsername(anyString())).thenReturn(mockUserDetails);
-        when(jwtService.generateToken(any(), any(UserDetails.class))).thenReturn("token");
 
         authService.register(contractorRequest);
 

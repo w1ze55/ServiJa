@@ -27,9 +27,12 @@ import org.springframework.stereotype.Service;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 @Service
@@ -50,6 +53,8 @@ public class WalletReportService {
     private final UserRepository userRepository;
 
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+    private static final DecimalFormatSymbols PT_BR_DECIMAL_SYMBOLS =
+            DecimalFormatSymbols.getInstance(Locale.forLanguageTag("pt-BR"));
 
     public ReportFile generateReport(String email, ReportFormat format) {
         User user = userRepository.findByEmail(email)
@@ -206,7 +211,9 @@ public class WalletReportService {
     private String formatBRL(Object value) {
         if (value == null) return "R$ 0,00";
         BigDecimal bd = value instanceof BigDecimal ? (BigDecimal) value : new BigDecimal(value.toString());
-        return String.format("R$ %,.2f", bd).replace(",", "X").replace(".", ",").replace("X", ".");
+        DecimalFormat formatter = new DecimalFormat("R$ #,##0.00", PT_BR_DECIMAL_SYMBOLS);
+        formatter.setParseBigDecimal(true);
+        return formatter.format(bd);
     }
 
     private String translateTransactionType(String type) {
