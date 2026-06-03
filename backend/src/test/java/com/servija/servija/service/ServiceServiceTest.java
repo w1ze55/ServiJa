@@ -49,6 +49,7 @@ class ServiceServiceTest {
     @Mock private ReviewRepository reviewRepository;
     @Mock private ObjectMapper objectMapper;
     @Mock private CategoryCatalogService categoryCatalogService;
+    @Mock private ServiceSearchWeeklyMetricService serviceSearchWeeklyMetricService;
     @Mock private AuditLogger auditLogger;
     @Mock private CurrentUserContextService currentUserContextService;
 
@@ -190,6 +191,64 @@ class ServiceServiceTest {
         List<ServiceResponse> responses = serviceService.getAllActiveServices();
 
         assertThat(responses).extracting(ServiceResponse::getId).containsExactly(14L);
+    }
+
+    @Test
+    @DisplayName("Deve filtrar servicos por nome do profissional quando houver categoria selecionada")
+    void getActiveServices_filtersByFreelancerNameWithCategorySelection() {
+        Service matchingService = buildService(21L, new BigDecimal("95.00"));
+        matchingService.getFreelancer().setName("Joao Silva");
+
+        Service nonMatchingService = buildService(22L, new BigDecimal("105.00"));
+        nonMatchingService.getFreelancer().setName("Maria Souza");
+
+        when(serviceRepository.findByServiceCategory_SlugAndIsActiveOrderByCreatedAtDesc("desenvolvimento-web", true))
+                .thenReturn(List.of(matchingService, nonMatchingService));
+        when(reviewRepository.countByServiceId(21L)).thenReturn(0L);
+        when(serviceRequestRepository.countByService_IdAndStatusAndResponseValueIsNotNull(21L, ServiceRequest.Status.COMPLETED))
+                .thenReturn(0L);
+
+        List<ServiceResponse> responses = serviceService.getActiveServices("desenvolvimento-web", null, "joao");
+
+        assertThat(responses).extracting(ServiceResponse::getId).containsExactly(21L);
+        assertThat(responses).extracting(ServiceResponse::getFreelancerName).containsExactly("Joao Silva");
+    }
+
+    @Test
+    @DisplayName("Deve registrar metricas semanais quando a busca publica for rastreavel")
+    void getActiveServices_tracksWeeklySearchResultsWhenRequested() {
+        Service firstService = buildService(23L, new BigDecimal("90.00"));
+        Service secondService = buildService(24L, new BigDecimal("130.00"));
+
+        when(serviceRepository.findByServiceCategory_SlugAndIsActiveOrderByCreatedAtDesc("design-grafico", true))
+                .thenReturn(List.of(firstService, secondService));
+        when(reviewRepository.countByServiceId(23L)).thenReturn(0L);
+        when(reviewRepository.countByServiceId(24L)).thenReturn(0L);
+        when(serviceRequestRepository.countByService_IdAndStatusAndResponseValueIsNotNull(23L, ServiceRequest.Status.COMPLETED))
+                .thenReturn(0L);
+        when(serviceRequestRepository.countByService_IdAndStatusAndResponseValueIsNotNull(24L, ServiceRequest.Status.COMPLETED))
+                .thenReturn(0L);
+
+        List<ServiceResponse> responses = serviceService.getActiveServices("design-grafico", null, null, true);
+
+        assertThat(responses).extracting(ServiceResponse::getId).containsExactly(23L, 24L);
+        verify(serviceSearchWeeklyMetricService).trackSearchResults(List.of(23L, 24L));
+    }
+
+    @Test
+    @DisplayName("Nao deve registrar metricas quando a busca publica nao for rastreavel")
+    void getActiveServices_skipsWeeklySearchTrackingWithoutIntent() {
+        Service service = buildService(25L, new BigDecimal("75.00"));
+
+        when(serviceRepository.findByIsActiveOrderByCreatedAtDesc(true)).thenReturn(List.of(service));
+        when(reviewRepository.countByServiceId(25L)).thenReturn(0L);
+        when(serviceRequestRepository.countByService_IdAndStatusAndResponseValueIsNotNull(25L, ServiceRequest.Status.COMPLETED))
+                .thenReturn(0L);
+
+        List<ServiceResponse> responses = serviceService.getActiveServices(null, null, null, true);
+
+        assertThat(responses).extracting(ServiceResponse::getId).containsExactly(25L);
+        verify(serviceSearchWeeklyMetricService, never()).trackSearchResults(any());
     }
 
     @Test

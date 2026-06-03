@@ -79,6 +79,7 @@ public class ClientHomeService {
     private final ServiceRequestService serviceRequestService;
     private final ServiceService serviceService;
     private final FavoriteService favoriteService;
+    private final ServiceSearchWeeklyMetricService serviceSearchWeeklyMetricService;
 
     @Transactional(readOnly = true)
     public ClientHomeResponse getHome() {
@@ -120,6 +121,7 @@ public class ClientHomeService {
                         metadata,
                         serviceRankingCache,
                         freelancerRankingCache))
+                .weeklyMostSearchedServices(selectWeeklyMostSearchedServices(metadata))
                 .featuredProfessionals(selectFeaturedProfessionals(
                         region,
                         normalizedInterestCategories,
@@ -131,6 +133,14 @@ public class ClientHomeService {
                         metadata,
                         serviceRankingCache))
                 .build();
+    }
+
+    private List<ServiceResponse> selectWeeklyMostSearchedServices(Metadata metadata) {
+        return serviceSearchWeeklyMetricService.getTopServiceIdsForCurrentWeek(FEATURED_LIMIT).stream()
+                .map(metadata.activeServicesById()::get)
+                .filter(Objects::nonNull)
+                .limit(FEATURED_LIMIT)
+                .toList();
     }
 
     protected User getCurrentContractor() {

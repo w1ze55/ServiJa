@@ -166,9 +166,14 @@ public class ServiceController {
     public ResponseEntity<List<ServiceResponse>> getAllActiveServices(
             @RequestParam(required = false) String categorySlug,
             @RequestParam(required = false) String subcategorySlug,
-            @RequestParam(required = false, name = "q") String query) {
+            @RequestParam(required = false, name = "q") String query,
+            @RequestParam(required = false, defaultValue = "false") boolean trackSearch) {
         try {
-            List<ServiceResponse> services = serviceService.getActiveServices(categorySlug, subcategorySlug, query);
+            List<ServiceResponse> services = serviceService.getActiveServices(
+                    categorySlug,
+                    subcategorySlug,
+                    query,
+                    trackSearch);
             return ResponseEntity.ok(services);
         } catch (AccessDeniedException e) {
             return ResponseEntity.status(403).build();

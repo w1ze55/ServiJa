@@ -1,6 +1,7 @@
 package com.servija.servija.controller;
 
 import com.servija.servija.dto.ClientHomeResponse;
+import com.servija.servija.dto.ServiceResponse;
 import com.servija.servija.exception.GlobalExceptionHandler;
 import com.servija.servija.service.ClientHomeService;
 import org.junit.jupiter.api.BeforeEach;
@@ -11,6 +12,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+
+import java.util.List;
 
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -40,11 +43,17 @@ class ClientHomeControllerTest {
                         .displayName("São Paulo, SP")
                         .localized(true)
                         .build())
+                .weeklyMostSearchedServices(List.of(
+                        ServiceResponse.builder()
+                                .id(77L)
+                                .title("Landing page premium")
+                                .build()))
                 .build());
 
         mockMvc.perform(get("/api/client-home"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.region.displayName").value("São Paulo, SP"));
+                .andExpect(jsonPath("$.region.displayName").value("São Paulo, SP"))
+                .andExpect(jsonPath("$.weeklyMostSearchedServices[0].id").value(77L));
     }
 
     @Test

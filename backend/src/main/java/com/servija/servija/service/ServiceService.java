@@ -27,6 +27,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.stream.Collectors;
 
 @Component
@@ -42,6 +43,7 @@ public class ServiceService {
     private final ReviewRepository reviewRepository;
     private final ObjectMapper objectMapper;
     private final CategoryCatalogService categoryCatalogService;
+    private final ServiceSearchWeeklyMetricService serviceSearchWeeklyMetricService;
     private final AuditLogger auditLogger;
     private final CurrentUserContextService currentUserContextService;
     private static final BigDecimal AVERAGE_PRICE_RANGE_SPREAD = new BigDecimal("0.20");
@@ -330,6 +332,15 @@ public class ServiceService {
 
     @Transactional(readOnly = true)
     public List<ServiceResponse> getActiveServices(String categorySlug, String subcategorySlug, String query) {
+        return getActiveServices(categorySlug, subcategorySlug, query, false);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ServiceResponse> getActiveServices(
+            String categorySlug,
+            String subcategorySlug,
+            String query,
+            boolean trackSearch) {
         List<Service> services;
 
         if (StringUtils.hasText(subcategorySlug)) {
@@ -344,16 +355,21 @@ public class ServiceService {
         }
 
         if (StringUtils.hasText(query) && (StringUtils.hasText(categorySlug) || StringUtils.hasText(subcategorySlug))) {
-            String normalizedQuery = query.toLowerCase();
+            String normalizedQuery = query.trim().toLowerCase(Locale.ROOT);
             services = services.stream()
-                    .filter(service -> (service.getTitle() != null
-                            && service.getTitle().toLowerCase().contains(normalizedQuery))
-                            || (service.getDescription() != null
-                                    && service.getDescription().toLowerCase().contains(normalizedQuery)))
+                    .filter(service -> matchesServiceSearch(service, normalizedQuery))
                     .toList();
         }
 
-        return toPublicResponses(services);
+        List<ServiceResponse> publicResponses = toPublicResponses(services);
+        if (trackSearch && hasExplicitSearchIntent(categorySlug, subcategorySlug, query)) {
+            serviceSearchWeeklyMetricService.trackSearchResults(
+                    publicResponses.stream()
+                            .map(ServiceResponse::getId)
+                            .toList());
+        }
+
+        return publicResponses;
     }
 
     /**
@@ -431,6 +447,23 @@ public class ServiceService {
                 .createdAt(service.getCreatedAt())
                 .updatedAt(service.getUpdatedAt())
                 .build();
+    }
+
+    private boolean matchesServiceSearch(Service service, String normalizedQuery) {
+        return containsNormalized(service.getTitle(), normalizedQuery)
+                || containsNormalized(service.getDescription(), normalizedQuery)
+                || containsNormalized(service.getFreelancer() != null ? service.getFreelancer().getName() : null,
+                        normalizedQuery);
+    }
+
+    private boolean hasExplicitSearchIntent(String categorySlug, String subcategorySlug, String query) {
+        return StringUtils.hasText(categorySlug)
+                || StringUtils.hasText(subcategorySlug)
+                || StringUtils.hasText(query);
+    }
+
+    private boolean containsNormalized(String value, String normalizedQuery) {
+        return value != null && value.toLowerCase(Locale.ROOT).contains(normalizedQuery);
     }
 
     private boolean hasCategorySelection(ServiceRequest request) {

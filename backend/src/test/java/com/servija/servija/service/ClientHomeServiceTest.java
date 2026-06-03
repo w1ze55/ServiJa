@@ -47,6 +47,7 @@ class ClientHomeServiceTest {
     @Mock private ServiceRequestService serviceRequestService;
     @Mock private ServiceService serviceService;
     @Mock private FavoriteService favoriteService;
+    @Mock private ServiceSearchWeeklyMetricService serviceSearchWeeklyMetricService;
 
     private ClientHomeService clientHomeService;
 
@@ -59,7 +60,8 @@ class ClientHomeServiceTest {
                 reviewRepository,
                 serviceRequestService,
                 serviceService,
-                favoriteService));
+                favoriteService,
+                serviceSearchWeeklyMetricService));
     }
 
     @Test
@@ -118,6 +120,8 @@ class ClientHomeServiceTest {
                 buildReview(5, LocalDateTime.now().minusDays(12))));
         when(reviewRepository.findByReviewedIdOrderByCreatedAtDesc(eq(globalFreelancer.getId()))).thenReturn(List.of(
                 buildReview(4, LocalDateTime.now().minusDays(160))));
+        when(serviceSearchWeeklyMetricService.getTopServiceIdsForCurrentWeek(6))
+                .thenReturn(List.of(regionalService.getId(), globalService.getId()));
 
         ClientHomeResponse response = clientHomeService.getHome();
 
@@ -128,6 +132,9 @@ class ClientHomeServiceTest {
         assertThat(response.getInterestCategories()).contains("UX e UI");
         assertThat(response.getFavorites().getServiceCount()).isEqualTo(1);
         assertThat(response.getFavorites().getProfessionalCount()).isEqualTo(1);
+        assertThat(response.getWeeklyMostSearchedServices())
+                .extracting(ServiceResponse::getId)
+                .containsExactly(regionalService.getId(), globalService.getId());
         assertThat(response.getFeaturedServices()).isNotEmpty();
         assertThat(response.getFeaturedServices().get(0).getId()).isEqualTo(regionalService.getId());
         assertThat(response.getFeaturedProfessionals()).isNotEmpty();
@@ -152,6 +159,7 @@ class ClientHomeServiceTest {
                 .thenReturn(List.of(buildAddress(freelancer.getUser(), "Atendimento", "Curitiba", "PR", true)));
         when(reviewRepository.findByReviewedIdOrderByCreatedAtDesc(freelancer.getId()))
                 .thenReturn(List.of(buildReview(5, LocalDateTime.now().minusDays(6))));
+        when(serviceSearchWeeklyMetricService.getTopServiceIdsForCurrentWeek(6)).thenReturn(List.of(service.getId()));
 
         ClientHomeResponse response = clientHomeService.getHome();
 
@@ -159,6 +167,33 @@ class ClientHomeServiceTest {
         assertThat(response.getRegion().getDisplayName()).isEqualTo("toda a plataforma");
         assertThat(response.getFeaturedServices()).hasSize(1);
         assertThat(response.getFeaturedProfessionals()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("Deve retornar apenas servicos semanais que continuam ativos e publicos")
+    void getHome_filtersWeeklyMostSearchedServicesAgainstCurrentCatalog() {
+        User contractor = buildContractor(12L, "cliente3@servija.com");
+        Freelancer freelancer = buildFreelancer(41L, "Marina Dev", true, "Recife", "PE");
+        ServiceResponse visibleService = buildService(301L, 41L, "Site institucional", "Tecnologia", "Web");
+
+        doReturn(contractor).when(clientHomeService).getCurrentContractor();
+        when(serviceRequestService.getByContractorEmail(contractor.getEmail())).thenReturn(List.of());
+        when(addressRepository.findByUserIdOrderByIsDefaultDescCreatedAtDesc(contractor.getId())).thenReturn(List.of());
+        when(favoriteService.getUserFavorites(contractor.getId())).thenReturn(List.of());
+        when(serviceService.getActiveServices(null, null, null)).thenReturn(List.of(visibleService));
+        when(freelancerRepository.findAllByIdInWithServiceCities(anyList())).thenReturn(List.of(freelancer));
+        when(freelancerRepository.findById(anyLong())).thenReturn(Optional.of(freelancer));
+        when(addressRepository.findByUserIdInOrderByUserIdAscIsDefaultDescCreatedAtDesc(anyList()))
+                .thenReturn(List.of(buildAddress(freelancer.getUser(), "Atendimento", "Recife", "PE", true)));
+        when(reviewRepository.findByReviewedIdOrderByCreatedAtDesc(freelancer.getId())).thenReturn(List.of());
+        when(serviceSearchWeeklyMetricService.getTopServiceIdsForCurrentWeek(6))
+                .thenReturn(List.of(999L, visibleService.getId(), 998L));
+
+        ClientHomeResponse response = clientHomeService.getHome();
+
+        assertThat(response.getWeeklyMostSearchedServices())
+                .extracting(ServiceResponse::getId)
+                .containsExactly(visibleService.getId());
     }
 
     private User buildContractor(Long id, String email) {
