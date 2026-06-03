@@ -196,7 +196,7 @@ const formatCompletedDate = (value?: string) =>
             <CloseIcon class="h-5 w-5" />
           </button>
 
-          <div class="grid grid-cols-1 md:grid-cols-2 h-full">
+          <div class="grid grid-cols-1 md:grid-cols-2 h-full overflow-y-auto md:overflow-hidden">
             <div class="relative bg-gray-900 flex items-center justify-center min-h-[300px] md:min-h-[500px]">
               <video
                 v-if="selectedItem?.type === 'video'"
@@ -219,7 +219,7 @@ const formatCompletedDate = (value?: string) =>
               </div>
             </div>
 
-            <div class="p-6 md:p-8 flex flex-col h-full overflow-y-auto">
+            <div class="p-6 md:p-8 flex flex-col md:h-full md:overflow-y-auto">
               <div>
                 <Badge variant="secondary" class="mb-3 bg-blue-50 text-[#286AD8] border-none">
                   {{ getItemCategory(selectedItem) }}
