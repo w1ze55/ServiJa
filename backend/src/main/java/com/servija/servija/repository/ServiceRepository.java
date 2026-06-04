@@ -14,6 +14,9 @@ public interface ServiceRepository extends JpaRepository<Service, Long> {
     // Buscar servicos por freelancer
     List<Service> findByFreelancerIdOrderByCreatedAtDesc(Long freelancerId);
 
+    // Buscar servicos por freelancer ignorando os excluidos logicamente (soft delete)
+    List<Service> findByFreelancerIdAndDeletedAtIsNullOrderByCreatedAtDesc(Long freelancerId);
+
     // Buscar servicos ativos por freelancer
     List<Service> findByFreelancerIdAndIsActiveOrderByCreatedAtDesc(Long freelancerId, Boolean isActive);
 
@@ -34,6 +37,11 @@ public interface ServiceRepository extends JpaRepository<Service, Long> {
 
     // Contar servicos ativos por freelancer
     Long countByFreelancerIdAndIsActive(Long freelancerId, Boolean isActive);
+
+    // Contagens ignorando os excluidos logicamente (soft delete)
+    Long countByFreelancerIdAndDeletedAtIsNull(Long freelancerId);
+
+    Long countByFreelancerIdAndIsActiveAndDeletedAtIsNull(Long freelancerId, Boolean isActive);
 
     // Buscar servicos por texto (titulo, descricao ou nome do freelancer)
     @Query("SELECT s FROM Service s " +

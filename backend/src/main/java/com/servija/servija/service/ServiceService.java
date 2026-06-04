@@ -9,6 +9,7 @@ import com.servija.servija.exception.ResourceNotFoundException;
 import com.servija.servija.model.Freelancer;
 import com.servija.servija.model.Service;
 import com.servija.servija.model.User;
+import com.servija.servija.repository.FavoriteRepository;
 import com.servija.servija.repository.FreelancerRepository;
 import com.servija.servija.repository.ReviewRepository;
 import com.servija.servija.repository.ServiceRepository;
@@ -25,6 +26,7 @@ import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -40,6 +42,7 @@ public class ServiceService {
     private final UserRepository userRepository;
     private final FileStorageService fileStorageService;
     private final ServiceRequestRepository serviceRequestRepository;
+    private final FavoriteRepository favoriteRepository;
     private final ReviewRepository reviewRepository;
     private final ObjectMapper objectMapper;
     private final CategoryCatalogService categoryCatalogService;
@@ -73,7 +76,8 @@ public class ServiceService {
     @Transactional(readOnly = true)
     public List<ServiceResponse> getMyServices() {
         Freelancer freelancer = getCurrentFreelancer();
-        List<Service> services = serviceRepository.findByFreelancerIdOrderByCreatedAtDesc(freelancer.getId());
+        List<Service> services = serviceRepository
+                .findByFreelancerIdAndDeletedAtIsNullOrderByCreatedAtDesc(freelancer.getId());
         return services.stream().map(this::toResponse).collect(Collectors.toList());
     }
 
@@ -84,6 +88,9 @@ public class ServiceService {
     public ServiceResponse getServiceById(Long id) {
         Service service = serviceRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Serviço não encontrado"));
+        if (service.getDeletedAt() != null) {
+            throw new RuntimeException("Serviço não encontrado");
+        }
         return toResponse(service);
     }
 
@@ -128,6 +135,10 @@ public class ServiceService {
 
         Service service = serviceRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Serviço não encontrado"));
+
+        if (service.getDeletedAt() != null) {
+            throw new RuntimeException("Serviço não encontrado");
+        }
 
         // Verificar se o serviço pertence ao freelancer atual
         if (!service.getFreelancer().getId().equals(freelancer.getId())) {
@@ -203,7 +214,10 @@ public class ServiceService {
     }
 
     /**
-     * Excluir um serviço
+     * Excluir um serviço.
+     * Faz soft delete (preserva o registro) quando há solicitações associadas, para não
+     * quebrar o histórico de transações; caso contrário, remove fisicamente o serviço e
+     * suas imagens no S3. Favoritos são sempre removidos (bookmarks descartáveis).
      */
     @Transactional
     public void deleteService(Long id) {
@@ -212,25 +226,43 @@ public class ServiceService {
         Service service = serviceRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Serviço não encontrado"));
 
+        // Já excluído logicamente: trata como não encontrado
+        if (service.getDeletedAt() != null) {
+            throw new RuntimeException("Serviço não encontrado");
+        }
+
         // Verificar se o serviço pertence ao freelancer atual
         if (!service.getFreelancer().getId().equals(freelancer.getId())) {
             throw new RuntimeException("Você não tem permissão para excluir este serviço");
         }
 
-        // Coletar URLs das imagens para deletar do S3
-        List<String> imageUrls = fromJson(service.getImages());
         ServiceResponse deletedService = toResponse(service);
+        boolean hasRequests = serviceRequestRepository.existsByService_Id(id);
 
-        serviceRepository.delete(service);
-        log.info("Serviço excluído: {}", id);
+        // Favoritos são bookmarks descartáveis: remova para não ficarem órfãos e para
+        // liberar a FK no caso do delete físico.
+        favoriteRepository.deleteByServiceId(id);
 
-        // Deletar imagens do S3
-        for (String url : imageUrls) {
-            if (isS3Url(url)) {
-                try {
-                    fileStorageService.deleteFile(url);
-                } catch (Exception e) {
-                    log.warn("Falha ao deletar imagem de serviço do S3 ao excluir: {}. Erro: {}", url, e.getMessage());
+        if (hasRequests) {
+            // Soft delete: mantém o registro (e as imagens no S3) para o histórico de solicitações
+            service.setIsActive(false);
+            service.setDeletedAt(LocalDateTime.now());
+            serviceRepository.save(service);
+            log.info("Serviço marcado como excluído (soft delete): {}", id);
+        } else {
+            // Hard delete: remove o registro e as imagens no S3
+            List<String> imageUrls = fromJson(service.getImages());
+            serviceRepository.delete(service);
+            log.info("Serviço excluído: {}", id);
+
+            for (String url : imageUrls) {
+                if (isS3Url(url)) {
+                    try {
+                        fileStorageService.deleteFile(url);
+                    } catch (Exception e) {
+                        log.warn("Falha ao deletar imagem de serviço do S3 ao excluir: {}. Erro: {}", url,
+                                e.getMessage());
+                    }
                 }
             }
         }
@@ -260,6 +292,10 @@ public class ServiceService {
 
         Service service = serviceRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Serviço não encontrado"));
+
+        if (service.getDeletedAt() != null) {
+            throw new RuntimeException("Serviço não encontrado");
+        }
 
         // Verificar se o serviço pertence ao freelancer atual
         if (!service.getFreelancer().getId().equals(freelancer.getId())) {
@@ -403,8 +439,8 @@ public class ServiceService {
     @Transactional(readOnly = true)
     public ServiceStats getServiceStats() {
         Freelancer freelancer = getCurrentFreelancer();
-        Long total = serviceRepository.countByFreelancerId(freelancer.getId());
-        Long active = serviceRepository.countByFreelancerIdAndIsActive(freelancer.getId(), true);
+        Long total = serviceRepository.countByFreelancerIdAndDeletedAtIsNull(freelancer.getId());
+        Long active = serviceRepository.countByFreelancerIdAndIsActiveAndDeletedAtIsNull(freelancer.getId(), true);
         Long inactive = total - active;
 
         return ServiceStats.builder()

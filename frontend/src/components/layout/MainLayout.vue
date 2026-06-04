@@ -931,28 +931,3 @@ const handleNotificationStreamEvent = (event: Event) => {
     </div>
   </div>
 </template>
-<style scoped>
-/* Estilo personalizado para a scrollbar da sidebar */
-nav::-webkit-scrollbar {
-  width: 5px;
-}
-
-nav::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-nav::-webkit-scrollbar-thumb {
-  background: #435574;
-  border-radius: 10px;
-}
-
-nav::-webkit-scrollbar-thumb:hover {
-  background: #286ad8;
-}
-
-/* Para garantir que a scrollbar não empurre o conteúdo */
-nav {
-  scrollbar-width: thin;
-  scrollbar-color: #435574 transparent;
-}
-</style>

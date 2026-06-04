@@ -8,6 +8,7 @@ import com.servija.servija.model.Freelancer;
 import com.servija.servija.model.Service;
 import com.servija.servija.model.ServiceRequest;
 import com.servija.servija.model.User;
+import com.servija.servija.repository.FavoriteRepository;
 import com.servija.servija.repository.FreelancerRepository;
 import com.servija.servija.repository.ReviewRepository;
 import com.servija.servija.repository.ServiceRepository;
@@ -46,6 +47,7 @@ class ServiceServiceTest {
     @Mock private UserRepository userRepository;
     @Mock private FileStorageService fileStorageService;
     @Mock private ServiceRequestRepository serviceRequestRepository;
+    @Mock private FavoriteRepository favoriteRepository;
     @Mock private ReviewRepository reviewRepository;
     @Mock private ObjectMapper objectMapper;
     @Mock private CategoryCatalogService categoryCatalogService;
@@ -287,6 +289,54 @@ class ServiceServiceTest {
                 eq(Map.of("fieldsChanged", List.of("title"))),
                 eq(Map.of("title", "Nome antigo")),
                 eq(Map.of("title", "Nome novo")));
+    }
+
+    @Test
+    @DisplayName("Deve fazer soft delete quando o servico possui solicitacoes associadas")
+    void deleteService_softDeletesWhenServiceHasRequests() {
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken("freela@servija.com", "secret"));
+
+        User freelancerUser = buildFreelancerUser();
+        Freelancer freelancerProfile = buildFreelancerProfile(freelancerUser);
+        Service service = buildService(40L, new BigDecimal("500.00"));
+
+        when(currentUserContextService.requireActiveRole(User.UserType.FREELANCER)).thenReturn(freelancerUser);
+        when(freelancerRepository.findById(3L)).thenReturn(Optional.of(freelancerProfile));
+        when(serviceRepository.findById(40L)).thenReturn(Optional.of(service));
+        when(serviceRequestRepository.existsByService_Id(40L)).thenReturn(true);
+
+        serviceService.deleteService(40L);
+
+        assertThat(service.getDeletedAt()).isNotNull();
+        assertThat(service.getIsActive()).isFalse();
+        verify(favoriteRepository).deleteByServiceId(40L);
+        verify(serviceRepository).save(service);
+        verify(serviceRepository, never()).delete(any(Service.class));
+        verify(fileStorageService, never()).deleteFile(any());
+    }
+
+    @Test
+    @DisplayName("Deve fazer hard delete quando o servico nao possui solicitacoes associadas")
+    void deleteService_hardDeletesWhenServiceHasNoRequests() {
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken("freela@servija.com", "secret"));
+
+        User freelancerUser = buildFreelancerUser();
+        Freelancer freelancerProfile = buildFreelancerProfile(freelancerUser);
+        Service service = buildService(41L, new BigDecimal("500.00"));
+
+        when(currentUserContextService.requireActiveRole(User.UserType.FREELANCER)).thenReturn(freelancerUser);
+        when(freelancerRepository.findById(3L)).thenReturn(Optional.of(freelancerProfile));
+        when(serviceRepository.findById(41L)).thenReturn(Optional.of(service));
+        when(serviceRequestRepository.existsByService_Id(41L)).thenReturn(false);
+
+        serviceService.deleteService(41L);
+
+        verify(favoriteRepository).deleteByServiceId(41L);
+        verify(serviceRepository).delete(service);
+        verify(serviceRepository, never()).save(any(Service.class));
+        assertThat(service.getDeletedAt()).isNull();
     }
 
     private User buildFreelancerUser() {
