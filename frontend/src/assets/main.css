@@ -28,6 +28,11 @@
     --input: 214.3 31.8% 91.4%;
     --ring: 217.5 72.1% 50.2%;
     --radius: 0.5rem;
+
+    /* Scrollbar */
+    --scrollbar-size: 10px;
+    --scrollbar-thumb: 215.4 16.3% 46.9%;        /* = --muted-foreground (light) */
+    --scrollbar-thumb-hover: 217.5 72.1% 50.2%;  /* = --primary */
   }
 
   .dark {
@@ -54,6 +59,10 @@
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 217.5 72.1% 50.2%;
+
+    /* Scrollbar (dark) */
+    --scrollbar-thumb: 215 20.2% 65.1%;          /* = --muted-foreground (dark) */
+    --scrollbar-thumb-hover: 217.5 72.1% 50.2%;
   }
 }
 
@@ -63,5 +72,54 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+@layer base {
+  html {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--scrollbar-thumb)) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: var(--scrollbar-size);
+    height: var(--scrollbar-size);
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--scrollbar-thumb) / 0.6);
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: hsl(var(--scrollbar-thumb-hover));
+  }
+  *::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+}
+
+@layer components {
+  .custom-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--scrollbar-thumb)) transparent;
+  }
+  .custom-scrollbar::-webkit-scrollbar {
+    width: var(--scrollbar-size);
+    height: var(--scrollbar-size);
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--scrollbar-thumb) / 0.6);
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background-color: hsl(var(--scrollbar-thumb-hover));
   }
 }

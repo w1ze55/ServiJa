@@ -23,12 +23,15 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayOutputStream;
+import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Locale;
 
 @Service
 @RequiredArgsConstructor
@@ -44,6 +47,7 @@ public class PlatformWalletReportService {
     }
 
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+    private static final DecimalFormatSymbols PT_BR_DECIMAL_SYMBOLS = DecimalFormatSymbols.getInstance(Locale.forLanguageTag("pt-BR"));
 
     private final PlatformWalletTransactionService transactionService;
     private final PlatformWalletService platformWalletService;
@@ -215,7 +219,9 @@ public class PlatformWalletReportService {
 
     private String formatBRL(BigDecimal value) {
         BigDecimal safeValue = value == null ? BigDecimal.ZERO : value;
-        return String.format("R$ %,.2f", safeValue).replace(",", "X").replace(".", ",").replace("X", ".");
+        DecimalFormat formatter = new DecimalFormat("R$ #,##0.00", PT_BR_DECIMAL_SYMBOLS);
+        formatter.setParseBigDecimal(true);
+        return formatter.format(safeValue);
     }
 
     private String translateTransactionType(String type) {

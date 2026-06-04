@@ -9,6 +9,7 @@ import com.servija.servija.exception.ResourceNotFoundException;
 import com.servija.servija.model.Freelancer;
 import com.servija.servija.model.Service;
 import com.servija.servija.model.User;
+import com.servija.servija.repository.FavoriteRepository;
 import com.servija.servija.repository.FreelancerRepository;
 import com.servija.servija.repository.ReviewRepository;
 import com.servija.servija.repository.ServiceRepository;
@@ -25,8 +26,10 @@ import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.stream.Collectors;
 
 @Component
@@ -39,10 +42,13 @@ public class ServiceService {
     private final UserRepository userRepository;
     private final FileStorageService fileStorageService;
     private final ServiceRequestRepository serviceRequestRepository;
+    private final FavoriteRepository favoriteRepository;
     private final ReviewRepository reviewRepository;
     private final ObjectMapper objectMapper;
     private final CategoryCatalogService categoryCatalogService;
+    private final ServiceSearchWeeklyMetricService serviceSearchWeeklyMetricService;
     private final AuditLogger auditLogger;
+    private final CurrentUserContextService currentUserContextService;
     private static final BigDecimal AVERAGE_PRICE_RANGE_SPREAD = new BigDecimal("0.20");
 
     /**
@@ -59,7 +65,7 @@ public class ServiceService {
      * Obter o freelancer do usuário atual
      */
     private Freelancer getCurrentFreelancer() {
-        User user = getCurrentUser();
+        User user = currentUserContextService.requireActiveRole(User.UserType.FREELANCER);
         return freelancerRepository.findById(user.getId())
                 .orElseThrow(() -> new RuntimeException("Perfil de freelancer não encontrado"));
     }
@@ -70,7 +76,8 @@ public class ServiceService {
     @Transactional(readOnly = true)
     public List<ServiceResponse> getMyServices() {
         Freelancer freelancer = getCurrentFreelancer();
-        List<Service> services = serviceRepository.findByFreelancerIdOrderByCreatedAtDesc(freelancer.getId());
+        List<Service> services = serviceRepository
+                .findByFreelancerIdAndDeletedAtIsNullOrderByCreatedAtDesc(freelancer.getId());
         return services.stream().map(this::toResponse).collect(Collectors.toList());
     }
 
@@ -81,6 +88,9 @@ public class ServiceService {
     public ServiceResponse getServiceById(Long id) {
         Service service = serviceRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Serviço não encontrado"));
+        if (service.getDeletedAt() != null) {
+            throw new RuntimeException("Serviço não encontrado");
+        }
         return toResponse(service);
     }
 
@@ -125,6 +135,10 @@ public class ServiceService {
 
         Service service = serviceRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Serviço não encontrado"));
+
+        if (service.getDeletedAt() != null) {
+            throw new RuntimeException("Serviço não encontrado");
+        }
 
         // Verificar se o serviço pertence ao freelancer atual
         if (!service.getFreelancer().getId().equals(freelancer.getId())) {
@@ -200,7 +214,10 @@ public class ServiceService {
     }
 
     /**
-     * Excluir um serviço
+     * Excluir um serviço.
+     * Faz soft delete (preserva o registro) quando há solicitações associadas, para não
+     * quebrar o histórico de transações; caso contrário, remove fisicamente o serviço e
+     * suas imagens no S3. Favoritos são sempre removidos (bookmarks descartáveis).
      */
     @Transactional
     public void deleteService(Long id) {
@@ -209,25 +226,43 @@ public class ServiceService {
         Service service = serviceRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Serviço não encontrado"));
 
+        // Já excluído logicamente: trata como não encontrado
+        if (service.getDeletedAt() != null) {
+            throw new RuntimeException("Serviço não encontrado");
+        }
+
         // Verificar se o serviço pertence ao freelancer atual
         if (!service.getFreelancer().getId().equals(freelancer.getId())) {
             throw new RuntimeException("Você não tem permissão para excluir este serviço");
         }
 
-        // Coletar URLs das imagens para deletar do S3
-        List<String> imageUrls = fromJson(service.getImages());
         ServiceResponse deletedService = toResponse(service);
+        boolean hasRequests = serviceRequestRepository.existsByService_Id(id);
 
-        serviceRepository.delete(service);
-        log.info("Serviço excluído: {}", id);
+        // Favoritos são bookmarks descartáveis: remova para não ficarem órfãos e para
+        // liberar a FK no caso do delete físico.
+        favoriteRepository.deleteByServiceId(id);
 
-        // Deletar imagens do S3
-        for (String url : imageUrls) {
-            if (isS3Url(url)) {
-                try {
-                    fileStorageService.deleteFile(url);
-                } catch (Exception e) {
-                    log.warn("Falha ao deletar imagem de serviço do S3 ao excluir: {}. Erro: {}", url, e.getMessage());
+        if (hasRequests) {
+            // Soft delete: mantém o registro (e as imagens no S3) para o histórico de solicitações
+            service.setIsActive(false);
+            service.setDeletedAt(LocalDateTime.now());
+            serviceRepository.save(service);
+            log.info("Serviço marcado como excluído (soft delete): {}", id);
+        } else {
+            // Hard delete: remove o registro e as imagens no S3
+            List<String> imageUrls = fromJson(service.getImages());
+            serviceRepository.delete(service);
+            log.info("Serviço excluído: {}", id);
+
+            for (String url : imageUrls) {
+                if (isS3Url(url)) {
+                    try {
+                        fileStorageService.deleteFile(url);
+                    } catch (Exception e) {
+                        log.warn("Falha ao deletar imagem de serviço do S3 ao excluir: {}. Erro: {}", url,
+                                e.getMessage());
+                    }
                 }
             }
         }
@@ -257,6 +292,10 @@ public class ServiceService {
 
         Service service = serviceRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Serviço não encontrado"));
+
+        if (service.getDeletedAt() != null) {
+            throw new RuntimeException("Serviço não encontrado");
+        }
 
         // Verificar se o serviço pertence ao freelancer atual
         if (!service.getFreelancer().getId().equals(freelancer.getId())) {
@@ -300,6 +339,7 @@ public class ServiceService {
      */
     @Transactional(readOnly = true)
     public List<ServiceResponse> getPublicServicesByFreelancer(Long freelancerId) {
+        currentUserContextService.denyFreelancerMarketplaceAccessIfAuthenticated();
         List<Service> services = serviceRepository.findByFreelancerIdAndIsActiveOrderByCreatedAtDesc(freelancerId,
                 true);
         return toPublicResponses(services);
@@ -328,6 +368,15 @@ public class ServiceService {
 
     @Transactional(readOnly = true)
     public List<ServiceResponse> getActiveServices(String categorySlug, String subcategorySlug, String query) {
+        return getActiveServices(categorySlug, subcategorySlug, query, false);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ServiceResponse> getActiveServices(
+            String categorySlug,
+            String subcategorySlug,
+            String query,
+            boolean trackSearch) {
         List<Service> services;
 
         if (StringUtils.hasText(subcategorySlug)) {
@@ -342,16 +391,21 @@ public class ServiceService {
         }
 
         if (StringUtils.hasText(query) && (StringUtils.hasText(categorySlug) || StringUtils.hasText(subcategorySlug))) {
-            String normalizedQuery = query.toLowerCase();
+            String normalizedQuery = query.trim().toLowerCase(Locale.ROOT);
             services = services.stream()
-                    .filter(service -> (service.getTitle() != null
-                            && service.getTitle().toLowerCase().contains(normalizedQuery))
-                            || (service.getDescription() != null
-                                    && service.getDescription().toLowerCase().contains(normalizedQuery)))
+                    .filter(service -> matchesServiceSearch(service, normalizedQuery))
                     .toList();
         }
 
-        return toPublicResponses(services);
+        List<ServiceResponse> publicResponses = toPublicResponses(services);
+        if (trackSearch && hasExplicitSearchIntent(categorySlug, subcategorySlug, query)) {
+            serviceSearchWeeklyMetricService.trackSearchResults(
+                    publicResponses.stream()
+                            .map(ServiceResponse::getId)
+                            .toList());
+        }
+
+        return publicResponses;
     }
 
     /**
@@ -385,8 +439,8 @@ public class ServiceService {
     @Transactional(readOnly = true)
     public ServiceStats getServiceStats() {
         Freelancer freelancer = getCurrentFreelancer();
-        Long total = serviceRepository.countByFreelancerId(freelancer.getId());
-        Long active = serviceRepository.countByFreelancerIdAndIsActive(freelancer.getId(), true);
+        Long total = serviceRepository.countByFreelancerIdAndDeletedAtIsNull(freelancer.getId());
+        Long active = serviceRepository.countByFreelancerIdAndIsActiveAndDeletedAtIsNull(freelancer.getId(), true);
         Long inactive = total - active;
 
         return ServiceStats.builder()
@@ -429,6 +483,23 @@ public class ServiceService {
                 .createdAt(service.getCreatedAt())
                 .updatedAt(service.getUpdatedAt())
                 .build();
+    }
+
+    private boolean matchesServiceSearch(Service service, String normalizedQuery) {
+        return containsNormalized(service.getTitle(), normalizedQuery)
+                || containsNormalized(service.getDescription(), normalizedQuery)
+                || containsNormalized(service.getFreelancer() != null ? service.getFreelancer().getName() : null,
+                        normalizedQuery);
+    }
+
+    private boolean hasExplicitSearchIntent(String categorySlug, String subcategorySlug, String query) {
+        return StringUtils.hasText(categorySlug)
+                || StringUtils.hasText(subcategorySlug)
+                || StringUtils.hasText(query);
+    }
+
+    private boolean containsNormalized(String value, String normalizedQuery) {
+        return value != null && value.toLowerCase(Locale.ROOT).contains(normalizedQuery);
     }
 
     private boolean hasCategorySelection(ServiceRequest request) {
@@ -489,9 +560,12 @@ public class ServiceService {
     }
 
     private Service requirePublicService(Long id) {
+        // own-profile guard applied after resolving the service owner
         Service service = serviceRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Serviço não encontrado"));
 
+        currentUserContextService.denyFreelancerMarketplaceAccessIfAuthenticated();
+        currentUserContextService.denyOwnFreelancerPublicAccess(service.getFreelancer().getId());
         if (!isPubliclyVisible(service)) {
             throw new ResourceNotFoundException("Serviço não encontrado");
         }
@@ -502,6 +576,10 @@ public class ServiceService {
     private List<ServiceResponse> toPublicResponses(List<Service> services) {
         return services.stream()
                 .filter(this::isPubliclyVisible)
+                .filter(service -> currentUserContextService.getOptionalAuthenticatedUser()
+                        .map(user -> user.getUserType() != User.UserType.CONTRACTOR
+                                || !user.getId().equals(service.getFreelancer().getId()))
+                        .orElse(true))
                 .map(this::toPublicResponse)
                 .collect(Collectors.toList());
     }

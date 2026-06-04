@@ -18,6 +18,7 @@ public class ClientHomeResponse {
     private List<ServiceRequestResponse> recentRequests;
     private List<ServiceRequestResponse> activeProjects;
     private FavoritesInfo favorites;
+    private List<ServiceResponse> weeklyMostSearchedServices;
     private List<NearbyFreelancerResponse> featuredProfessionals;
     private List<ServiceResponse> featuredServices;
 

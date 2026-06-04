@@ -316,6 +316,24 @@ function formatHour(iso: string) {
   return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 }
 
+function resolveAttachmentName(msg: MessageDTO) {
+  if (msg.attachmentName?.trim()) {
+    return msg.attachmentName.trim();
+  }
+
+  if (!msg.attachmentUrl) {
+    return 'Anexo';
+  }
+
+  try {
+    const lastSegment = new URL(msg.attachmentUrl).pathname.split('/').pop();
+    return lastSegment ? decodeURIComponent(lastSegment) : 'Anexo';
+  } catch {
+    const lastSegment = msg.attachmentUrl.split('/').pop();
+    return lastSegment ? decodeURIComponent(lastSegment) : 'Anexo';
+  }
+}
+
 function toDisplay(msg: MessageDTO): ChatMessage {
   const isMe = msg.senderId === user.value?.email;
   const counterpartyName = activeConversation.value ? otherPartyName(activeConversation.value) : '';
@@ -328,7 +346,7 @@ function toDisplay(msg: MessageDTO): ChatMessage {
     status: msg.status,
     readAt: msg.readAt,
     attachments: msg.attachmentUrl
-      ? [{ id: msg.id, name: 'Anexo', url: msg.attachmentUrl, size: '' }]
+      ? [{ id: msg.id, name: resolveAttachmentName(msg), url: msg.attachmentUrl, size: '' }]
       : undefined,
   };
 }
@@ -588,13 +606,15 @@ async function handleSend() {
     }
     if (files.length > 0) {
       const urls = await uploadFiles(files);
-      for (const url of urls) {
+      for (const [index, url] of urls.entries()) {
+        const fileName = files[index]?.name || 'Anexo';
         const asImage = isImageUrl(url);
         const msg = await chatService.sendMessage(
           activeConversation.value.id,
           asImage ? 'Imagem' : 'Arquivo',
           asImage ? 'image' : 'file',
-          url
+          url,
+          fileName
         );
         if (!messages.value.some((m) => m.id === msg.id)) {
           messages.value.push(toDisplay(msg));
@@ -964,7 +984,7 @@ const handleSearch = (query: string) => router.push({ path: '/search', query: { 
                           variant="compact"
                           :class="
                             msg.sender === currentUserRole
-                              ? 'bg-white/10 border-white/20 text-white'
+                              ? 'bg-blue-100 border-white/20 text-white'
                               : ''
                           "
                         />

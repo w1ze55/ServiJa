@@ -47,6 +47,17 @@ const getDisplayLocation = (freelancer: Freelancer) => {
   return city || state || 'Localização não informada';
 };
 
+const hasFreelancerRating = (freelancer: Freelancer) =>
+  (freelancer.reviewCount ?? 0) > 0 && Number.isFinite(freelancer.rating);
+
+const formatFreelancerRatingDisplay = (freelancer: Freelancer) => {
+  if (!hasFreelancerRating(freelancer)) {
+    return 'Sem avaliações';
+  }
+
+  return `${freelancer.rating.toFixed(1)} (${freelancer.reviewCount})`;
+};
+
 const handleCardClick = () => {
   props.onViewProfile(props.freelancer.id);
 };
@@ -97,9 +108,8 @@ const handleToggleFavorite = (e: MouseEvent) => {
           {{ freelancer.servicesCount }} {{ freelancer.servicesCount === 1 ? 'serviço cadastrado' : 'serviços cadastrados' }}
         </p>
         <div class="flex items-center gap-1 text-[#435574] mt-1">
-          <Star class="h-3 w-3 fill-yellow-400 text-yellow-400" />
-          <span class="text-xs font-semibold text-[#263238]">{{ freelancer.rating.toFixed(1) }}</span>
-          <span class="text-[10px]">({{ freelancer.reviewCount }})</span>
+          <Star :class="`h-3 w-3 ${hasFreelancerRating(freelancer) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`" />
+          <span class="text-xs font-semibold text-[#263238]">{{ formatFreelancerRatingDisplay(freelancer) }}</span>
         </div>
       </div>
     </div>
@@ -111,10 +121,6 @@ const handleToggleFavorite = (e: MouseEvent) => {
           {{ getDisplayLocation(freelancer) }}
         </span>
       </div>
-
-      <p class="text-xs text-[#435574] line-clamp-1">
-        Atua em: <span class="font-semibold text-[#263238]">{{ freelancer.category || (freelancer.categories?.join(', ')) }}</span>
-      </p>
       
       <div class="flex flex-wrap gap-2 py-1 min-h-[28px]">
         <template v-if="freelancer.categories">

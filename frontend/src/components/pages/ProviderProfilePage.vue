@@ -64,8 +64,10 @@ import AvatarFallback from '../ui/avatar-fallback.vue';
 import api from '@/api/config/axios';
 import { toast } from '@/utils/toast';
 import { useFavoritesStore } from '@/stores/favorites';
+import { useUserStore } from '@/stores/userStore';
 import { getServicePriceDisplay, type ServicePriceRangeData } from '@/utils/servicePricing';
 import { formatServiceRatingDisplay, hasServiceRating, type ServiceReviewSummary } from '@/utils/serviceReviews';
+import { isOwnFreelancerProfile } from '@/utils/userRoles';
 
 interface FreelancerData {
   id: number;
@@ -267,6 +269,7 @@ const quoteServiceAddress = ref<QuoteServiceAddress>(createEmptyQuoteAddress());
 const quoteAddressErrors = ref<QuoteAddressErrors>(createEmptyQuoteAddressErrors());
 const isLoadingQuoteCEP = ref(false);
 const favoritesStore = useFavoritesStore();
+const userStore = useUserStore();
 const router = useRouter();
 const fileInputRef = ref<HTMLInputElement | null>(null);
 const selectedProject = ref<PortfolioProject | null>(null);
@@ -312,6 +315,12 @@ const loadFreelancerData = async () => {
   error.value = '';
 
   try {
+    if (isOwnFreelancerProfile(userStore.user, props.providerId)) {
+      toast.error('Voce nao pode acessar o proprio perfil publico como cliente');
+      await router.replace('/explore');
+      return;
+    }
+
     // Buscar dados do freelancer
     const freelancerResponse = await api.get(`/freelancer/${props.providerId}/profile`);
     freelancer.value = freelancerResponse.data;
@@ -1366,7 +1375,7 @@ onMounted(() => {
           >
             <CloseIcon class="h-5 w-5" />
           </button>
-          <div class="grid grid-cols-1 md:grid-cols-2 h-full">
+          <div class="grid grid-cols-1 md:grid-cols-2 h-full overflow-y-auto md:overflow-hidden">
             <!-- Image Carousel -->
             <div class="relative bg-gray-900 flex items-center justify-center min-h-[300px] md:min-h-[500px]">
               <img
@@ -1408,7 +1417,7 @@ onMounted(() => {
             </div>
 
             <!-- Project Details -->
-            <div class="p-6 md:p-8 flex flex-col h-full overflow-y-auto">
+            <div class="p-6 md:p-8 flex flex-col md:h-full md:overflow-y-auto">
               <div>
                 <Badge variant="secondary" class="mb-3 bg-blue-50 text-[#286AD8] border-none">
                   {{ selectedProject?.category }}

@@ -39,6 +39,7 @@ import logo from "@/assets/favicon-32x32.png";
 import api from "@/api/config/axios";
 import { useUserStore } from "@/stores/userStore";
 import { useNotificationStore } from "@/stores/notificationStore";
+import { useFavoritesStore } from "@/stores/favorites";
 import { useNotificationsRealtime } from "@/composables/useNotificationsRealtime";
 import { useProfileWebSocket } from "@/composables/useProfileWebSocket";
 import {
@@ -49,16 +50,22 @@ import {
 import PendingReviewBanner from "../shared/PendingReviewBanner.vue";
 import NotificationsDropdown from "@/components/notifications/NotificationsDropdown.vue";
 import type { NotificationStreamEvent } from "@/types/notifications";
+import type { UserRole } from "@/types";
+import { getLandingRouteForRole, mapFrontendRoleToBackend, mapFrontendRoleToLegacyType, mergeUserRoleState } from "@/utils/userRoles";
+import { toast } from "@/utils/toast";
 
 const router = useRouter();
 const userStore = useUserStore();
 const notificationStore = useNotificationStore();
+const favoritesStore = useFavoritesStore();
 
 interface User {
   id: string;
   name: string;
   email: string;
   type: "contractor" | "provider";
+  activeRole?: UserRole;
+  roles?: UserRole[];
   avatar?: string;
 }
 
@@ -93,12 +100,39 @@ const props = defineProps<Props>();
 
 // Usar o usuário da store se disponível, caso contrário usar das props
 const currentUser = computed(() => userStore.user || props.user);
+const currentActiveRole = computed<UserRole>(() =>
+  userStore.user?.activeRole || (currentUser.value.type === "provider" ? "freelancer" : "contractor"),
+);
+const currentLegacyType = computed(() => mapFrontendRoleToLegacyType(currentActiveRole.value));
+const canAccessMap = computed(() => currentActiveRole.value === "contractor");
+const interactiveRoles = computed(() =>
+  (userStore.user?.roles || []).filter((role) => role !== "admin"),
+);
+const canSwitchRoles = computed(() => interactiveRoles.value.length > 1);
+const missingSecondaryRole = computed<UserRole | null>(() => {
+  if (!userStore.user || userStore.user.activeRole === "admin") {
+    return null;
+  }
+
+  if (!userStore.user.roles.includes("contractor")) {
+    return "contractor";
+  }
+
+  if (!userStore.user.roles.includes("freelancer")) {
+    return "freelancer";
+  }
+
+  return null;
+});
+
+const isSwitchingRole = ref(false);
+const isActivatingProfile = ref(false);
 let notificationConnection: ReturnType<typeof useNotificationsRealtime> | null = null;
 let profileConnection: ReturnType<typeof useProfileWebSocket> | null = null;
 
 watch(
-  () => currentUser.value?.email,
-  (email) => {
+  () => [currentUser.value?.email, currentActiveRole.value] as const,
+  ([email]) => {
     notificationConnection?.disconnect();
     notificationConnection = null;
     profileConnection?.disconnect();
@@ -121,9 +155,17 @@ watch(
   { immediate: true },
 );
 
+const getInitialSidebarPinned = () => {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  return window.localStorage.getItem("sidebarPinned") === "true";
+};
+
 const sidebarOpen = ref(false);
-const sidebarPinned = ref(false);
-const sidebarExpanded = ref(false);
+const sidebarPinned = ref(getInitialSidebarPinned());
+const sidebarExpanded = ref(sidebarPinned.value);
 const professionalDropdownOpen = ref(false);
 
 // Estado dos dropdowns do topbar
@@ -271,6 +313,11 @@ const getStateAbbreviation = (stateName: string): string => {
 
 // Abrir mapa (navegar para a página do mapa)
 const openMap = () => {
+  if (!canAccessMap.value) {
+    toast.error("Mapa disponivel apenas no perfil cliente");
+    return;
+  }
+
   router.push("/map");
 };
 
@@ -312,13 +359,6 @@ onMounted(() => {
 
   window.addEventListener("notification-stream-event", handleNotificationStreamEvent as EventListener);
   window.addEventListener(userLocationUpdatedEventName, handleUserLocationUpdated as EventListener);
-
-  // Carregar estado do pin da sidebar
-  const pinnedState = localStorage.getItem("sidebarPinned");
-  if (pinnedState === "true") {
-    sidebarPinned.value = true;
-    sidebarExpanded.value = true;
-  }
 });
 
 onUnmounted(() => {
@@ -348,6 +388,78 @@ const handleMouseLeave = () => {
     scheduleSidebarClose();
   }
 };
+
+const resetRoleSensitiveState = () => {
+  favoritesStore.$reset();
+  notificationStore.resetState();
+};
+
+const applySessionResponse = (data: any) => {
+  const nextUser = mergeUserRoleState(userStore.user!, data?.user || data || {});
+  const token = data?.token || nextUser.token;
+
+  if (token) {
+    localStorage.setItem("token", token);
+  }
+
+  userStore.setUser({
+    ...nextUser,
+    token,
+  });
+};
+
+const switchRole = async (role: UserRole) => {
+  if (!userStore.user || role === currentActiveRole.value || isSwitchingRole.value) {
+    return;
+  }
+
+  isSwitchingRole.value = true;
+
+  try {
+    const response = await api.post("/auth/switch-role", {
+      role: mapFrontendRoleToBackend(role),
+    });
+
+    resetRoleSensitiveState();
+    applySessionResponse(response.data);
+    await router.push(getLandingRouteForRole(role));
+    toast.success(role === "contractor" ? "Modo cliente ativado" : "Modo freelancer ativado");
+  } catch (error: any) {
+    console.error("Erro ao alternar perfil:", error);
+    toast.error(error.response?.data?.message || "Nao foi possivel alternar o perfil");
+  } finally {
+    isSwitchingRole.value = false;
+  }
+};
+
+const activateSecondaryProfile = async () => {
+  if (!userStore.user || !missingSecondaryRole.value || isActivatingProfile.value) {
+    return;
+  }
+
+  isActivatingProfile.value = true;
+
+  try {
+    const response = await api.post("/users/me/profiles", {
+      role: mapFrontendRoleToBackend(missingSecondaryRole.value),
+    });
+
+    userStore.setUser(mergeUserRoleState(userStore.user, response.data));
+    toast.success(
+      missingSecondaryRole.value === "contractor"
+        ? "Perfil de cliente ativado. Agora voce pode alternar pelo toggle."
+        : "Perfil de freelancer ativado. Agora voce pode alternar pelo toggle.",
+    );
+  } catch (error: any) {
+    console.error("Erro ao ativar perfil secundario:", error);
+    toast.error(error.response?.data?.message || "Nao foi possivel ativar o perfil");
+  } finally {
+    isActivatingProfile.value = false;
+  }
+};
+
+const getRoleLabel = (role: UserRole) =>
+  role === "contractor" ? "Cliente" : role === "freelancer" ? "Freelancer" : "Admin";
 
 // Menu items based on user type
 const menuItems = computed(() =>
@@ -469,10 +581,14 @@ const handleNotificationStreamEvent = (event: Event) => {
         >
           <button
             @click="openMap"
-            :class="`w-full flex items-center rounded-lg transition-all duration-200 text-white/70 hover:bg-white/10 hover:text-white ${
+            :class="`w-full flex items-center rounded-lg transition-all duration-200 ${
               sidebarExpanded ? 'gap-3 px-4 py-3 text-left' : 'py-3 justify-center'
+            } ${
+              canAccessMap
+                ? 'text-white/70 hover:bg-white/10 hover:text-white'
+                : 'cursor-default text-white/70'
             }`"
-            title="Ver mapa com profissionais próximos"
+            :title="canAccessMap ? 'Ver mapa com profissionais próximos' : 'Disponível apenas no perfil cliente'"
           >
             <MapPin class="h-5 w-5 flex-shrink-0" />
             <div v-show="sidebarExpanded" class="flex-1 min-w-0">
@@ -598,7 +714,9 @@ const handleNotificationStreamEvent = (event: Event) => {
               openMap();
               sidebarOpen = false;
             "
-            class="w-full flex items-center gap-2 text-white/70 hover:text-white transition-colors text-left"
+            :class="`w-full flex items-center gap-2 transition-colors text-left ${
+              canAccessMap ? 'text-white/70 hover:text-white' : 'cursor-default text-white/70'
+            }`"
           >
             <MapPin class="h-4 w-4 flex-shrink-0" />
             <div class="flex-1 min-w-0">
@@ -706,9 +824,30 @@ const handleNotificationStreamEvent = (event: Event) => {
 
             <div class="flex-1" />
 
+            <div
+              v-if="canSwitchRoles"
+              class="hidden sm:flex items-center rounded-full border border-slate-200 bg-slate-50 p-1"
+            >
+              <button
+                v-for="role in interactiveRoles"
+                :key="role"
+                type="button"
+                class="rounded-full px-3 py-1.5 text-sm font-medium transition-colors"
+                :class="
+                  currentActiveRole === role
+                    ? 'bg-[#286AD8] text-white shadow-sm'
+                    : 'text-[#435574] hover:text-[#263238]'
+                "
+                :disabled="isSwitchingRole"
+                @click="switchRole(role)"
+              >
+                {{ getRoleLabel(role) }}
+              </button>
+            </div>
+
             <NotificationsDropdown
               v-model:open="topbarNotificationsOpen"
-              :user-type="currentUser.type === 'provider' ? 'provider' : 'contractor'"
+              :user-type="currentLegacyType === 'provider' ? 'provider' : 'contractor'"
             />
 
             <DropdownMenu v-model:open="topbarUserMenuOpen">
@@ -735,7 +874,7 @@ const handleNotificationStreamEvent = (event: Event) => {
                 <DropdownMenuItem
                   @click="
                     props.onNavigate(
-                      currentUser.type === 'contractor'
+                      currentLegacyType === 'contractor'
                         ? 'profile'
                         : 'freelancer-profile-settings',
                     )
@@ -745,18 +884,27 @@ const handleNotificationStreamEvent = (event: Event) => {
                   <span>Perfil</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                  v-if="currentUser.type === 'contractor'"
+                  v-if="currentLegacyType === 'contractor'"
                   @click="props.onNavigate('favorites')"
                 >
                   <Heart class="mr-2 h-4 w-4" />
                   <span>Favoritos</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                  v-if="currentUser.type === 'provider'"
+                  v-if="currentLegacyType === 'provider'"
                   @click="props.onNavigate('freelancer-wallet')"
                 >
                   <History class="mr-2 h-4 w-4" />
                   <span>Histórico de Transações</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  v-if="missingSecondaryRole"
+                  @click="activateSecondaryProfile"
+                >
+                  <Briefcase class="mr-2 h-4 w-4" />
+                  <span>
+                    {{ missingSecondaryRole === 'contractor' ? 'Ativar perfil cliente' : 'Ativar perfil freelancer' }}
+                  </span>
                 </DropdownMenuItem>
                 <DropdownMenuItem @click="props.onNavigate('settings')">
                   <Settings class="mr-2 h-4 w-4" />
@@ -783,28 +931,3 @@ const handleNotificationStreamEvent = (event: Event) => {
     </div>
   </div>
 </template>
-<style scoped>
-/* Estilo personalizado para a scrollbar da sidebar */
-nav::-webkit-scrollbar {
-  width: 5px;
-}
-
-nav::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-nav::-webkit-scrollbar-thumb {
-  background: #435574;
-  border-radius: 10px;
-}
-
-nav::-webkit-scrollbar-thumb:hover {
-  background: #286ad8;
-}
-
-/* Para garantir que a scrollbar não empurre o conteúdo */
-nav {
-  scrollbar-width: thin;
-  scrollbar-color: #435574 transparent;
-}
-</style>

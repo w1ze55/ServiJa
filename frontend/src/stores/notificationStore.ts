@@ -253,6 +253,18 @@ export const useNotificationStore = defineStore('notifications', () => {
     }
   };
 
+  const resetState = () => {
+    notifications.value = [];
+    unreadCount.value = 0;
+    isLoadingPreview.value = false;
+    isLoadingPage.value = false;
+    isMutating.value = false;
+    lastSyncAt.value = null;
+    hasLoadedPreview.value = false;
+    hasLoadedPage.value = false;
+    pendingNotificationIds.value = [];
+  };
+
   return {
     notifications,
     unreadCount,
@@ -274,5 +286,6 @@ export const useNotificationStore = defineStore('notifications', () => {
     deleteNotification,
     clearAllNotifications,
     applyStreamEvent,
+    resetState,
   };
 });

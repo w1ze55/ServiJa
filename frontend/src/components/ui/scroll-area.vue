@@ -26,7 +26,6 @@ const classes = computed(() =>
     >
       <slot />
     </div>
-    <ScrollBar />
   </div>
 </template>
 

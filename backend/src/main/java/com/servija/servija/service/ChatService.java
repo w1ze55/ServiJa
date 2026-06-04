@@ -55,14 +55,19 @@ public class ChatService {
                     return conversationRepository.save(newConv);
                 });
 
-        return toDTO(conv);
+        conv = syncConversationLockState(conv, sr);
+        return toDTO(conv, sr);
     }
 
     public List<ConversationDTO> listConversations(String userEmail) {
         return conversationRepository
                 .findByContractorEmailOrProviderEmailOrderByUpdatedAtDesc(userEmail, userEmail)
                 .stream()
-                .map(this::toDTO)
+                .map(conversation -> {
+                    ServiceRequest serviceRequest = getServiceRequest(conversation.getServiceRequestId());
+                    Conversation syncedConversation = syncConversationLockState(conversation, serviceRequest);
+                    return toDTO(syncedConversation, serviceRequest);
+                })
                 .toList();
     }
 
@@ -83,7 +88,10 @@ public class ChatService {
 
         assertConversationParticipant(conv, userEmail);
 
-        if (conv.isLocked()) {
+        ServiceRequest serviceRequest = getServiceRequest(conv.getServiceRequestId());
+        conv = syncConversationLockState(conv, serviceRequest);
+
+        if (isConversationLocked(conv, serviceRequest)) {
             throw new IllegalStateException("Chat bloqueado para esta solicitação");
         }
 
@@ -97,6 +105,7 @@ public class ChatService {
                 .type(request.type() != null ? request.type() : "text")
                 .content(request.content())
                 .attachmentUrl(request.attachmentUrl())
+                .attachmentName(request.attachmentName())
                 .status("sent")
                 .sentAt(Instant.now())
                 .build();
@@ -174,8 +183,38 @@ public class ChatService {
         }
     }
 
+    private ServiceRequest getServiceRequest(Long serviceRequestId) {
+        return serviceRequestRepository.findById(serviceRequestId).orElse(null);
+    }
+
+    private Conversation syncConversationLockState(Conversation conversation, ServiceRequest serviceRequest) {
+        if (serviceRequest == null) {
+            return conversation;
+        }
+
+        boolean shouldLock = serviceRequest.getStatus() == ServiceRequest.Status.COMPLETED;
+        if (conversation.isLocked() == shouldLock) {
+            return conversation;
+        }
+
+        conversation.setLocked(shouldLock);
+        conversation.setUpdatedAt(Instant.now());
+        return conversationRepository.save(conversation);
+    }
+
+    private boolean isConversationLocked(Conversation conversation, ServiceRequest serviceRequest) {
+        if (serviceRequest != null) {
+            return serviceRequest.getStatus() == ServiceRequest.Status.COMPLETED;
+        }
+
+        return conversation.isLocked();
+    }
+
     private ConversationDTO toDTO(Conversation c) {
-        ServiceRequest serviceRequest = serviceRequestRepository.findById(c.getServiceRequestId()).orElse(null);
+        return toDTO(c, getServiceRequest(c.getServiceRequestId()));
+    }
+
+    private ConversationDTO toDTO(Conversation c, ServiceRequest serviceRequest) {
         String contractorName = serviceRequest != null && serviceRequest.getContractor() != null
                 ? serviceRequest.getContractor().getName()
                 : null;
@@ -195,13 +234,13 @@ public class ChatService {
                         c.getLastMessage().getSentAt());
         return new ConversationDTO(c.getId(), c.getServiceRequestId(),
                 c.getContractorEmail(), contractorName, contractorAvatarUrl,
-                c.getProviderEmail(), providerName, providerAvatarUrl, c.isLocked(),
+                c.getProviderEmail(), providerName, providerAvatarUrl, isConversationLocked(c, serviceRequest),
                 lastMsg, c.getUnreadCount(), c.getCreatedAt(), c.getUpdatedAt());
     }
 
     private MessageDTO toDTO(Message m) {
         return new MessageDTO(m.getId(), m.getConversationId(), m.getSenderId(),
                 m.getSenderType(), m.getType(), m.getContent(),
-                m.getAttachmentUrl(), m.getStatus(), m.getSentAt(), m.getReadAt());
+                m.getAttachmentUrl(), m.getAttachmentName(), m.getStatus(), m.getSentAt(), m.getReadAt());
     }
 }

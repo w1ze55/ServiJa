@@ -12,6 +12,7 @@ import com.servija.servija.dto.RegistrationValidationRequest;
 import com.servija.servija.dto.RegisterRequest;
 import com.servija.servija.dto.ResetPasswordRequest;
 import com.servija.servija.dto.TwoFactorVerifyRequest;
+import com.servija.servija.dto.UserRoleRequest;
 import com.servija.servija.dto.VerifyEmailRequest;
 import com.servija.servija.dto.VerifyResetPasswordCodeRequest;
 import com.servija.servija.service.AdminResetPasswordLinkService;
@@ -26,6 +27,8 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -106,6 +109,19 @@ public class AuthController {
     })
     public ResponseEntity<AuthResponse> verifyTwoFactor(@Valid @RequestBody TwoFactorVerifyRequest request) {
         AuthResponse response = authService.verifyTwoFactorChallenge(request.getChallengeToken(), request.getCode());
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/switch-role")
+    @Operation(summary = "Alternar perfil ativo", description = "Atualiza o papel ativo do usuario autenticado e retorna um novo token JWT")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Perfil ativo alterado com sucesso", content = @Content(schema = @Schema(implementation = AuthResponse.class))),
+            @ApiResponse(responseCode = "400", description = "Perfil invalido ou nao habilitado", content = @Content(schema = @Schema(implementation = MessageResponse.class))),
+            @ApiResponse(responseCode = "401", description = "Nao autenticado", content = @Content(schema = @Schema(implementation = MessageResponse.class)))
+    })
+    public ResponseEntity<AuthResponse> switchRole(@Valid @RequestBody UserRoleRequest request) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        AuthResponse response = authService.switchRole(authentication.getName(), request);
         return ResponseEntity.ok(response);
     }
 

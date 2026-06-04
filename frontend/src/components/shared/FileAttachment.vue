@@ -19,7 +19,7 @@ interface Props {
   type?: string;
   description?: string;
   senderInfo?: string;
-  variant?: 'default' | 'amber' | 'blue' | 'compact';
+  variant?: 'default' | 'amber' | 'blue' | 'compact' | 'chat';
   mode?: 'display' | 'picker';
   actionLabel?: string;
 }
@@ -89,6 +89,7 @@ const variantClasses = {
   amber: 'bg-blue-50 border-blue-100 hover:bg-white',
   blue: 'bg-blue-50 border-blue-100 hover:bg-white',
   compact: 'bg-transparent border-transparent p-0 shadow-none hover:bg-gray-50',
+  chat: 'bg-white border-gray-200',
 };
 
 const iconClasses = {
@@ -96,6 +97,7 @@ const iconClasses = {
   amber: 'bg-blue-100 text-blue-600',
   blue: 'bg-blue-100 text-blue-600',
   compact: 'bg-gray-100 text-gray-500',
+  chat: 'bg-white text-black',
 };
 
 const rootClasses = {
@@ -127,15 +129,15 @@ const handleAction = () => {
         <component :is="getFileIcon(name, type)" class="h-5 w-5" />
       </div>
       <div class="min-w-0">
-        <p class="text-sm font-semibold text-[#263238] truncate" :title="name">
+        <p class="text-sm font-semibold text-current truncate" :title="name">
           {{ name }}
         </p>
         <div class="flex items-center gap-2 mt-0.5">
-          <span v-if="size" class="text-xs text-[#435574]">{{ size }}</span>
+          <span v-if="size" class="text-xs text-current">{{ size }}</span>
           <span v-if="size && senderInfo" class="w-1 h-1 rounded-full bg-gray-300"></span>
-          <span v-if="senderInfo" class="text-xs text-[#435574]">{{ senderInfo }}</span>
+          <span v-if="senderInfo" class="text-xs text-current">{{ senderInfo }}</span>
         </div>
-        <p v-if="description" class="text-xs text-[#435574] mt-1 whitespace-pre-line break-words">
+        <p v-if="description" class="text-xs text-current mt-1 whitespace-pre-line break-words">
           {{ description }}
         </p>
       </div>
@@ -145,7 +147,11 @@ const handleAction = () => {
       <Button 
         variant="ghost" 
         size="icon" 
-        class="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-blue-50"
+        :class="
+          variant === 'chat'
+            ? 'h-8 w-8 text-black hover:bg-transparent hover:text-black'
+            : 'h-8 w-8 text-muted-foreground hover:text-primary hover:bg-blue-50'
+        "
         title="Visualizar"
         @click="handleView"
       >
@@ -154,7 +160,11 @@ const handleAction = () => {
       <Button 
         variant="ghost" 
         size="icon" 
-        class="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-blue-50"
+        :class="
+          variant === 'chat'
+            ? 'h-8 w-8 text-black hover:bg-transparent hover:text-black'
+            : 'h-8 w-8 text-muted-foreground hover:text-primary hover:bg-blue-50'
+        "
         title="Baixar"
         @click="handleDownload"
       >

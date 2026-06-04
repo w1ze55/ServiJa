@@ -7,6 +7,7 @@ import com.servija.servija.dto.MessageResponse;
 import com.servija.servija.dto.ProfileResponse;
 import com.servija.servija.dto.UpdateAvatarRequest;
 import com.servija.servija.dto.UpdateUserRequest;
+import com.servija.servija.dto.UserRoleRequest;
 import com.servija.servija.service.FileStorageService;
 import com.servija.servija.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -59,6 +60,19 @@ public class UserController {
         String email = authentication.getName();
 
         ProfileResponse profile = userService.getCurrentUserProfile(email);
+        return ResponseEntity.ok(profile);
+    }
+
+    @PostMapping("/me/profiles")
+    @Operation(summary = "Ativar perfil secundario", description = "Cria o perfil solicitado na mesma conta autenticada")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Perfil ativado com sucesso", content = @Content(schema = @Schema(implementation = ProfileResponse.class))),
+            @ApiResponse(responseCode = "400", description = "Perfil invalido", content = @Content(schema = @Schema(implementation = MessageResponse.class))),
+            @ApiResponse(responseCode = "401", description = "Nao autenticado")
+    })
+    public ResponseEntity<ProfileResponse> activateProfile(@Valid @RequestBody UserRoleRequest request) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        ProfileResponse profile = userService.activateProfile(authentication.getName(), request.getRole());
         return ResponseEntity.ok(profile);
     }
 

@@ -1,8 +1,17 @@
 package com.servija.servija.service;
 
 import com.servija.servija.dto.ReviewRequest;
-import com.servija.servija.model.*;
-import com.servija.servija.repository.*;
+import com.servija.servija.model.Freelancer;
+import com.servija.servija.model.Review;
+import com.servija.servija.model.ReviewSummary;
+import com.servija.servija.model.ServiceRequest;
+import com.servija.servija.model.User;
+import com.servija.servija.repository.FreelancerRepository;
+import com.servija.servija.repository.ReviewRepository;
+import com.servija.servija.repository.ReviewSummaryRepository;
+import com.servija.servija.repository.ServiceRepository;
+import com.servija.servija.repository.ServiceRequestRepository;
+import com.servija.servija.repository.UserRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -12,27 +21,23 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class ReviewServiceTest {
 
-    @Mock
-    private ReviewRepository reviewRepository;
-    @Mock
-    private ServiceRequestRepository serviceRequestRepository;
-    @Mock
-    private ServiceRepository serviceRepository;
-    @Mock
-    private UserRepository userRepository;
-    @Mock
-    private FreelancerRepository freelancerRepository;
-    @Mock
-    private WebSocketService webSocketService;
-    @Mock
-    private ReviewSummaryRepository reviewSummaryRepository;
+    @Mock private ReviewRepository reviewRepository;
+    @Mock private ServiceRequestRepository serviceRequestRepository;
+    @Mock private ServiceRepository serviceRepository;
+    @Mock private UserRepository userRepository;
+    @Mock private FreelancerRepository freelancerRepository;
+    @Mock private WebSocketService webSocketService;
+    @Mock private ReviewSummaryRepository reviewSummaryRepository;
 
     @InjectMocks
     private ReviewService reviewService;
@@ -40,30 +45,26 @@ class ReviewServiceTest {
     @Test
     @DisplayName("createReview invalida cache de resumo quando summary existe para o freelancer")
     void createReview_invalidatesCacheWhenSummaryExists() {
-        Freelancer freelancer = new Freelancer();
-        freelancer.setId(10L);
-        freelancer.setEmail("free@test.com");
-
-        User contractor = new User();
-        contractor.setId(2L);
-        contractor.setEmail("client@test.com");
+        User freelancerUser = buildUser(10L, "free@test.com", User.UserType.FREELANCER);
+        Freelancer freelancer = buildFreelancerProfile(freelancerUser);
+        User contractor = buildUser(2L, "client@test.com", User.UserType.CONTRACTOR);
 
         ServiceRequest sr = new ServiceRequest();
         sr.setId(1L);
         sr.setStatus(ServiceRequest.Status.COMPLETED);
-        sr.setFreelancer(freelancer);
+        sr.setFreelancer(freelancerUser);
         sr.setContractor(contractor);
         sr.setServiceName("Limpeza");
 
         ReviewRequest request = new ReviewRequest();
         request.setRating(5);
-        request.setComment("Ótimo!");
+        request.setComment("Otimo!");
 
         Review saved = new Review();
         saved.setId(100L);
         saved.setRating(5);
         saved.setReviewer(contractor);
-        saved.setReviewed(freelancer);
+        saved.setReviewed(freelancerUser);
         saved.setServiceRequest(sr);
         saved.setReviewerType(Review.ReviewerType.CONTRACTOR);
 
@@ -80,6 +81,7 @@ class ReviewServiceTest {
         when(reviewRepository.save(any())).thenReturn(saved);
         when(reviewRepository.findAverageRatingByReviewedId(10L)).thenReturn(5.0);
         when(reviewRepository.countByReviewedId(10L)).thenReturn(4L);
+        when(freelancerRepository.findById(10L)).thenReturn(Optional.of(freelancer));
         when(freelancerRepository.save(any())).thenReturn(freelancer);
         when(reviewSummaryRepository.findByFreelancerId(10L)).thenReturn(Optional.of(existingSummary));
         when(reviewSummaryRepository.save(any())).thenReturn(existingSummary);
@@ -91,20 +93,16 @@ class ReviewServiceTest {
     }
 
     @Test
-    @DisplayName("createReview não chama save no cache quando freelancer ainda não tem summary")
+    @DisplayName("createReview nao chama save no cache quando freelancer ainda nao tem summary")
     void createReview_doesNotCallSaveWhenNoSummaryExists() {
-        Freelancer freelancer = new Freelancer();
-        freelancer.setId(10L);
-        freelancer.setEmail("free@test.com");
-
-        User contractor = new User();
-        contractor.setId(2L);
-        contractor.setEmail("client@test.com");
+        User freelancerUser = buildUser(10L, "free@test.com", User.UserType.FREELANCER);
+        Freelancer freelancer = buildFreelancerProfile(freelancerUser);
+        User contractor = buildUser(2L, "client@test.com", User.UserType.CONTRACTOR);
 
         ServiceRequest sr = new ServiceRequest();
         sr.setId(1L);
         sr.setStatus(ServiceRequest.Status.COMPLETED);
-        sr.setFreelancer(freelancer);
+        sr.setFreelancer(freelancerUser);
         sr.setContractor(contractor);
         sr.setServiceName("Pintura");
 
@@ -115,7 +113,7 @@ class ReviewServiceTest {
         saved.setId(101L);
         saved.setRating(4);
         saved.setReviewer(contractor);
-        saved.setReviewed(freelancer);
+        saved.setReviewed(freelancerUser);
         saved.setServiceRequest(sr);
         saved.setReviewerType(Review.ReviewerType.CONTRACTOR);
 
@@ -125,6 +123,7 @@ class ReviewServiceTest {
         when(reviewRepository.save(any())).thenReturn(saved);
         when(reviewRepository.findAverageRatingByReviewedId(10L)).thenReturn(4.0);
         when(reviewRepository.countByReviewedId(10L)).thenReturn(1L);
+        when(freelancerRepository.findById(10L)).thenReturn(Optional.of(freelancer));
         when(freelancerRepository.save(any())).thenReturn(freelancer);
         when(reviewSummaryRepository.findByFreelancerId(10L)).thenReturn(Optional.empty());
 
@@ -132,5 +131,27 @@ class ReviewServiceTest {
 
         verify(reviewSummaryRepository).findByFreelancerId(10L);
         verify(reviewSummaryRepository, never()).save(any());
+    }
+
+    private User buildUser(Long id, String email, User.UserType role) {
+        return User.builder()
+                .id(id)
+                .name(role == User.UserType.FREELANCER ? "Freela" : "Cliente")
+                .email(email)
+                .cpf("1234567890" + id)
+                .phone("11999999999")
+                .userType(role)
+                .activeRole(role)
+                .roles(Set.of(role))
+                .active(true)
+                .build();
+    }
+
+    private Freelancer buildFreelancerProfile(User user) {
+        Freelancer freelancer = new Freelancer();
+        freelancer.setId(user.getId());
+        freelancer.setUser(user);
+        freelancer.setAvailable(true);
+        return freelancer;
     }
 }

@@ -24,6 +24,7 @@ export interface MessageDTO {
   type: 'text' | 'image' | 'file' | 'system';
   content: string;
   attachmentUrl: string | null;
+  attachmentName: string | null;
   status: string;
   sentAt: string;
   readAt: string | null;
@@ -69,12 +70,14 @@ export const chatService = {
     conversationId: string,
     content: string,
     type: 'text' | 'image' | 'file' = 'text',
-    attachmentUrl?: string
+    attachmentUrl?: string,
+    attachmentName?: string
   ): Promise<MessageDTO> {
     const response = await api.post<MessageDTO>(`/chat/conversations/${conversationId}/messages`, {
       content,
       type,
       attachmentUrl: attachmentUrl ?? null,
+      attachmentName: attachmentName ?? null,
     });
     return response.data;
   },

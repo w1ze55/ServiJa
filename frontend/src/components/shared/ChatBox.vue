@@ -95,13 +95,30 @@ const removeAttachment = (index: number) => {
 };
 
 const send = () => {
-  if (!newMessage.value.trim() && messageAttachments.value.length === 0) {
+  const message = newMessage.value.trim();
+
+  if (!message && messageAttachments.value.length === 0) {
     toast.error('Digite uma mensagem ou adicione um anexo');
     return;
   }
-  emit('send-message', newMessage.value, messageAttachments.value);
+
+  emit('send-message', message, [...messageAttachments.value]);
   newMessage.value = '';
   messageAttachments.value = [];
+};
+
+const handleComposerKeydown = (event: KeyboardEvent) => {
+  if (event.key !== 'Enter' || event.shiftKey || event.isComposing) {
+    return;
+  }
+
+  event.preventDefault();
+
+  if (props.isSending) {
+    return;
+  }
+
+  send();
 };
 
 const formatDate = (dateString: string) => {
@@ -117,13 +134,22 @@ const formatDate = (dateString: string) => {
 </script>
 
 <template>
-  <div class="flex flex-col h-full w-full">
-    <div v-if="!messages || messages.length === 0" class="text-center py-8">
-      <MessageSquare class="h-10 w-10 text-gray-300 mx-auto mb-3" />
-      <p class="text-[#435574]">Nenhuma mensagem ainda</p>
+  <div class="flex h-full w-full flex-col gap-4">
+    <div
+      v-if="!messages || messages.length === 0"
+      class="flex flex-1 items-center justify-center rounded-xl border border-dashed border-gray-200 bg-gray-50 px-6 py-8 text-center"
+    >
+      <div>
+        <MessageSquare class="mx-auto mb-3 h-10 w-10 text-gray-300" />
+        <p class="text-[#435574]">Nenhuma mensagem ainda</p>
+      </div>
     </div>
 
-    <div v-else ref="scrollContainer" class="space-y-4 max-h-96 overflow-y-auto mb-4">
+    <div
+      v-else
+      ref="scrollContainer"
+      class="flex-1 space-y-4 overflow-y-auto rounded-xl border border-gray-100 bg-slate-50/60 p-4 pr-3"
+    >
       <div
         v-for="msg in messages"
         :key="msg.id"
@@ -137,7 +163,7 @@ const formatDate = (dateString: string) => {
           }`"
         >
           <p class="text-xs font-medium mb-1 opacity-80">{{ msg.senderName }}</p>
-          <p class="text-sm">{{ msg.message }}</p>
+          <p class="text-sm whitespace-pre-wrap break-words">{{ msg.message }}</p>
           <div v-if="msg.attachments && msg.attachments.length > 0" class="mt-3 space-y-2">
             <FileAttachment
               v-for="att in msg.attachments"
@@ -145,8 +171,7 @@ const formatDate = (dateString: string) => {
               :name="att.name"
               :url="att.url"
               :size="att.size"
-              variant="compact"
-              :class="msg.sender === currentUserRole ? 'bg-white/10 border-white/20 text-white' : ''"
+              variant="chat"
             />
           </div>
           <p class="text-xs mt-1 opacity-60">{{ formatDate(msg.timestamp) }}</p>
@@ -155,7 +180,7 @@ const formatDate = (dateString: string) => {
     </div>
 
     <!-- Message Input -->
-    <div v-if="!isLocked" class="space-y-3 mt-auto">
+    <div v-if="!isLocked" class="space-y-3">
       <!-- Selected Files Preview -->
       <div v-if="messageAttachments.length > 0" class="flex flex-wrap gap-2">
         <div
@@ -179,7 +204,8 @@ const formatDate = (dateString: string) => {
           v-model="newMessage"
           placeholder="Digite sua mensagem..."
           :rows="2"
-          class="flex-1"
+          class="flex-1 min-h-[5.5rem]"
+          @keydown="handleComposerKeydown"
         />
         <div class="flex flex-col gap-2">
           <Button
@@ -207,7 +233,7 @@ const formatDate = (dateString: string) => {
         </div>
       </div>
     </div> <!-- Quando o serviço estiver concluído deve aparecer outra mensagem -->
-    <div v-else class="flex items-center justify-center p-4 bg-gray-50 rounded-lg border border-dashed border-gray-200 mt-auto">
+    <div v-else class="flex items-center justify-center rounded-lg border border-dashed border-gray-200 bg-gray-50 p-4">
       <p class="text-sm text-[#435574] flex items-center gap-2 text-center">
         <Lock class="h-4 w-4 text-[#286AD8]" />
         {{ lockMessage }}

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import {
   Search,
   Grid3x3,
@@ -32,9 +33,11 @@ import FreelancerCard from '../freelancer/FreelancerCard.vue';
 import api from '@/api/config/axios';
 import { toast } from '@/utils/toast';
 import { useFavoritesStore } from '@/stores/favorites';
+import { useUserStore } from '@/stores/userStore';
 import { useCategoryCatalogStore } from '@/stores/categoryCatalogStore';
 import { getServicePriceDisplay, getServicePriceSortValue, type ServicePriceRangeData } from '@/utils/servicePricing';
 import { formatServiceRatingDisplay, hasServiceRating, type ServiceReviewSummary } from '@/utils/serviceReviews';
+import { isOwnFreelancerProfile } from '@/utils/userRoles';
 
 interface ServiceItem extends ServicePriceRangeData, ServiceReviewSummary {
   id: number;
@@ -70,6 +73,8 @@ interface Props {
 }
 
 const props = defineProps<Props>();
+const route = useRoute();
+const router = useRouter();
 
 const services = ref<ServiceItem[]>([]);
 const isLoading = ref(false);
@@ -81,8 +86,10 @@ const sortBy = ref('recent');
 const searchMode = ref<'services' | 'professionals'>('services');
 const viewMode = ref<'grid' | 'list'>('grid');
 const freelancerProfiles = ref<Record<number, FreelancerProfileData>>({});
+const lastTrackedSearchSignature = ref<string | null>(null);
 
 const favoritesStore = useFavoritesStore();
+const userStore = useUserStore();
 const categoryCatalogStore = useCategoryCatalogStore();
 
 const categories = computed(() => [
@@ -117,22 +124,16 @@ const sortOptions = [
   { value: 'name-asc', label: 'Nome (A-Z)' },
 ];
 
-const loadServices = async () => {
+const loadServices = async (options?: { trackSearch?: boolean }) => {
   isLoading.value = true;
   error.value = '';
   try {
-    const hasSearchQuery = !!searchQuery.value.trim();
     const response = await api.get('/services/public/all', {
       params: {
-        categorySlug:
-          !hasSearchQuery && selectedCategory.value !== 'all'
-            ? selectedCategory.value
-            : undefined,
-        subcategorySlug:
-          !hasSearchQuery && selectedSubcategory.value !== 'all'
-            ? selectedSubcategory.value
-            : undefined,
+        categorySlug: selectedCategory.value !== 'all' ? selectedCategory.value : undefined,
+        subcategorySlug: selectedSubcategory.value !== 'all' ? selectedSubcategory.value : undefined,
         q: searchQuery.value.trim() || undefined,
+        trackSearch: options?.trackSearch ? true : undefined,
       },
     });
     services.value = response.data || [];
@@ -149,15 +150,93 @@ const loadServices = async () => {
   }
 };
 
+const normalizeRouteParam = (value: unknown) => (typeof value === 'string' ? value.trim() : '');
+
+const resolveCategorySlugFromSubcategory = (subcategorySlug: string) =>
+  categoryCatalogStore.activePublicCategories.find((category) =>
+    category.subcategories.some((subcategory) => subcategory.slug === subcategorySlug)
+  )?.slug || '';
+
+const buildSearchSignature = (query: string, categorySlug: string, subcategorySlug: string) =>
+  [query.trim().toLowerCase(), categorySlug, subcategorySlug].join('|');
+
+const hasExplicitSearchIntent = (query: string, categorySlug: string, subcategorySlug: string) =>
+  Boolean(query.trim() || categorySlug || subcategorySlug);
+
+const getNormalizedRouteFilters = () => {
+  const query = normalizeRouteParam(route.query.q);
+  const subcategorySlug = normalizeRouteParam(route.query.subcategorySlug);
+  const categorySlug = normalizeRouteParam(route.query.categorySlug)
+    || (subcategorySlug ? resolveCategorySlugFromSubcategory(subcategorySlug) : '');
+
+  return {
+    query,
+    categorySlug,
+    subcategorySlug,
+  };
+};
+
+const syncFiltersToRoute = async () => {
+  const nextQuery: Record<string, string> = {};
+
+  if (searchQuery.value.trim()) {
+    nextQuery.q = searchQuery.value.trim();
+  }
+  if (selectedCategory.value !== 'all') {
+    nextQuery.categorySlug = selectedCategory.value;
+  }
+  if (selectedSubcategory.value !== 'all') {
+    nextQuery.subcategorySlug = selectedSubcategory.value;
+  }
+
+  const currentQuery = {
+    q: normalizeRouteParam(route.query.q),
+    categorySlug: normalizeRouteParam(route.query.categorySlug),
+    subcategorySlug: normalizeRouteParam(route.query.subcategorySlug),
+  };
+
+  if (
+    currentQuery.q === (nextQuery.q || '')
+    && currentQuery.categorySlug === (nextQuery.categorySlug || '')
+    && currentQuery.subcategorySlug === (nextQuery.subcategorySlug || '')
+  ) {
+    return;
+  }
+
+  await router.replace({ path: route.path, query: nextQuery });
+};
+
+const applyRouteFilters = async () => {
+  const { query, categorySlug, subcategorySlug } = getNormalizedRouteFilters();
+
+  searchQuery.value = query;
+  selectedCategory.value = categorySlug || 'all';
+  selectedSubcategory.value = subcategorySlug || 'all';
+
+  const signature = buildSearchSignature(query, categorySlug, subcategorySlug);
+  const shouldTrackSearch = hasExplicitSearchIntent(query, categorySlug, subcategorySlug)
+    && signature !== lastTrackedSearchSignature.value;
+
+  lastTrackedSearchSignature.value = hasExplicitSearchIntent(query, categorySlug, subcategorySlug)
+    ? signature
+    : null;
+
+  await loadServices({ trackSearch: shouldTrackSearch });
+};
+
 const loadFreelancerProfiles = async (freelancerIds: number[]) => {
-  if (freelancerIds.length === 0) {
+  const visibleFreelancerIds = freelancerIds.filter(
+    (freelancerId) => !isOwnFreelancerProfile(userStore.user, freelancerId),
+  );
+
+  if (visibleFreelancerIds.length === 0) {
     freelancerProfiles.value = {};
     return;
   }
 
   try {
     const profiles = await Promise.all(
-      freelancerIds.map(async (freelancerId) => {
+      visibleFreelancerIds.map(async (freelancerId) => {
         const response = await api.get(`/freelancer/${freelancerId}/profile`);
         return response.data as FreelancerProfileData;
       })
@@ -173,34 +252,37 @@ const loadFreelancerProfiles = async (freelancerIds: number[]) => {
 };
 
 const handleSearch = () => {
-  loadServices();
+  clearTimeout(searchTimer);
+  void syncFiltersToRoute();
 };
 
 let searchTimer: ReturnType<typeof setTimeout>;
 const handleSearchInput = () => {
   clearTimeout(searchTimer);
   searchTimer = setTimeout(() => {
-    loadServices();
+    void syncFiltersToRoute();
   }, 500);
 };
 
-watch(selectedCategory, () => {
+const handleCategoryChange = (value: string) => {
+  selectedCategory.value = value;
   if (!subcategories.value.some((subcategory) => subcategory.value === selectedSubcategory.value)) {
     selectedSubcategory.value = 'all';
   }
-  if (!searchQuery.value.trim()) {
-    loadServices();
-  }
-});
+  clearTimeout(searchTimer);
+  void syncFiltersToRoute();
+};
 
-watch(selectedSubcategory, () => {
-  if (!searchQuery.value.trim()) {
-    loadServices();
-  }
-});
+const handleSubcategoryChange = (value: string) => {
+  selectedSubcategory.value = value;
+  clearTimeout(searchTimer);
+  void syncFiltersToRoute();
+};
 
 const filteredServices = computed(() => {
-  let result = [...services.value];
+  let result = services.value.filter(
+    (service) => !isOwnFreelancerProfile(userStore.user, service.freelancerId),
+  );
 
   switch (sortBy.value) {
     case 'price-asc':
@@ -270,10 +352,20 @@ const isFavoriteService = (id: number | string) => favoritesStore.isFavoriteServ
 const isFavoriteFreelancer = (id: number | string) => favoritesStore.isFavoriteFreelancer(id);
 
 const handleViewProfile = (providerId: string | number) => {
+  if (isOwnFreelancerProfile(userStore.user, providerId)) {
+    toast.error('Voce nao pode acessar o proprio perfil publico como cliente');
+    return;
+  }
+
   props.onNavigate('provider-profile', { providerId: Number(providerId) });
 };
 
 const handleViewService = (params: { providerId: number; serviceId: number }) => {
+  if (isOwnFreelancerProfile(userStore.user, params.providerId)) {
+    toast.error('Voce nao pode acessar o proprio servico publico como cliente');
+    return;
+  }
+
   props.onNavigate('service-detail', params);
 };
 
@@ -282,7 +374,27 @@ const clearFilters = () => {
   selectedCategory.value = 'all';
   selectedSubcategory.value = 'all';
   sortBy.value = 'recent';
-  loadServices();
+  clearTimeout(searchTimer);
+  void syncFiltersToRoute();
+};
+
+const clearSearchQuery = () => {
+  searchQuery.value = '';
+  clearTimeout(searchTimer);
+  void syncFiltersToRoute();
+};
+
+const clearCategoryFilter = () => {
+  selectedCategory.value = 'all';
+  selectedSubcategory.value = 'all';
+  clearTimeout(searchTimer);
+  void syncFiltersToRoute();
+};
+
+const clearSubcategoryFilter = () => {
+  selectedSubcategory.value = 'all';
+  clearTimeout(searchTimer);
+  void syncFiltersToRoute();
 };
 
 const getInitials = (name: string) => {
@@ -296,8 +408,7 @@ const getInitials = (name: string) => {
 };
 
 onMounted(() => {
-  categoryCatalogStore.loadPublicCategories();
-  loadServices();
+  void categoryCatalogStore.loadPublicCategories();
 });
 
 watch(
@@ -306,6 +417,27 @@ watch(
     loadFreelancerProfiles(groups.map((group) => group.freelancerId));
   },
   { immediate: true }
+);
+
+watch(
+  () => route.query,
+  () => {
+    void applyRouteFilters();
+  },
+  { immediate: true }
+);
+
+watch(
+  () => categoryCatalogStore.activePublicCategories.length,
+  (currentLength, previousLength) => {
+    if (
+      currentLength > 0
+      && currentLength !== previousLength
+      && normalizeRouteParam(route.query.subcategorySlug)
+    ) {
+      void applyRouteFilters();
+    }
+  }
 );
 </script>
 
@@ -351,7 +483,7 @@ watch(
           />
           <button
             v-if="searchQuery"
-            @click="searchQuery = ''; loadServices()"
+            @click="clearSearchQuery"
             class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
           >
             <X class="h-4 w-4" />
@@ -360,7 +492,7 @@ watch(
 
         <!-- Category Filter -->
         <div class="w-full md:w-56">
-          <Select :model-value="selectedCategory" @update:model-value="(val) => selectedCategory = val as string">
+          <Select :model-value="selectedCategory" @update:model-value="(val) => handleCategoryChange(val as string)">
             <SelectTrigger>
               <SelectValue :label="categories.find(c => c.value === selectedCategory)?.label" placeholder="Categoria" />
             </SelectTrigger>
@@ -373,7 +505,7 @@ watch(
         </div>
 
         <div class="w-full md:w-56">
-          <Select :model-value="selectedSubcategory" @update:model-value="(val) => selectedSubcategory = val as string">
+          <Select :model-value="selectedSubcategory" @update:model-value="(val) => handleSubcategoryChange(val as string)">
             <SelectTrigger>
               <SelectValue :label="subcategories.find(c => c.value === selectedSubcategory)?.label" placeholder="Subcategoria" />
             </SelectTrigger>
@@ -420,18 +552,24 @@ watch(
       </div>
 
       <!-- Active Filters -->
-      <div v-if="searchQuery || selectedCategory !== 'all'" class="flex items-center gap-2 mt-3 pt-3 border-t border-gray-100">
+      <div v-if="searchQuery || selectedCategory !== 'all' || selectedSubcategory !== 'all'" class="flex items-center gap-2 mt-3 pt-3 border-t border-gray-100">
         <SlidersHorizontal class="h-4 w-4 text-[#435574]" />
         <span class="text-sm text-[#435574]">Filtros ativos:</span>
         <Badge v-if="searchQuery" variant="secondary" class="gap-1">
           "{{ searchQuery }}"
-          <button @click="searchQuery = ''; loadServices()" class="ml-1 hover:text-red-500">
+          <button @click="clearSearchQuery" class="ml-1 hover:text-red-500">
             <X class="h-3 w-3" />
           </button>
         </Badge>
         <Badge v-if="selectedCategory !== 'all'" variant="secondary" class="gap-1">
           {{ categories.find(c => c.value === selectedCategory)?.label }}
-          <button @click="selectedCategory = 'all'; loadServices()" class="ml-1 hover:text-red-500">
+          <button @click="clearCategoryFilter" class="ml-1 hover:text-red-500">
+            <X class="h-3 w-3" />
+          </button>
+        </Badge>
+        <Badge v-if="selectedSubcategory !== 'all'" variant="secondary" class="gap-1">
+          {{ subcategories.find(c => c.value === selectedSubcategory)?.label }}
+          <button @click="clearSubcategoryFilter" class="ml-1 hover:text-red-500">
             <X class="h-3 w-3" />
           </button>
         </Badge>

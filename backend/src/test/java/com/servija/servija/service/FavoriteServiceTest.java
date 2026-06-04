@@ -20,6 +20,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -29,26 +30,13 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class FavoriteServiceTest {
 
-    @Mock
-    private FavoriteRepository favoriteRepository;
-
-    @Mock
-    private ServiceRepository serviceRepository;
-
-    @Mock
-    private FreelancerRepository freelancerRepository;
-
-    @Mock
-    private AddressRepository addressRepository;
-
-    @Mock
-    private UserRepository userRepository;
-
-    @Mock
-    private ServiceService serviceService;
-
-    @Mock
-    private AuditLogger auditLogger;
+    @Mock private FavoriteRepository favoriteRepository;
+    @Mock private ServiceRepository serviceRepository;
+    @Mock private FreelancerRepository freelancerRepository;
+    @Mock private AddressRepository addressRepository;
+    @Mock private UserRepository userRepository;
+    @Mock private ServiceService serviceService;
+    @Mock private AuditLogger auditLogger;
 
     private FavoriteService favoriteService;
 
@@ -78,7 +66,7 @@ class FavoriteServiceTest {
         when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
         when(favoriteRepository.findByUser(user)).thenReturn(List.of(favorite));
         when(addressRepository.findByUserIdInOrderByUserIdAscIsDefaultDescCreatedAtDesc(List.of(freelancer.getId())))
-                .thenReturn(List.of(buildAddress(freelancer, "Sao Jose", "SC", true)));
+                .thenReturn(List.of(buildAddress(freelancer.getUser(), "Sao Jose", "SC", true)));
 
         List<FavoriteResponse> response = favoriteService.getUserFavorites(user.getId());
 
@@ -143,17 +131,21 @@ class FavoriteServiceTest {
         user.setCpf("12345678901");
         user.setPhone("11999999999");
         user.setUserType(type);
+        user.setActiveRole(type);
+        user.setRoles(Set.of(type));
         return user;
     }
 
     private Freelancer buildFreelancer(Long id, String name) {
+        User freelancerUser = buildUser(id, User.UserType.FREELANCER);
+        freelancerUser.setName(name);
+        freelancerUser.setEmail("freelancer@test.com");
+        freelancerUser.setCpf("12345678902");
+        freelancerUser.setPhone("11999999998");
+
         Freelancer freelancer = new Freelancer();
         freelancer.setId(id);
-        freelancer.setName(name);
-        freelancer.setEmail("freelancer@test.com");
-        freelancer.setCpf("12345678902");
-        freelancer.setPhone("11999999998");
-        freelancer.setUserType(User.UserType.FREELANCER);
+        freelancer.setUser(freelancerUser);
         freelancer.setProfessionalTitle("Designer");
         freelancer.setCategory("Design");
         freelancer.setAvailable(true);

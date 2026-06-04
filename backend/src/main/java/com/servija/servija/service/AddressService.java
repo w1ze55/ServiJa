@@ -202,7 +202,7 @@ public class AddressService {
         if (coordinates.isEmpty()) {
             if (required) {
                 throw new IllegalArgumentException(
-                        "Nao foi possivel localizar o endereco informado no mapa.");
+                        "Não foi possível localizar o endereço informado no mapa.");
             }
             return false;
         }

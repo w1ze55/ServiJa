@@ -1,0 +1,128 @@
+name: Load Test (manual)
+
+# ─────────────────────────────────────────────────────────────────
+# Teste de carga da API ServiJá — SEPARADO dos pipelines de deploy.
+# Roda APENAS sob demanda (workflow_dispatch) e exige a seleção
+# explícita de um perfil de carga antes de iniciar.
+#
+# Script: tests/load/run-load.mjs (Node puro, sem dependências npm).
+# Perfis em tests/load/config.local.json: 50/100/1000/10000/50000
+# VUs no pico, ou "all" (todos em sequência).
+#
+# Secrets obrigatórios (Settings → Secrets and variables → Actions):
+#   LOAD_ADMIN_EMAIL     e-mail do admin bootstrap (sem 2FA)
+#   LOAD_ADMIN_PASSWORD  senha do admin bootstrap
+# ─────────────────────────────────────────────────────────────────
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: 'Perfil de carga (VUs no pico) — OBRIGATÓRIO selecionar'
+        required: true
+        type: choice
+        default: '(selecione um perfil)'
+        options:
+          - '(selecione um perfil)'
+          - '50'
+          - '100'
+          - '1000'
+          - '10000'
+          - '50000'
+          - 'all'
+      base_url:
+        description: 'URL base do backend alvo (sem /api)'
+        required: true
+        type: string
+        default: 'https://homolog.servija.app'
+      preflight_only:
+        description: 'Somente preflight (valida endpoints/credenciais, não gera carga)'
+        required: false
+        type: boolean
+        default: false
+
+# Menor privilégio: só lemos o repo e subimos artefatos.
+permissions:
+  contents: read
+
+# Serializa execuções: evita dois testes de carga simultâneos.
+concurrency:
+  group: load-test-${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  load-test:
+    name: Run load test
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── Garante que um perfil foi de fato escolhido ────────────
+      - name: Validate profile selection
+        env:
+          PROFILE: ${{ inputs.profile }}
+        run: |
+          if [ "$PROFILE" = "(selecione um perfil)" ]; then
+            echo "::error::Nenhum perfil selecionado. Reabra 'Run workflow' e escolha 50, 100, 1000, 10000, 50000 ou all."
+            exit 1
+          fi
+          echo "Perfil selecionado: $PROFILE"
+
+      # ── Credenciais do admin bootstrap (cenário adminRead) ─────
+      - name: Verify admin credentials configured
+        env:
+          LOAD_ADMIN_EMAIL: ${{ secrets.LOAD_ADMIN_EMAIL }}
+          LOAD_ADMIN_PASSWORD: ${{ secrets.LOAD_ADMIN_PASSWORD }}
+        run: |
+          if [ -z "$LOAD_ADMIN_EMAIL" ] || [ -z "$LOAD_ADMIN_PASSWORD" ]; then
+            echo "::error::Secrets LOAD_ADMIN_EMAIL e LOAD_ADMIN_PASSWORD são obrigatórios (admin sem 2FA)."
+            exit 1
+          fi
+          echo "Credenciais de admin configuradas."
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # ── Executa o teste de carga ───────────────────────────────
+      # base_url chega via env (não interpolado no corpo do script)
+      # para evitar injeção a partir de input de texto livre.
+      - name: Run load test
+        env:
+          PROFILE: ${{ inputs.profile }}
+          PREFLIGHT_ONLY: ${{ inputs.preflight_only }}
+          LOAD_BASE_URL: ${{ inputs.base_url }}
+          LOAD_ADMIN_EMAIL: ${{ secrets.LOAD_ADMIN_EMAIL }}
+          LOAD_ADMIN_PASSWORD: ${{ secrets.LOAD_ADMIN_PASSWORD }}
+        run: |
+          FLAGS="--profile $PROFILE"
+          if [ "$PREFLIGHT_ONLY" = "true" ]; then
+            FLAGS="$FLAGS --preflight-only"
+          fi
+          echo "Alvo: $LOAD_BASE_URL"
+          echo "Comando: node tests/load/run-load.mjs $FLAGS"
+          node tests/load/run-load.mjs $FLAGS
+
+      # ── Publica o summary.md no resumo do run (best-effort) ────
+      - name: Publish report to job summary
+        if: always()
+        run: |
+          LATEST=$(ls -dt tests/load/reports/*/ 2>/dev/null | head -1)
+          if [ -n "$LATEST" ] && [ -f "${LATEST}summary.md" ]; then
+            cat "${LATEST}summary.md" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Nenhum summary.md encontrado em tests/load/reports/." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      # ── Sobe os relatórios completos como artefato ─────────────
+      - name: Upload load test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: load-test-reports-${{ inputs.profile }}
+          path: tests/load/reports/
+          retention-days: 14
+          if-no-files-found: warn

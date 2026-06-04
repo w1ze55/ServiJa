@@ -13,6 +13,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
+import java.util.Set;
+
 @Component
 @Order(10)
 @RequiredArgsConstructor
@@ -77,6 +79,8 @@ public class AdminBootstrapService implements ApplicationRunner {
                 .phone(normalizedPhone)
                 .password(passwordEncoder.encode(password))
                 .userType(User.UserType.ADMIN)
+                .activeRole(User.UserType.ADMIN)
+                .roles(Set.of(User.UserType.ADMIN))
                 .emailVerified(true)
                 .active(true)
                 .build();

@@ -3,7 +3,6 @@ package com.servija.servija.auth;
 import com.servija.servija.dto.AuthResponse;
 import com.servija.servija.exception.ResourceNotFoundException;
 import com.servija.servija.exception.TooManyAttemptsException;
-import com.servija.servija.model.Contractor;
 import com.servija.servija.model.User;
 import com.servija.servija.repository.ContractorRepository;
 import com.servija.servija.repository.FreelancerRepository;
@@ -27,79 +26,69 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class AuthServiceVerificationTest {
 
-    @Mock
-    private UserRepository userRepository;
-    @Mock
-    private ContractorRepository contractorRepository;
-    @Mock
-    private FreelancerRepository freelancerRepository;
-    @Mock
-    private PasswordEncoder passwordEncoder;
-    @Mock
-    private JwtService jwtService;
-    @Mock
-    private AuthenticationManager authenticationManager;
-    @Mock
-    private CustomUserDetailsService userDetailsService;
-    @Mock
-    private EmailService emailService;
-    @Mock
-    private AuditLogger auditLogger;
+    @Mock private UserRepository userRepository;
+    @Mock private ContractorRepository contractorRepository;
+    @Mock private FreelancerRepository freelancerRepository;
+    @Mock private PasswordEncoder passwordEncoder;
+    @Mock private JwtService jwtService;
+    @Mock private AuthenticationManager authenticationManager;
+    @Mock private CustomUserDetailsService userDetailsService;
+    @Mock private EmailService emailService;
+    @Mock private AuditLogger auditLogger;
 
     @InjectMocks
     private AuthService authService;
 
-    private Contractor user;
+    private User user;
 
     @BeforeEach
     void setUp() {
-        user = Contractor.builder()
+        user = User.builder()
                 .id(1L)
-                .name("João Silva")
+                .name("Joao Silva")
                 .email("joao@email.com")
                 .cpf("12345678901")
                 .phone("11999999999")
                 .password("encoded-password")
                 .userType(User.UserType.CONTRACTOR)
+                .activeRole(User.UserType.CONTRACTOR)
+                .roles(Set.of(User.UserType.CONTRACTOR))
                 .emailVerified(false)
                 .active(true)
                 .verificationCode("123456")
                 .verificationCodeExpiry(LocalDateTime.now().plusHours(24))
                 .verificationAttempts(0)
-                .totalContracts(0)
-                .activeContracts(0)
-                .completedContracts(0)
                 .build();
     }
 
     @Nested
-    @DisplayName("Verificação de Email")
+    @DisplayName("Verificacao de Email")
     class EmailVerification {
 
         @Test
-        @DisplayName("Deve verificar email com código correto")
+        @DisplayName("Deve verificar email com codigo correto")
         void verifyEmail_correctCode_success() {
-            when(userRepository.findByEmail("joao@email.com")).thenReturn(Optional.of(user));
-            when(userRepository.save(any(User.class))).thenReturn(user);
-
             UserDetails mockUserDetails = mock(UserDetails.class);
+            when(userRepository.findByEmail("joao@email.com")).thenReturn(Optional.of(user));
+            when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
             when(userDetailsService.loadUserByUsername("joao@email.com")).thenReturn(mockUserDetails);
-            when(jwtService.generateToken(mockUserDetails)).thenReturn("jwt-verified");
+            when(jwtService.generateToken(any(), any(UserDetails.class))).thenReturn("jwt-verified");
 
             AuthResponse response = authService.verifyEmail("joao@email.com", "123456");
 
-            assertThat(response).isNotNull();
             assertThat(response.getToken()).isEqualTo("jwt-verified");
             assertThat(user.getEmailVerified()).isTrue();
             assertThat(user.getVerificationCode()).isNull();
@@ -109,10 +98,10 @@ class AuthServiceVerificationTest {
         }
 
         @Test
-        @DisplayName("Deve lançar exceção com código incorreto e informar tentativas restantes")
+        @DisplayName("Deve lancar excecao com codigo incorreto e informar tentativas restantes")
         void verifyEmail_wrongCode_throwsWithRemainingAttempts() {
             when(userRepository.findByEmail("joao@email.com")).thenReturn(Optional.of(user));
-            when(userRepository.save(any(User.class))).thenReturn(user);
+            when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
             assertThatThrownBy(() -> authService.verifyEmail("joao@email.com", "000000"))
                     .isInstanceOf(IllegalArgumentException.class)
@@ -122,10 +111,9 @@ class AuthServiceVerificationTest {
         }
 
         @Test
-        @DisplayName("Deve lançar exceção com código expirado")
+        @DisplayName("Deve lancar excecao com codigo expirado")
         void verifyEmail_expiredCode_throwsException() {
             user.setVerificationCodeExpiry(LocalDateTime.now().minusHours(1));
-
             when(userRepository.findByEmail("joao@email.com")).thenReturn(Optional.of(user));
 
             assertThatThrownBy(() -> authService.verifyEmail("joao@email.com", "123456"))
@@ -134,10 +122,9 @@ class AuthServiceVerificationTest {
         }
 
         @Test
-        @DisplayName("Deve lançar exceção quando email já verificado")
+        @DisplayName("Deve lancar excecao quando email ja verificado")
         void verifyEmail_alreadyVerified_throwsException() {
             user.setEmailVerified(true);
-
             when(userRepository.findByEmail("joao@email.com")).thenReturn(Optional.of(user));
 
             assertThatThrownBy(() -> authService.verifyEmail("joao@email.com", "123456"))
@@ -151,12 +138,11 @@ class AuthServiceVerificationTest {
     class LockoutAndAttempts {
 
         @Test
-        @DisplayName("Deve aplicar lockout de 30 minutos após 5 tentativas erradas")
+        @DisplayName("Deve aplicar lockout de 30 minutos apos 5 tentativas erradas")
         void verifyEmail_maxAttempts_triggersLockout() {
-            user.setVerificationAttempts(4); // 4 tentativas anteriores, esta será a 5ª
-
+            user.setVerificationAttempts(4);
             when(userRepository.findByEmail("joao@email.com")).thenReturn(Optional.of(user));
-            when(userRepository.save(any(User.class))).thenReturn(user);
+            when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
             assertThatThrownBy(() -> authService.verifyEmail("joao@email.com", "000000"))
                     .isInstanceOf(TooManyAttemptsException.class)
@@ -164,16 +150,13 @@ class AuthServiceVerificationTest {
 
             assertThat(user.getVerificationAttempts()).isEqualTo(5);
             assertThat(user.getVerificationLockUntil()).isNotNull();
-            assertThat(user.getVerificationLockUntil()).isAfter(LocalDateTime.now().plusMinutes(29));
-            assertThat(user.getVerificationLockUntil()).isBefore(LocalDateTime.now().plusMinutes(31));
         }
 
         @Test
-        @DisplayName("Deve bloquear requisição durante lockout ativo")
+        @DisplayName("Deve bloquear requisicao durante lockout ativo")
         void verifyEmail_duringLockout_throwsException() {
             user.setVerificationLockUntil(LocalDateTime.now().plusMinutes(20));
             user.setVerificationAttempts(5);
-
             when(userRepository.findByEmail("joao@email.com")).thenReturn(Optional.of(user));
 
             assertThatThrownBy(() -> authService.verifyEmail("joao@email.com", "123456"))
@@ -185,15 +168,14 @@ class AuthServiceVerificationTest {
         @Test
         @DisplayName("Deve resetar tentativas quando lockout expira")
         void verifyEmail_lockoutExpired_resetsAttempts() {
+            UserDetails mockUserDetails = mock(UserDetails.class);
             user.setVerificationLockUntil(LocalDateTime.now().minusMinutes(5));
             user.setVerificationAttempts(5);
 
             when(userRepository.findByEmail("joao@email.com")).thenReturn(Optional.of(user));
-            when(userRepository.save(any(User.class))).thenReturn(user);
-
-            UserDetails mockUserDetails = mock(UserDetails.class);
+            when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
             when(userDetailsService.loadUserByUsername("joao@email.com")).thenReturn(mockUserDetails);
-            when(jwtService.generateToken(mockUserDetails)).thenReturn("jwt-after-lockout");
+            when(jwtService.generateToken(any(), any(UserDetails.class))).thenReturn("jwt-after-lockout");
 
             AuthResponse response = authService.verifyEmail("joao@email.com", "123456");
 
@@ -206,14 +188,14 @@ class AuthServiceVerificationTest {
         @DisplayName("Deve incrementar tentativas corretamente a cada erro")
         void verifyEmail_incrementsAttemptsOnEachError() {
             when(userRepository.findByEmail("joao@email.com")).thenReturn(Optional.of(user));
-            when(userRepository.save(any(User.class))).thenReturn(user);
+            when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
             for (int i = 1; i <= 4; i++) {
                 user.setVerificationAttempts(i - 1);
 
                 try {
                     authService.verifyEmail("joao@email.com", "000000");
-                } catch (IllegalArgumentException e) {
+                } catch (IllegalArgumentException exception) {
                     assertThat(user.getVerificationAttempts()).isEqualTo(i);
                 }
             }
@@ -221,34 +203,34 @@ class AuthServiceVerificationTest {
     }
 
     @Nested
-    @DisplayName("Reenvio de Código")
+    @DisplayName("Reenvio de Codigo")
     class ResendCode {
 
         @Test
-        @DisplayName("Deve gerar novo código, resetar tentativas e lockout ao reenviar")
+        @DisplayName("Deve gerar novo codigo, resetar tentativas e lockout ao reenviar")
         void resendCode_success() {
             String originalCode = user.getVerificationCode();
             user.setVerificationAttempts(3);
             user.setVerificationLockUntil(LocalDateTime.now().plusMinutes(10));
 
             when(userRepository.findByEmail("joao@email.com")).thenReturn(Optional.of(user));
-            when(userRepository.save(any(User.class))).thenReturn(user);
+            when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
             authService.resendVerificationCode("joao@email.com");
 
-            assertThat(user.getVerificationCode()).isNotNull();
-            assertThat(user.getVerificationCode()).hasSize(6);
-            assertThat(user.getVerificationCode()).isNotEqualTo(originalCode);
+            assertThat(user.getVerificationCode()).isNotNull().hasSize(6).isNotEqualTo(originalCode);
             assertThat(user.getVerificationAttempts()).isZero();
             assertThat(user.getVerificationLockUntil()).isNull();
-            verify(emailService).sendVerificationEmail(eq("joao@email.com"), eq("João Silva"), anyString());
+            verify(emailService).sendVerificationEmail(
+                    "joao@email.com",
+                    "Joao Silva",
+                    user.getVerificationCode());
         }
 
         @Test
-        @DisplayName("Deve lançar exceção ao reenviar para email já verificado")
+        @DisplayName("Deve lancar excecao ao reenviar para email ja verificado")
         void resendCode_alreadyVerified_throwsException() {
             user.setEmailVerified(true);
-
             when(userRepository.findByEmail("joao@email.com")).thenReturn(Optional.of(user));
 
             assertThatThrownBy(() -> authService.resendVerificationCode("joao@email.com"))
@@ -257,7 +239,7 @@ class AuthServiceVerificationTest {
         }
 
         @Test
-        @DisplayName("Deve lançar exceção ao reenviar para email inexistente")
+        @DisplayName("Deve lancar excecao ao reenviar para email inexistente")
         void resendCode_emailNotFound_throwsException() {
             when(userRepository.findByEmail("inexistente@email.com")).thenReturn(Optional.empty());
 

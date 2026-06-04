@@ -5,7 +5,9 @@ import com.servija.servija.dto.AddressRequest;
 import com.servija.servija.dto.LoginRequest;
 import com.servija.servija.dto.RegistrationValidationRequest;
 import com.servija.servija.dto.RegisterRequest;
+import com.servija.servija.dto.UserRoleRequest;
 import com.servija.servija.exception.DuplicateResourceException;
+import com.servija.servija.exception.EmailVerificationRequiredException;
 import com.servija.servija.exception.InvalidCredentialsException;
 import com.servija.servija.exception.ResourceNotFoundException;
 import com.servija.servija.exception.TooManyAttemptsException;
@@ -25,7 +27,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
+import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -51,31 +55,23 @@ public class AuthService {
     private final PasswordPolicyService passwordPolicyService;
     private final AdminResetPasswordLinkService adminResetPasswordLinkService;
     private final TotpService totpService;
+    private final UserRoleCompatibilityService userRoleCompatibilityService;
 
     @Transactional
     public AuthResponse register(RegisterRequest request) {
         validateRegistrationData(request);
 
-        User user = request.getUserType() == User.UserType.CONTRACTOR
-                ? createContractor(request)
-                : createFreelancer(request);
+        User user = createBaseUser(request);
 
         String verificationCode = generateVerificationCode();
         user.setVerificationCode(verificationCode);
         user.setVerificationCodeExpiry(LocalDateTime.now().plusMinutes(VERIFICATION_CODE_EXPIRY_MINUTES));
-
-        if (user instanceof Contractor contractor) {
-            user = contractorRepository.save(contractor);
-        } else {
-            user = freelancerRepository.save((Freelancer) user);
-        }
+        user = userRepository.save(user);
+        ensureProfileForRole(user, request.getUserType());
 
         addressService.createAddressForUser(user, request.getAddress());
 
         emailService.sendVerificationEmail(user.getEmail(), user.getName(), verificationCode);
-
-        UserDetails userDetails = userDetailsService.loadUserByUsername(user.getEmail());
-        String token = jwtService.generateToken(userDetails);
 
         auditLogger.recordFor(
                 user,
@@ -86,7 +82,7 @@ public class AuthService {
                 com.servija.servija.model.AuditLog.Result.SUCCESS,
                 Map.of("userType", user.getUserType()));
 
-        return buildAuthResponse(user, token);
+        return buildAuthResponse(user, null);
     }
 
     public void validateRegistrationData(RegisterRequest request) {
@@ -122,6 +118,7 @@ public class AuthService {
 
             User user = userRepository.findByEmail(request.getEmail())
                     .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
+            user = userRoleCompatibilityService.repairIfNeeded(user);
 
             if (user.getUserType() == User.UserType.ADMIN) {
                 throw new InvalidCredentialsException("Credenciais invalidas");
@@ -131,12 +128,15 @@ public class AuthService {
                 throw new InvalidCredentialsException("Conta suspensa");
             }
 
+            if (!Boolean.TRUE.equals(user.getEmailVerified())) {
+                throw new EmailVerificationRequiredException(user.getEmail());
+            }
+
             if (Boolean.TRUE.equals(user.getTotpEnabled())) {
                 return buildChallengeResponse(user);
             }
 
-            UserDetails userDetails = userDetailsService.loadUserByUsername(user.getEmail());
-            String token = jwtService.generateToken(userDetails);
+            String token = generateAccessToken(user);
 
             auditLogger.recordFor(
                     user,
@@ -179,6 +179,7 @@ public class AuthService {
 
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
+        user = userRoleCompatibilityService.repairIfNeeded(user);
 
         if (user.getUserType() != User.UserType.ADMIN) {
             throw new InvalidCredentialsException("Credenciais invalidas");
@@ -188,12 +189,15 @@ public class AuthService {
             throw new InvalidCredentialsException("Conta suspensa");
         }
 
+        if (!Boolean.TRUE.equals(user.getEmailVerified())) {
+            throw new EmailVerificationRequiredException(user.getEmail());
+        }
+
         if (Boolean.TRUE.equals(user.getTotpEnabled())) {
             return buildChallengeResponse(user);
         }
 
-        UserDetails userDetails = userDetailsService.loadUserByUsername(user.getEmail());
-        String token = jwtService.generateToken(userDetails);
+        String token = generateAccessToken(user);
 
         return buildAuthResponse(user, token);
     }
@@ -255,7 +259,7 @@ public class AuthService {
             throw new InvalidCredentialsException("Código inválido");
         }
 
-        String token = jwtService.generateToken(userDetails);
+        String token = generateAccessToken(user);
 
         String method = result == TotpService.VerifyResult.OK_BACKUP ? "password+backup" : "password+totp";
         auditLogger.recordFor(
@@ -291,7 +295,7 @@ public class AuthService {
 
     private AuthResponse buildChallengeResponse(User user) {
         UserDetails userDetails = userDetailsService.loadUserByUsername(user.getEmail());
-        Map<String, Object> claims = new java.util.HashMap<>();
+        Map<String, Object> claims = new java.util.HashMap<>(buildTokenClaims(user));
         claims.put("totp_pending", true);
         String challenge = jwtService.generateToken(userDetails, claims, TOTP_CHALLENGE_TTL_MS);
         return AuthResponse.builder()
@@ -354,8 +358,7 @@ public class AuthService {
         user.setVerificationLockUntil(null);
         userRepository.save(user);
 
-        UserDetails userDetails = userDetailsService.loadUserByUsername(user.getEmail());
-        String token = jwtService.generateToken(userDetails);
+        String token = generateAccessToken(user);
 
         auditLogger.recordFor(
                 user,
@@ -510,56 +513,105 @@ public class AuthService {
         if (exception instanceof TooManyAttemptsException) {
             return "too_many_attempts";
         }
+        if (exception instanceof EmailVerificationRequiredException) {
+            return "email_not_verified";
+        }
         if (exception instanceof InvalidCredentialsException && "Conta suspensa".equalsIgnoreCase(exception.getMessage())) {
             return "account_suspended";
         }
         return "invalid_credentials";
     }
 
+    @Transactional
+    public AuthResponse switchRole(String email, UserRoleRequest request) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("Usuario nao encontrado"));
+
+        User.UserType requestedRole = request.getRole();
+        validateInteractiveRole(requestedRole);
+
+        if (!user.hasRole(requestedRole)) {
+            throw new IllegalArgumentException("Este perfil nao esta habilitado para a conta");
+        }
+
+        user.setActiveRole(requestedRole);
+        user = userRepository.save(user);
+        return buildAuthResponse(user, generateAccessToken(user));
+    }
+
     private User saveUser(User user) {
-        if (user instanceof Contractor contractor) {
-            return contractorRepository.save(contractor);
-        }
-        if (user instanceof Freelancer freelancer) {
-            return freelancerRepository.save(freelancer);
-        }
         return userRepository.save(user);
     }
 
-    private Contractor createContractor(RegisterRequest request) {
-        return Contractor.builder()
+    private User createBaseUser(RegisterRequest request) {
+        Set<User.UserType> initialRoles = new LinkedHashSet<>();
+        initialRoles.add(request.getUserType());
+
+        User user = User.builder()
                 .name(request.getName())
                 .email(request.getEmail())
                 .cpf(request.getCpf())
                 .phone(request.getPhone())
                 .birthDate(request.getBirthDate())
                 .password(passwordEncoder.encode(request.getPassword()))
-                .userType(User.UserType.CONTRACTOR)
+                .userType(request.getUserType())
+                .activeRole(request.getUserType())
+                .roles(initialRoles)
                 .emailVerified(false)
                 .active(true)
-                .totalContracts(0)
-                .activeContracts(0)
-                .completedContracts(0)
                 .build();
+        user.addRole(request.getUserType());
+        return user;
     }
 
-    private Freelancer createFreelancer(RegisterRequest request) {
-        return Freelancer.builder()
-                .name(request.getName())
-                .email(request.getEmail())
-                .cpf(request.getCpf())
-                .phone(request.getPhone())
-                .birthDate(request.getBirthDate())
-                .password(passwordEncoder.encode(request.getPassword()))
-                .userType(User.UserType.FREELANCER)
-                .emailVerified(false)
-                .active(true)
-                .totalReviews(0)
-                .completedJobs(0)
-                .activeJobs(0)
-                .profileCompleted(false)
-                .available(true)
-                .build();
+    private void ensureProfileForRole(User user, User.UserType role) {
+        validateInteractiveRole(role);
+
+        if (role == User.UserType.CONTRACTOR) {
+            contractorRepository.findById(user.getId())
+                    .orElseGet(() -> contractorRepository.save(Contractor.builder()
+                            .user(user)
+                            .totalContracts(0)
+                            .activeContracts(0)
+                            .completedContracts(0)
+                            .build()));
+            user.setContractorProfile(contractorRepository.findById(user.getId()).orElse(null));
+        } else if (role == User.UserType.FREELANCER) {
+            freelancerRepository.findById(user.getId())
+                    .orElseGet(() -> freelancerRepository.save(Freelancer.builder()
+                            .user(user)
+                            .totalReviews(0)
+                            .completedJobs(0)
+                            .activeJobs(0)
+                            .profileCompleted(false)
+                            .available(true)
+                            .build()));
+            user.setFreelancerProfile(freelancerRepository.findById(user.getId()).orElse(null));
+        }
+
+        user.addRole(role);
+        userRepository.save(user);
+    }
+
+    private void validateInteractiveRole(User.UserType role) {
+        if (role == null || role == User.UserType.ADMIN) {
+            throw new IllegalArgumentException("Perfil invalido para esta operacao");
+        }
+    }
+
+    private String generateAccessToken(User user) {
+        UserDetails userDetails = userDetailsService.loadUserByUsername(user.getEmail());
+        return jwtService.generateToken(buildTokenClaims(user), userDetails);
+    }
+
+    private Map<String, Object> buildTokenClaims(User user) {
+        Set<User.UserType> effectiveRoles = user.getRoles() == null || user.getRoles().isEmpty()
+                ? Set.of(user.getUserType())
+                : user.getRoles();
+
+        return Map.of(
+                "roles", effectiveRoles.stream().map(Enum::name).toList(),
+                "active_role", user.getUserType().name());
     }
 
     private String generateVerificationCode() {
@@ -577,6 +629,8 @@ public class AuthService {
                 .phone(user.getPhone())
                 .birthDate(user.getBirthDate())
                 .userType(user.getUserType())
+                .activeRole(user.getActiveRole())
+                .roles(user.getRoles())
                 .emailVerified(user.getEmailVerified())
                 .avatarUrl(user.getAvatarUrl())
                 .active(user.getActive())

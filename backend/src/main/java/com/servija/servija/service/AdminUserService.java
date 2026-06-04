@@ -11,6 +11,7 @@ import com.servija.servija.model.Contractor;
 import com.servija.servija.model.Freelancer;
 import com.servija.servija.model.User;
 import com.servija.servija.model.ServiceRequest;
+import com.servija.servija.repository.ContractorRepository;
 import com.servija.servija.repository.FreelancerRepository;
 import com.servija.servija.repository.ReviewRepository;
 import com.servija.servija.repository.ServiceRepository;
@@ -42,6 +43,7 @@ public class AdminUserService {
     private static final Pattern PHONE_PATTERN = Pattern.compile("^\\d{10,11}$");
 
     private final UserRepository userRepository;
+    private final ContractorRepository contractorRepository;
     private final FreelancerRepository freelancerRepository;
     private final ServiceRepository serviceRepository;
     private final ServiceRequestRepository serviceRequestRepository;
@@ -139,11 +141,11 @@ public class AdminUserService {
             applyUserTypeChange(user, request.getUserType());
         }
 
-        if (user instanceof Freelancer freelancer && request.getBio() != null) {
-            freelancer.setBio(request.getBio());
-            freelancerRepository.save(freelancer);
-            recordUserUpdateAudit(freelancer, beforeState, buildAuditState(freelancer));
-            return toDetailDto(freelancer);
+        if (request.getBio() != null) {
+            freelancerRepository.findById(user.getId()).ifPresent(freelancer -> {
+                freelancer.setBio(request.getBio());
+                freelancerRepository.save(freelancer);
+            });
         }
 
         User saved = userRepository.save(user);
@@ -222,16 +224,28 @@ public class AdminUserService {
     }
 
     private void applyUserTypeChange(User user, User.UserType newType) {
-        Long userId = user.getId();
-
         if (newType == User.UserType.FREELANCER) {
-            userRepository.updateUserTypeNative(userId, "FREELANCER");
-            userRepository.insertFreelancerRecordIfNotExists(userId);
-            user.setUserType(User.UserType.FREELANCER);
+            freelancerRepository.findById(user.getId()).orElseGet(() -> freelancerRepository.save(
+                    Freelancer.builder()
+                            .user(user)
+                            .totalReviews(0)
+                            .completedJobs(0)
+                            .activeJobs(0)
+                            .profileCompleted(false)
+                            .available(true)
+                            .build()));
+            user.addRole(User.UserType.FREELANCER);
+            user.setActiveRole(User.UserType.FREELANCER);
         } else if (newType == User.UserType.CONTRACTOR) {
-            userRepository.updateUserTypeNative(userId, "CONTRACTOR");
-            userRepository.insertContractorRecordIfNotExists(userId);
-            user.setUserType(User.UserType.CONTRACTOR);
+            contractorRepository.findById(user.getId()).orElseGet(() -> contractorRepository.save(
+                    Contractor.builder()
+                            .user(user)
+                            .totalContracts(0)
+                            .activeContracts(0)
+                            .completedContracts(0)
+                            .build()));
+            user.addRole(User.UserType.CONTRACTOR);
+            user.setActiveRole(User.UserType.CONTRACTOR);
         }
     }
 
@@ -311,7 +325,7 @@ public class AdminUserService {
                 .updatedAt(user.getUpdatedAt())
                 .deletedAt(user.getDeletedAt());
 
-        if (user instanceof Freelancer f) {
+        freelancerRepository.findById(user.getId()).ifPresent(f -> {
             Double freelancerAvgRating = reviewRepository.findAverageRatingByReviewedId(f.getId());
             long freelancerReviewCount = reviewRepository.countByReviewedId(f.getId());
             long completedCount = serviceRequestRepository.countByFreelancerIdAndStatus(f.getId(), ServiceRequest.Status.COMPLETED);
@@ -338,7 +352,9 @@ public class AdminUserService {
                                     .createdAt(s.getCreatedAt())
                                     .build())
                             .toList());
-        } else if (user instanceof Contractor) {
+        });
+
+        contractorRepository.findById(user.getId()).ifPresent(contractor -> {
             Double avg = reviewRepository.findAverageRatingByReviewedId(user.getId());
             long reviewCount = reviewRepository.countByReviewedId(user.getId());
             long completed = serviceRequestRepository.countByContractorIdAndStatus(user.getId(), ServiceRequest.Status.COMPLETED);
@@ -352,7 +368,7 @@ public class AdminUserService {
                     .completedContracts((int) completed)
                     .contractorRating(avg != null ? java.math.BigDecimal.valueOf(avg) : null)
                     .contractorTotalReviews(reviewCount);
-        }
+        });
 
         return builder.build();
     }
@@ -379,9 +395,7 @@ public class AdminUserService {
         state.put("email", user.getEmail());
         state.put("phone", user.getPhone());
         state.put("userType", user.getUserType() != null ? user.getUserType().name() : null);
-        if (user instanceof Freelancer freelancer) {
-            state.put("bio", freelancer.getBio());
-        }
+        freelancerRepository.findById(user.getId()).ifPresent(freelancer -> state.put("bio", freelancer.getBio()));
         return state;
     }
 

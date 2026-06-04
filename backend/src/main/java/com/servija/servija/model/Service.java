@@ -80,6 +80,11 @@ public class Service {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
+    // Soft delete: preenchido quando o serviço é excluído logicamente (possui solicitações associadas).
+    // NULL = serviço não excluído. Distinto de isActive=false (pausado).
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
     public enum PriceType {
         FIXED, HOURLY, DAILY
     }

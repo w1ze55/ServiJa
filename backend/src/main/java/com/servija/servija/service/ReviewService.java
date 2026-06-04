@@ -65,6 +65,10 @@ public class ReviewService {
         Review.ReviewerType reviewerType = Review.ReviewerType.CONTRACTOR;
         User reviewed = serviceRequest.getFreelancer();
 
+        if (reviewed != null && reviewed.getId().equals(reviewer.getId())) {
+            throw new IllegalStateException("Voce nao pode avaliar a si mesmo");
+        }
+
         String tagsString = request.getTags() != null && !request.getTags().isEmpty()
                 ? String.join(",", request.getTags())
                 : null;
@@ -81,8 +85,8 @@ public class ReviewService {
 
         Review saved = reviewRepository.save(review);
 
-        if (reviewerType == Review.ReviewerType.CONTRACTOR && reviewed instanceof Freelancer freelancer) {
-            updateFreelancerRating(freelancer);
+        if (reviewerType == Review.ReviewerType.CONTRACTOR && reviewed != null) {
+            freelancerRepository.findById(reviewed.getId()).ifPresent(this::updateFreelancerRating);
         }
 
         reviewSummaryRepository.findByFreelancerId(reviewed.getId())
