@@ -11,6 +11,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -40,6 +41,8 @@ public class PublicPortfolioController {
         try {
             List<PortfolioProjectResponse> projects = portfolioService.getPublicProjects(freelancerId);
             return ResponseEntity.ok(projects);
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(403).build();
         } catch (Exception e) {
             return ResponseEntity.internalServerError().build();
         }

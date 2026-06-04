@@ -40,26 +40,14 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class ClientHomeServiceTest {
 
-    @Mock
-    private UserRepository userRepository;
-
-    @Mock
-    private AddressRepository addressRepository;
-
-    @Mock
-    private FreelancerRepository freelancerRepository;
-
-    @Mock
-    private ReviewRepository reviewRepository;
-
-    @Mock
-    private ServiceRequestService serviceRequestService;
-
-    @Mock
-    private ServiceService serviceService;
-
-    @Mock
-    private FavoriteService favoriteService;
+    @Mock private UserRepository userRepository;
+    @Mock private AddressRepository addressRepository;
+    @Mock private FreelancerRepository freelancerRepository;
+    @Mock private ReviewRepository reviewRepository;
+    @Mock private ServiceRequestService serviceRequestService;
+    @Mock private ServiceService serviceService;
+    @Mock private FavoriteService favoriteService;
+    @Mock private ServiceSearchWeeklyMetricService serviceSearchWeeklyMetricService;
 
     private ClientHomeService clientHomeService;
 
@@ -72,14 +60,15 @@ class ClientHomeServiceTest {
                 reviewRepository,
                 serviceRequestService,
                 serviceService,
-                favoriteService));
+                favoriteService,
+                serviceSearchWeeklyMetricService));
     }
 
     @Test
-    @DisplayName("Deve montar a home do cliente com região, interesses e destaques")
+    @DisplayName("Deve montar a home do cliente com regiao, interesses e destaques")
     void getHome_buildsRegionalHomePayload() {
         User contractor = buildContractor(10L, "cliente@servija.com");
-        Freelancer regionalFreelancer = buildFreelancer(21L, "Ana UX", true, "São Paulo", "SP");
+        Freelancer regionalFreelancer = buildFreelancer(21L, "Ana UX", true, "Sao Paulo", "SP");
         Freelancer globalFreelancer = buildFreelancer(22L, "Bruno Dev", true, "Campinas", "SP");
 
         ServiceResponse regionalService = buildService(100L, 21L, "UX para SaaS", "Desenvolvimento e TI", "UX e UI");
@@ -87,14 +76,14 @@ class ClientHomeServiceTest {
 
         List<ServiceRequestResponse> requests = List.of(
                 buildRequest(1L, "PENDING", "Briefing de produto", "Desenvolvimento e TI", "UX e UI", LocalDateTime.now().minusDays(1)),
-                buildRequest(2L, "ACCEPTED", "Protótipo navegável", "Desenvolvimento e TI", "UX e UI", LocalDateTime.now().minusDays(3)),
-                buildRequest(3L, "COMPLETED", "Página de captura", "Desenvolvimento e TI", "Landing Pages", LocalDateTime.now().minusDays(10))
+                buildRequest(2L, "ACCEPTED", "Prototipo navegavel", "Desenvolvimento e TI", "UX e UI", LocalDateTime.now().minusDays(3)),
+                buildRequest(3L, "COMPLETED", "Pagina de captura", "Desenvolvimento e TI", "Landing Pages", LocalDateTime.now().minusDays(10))
         );
 
         doReturn(contractor).when(clientHomeService).getCurrentContractor();
         when(serviceRequestService.getByContractorEmail(contractor.getEmail())).thenReturn(requests);
         when(addressRepository.findByUserIdOrderByIsDefaultDescCreatedAtDesc(contractor.getId()))
-                .thenReturn(List.of(buildAddress(contractor, "Casa", "São Paulo", "SP", true)));
+                .thenReturn(List.of(buildAddress(contractor, "Casa", "Sao Paulo", "SP", true)));
         when(favoriteService.getUserFavorites(contractor.getId())).thenReturn(List.of(
                 FavoriteResponse.builder()
                         .id(501L)
@@ -119,8 +108,8 @@ class ClientHomeServiceTest {
         when(freelancerRepository.findById(eq(globalFreelancer.getId()))).thenReturn(Optional.of(globalFreelancer));
         when(addressRepository.findByUserIdInOrderByUserIdAscIsDefaultDescCreatedAtDesc(anyList()))
                 .thenReturn(List.of(
-                        buildAddress(regionalFreelancer, "Atendimento", "São Paulo", "SP", true),
-                        buildAddress(globalFreelancer, "Atendimento", "Campinas", "SP", true)));
+                        buildAddress(regionalFreelancer.getUser(), "Atendimento", "Sao Paulo", "SP", true),
+                        buildAddress(globalFreelancer.getUser(), "Atendimento", "Campinas", "SP", true)));
         when(reviewRepository.findByServiceId(eq(regionalService.getId()))).thenReturn(List.of(
                 buildReview(5, LocalDateTime.now().minusDays(5)),
                 buildReview(5, LocalDateTime.now().minusDays(15))));
@@ -131,16 +120,21 @@ class ClientHomeServiceTest {
                 buildReview(5, LocalDateTime.now().minusDays(12))));
         when(reviewRepository.findByReviewedIdOrderByCreatedAtDesc(eq(globalFreelancer.getId()))).thenReturn(List.of(
                 buildReview(4, LocalDateTime.now().minusDays(160))));
+        when(serviceSearchWeeklyMetricService.getTopServiceIdsForCurrentWeek(6))
+                .thenReturn(List.of(regionalService.getId(), globalService.getId()));
 
         ClientHomeResponse response = clientHomeService.getHome();
 
         assertThat(response.getRegion().getLocalized()).isTrue();
-        assertThat(response.getRegion().getDisplayName()).isEqualTo("São Paulo, SP");
+        assertThat(response.getRegion().getDisplayName()).isEqualTo("Sao Paulo, SP");
         assertThat(response.getRecentRequests()).hasSize(1);
         assertThat(response.getActiveProjects()).hasSize(1);
         assertThat(response.getInterestCategories()).contains("UX e UI");
         assertThat(response.getFavorites().getServiceCount()).isEqualTo(1);
         assertThat(response.getFavorites().getProfessionalCount()).isEqualTo(1);
+        assertThat(response.getWeeklyMostSearchedServices())
+                .extracting(ServiceResponse::getId)
+                .containsExactly(regionalService.getId(), globalService.getId());
         assertThat(response.getFeaturedServices()).isNotEmpty();
         assertThat(response.getFeaturedServices().get(0).getId()).isEqualTo(regionalService.getId());
         assertThat(response.getFeaturedProfessionals()).isNotEmpty();
@@ -148,11 +142,11 @@ class ClientHomeServiceTest {
     }
 
     @Test
-    @DisplayName("Deve usar fallback global quando o cliente não possui endereço")
+    @DisplayName("Deve usar fallback global quando o cliente nao possui endereco")
     void getHome_fallsBackToGlobalRankingWithoutAddress() {
         User contractor = buildContractor(11L, "cliente2@servija.com");
         Freelancer freelancer = buildFreelancer(31L, "Clara Produto", true, "Curitiba", "PR");
-        ServiceResponse service = buildService(201L, 31L, "Diagnóstico de produto", "Consultoria", "Produto");
+        ServiceResponse service = buildService(201L, 31L, "Diagnostico de produto", "Consultoria", "Produto");
 
         doReturn(contractor).when(clientHomeService).getCurrentContractor();
         when(serviceRequestService.getByContractorEmail(contractor.getEmail())).thenReturn(List.of());
@@ -162,9 +156,10 @@ class ClientHomeServiceTest {
         when(freelancerRepository.findAllByIdInWithServiceCities(anyList())).thenReturn(List.of(freelancer));
         when(freelancerRepository.findById(anyLong())).thenReturn(Optional.of(freelancer));
         when(addressRepository.findByUserIdInOrderByUserIdAscIsDefaultDescCreatedAtDesc(anyList()))
-                .thenReturn(List.of(buildAddress(freelancer, "Atendimento", "Curitiba", "PR", true)));
+                .thenReturn(List.of(buildAddress(freelancer.getUser(), "Atendimento", "Curitiba", "PR", true)));
         when(reviewRepository.findByReviewedIdOrderByCreatedAtDesc(freelancer.getId()))
                 .thenReturn(List.of(buildReview(5, LocalDateTime.now().minusDays(6))));
+        when(serviceSearchWeeklyMetricService.getTopServiceIdsForCurrentWeek(6)).thenReturn(List.of(service.getId()));
 
         ClientHomeResponse response = clientHomeService.getHome();
 
@@ -172,6 +167,33 @@ class ClientHomeServiceTest {
         assertThat(response.getRegion().getDisplayName()).isEqualTo("toda a plataforma");
         assertThat(response.getFeaturedServices()).hasSize(1);
         assertThat(response.getFeaturedProfessionals()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("Deve retornar apenas servicos semanais que continuam ativos e publicos")
+    void getHome_filtersWeeklyMostSearchedServicesAgainstCurrentCatalog() {
+        User contractor = buildContractor(12L, "cliente3@servija.com");
+        Freelancer freelancer = buildFreelancer(41L, "Marina Dev", true, "Recife", "PE");
+        ServiceResponse visibleService = buildService(301L, 41L, "Site institucional", "Tecnologia", "Web");
+
+        doReturn(contractor).when(clientHomeService).getCurrentContractor();
+        when(serviceRequestService.getByContractorEmail(contractor.getEmail())).thenReturn(List.of());
+        when(addressRepository.findByUserIdOrderByIsDefaultDescCreatedAtDesc(contractor.getId())).thenReturn(List.of());
+        when(favoriteService.getUserFavorites(contractor.getId())).thenReturn(List.of());
+        when(serviceService.getActiveServices(null, null, null)).thenReturn(List.of(visibleService));
+        when(freelancerRepository.findAllByIdInWithServiceCities(anyList())).thenReturn(List.of(freelancer));
+        when(freelancerRepository.findById(anyLong())).thenReturn(Optional.of(freelancer));
+        when(addressRepository.findByUserIdInOrderByUserIdAscIsDefaultDescCreatedAtDesc(anyList()))
+                .thenReturn(List.of(buildAddress(freelancer.getUser(), "Atendimento", "Recife", "PE", true)));
+        when(reviewRepository.findByReviewedIdOrderByCreatedAtDesc(freelancer.getId())).thenReturn(List.of());
+        when(serviceSearchWeeklyMetricService.getTopServiceIdsForCurrentWeek(6))
+                .thenReturn(List.of(999L, visibleService.getId(), 998L));
+
+        ClientHomeResponse response = clientHomeService.getHome();
+
+        assertThat(response.getWeeklyMostSearchedServices())
+                .extracting(ServiceResponse::getId)
+                .containsExactly(visibleService.getId());
     }
 
     private User buildContractor(Long id, String email) {
@@ -182,17 +204,25 @@ class ClientHomeServiceTest {
         contractor.setCpf("12345678901");
         contractor.setPhone("11999999999");
         contractor.setUserType(User.UserType.CONTRACTOR);
+        contractor.setActiveRole(User.UserType.CONTRACTOR);
+        contractor.setRoles(java.util.Set.of(User.UserType.CONTRACTOR));
         return contractor;
     }
 
     private Freelancer buildFreelancer(Long id, String name, boolean available, String city, String state) {
+        User freelancerUser = new User();
+        freelancerUser.setId(id);
+        freelancerUser.setName(name);
+        freelancerUser.setEmail(name.toLowerCase(Locale.ROOT).replace(" ", "") + "@servija.com");
+        freelancerUser.setCpf("1234567890" + id);
+        freelancerUser.setPhone("11999999999");
+        freelancerUser.setUserType(User.UserType.FREELANCER);
+        freelancerUser.setActiveRole(User.UserType.FREELANCER);
+        freelancerUser.setRoles(java.util.Set.of(User.UserType.FREELANCER));
+
         Freelancer freelancer = new Freelancer();
         freelancer.setId(id);
-        freelancer.setName(name);
-        freelancer.setEmail(name.toLowerCase(Locale.ROOT).replace(" ", "") + "@servija.com");
-        freelancer.setCpf("1234567890" + id);
-        freelancer.setPhone("11999999999");
-        freelancer.setUserType(User.UserType.FREELANCER);
+        freelancer.setUser(freelancerUser);
         freelancer.setProfessionalTitle("Especialista");
         freelancer.setCategory("Desenvolvimento e TI");
         freelancer.setAvailable(available);
@@ -230,7 +260,7 @@ class ClientHomeServiceTest {
                 .categoryLabel(category)
                 .subcategory(subcategory)
                 .subcategoryLabel(subcategory)
-                .description("Descrição do serviço")
+                .description("Descricao do servico")
                 .serviceRating(BigDecimal.valueOf(4.9))
                 .serviceReviewCount(12)
                 .price(BigDecimal.valueOf(1500))
@@ -258,13 +288,9 @@ class ClientHomeServiceTest {
                 .id(id)
                 .serviceName(serviceName)
                 .category(category)
-                .categoryLabel(category)
                 .subcategory(subcategory)
-                .subcategoryLabel(subcategory)
-                .description("Descrição da solicitação")
                 .status(status)
                 .createdAt(createdAt)
-                .updatedAt(createdAt.plusHours(6))
                 .build();
     }
 

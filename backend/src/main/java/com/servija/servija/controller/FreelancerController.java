@@ -17,6 +17,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -54,6 +55,8 @@ public class FreelancerController {
         try {
             FreelancerProfileResponse profile = freelancerService.getVisiblePublicProfile(id);
             return ResponseEntity.ok(profile);
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(403).build();
         } catch (ResourceNotFoundException e) {
             return ResponseEntity.notFound().build();
         } catch (Exception e) {
@@ -170,6 +173,8 @@ public class FreelancerController {
                     subcategoryId, subcategorySlug, minRating, available, city, state
             );
             return ResponseEntity.ok(nearbyFreelancers);
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(403).build();
         } catch (Exception e) {
             return ResponseEntity.internalServerError().build();
         }

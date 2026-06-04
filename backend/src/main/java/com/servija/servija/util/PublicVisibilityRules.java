@@ -16,7 +16,9 @@ public final class PublicVisibilityRules {
     }
 
     public static boolean isFreelancerPublic(Freelancer freelancer) {
-        return isUserPublic(freelancer);
+        return freelancer != null
+                && isUserPublic(freelancer.getUser())
+                && Boolean.TRUE.equals(freelancer.getAvailable());
     }
 
     public static boolean isServicePublic(Service service) {

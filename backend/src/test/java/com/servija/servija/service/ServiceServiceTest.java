@@ -7,11 +7,14 @@ import com.servija.servija.model.AuditLog;
 import com.servija.servija.model.Freelancer;
 import com.servija.servija.model.Service;
 import com.servija.servija.model.ServiceRequest;
+import com.servija.servija.model.User;
+import com.servija.servija.repository.FavoriteRepository;
 import com.servija.servija.repository.FreelancerRepository;
 import com.servija.servija.repository.ReviewRepository;
 import com.servija.servija.repository.ServiceRepository;
 import com.servija.servija.repository.ServiceRequestRepository;
 import com.servija.servija.repository.UserRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -26,45 +29,39 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.never;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class ServiceServiceTest {
 
-    @Mock
-    private ServiceRepository serviceRepository;
-
-    @Mock
-    private FreelancerRepository freelancerRepository;
-
-    @Mock
-    private UserRepository userRepository;
-
-    @Mock
-    private FileStorageService fileStorageService;
-
-    @Mock
-    private ServiceRequestRepository serviceRequestRepository;
-
-    @Mock
-    private ReviewRepository reviewRepository;
-
-    @Mock
-    private ObjectMapper objectMapper;
-
-    @Mock
-    private CategoryCatalogService categoryCatalogService;
-
-    @Mock
-    private AuditLogger auditLogger;
+    @Mock private ServiceRepository serviceRepository;
+    @Mock private FreelancerRepository freelancerRepository;
+    @Mock private UserRepository userRepository;
+    @Mock private FileStorageService fileStorageService;
+    @Mock private ServiceRequestRepository serviceRequestRepository;
+    @Mock private FavoriteRepository favoriteRepository;
+    @Mock private ReviewRepository reviewRepository;
+    @Mock private ObjectMapper objectMapper;
+    @Mock private CategoryCatalogService categoryCatalogService;
+    @Mock private ServiceSearchWeeklyMetricService serviceSearchWeeklyMetricService;
+    @Mock private AuditLogger auditLogger;
+    @Mock private CurrentUserContextService currentUserContextService;
 
     @InjectMocks
     private ServiceService serviceService;
+
+    @BeforeEach
+    void setUp() {
+        lenient().when(currentUserContextService.getOptionalAuthenticatedUser()).thenReturn(Optional.empty());
+    }
 
     @AfterEach
     void tearDown() {
@@ -72,16 +69,15 @@ class ServiceServiceTest {
     }
 
     @Test
-    @DisplayName("Deve retornar faixa média de preço quando houver serviços concluídos com valor")
+    @DisplayName("Deve retornar faixa media de preco quando houver servicos concluidos com valor")
     void getPublicServiceByIdWithPricing_returnsAverageRange() {
         Service service = buildService(7L, new BigDecimal("200.00"));
 
         when(serviceRepository.findById(7L)).thenReturn(Optional.of(service));
         when(reviewRepository.countByServiceId(7L)).thenReturn(3L);
         when(reviewRepository.findAverageRatingByServiceId(7L)).thenReturn(4.66);
-        when(serviceRequestRepository.countByService_IdAndStatusAndResponseValueIsNotNull(
-                7L,
-                ServiceRequest.Status.COMPLETED)).thenReturn(4L);
+        when(serviceRequestRepository.countByService_IdAndStatusAndResponseValueIsNotNull(7L, ServiceRequest.Status.COMPLETED))
+                .thenReturn(4L);
         when(serviceRequestRepository.findAverageCompletedResponseValueByServiceId(7L, "COMPLETED"))
                 .thenReturn(new BigDecimal("225.00"));
 
@@ -97,16 +93,15 @@ class ServiceServiceTest {
     }
 
     @Test
-    @DisplayName("Deve manter o preço cadastrado quando não houver histórico concluído")
+    @DisplayName("Deve manter o preco cadastrado quando nao houver historico concluido")
     void getPublicServiceByIdWithPricing_keepsRegisteredPriceWithoutHistory() {
         Service service = buildService(9L, new BigDecimal("180.00"));
 
         when(serviceRepository.findById(9L)).thenReturn(Optional.of(service));
         when(reviewRepository.countByServiceId(9L)).thenReturn(2L);
         when(reviewRepository.findAverageRatingByServiceId(9L)).thenReturn(4.25);
-        when(serviceRequestRepository.countByService_IdAndStatusAndResponseValueIsNotNull(
-                9L,
-                ServiceRequest.Status.COMPLETED)).thenReturn(0L);
+        when(serviceRequestRepository.countByService_IdAndStatusAndResponseValueIsNotNull(9L, ServiceRequest.Status.COMPLETED))
+                .thenReturn(0L);
 
         ServiceResponse response = serviceService.getVisiblePublicServiceByIdWithPricing(9L);
 
@@ -121,16 +116,15 @@ class ServiceServiceTest {
     }
 
     @Test
-    @DisplayName("Deve retornar faixa média de preço nas listagens públicas quando houver histórico concluído")
+    @DisplayName("Deve retornar faixa media de preco nas listagens publicas quando houver historico concluido")
     void getAllActiveServices_returnsAverageRangeForPublicListings() {
         Service service = buildService(11L, new BigDecimal("80.00"));
 
         when(serviceRepository.findByIsActiveOrderByCreatedAtDesc(true)).thenReturn(List.of(service));
         when(reviewRepository.countByServiceId(11L)).thenReturn(4L);
         when(reviewRepository.findAverageRatingByServiceId(11L)).thenReturn(4.74);
-        when(serviceRequestRepository.countByService_IdAndStatusAndResponseValueIsNotNull(
-                11L,
-                ServiceRequest.Status.COMPLETED)).thenReturn(3L);
+        when(serviceRequestRepository.countByService_IdAndStatusAndResponseValueIsNotNull(11L, ServiceRequest.Status.COMPLETED))
+                .thenReturn(3L);
         when(serviceRequestRepository.findAverageCompletedResponseValueByServiceId(11L, "COMPLETED"))
                 .thenReturn(new BigDecimal("64.90"));
 
@@ -147,16 +141,15 @@ class ServiceServiceTest {
     }
 
     @Test
-    @DisplayName("Deve manter o preço cadastrado nas listagens públicas quando não houver histórico concluído")
+    @DisplayName("Deve manter o preco cadastrado nas listagens publicas quando nao houver historico concluido")
     void getAllActiveServices_keepsRegisteredPriceWithoutHistory() {
         Service service = buildService(12L, new BigDecimal("150.00"));
 
         when(serviceRepository.findByIsActiveOrderByCreatedAtDesc(true)).thenReturn(List.of(service));
         when(reviewRepository.countByServiceId(12L)).thenReturn(2L);
         when(reviewRepository.findAverageRatingByServiceId(12L)).thenReturn(4.24);
-        when(serviceRequestRepository.countByService_IdAndStatusAndResponseValueIsNotNull(
-                12L,
-                ServiceRequest.Status.COMPLETED)).thenReturn(0L);
+        when(serviceRequestRepository.countByService_IdAndStatusAndResponseValueIsNotNull(12L, ServiceRequest.Status.COMPLETED))
+                .thenReturn(0L);
 
         List<ServiceResponse> responses = serviceService.getAllActiveServices();
 
@@ -172,7 +165,7 @@ class ServiceServiceTest {
     }
 
     @Test
-    @DisplayName("Deve ocultar serviço público quando o freelancer está bloqueado")
+    @DisplayName("Deve ocultar servico publico quando o freelancer esta bloqueado")
     void getVisiblePublicServiceByIdWithPricing_hidesBlockedFreelancer() {
         Service service = buildService(13L, new BigDecimal("120.00"));
         service.getFreelancer().setActive(false);
@@ -180,13 +173,13 @@ class ServiceServiceTest {
         when(serviceRepository.findById(13L)).thenReturn(Optional.of(service));
 
         org.assertj.core.api.Assertions.assertThatThrownBy(
-                () -> serviceService.getVisiblePublicServiceByIdWithPricing(13L))
+                        () -> serviceService.getVisiblePublicServiceByIdWithPricing(13L))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessage("Serviço não encontrado");
     }
 
     @Test
-    @DisplayName("Deve remover da listagem pública serviços de freelancers bloqueados")
+    @DisplayName("Deve remover da listagem publica servicos de freelancers bloqueados")
     void getAllActiveServices_filtersBlockedFreelancerServices() {
         Service visibleService = buildService(14L, new BigDecimal("90.00"));
         Service hiddenService = buildService(15L, new BigDecimal("110.00"));
@@ -194,13 +187,70 @@ class ServiceServiceTest {
 
         when(serviceRepository.findByIsActiveOrderByCreatedAtDesc(true)).thenReturn(List.of(visibleService, hiddenService));
         when(reviewRepository.countByServiceId(14L)).thenReturn(0L);
-        when(serviceRequestRepository.countByService_IdAndStatusAndResponseValueIsNotNull(
-                14L,
-                ServiceRequest.Status.COMPLETED)).thenReturn(0L);
+        when(serviceRequestRepository.countByService_IdAndStatusAndResponseValueIsNotNull(14L, ServiceRequest.Status.COMPLETED))
+                .thenReturn(0L);
 
         List<ServiceResponse> responses = serviceService.getAllActiveServices();
 
         assertThat(responses).extracting(ServiceResponse::getId).containsExactly(14L);
+    }
+
+    @Test
+    @DisplayName("Deve filtrar servicos por nome do profissional quando houver categoria selecionada")
+    void getActiveServices_filtersByFreelancerNameWithCategorySelection() {
+        Service matchingService = buildService(21L, new BigDecimal("95.00"));
+        matchingService.getFreelancer().setName("Joao Silva");
+
+        Service nonMatchingService = buildService(22L, new BigDecimal("105.00"));
+        nonMatchingService.getFreelancer().setName("Maria Souza");
+
+        when(serviceRepository.findByServiceCategory_SlugAndIsActiveOrderByCreatedAtDesc("desenvolvimento-web", true))
+                .thenReturn(List.of(matchingService, nonMatchingService));
+        when(reviewRepository.countByServiceId(21L)).thenReturn(0L);
+        when(serviceRequestRepository.countByService_IdAndStatusAndResponseValueIsNotNull(21L, ServiceRequest.Status.COMPLETED))
+                .thenReturn(0L);
+
+        List<ServiceResponse> responses = serviceService.getActiveServices("desenvolvimento-web", null, "joao");
+
+        assertThat(responses).extracting(ServiceResponse::getId).containsExactly(21L);
+        assertThat(responses).extracting(ServiceResponse::getFreelancerName).containsExactly("Joao Silva");
+    }
+
+    @Test
+    @DisplayName("Deve registrar metricas semanais quando a busca publica for rastreavel")
+    void getActiveServices_tracksWeeklySearchResultsWhenRequested() {
+        Service firstService = buildService(23L, new BigDecimal("90.00"));
+        Service secondService = buildService(24L, new BigDecimal("130.00"));
+
+        when(serviceRepository.findByServiceCategory_SlugAndIsActiveOrderByCreatedAtDesc("design-grafico", true))
+                .thenReturn(List.of(firstService, secondService));
+        when(reviewRepository.countByServiceId(23L)).thenReturn(0L);
+        when(reviewRepository.countByServiceId(24L)).thenReturn(0L);
+        when(serviceRequestRepository.countByService_IdAndStatusAndResponseValueIsNotNull(23L, ServiceRequest.Status.COMPLETED))
+                .thenReturn(0L);
+        when(serviceRequestRepository.countByService_IdAndStatusAndResponseValueIsNotNull(24L, ServiceRequest.Status.COMPLETED))
+                .thenReturn(0L);
+
+        List<ServiceResponse> responses = serviceService.getActiveServices("design-grafico", null, null, true);
+
+        assertThat(responses).extracting(ServiceResponse::getId).containsExactly(23L, 24L);
+        verify(serviceSearchWeeklyMetricService).trackSearchResults(List.of(23L, 24L));
+    }
+
+    @Test
+    @DisplayName("Nao deve registrar metricas quando a busca publica nao for rastreavel")
+    void getActiveServices_skipsWeeklySearchTrackingWithoutIntent() {
+        Service service = buildService(25L, new BigDecimal("75.00"));
+
+        when(serviceRepository.findByIsActiveOrderByCreatedAtDesc(true)).thenReturn(List.of(service));
+        when(reviewRepository.countByServiceId(25L)).thenReturn(0L);
+        when(serviceRequestRepository.countByService_IdAndStatusAndResponseValueIsNotNull(25L, ServiceRequest.Status.COMPLETED))
+                .thenReturn(0L);
+
+        List<ServiceResponse> responses = serviceService.getActiveServices(null, null, null, true);
+
+        assertThat(responses).extracting(ServiceResponse::getId).containsExactly(25L);
+        verify(serviceSearchWeeklyMetricService, never()).trackSearchResults(any());
     }
 
     @Test
@@ -209,12 +259,8 @@ class ServiceServiceTest {
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken("freela@servija.com", "secret"));
 
-        Freelancer freelancer = Freelancer.builder()
-                .id(3L)
-                .email("freela@servija.com")
-                .name("Freelancer")
-                .active(true)
-                .build();
+        User freelancerUser = buildFreelancerUser();
+        Freelancer freelancerProfile = buildFreelancerProfile(freelancerUser);
 
         Service service = buildService(30L, new BigDecimal("1000"));
         service.setTitle("Nome antigo");
@@ -223,8 +269,8 @@ class ServiceServiceTest {
                 .title("Nome novo")
                 .build();
 
-        when(userRepository.findByEmail("freela@servija.com")).thenReturn(Optional.of(freelancer));
-        when(freelancerRepository.findById(3L)).thenReturn(Optional.of(freelancer));
+        when(currentUserContextService.requireActiveRole(User.UserType.FREELANCER)).thenReturn(freelancerUser);
+        when(freelancerRepository.findById(3L)).thenReturn(Optional.of(freelancerProfile));
         when(serviceRepository.findById(30L)).thenReturn(Optional.of(service));
         when(serviceRepository.save(service)).thenAnswer(invocation -> {
             service.setPrice(new BigDecimal("1000.00"));
@@ -245,15 +291,84 @@ class ServiceServiceTest {
                 eq(Map.of("title", "Nome novo")));
     }
 
+    @Test
+    @DisplayName("Deve fazer soft delete quando o servico possui solicitacoes associadas")
+    void deleteService_softDeletesWhenServiceHasRequests() {
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken("freela@servija.com", "secret"));
+
+        User freelancerUser = buildFreelancerUser();
+        Freelancer freelancerProfile = buildFreelancerProfile(freelancerUser);
+        Service service = buildService(40L, new BigDecimal("500.00"));
+
+        when(currentUserContextService.requireActiveRole(User.UserType.FREELANCER)).thenReturn(freelancerUser);
+        when(freelancerRepository.findById(3L)).thenReturn(Optional.of(freelancerProfile));
+        when(serviceRepository.findById(40L)).thenReturn(Optional.of(service));
+        when(serviceRequestRepository.existsByService_Id(40L)).thenReturn(true);
+
+        serviceService.deleteService(40L);
+
+        assertThat(service.getDeletedAt()).isNotNull();
+        assertThat(service.getIsActive()).isFalse();
+        verify(favoriteRepository).deleteByServiceId(40L);
+        verify(serviceRepository).save(service);
+        verify(serviceRepository, never()).delete(any(Service.class));
+        verify(fileStorageService, never()).deleteFile(any());
+    }
+
+    @Test
+    @DisplayName("Deve fazer hard delete quando o servico nao possui solicitacoes associadas")
+    void deleteService_hardDeletesWhenServiceHasNoRequests() {
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken("freela@servija.com", "secret"));
+
+        User freelancerUser = buildFreelancerUser();
+        Freelancer freelancerProfile = buildFreelancerProfile(freelancerUser);
+        Service service = buildService(41L, new BigDecimal("500.00"));
+
+        when(currentUserContextService.requireActiveRole(User.UserType.FREELANCER)).thenReturn(freelancerUser);
+        when(freelancerRepository.findById(3L)).thenReturn(Optional.of(freelancerProfile));
+        when(serviceRepository.findById(41L)).thenReturn(Optional.of(service));
+        when(serviceRequestRepository.existsByService_Id(41L)).thenReturn(false);
+
+        serviceService.deleteService(41L);
+
+        verify(favoriteRepository).deleteByServiceId(41L);
+        verify(serviceRepository).delete(service);
+        verify(serviceRepository, never()).save(any(Service.class));
+        assertThat(service.getDeletedAt()).isNull();
+    }
+
+    private User buildFreelancerUser() {
+        return User.builder()
+                .id(3L)
+                .name("Freelancer")
+                .email("freela@servija.com")
+                .cpf("12345678901")
+                .phone("11999999999")
+                .userType(User.UserType.FREELANCER)
+                .activeRole(User.UserType.FREELANCER)
+                .roles(Set.of(User.UserType.FREELANCER))
+                .active(true)
+                .avatarUrl("https://cdn.servija.com/avatar.png")
+                .build();
+    }
+
+    private Freelancer buildFreelancerProfile(User user) {
+        Freelancer freelancer = new Freelancer();
+        freelancer.setId(user.getId());
+        freelancer.setUser(user);
+        freelancer.setAvailable(true);
+        return freelancer;
+    }
+
     private Service buildService(Long id, BigDecimal price) {
+        User freelancerUser = buildFreelancerUser();
+        Freelancer freelancer = buildFreelancerProfile(freelancerUser);
+
         return Service.builder()
                 .id(id)
-                .freelancer(Freelancer.builder()
-                        .id(3L)
-                        .name("Freelancer")
-                        .avatarUrl("https://cdn.servija.com/avatar.png")
-                        .active(true)
-                        .build())
+                .freelancer(freelancer)
                 .title("Deploy AWS")
                 .category("Desenvolvimento Web")
                 .description("Deploy completo")

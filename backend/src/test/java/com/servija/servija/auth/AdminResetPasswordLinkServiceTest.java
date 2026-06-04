@@ -1,7 +1,6 @@
 package com.servija.servija.auth;
 
 import com.servija.servija.dto.AdminResetPasswordLinkValidationResponse;
-import com.servija.servija.model.Contractor;
 import com.servija.servija.model.User;
 import com.servija.servija.repository.UserRepository;
 import com.servija.servija.service.AdminResetPasswordLinkService;
@@ -21,12 +20,12 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.net.URI;
 import java.time.LocalDateTime;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -34,28 +33,21 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class AdminResetPasswordLinkServiceTest {
 
-    @Mock
-    private UserRepository userRepository;
-    @Mock
-    private EmailService emailService;
-    @Mock
-    private PasswordEncoder passwordEncoder;
-    @Mock
-    private PasswordPolicyService passwordPolicyService;
+    @Mock private UserRepository userRepository;
+    @Mock private EmailService emailService;
+    @Mock private PasswordEncoder passwordEncoder;
+    @Mock private PasswordPolicyService passwordPolicyService;
 
     @InjectMocks
     private AdminResetPasswordLinkService adminResetPasswordLinkService;
 
-    private Contractor user;
+    private User user;
 
     @BeforeEach
     void setUp() {
-        ReflectionTestUtils.setField(
-                adminResetPasswordLinkService,
-                "publicFrontendUrl",
-                "http://localhost:5173");
+        ReflectionTestUtils.setField(adminResetPasswordLinkService, "publicFrontendUrl", "http://localhost:5173");
 
-        user = Contractor.builder()
+        user = User.builder()
                 .id(1L)
                 .name("Joao Silva")
                 .email("joao@email.com")
@@ -63,14 +55,13 @@ class AdminResetPasswordLinkServiceTest {
                 .phone("11999999999")
                 .password("encoded-password")
                 .userType(User.UserType.CONTRACTOR)
+                .activeRole(User.UserType.CONTRACTOR)
+                .roles(Set.of(User.UserType.CONTRACTOR))
                 .active(true)
                 .resetPasswordToken("654321")
                 .resetPasswordTokenExpiry(LocalDateTime.now().plusMinutes(30))
                 .resetPasswordAttempts(3)
                 .resetPasswordLockUntil(LocalDateTime.now().plusMinutes(5))
-                .totalContracts(0)
-                .activeContracts(0)
-                .completedContracts(0)
                 .build();
 
         when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -91,19 +82,18 @@ class AdminResetPasswordLinkServiceTest {
 
         ArgumentCaptor<String> linkCaptor = ArgumentCaptor.forClass(String.class);
         verify(emailService, times(2)).sendAdminPasswordResetLinkEmail(
-                eq("joao@email.com"),
-                eq("Joao Silva"),
+                org.mockito.ArgumentMatchers.eq("joao@email.com"),
+                org.mockito.ArgumentMatchers.eq("Joao Silva"),
                 linkCaptor.capture());
 
-        String firstLink = linkCaptor.getAllValues().get(0);
-        String secondLink = linkCaptor.getAllValues().get(1);
-        String firstToken = extractToken(firstLink);
-        String secondToken = extractToken(secondLink);
+        String firstToken = extractToken(linkCaptor.getAllValues().get(0));
+        String secondToken = extractToken(linkCaptor.getAllValues().get(1));
 
         assertThat(firstToken).isNotEqualTo(secondToken);
         assertThat(user.getAdminResetPasswordTokenHash()).isNotEqualTo(firstHash);
         assertThat(user.getAdminResetPasswordTokenHash()).hasSize(64);
         assertThat(user.getAdminResetPasswordTokenExpiry()).isAfter(LocalDateTime.now().plusMinutes(29));
+
         assertThatThrownBy(() -> adminResetPasswordLinkService.validateToken(firstToken))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Link de redefinição inválido.");
@@ -158,16 +148,11 @@ class AdminResetPasswordLinkServiceTest {
     private String issueLinkAndExtractToken() {
         ArgumentCaptor<String> linkCaptor = ArgumentCaptor.forClass(String.class);
         adminResetPasswordLinkService.sendResetLink(user);
-        String link = captureLastLink(linkCaptor);
-        return extractToken(link);
-    }
-
-    private String captureLastLink(ArgumentCaptor<String> linkCaptor) {
         verify(emailService).sendAdminPasswordResetLinkEmail(
-                eq("joao@email.com"),
-                eq("Joao Silva"),
+                org.mockito.ArgumentMatchers.eq("joao@email.com"),
+                org.mockito.ArgumentMatchers.eq("Joao Silva"),
                 linkCaptor.capture());
-        return linkCaptor.getValue();
+        return extractToken(linkCaptor.getValue());
     }
 
     private String extractToken(String link) {

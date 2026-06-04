@@ -136,7 +136,7 @@ class AdminDashboardServiceTest {
                 org.assertj.core.groups.Tuple.tuple("REFUNDED", 2L),
                 org.assertj.core.groups.Tuple.tuple("OTHERS", 1L)
         );
-        assertThat(response.getRevenueSeries()).hasSize(5);
+        assertThat(response.getRevenueSeries()).hasSize(6);
         assertThat(response.getRevenueSeries().get(1).getAmount()).isEqualByComparingTo("0.00");
         assertThat(response.getRevenueSeries().get(2).getAmount()).isEqualByComparingTo("700.00");
         assertThat(response.getTopContractedServices()).extracting("label", "contractsCount").containsExactly(

@@ -13,6 +13,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -24,6 +26,10 @@ public class AuditLogService {
 
     private final AuditLogRepository auditLogRepository;
 
+    // Auditoria é best-effort: grava em transação própria (REQUIRES_NEW) para que uma falha
+    // ao auditar (ex.: drift de schema, campo muito longo) nunca marque a transação de negócio
+    // como rollback-only e quebre a operação do usuário. O chamador (AuditLogger) trata a exceção.
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public AuditLog save(AuditLog log) {
         return auditLogRepository.save(log);
     }

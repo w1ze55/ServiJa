@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import {
   Plus,
@@ -11,6 +11,9 @@ import {
   EyeOff,
   DollarSign,
   Clock,
+  Grid3x3,
+  List,
+  Image as ImageIcon,
 } from 'lucide-vue-next';
 import Button from '@/components/ui/button.vue';
 import Input from '@/components/ui/input.vue';
@@ -84,11 +87,21 @@ const showServiceForm = ref(false);
 const editingService = ref<ServiceFormData | null>(null);
 const showPreviewModal = ref(false);
 const previewService = ref<Service | null>(null);
-type ServiceMenuContext = 'desktop' | 'mobile';
+type ServiceMenuContext = 'desktop' | 'mobile' | 'grid';
 
 const activeServiceMenuKey = ref<string | null>(null);
 const itemsPerPage = 8;
 const isLoading = ref(false);
+
+// Modo de visualização (grade ou lista), persistido por usuário no localStorage.
+// Grade é o padrão; só usa lista se o usuário tiver escolhido explicitamente.
+const VIEW_MODE_STORAGE_KEY = 'freelancerServicesViewMode';
+const viewMode = ref<'grid' | 'list'>(
+  localStorage.getItem(VIEW_MODE_STORAGE_KEY) === 'list' ? 'list' : 'grid'
+);
+watch(viewMode, (mode) => {
+  localStorage.setItem(VIEW_MODE_STORAGE_KEY, mode);
+});
 
 // Dados
 const services = ref<Service[]>([]);
@@ -592,6 +605,33 @@ onMounted(() => {
       </Card>
 
       <template v-else>
+        <!-- Toolbar: contagem + alternância grade/lista -->
+        <div class="flex items-center justify-between gap-3">
+          <p class="text-sm text-[#435574]">
+            {{ filteredServices.length }} {{ filteredServices.length === 1 ? 'serviço' : 'serviços' }}
+          </p>
+          <div class="flex gap-1">
+            <Button
+              :variant="viewMode === 'list' ? 'default' : 'outline'"
+              size="icon"
+              aria-label="Visualizar em lista"
+              @click="viewMode = 'list'"
+            >
+              <List class="h-4 w-4" />
+            </Button>
+            <Button
+              :variant="viewMode === 'grid' ? 'default' : 'outline'"
+              size="icon"
+              aria-label="Visualizar em grade"
+              @click="viewMode = 'grid'"
+            >
+              <Grid3x3 class="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+
+        <!-- ===== VISUALIZAÇÃO EM LISTA ===== -->
+        <template v-if="viewMode === 'list'">
         <!-- Desktop Table -->
         <Card class="hidden md:block overflow-hidden bg-white">
           <div class="overflow-x-auto">
@@ -802,6 +842,112 @@ onMounted(() => {
               >
                 {{ service.isActive ? 'Ativo' : 'Inativo' }}
               </Badge>
+            </div>
+          </Card>
+        </div>
+        </template>
+
+        <!-- ===== VISUALIZAÇÃO EM GRADE ===== -->
+        <div
+          v-else
+          class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
+        >
+          <Card
+            v-for="service in currentServices"
+            :key="service.id"
+            class="group flex flex-col gap-0 overflow-hidden bg-white cursor-pointer hover:shadow-md transition-shadow"
+            @click="handlePreviewService(service.id)"
+          >
+            <!-- Imagem -->
+            <div class="relative h-40 bg-gradient-to-br from-[#286AD8]/10 to-[#435574]/10 overflow-hidden">
+              <img
+                v-if="service.images && service.images.length > 0"
+                :src="service.images[0]"
+                :alt="service.title"
+                class="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-300"
+              />
+              <div v-else class="w-full h-full flex items-center justify-center">
+                <ImageIcon class="h-10 w-10 text-[#286AD8]/30" />
+              </div>
+
+              <!-- Status -->
+              <Badge
+                :class="
+                  service.isActive
+                    ? 'absolute top-3 left-3 backdrop-blur-sm bg-green-100/90 text-green-700 hover:bg-green-100/90'
+                    : 'absolute top-3 left-3 backdrop-blur-sm bg-gray-200/90 text-gray-700 hover:bg-gray-200/90'
+                "
+              >
+                {{ service.isActive ? 'Ativo' : 'Inativo' }}
+              </Badge>
+
+              <!-- Menu de ações -->
+              <div class="absolute top-2 right-2 z-10" @click.stop>
+                <DropdownMenu
+                  :open="isServiceMenuOpen(service.id, 'grid')"
+                  @update:open="(isOpen: boolean) => setServiceMenuOpen(service.id, 'grid', isOpen)"
+                >
+                  <button
+                    type="button"
+                    class="inline-flex h-9 w-9 items-center justify-center rounded-md bg-white/80 text-[#435574] backdrop-blur-sm transition-colors hover:bg-white hover:text-[#263238] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#286AD8]"
+                    aria-haspopup="menu"
+                    :aria-expanded="isServiceMenuOpen(service.id, 'grid')"
+                    aria-label="Abrir menu de ações"
+                    @click.stop="toggleServiceMenu(service.id, 'grid')"
+                  >
+                    <MoreVertical class="h-4 w-4" />
+                  </button>
+                  <DropdownMenuContent align="end" class="z-[9999] min-w-[12rem] bg-white text-[#263238]">
+                    <DropdownMenuItem @click="handlePreviewService(service.id)">
+                      <Eye class="h-4 w-4 mr-2" />
+                      Visualizar Preview
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem @click="handleEditService(service.id)">
+                      <Edit class="h-4 w-4 mr-2" />
+                      Editar
+                    </DropdownMenuItem>
+                    <DropdownMenuItem @click="serviceToToggle = service">
+                      <EyeOff v-if="service.isActive" class="h-4 w-4 mr-2" />
+                      <Eye v-else class="h-4 w-4 mr-2" />
+                      {{ service.isActive ? 'Desativar' : 'Ativar' }}
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem @click="serviceToDelete = service" class="text-red-600">
+                      <Trash2 class="h-4 w-4 mr-2" />
+                      Excluir
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </div>
+
+            <!-- Conteúdo -->
+            <div class="p-4 flex flex-1 flex-col">
+              <h3 class="font-semibold text-[#263238] mb-2 line-clamp-1 group-hover:text-[#286AD8] transition-colors">
+                {{ service.title }}
+              </h3>
+              <div class="flex flex-wrap gap-2 mb-3">
+                <Badge variant="secondary" class="text-xs">{{ service.category }}</Badge>
+                <Badge v-if="service.subcategory" variant="outline" class="text-xs bg-white text-[#435574]">
+                  {{ service.subcategory }}
+                </Badge>
+                <Badge variant="outline" class="text-xs bg-white text-[#435574]">
+                  {{ getWorkModelLabel(service.workModel) }}
+                </Badge>
+              </div>
+              <p class="text-sm text-[#435574] mb-4 line-clamp-2">{{ service.description }}</p>
+
+              <div class="mt-auto flex items-center justify-between pt-3 border-t border-gray-100">
+                <div class="flex items-center gap-1 text-[#286AD8]">
+                  <DollarSign class="h-4 w-4" />
+                  <span class="font-bold text-sm">{{ formatCurrency(service.price) }}</span>
+                </div>
+                <div class="flex items-center gap-1 text-[#435574]">
+                  <Clock class="h-3.5 w-3.5" />
+                  <span class="text-xs">{{ formatDeliveryTime(service.deliveryTime, service.deliveryUnit) }}</span>
+                </div>
+              </div>
             </div>
           </Card>
         </div>

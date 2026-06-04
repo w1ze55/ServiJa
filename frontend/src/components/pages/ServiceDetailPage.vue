@@ -33,11 +33,13 @@ import Label from '@/components/ui/label.vue';
 import api from '@/api/config/axios';
 import { toast } from '@/utils/toast';
 import { useFavoritesStore } from '@/stores/favorites';
+import { useUserStore } from '@/stores/userStore';
 import { formatBaseServicePrice, getServicePriceDisplay, hasAveragePriceRange as hasAveragePriceRangeData, type ServicePriceRangeData } from '@/utils/servicePricing';
 import { getWorkModelLabel, normalizeWorkModel } from '@/utils/workModel';
 import ImageGallery from '@/components/shared/ImageGallery.vue';
 import ReviewList from '@/components/shared/ReviewList.vue';
 import type { ReviewItem } from '@/components/shared/ReviewList.vue';
+import { isOwnFreelancerProfile } from '@/utils/userRoles';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -104,6 +106,7 @@ const props = defineProps<{
 
 const router = useRouter();
 const favoritesStore = useFavoritesStore();
+const userStore = useUserStore();
 
 const service = ref<ServiceItem | null>(null);
 const freelancer = ref<FreelancerData | null>(null);
@@ -200,6 +203,12 @@ const loadData = async () => {
   isLoading.value = true;
   error.value = '';
   try {
+    if (isOwnFreelancerProfile(userStore.user, props.providerId)) {
+      toast.error('Voce nao pode acessar o proprio servico publico como cliente');
+      await router.replace('/explore');
+      return;
+    }
+
     // Buscar perfil do freelancer e dados do serviço em paralelo
     const [freelancerRes, serviceRes] = await Promise.all([
       api.get(`/freelancer/${props.providerId}/profile`),
@@ -263,6 +272,11 @@ const goBack = () => {
 };
 
 const goToProviderProfile = () => {
+  if (isOwnFreelancerProfile(userStore.user, props.providerId)) {
+    router.push('/explore');
+    return;
+  }
+
   router.push(`/provider-profile/${props.providerId}`);
 };
 

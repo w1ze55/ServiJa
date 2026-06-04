@@ -36,3 +36,5 @@ node_modules/
 **/node_modules/
 frontend/dist/
 frontend-admin/dist/
+tests/load/reports/
+docs/

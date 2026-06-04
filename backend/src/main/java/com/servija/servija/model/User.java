@@ -1,10 +1,25 @@
 package com.servija.servija.model;
 
-import jakarta.persistence.*;
+import jakarta.persistence.CollectionTable;
+import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.Lob;
+import jakarta.persistence.OneToOne;
+import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
-import lombok.experimental.SuperBuilder;
+import lombok.ToString;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 import org.springframework.security.core.GrantedAuthority;
@@ -15,14 +30,19 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.LinkedHashSet;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Entity
 @Table(name = "users")
 @Data
-@SuperBuilder
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Inheritance(strategy = InheritanceType.JOINED)
+@EqualsAndHashCode(exclude = {"roles", "contractorProfile", "freelancerProfile"})
+@ToString(exclude = {"roles", "contractorProfile", "freelancerProfile"})
 public class User implements UserDetails {
 
     @Id
@@ -50,6 +70,17 @@ public class User implements UserDetails {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private UserType userType;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "active_role", nullable = false, length = 20)
+    private UserType activeRole;
+
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "user_roles", joinColumns = @JoinColumn(name = "user_id"))
+    @Column(name = "role", nullable = false, length = 20)
+    @Enumerated(EnumType.STRING)
+    @Builder.Default
+    private Set<UserType> roles = new LinkedHashSet<>();
 
     @Column(nullable = false)
     @lombok.Builder.Default
@@ -130,6 +161,12 @@ public class User implements UserDetails {
     @Column(name = "totp_locked_until")
     private LocalDateTime totpLockedUntil;
 
+    @OneToOne(mappedBy = "user", fetch = FetchType.LAZY)
+    private Contractor contractorProfile;
+
+    @OneToOne(mappedBy = "user", fetch = FetchType.LAZY)
+    private Freelancer freelancerProfile;
+
     public enum UserType {
         CONTRACTOR,
         FREELANCER,
@@ -138,8 +175,70 @@ public class User implements UserDetails {
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return Collections.singletonList(
-                new SimpleGrantedAuthority("ROLE_" + userType.name()));
+        Set<UserType> effectiveRoles = getRoles();
+
+        if (effectiveRoles == null || effectiveRoles.isEmpty()) {
+            return Collections.emptySet();
+        }
+
+        return effectiveRoles.stream()
+                .map(role -> new SimpleGrantedAuthority("ROLE_" + role.name()))
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    public UserType getUserType() {
+        return resolveEffectiveActiveRole();
+    }
+
+    public UserType getActiveRole() {
+        return resolveEffectiveActiveRole();
+    }
+
+    public Set<UserType> getRoles() {
+        Set<UserType> effectiveRoles = resolveEffectiveRoles();
+        return effectiveRoles.isEmpty()
+                ? Collections.emptySet()
+                : Collections.unmodifiableSet(effectiveRoles);
+    }
+
+    public UserType getStoredUserType() {
+        return userType;
+    }
+
+    public UserType getStoredActiveRole() {
+        return activeRole;
+    }
+
+    public Set<UserType> getStoredRoles() {
+        return roles;
+    }
+
+    public void setUserType(UserType userType) {
+        this.userType = userType;
+        this.activeRole = userType;
+        addRole(userType);
+    }
+
+    public void setActiveRole(UserType activeRole) {
+        this.activeRole = activeRole;
+        this.userType = activeRole;
+        addRole(activeRole);
+    }
+
+    public void addRole(UserType role) {
+        if (role == null) {
+            return;
+        }
+
+        if (roles == null) {
+            roles = new LinkedHashSet<>();
+        }
+
+        roles.add(role);
+    }
+
+    public boolean hasRole(UserType role) {
+        return role != null && getRoles().contains(role);
     }
 
     @Override
@@ -165,5 +264,42 @@ public class User implements UserDetails {
     @Override
     public boolean isEnabled() {
         return active;
+    }
+
+    public UserType resolveEffectiveActiveRole() {
+        if (activeRole == UserType.ADMIN && userType != null && userType != UserType.ADMIN) {
+            return userType;
+        }
+
+        return activeRole != null ? activeRole : userType;
+    }
+
+    public boolean hasLegacyInvalidActiveRole() {
+        return activeRole == UserType.ADMIN && userType != null && userType != UserType.ADMIN;
+    }
+
+    public Set<UserType> resolveEffectiveRoles() {
+        LinkedHashSet<UserType> effectiveRoles = new LinkedHashSet<>();
+
+        if (roles != null && !roles.isEmpty()) {
+            effectiveRoles.addAll(roles);
+        }
+
+        if (hasLegacyInvalidActiveRole()) {
+            effectiveRoles.remove(UserType.ADMIN);
+        }
+
+        UserType effectiveActiveRole = resolveEffectiveActiveRole();
+        if (effectiveActiveRole != null) {
+            effectiveRoles.add(effectiveActiveRole);
+        }
+
+        if (userType != null && userType != UserType.ADMIN) {
+            effectiveRoles.add(userType);
+        }
+
+        return effectiveRoles.stream()
+                .filter(Objects::nonNull)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
     }
 }

@@ -48,6 +48,9 @@ public interface ServiceRequestRepository extends JpaRepository<ServiceRequest, 
 
     long countByService_IdAndStatusAndResponseValueIsNotNull(Long serviceId, ServiceRequest.Status status);
 
+    // Existe alguma solicitacao associada a este servico? (usado para decidir soft vs hard delete)
+    boolean existsByService_Id(Long serviceId);
+
     @Query("""
             select count(sr)
             from ServiceRequest sr

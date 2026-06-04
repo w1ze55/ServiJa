@@ -1,6 +1,5 @@
 package com.servija.servija.auth;
 
-import com.servija.servija.model.Contractor;
 import com.servija.servija.model.User;
 import com.servija.servija.repository.ContractorRepository;
 import com.servija.servija.repository.FreelancerRepository;
@@ -25,49 +24,38 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class AuthServicePasswordResetTest {
 
-    @Mock
-    private UserRepository userRepository;
-    @Mock
-    private ContractorRepository contractorRepository;
-    @Mock
-    private FreelancerRepository freelancerRepository;
-    @Mock
-    private PasswordEncoder passwordEncoder;
-    @Mock
-    private JwtService jwtService;
-    @Mock
-    private AuthenticationManager authenticationManager;
-    @Mock
-    private CustomUserDetailsService userDetailsService;
-    @Mock
-    private EmailService emailService;
-    @Mock
-    private AuditLogger auditLogger;
-    @Mock
-    private AddressService addressService;
-    @Mock
-    private PasswordPolicyService passwordPolicyService;
-    @Mock
-    private AdminResetPasswordLinkService adminResetPasswordLinkService;
+    @Mock private UserRepository userRepository;
+    @Mock private ContractorRepository contractorRepository;
+    @Mock private FreelancerRepository freelancerRepository;
+    @Mock private PasswordEncoder passwordEncoder;
+    @Mock private JwtService jwtService;
+    @Mock private AuthenticationManager authenticationManager;
+    @Mock private CustomUserDetailsService userDetailsService;
+    @Mock private EmailService emailService;
+    @Mock private AuditLogger auditLogger;
+    @Mock private AddressService addressService;
+    @Mock private PasswordPolicyService passwordPolicyService;
+    @Mock private AdminResetPasswordLinkService adminResetPasswordLinkService;
 
     @InjectMocks
     private AuthService authService;
 
-    private Contractor user;
+    private User user;
 
     @BeforeEach
     void setUp() {
-        user = Contractor.builder()
+        user = User.builder()
                 .id(1L)
                 .name("Joao Silva")
                 .email("joao@email.com")
@@ -75,15 +63,14 @@ class AuthServicePasswordResetTest {
                 .phone("11999999999")
                 .password("encoded-password")
                 .userType(User.UserType.CONTRACTOR)
+                .activeRole(User.UserType.CONTRACTOR)
+                .roles(Set.of(User.UserType.CONTRACTOR))
                 .active(true)
                 .resetPasswordToken("123456")
                 .resetPasswordTokenExpiry(LocalDateTime.now().plusMinutes(30))
                 .resetPasswordAttempts(2)
                 .adminResetPasswordTokenHash("existing-admin-link-hash")
                 .adminResetPasswordTokenExpiry(LocalDateTime.now().plusMinutes(30))
-                .totalContracts(0)
-                .activeContracts(0)
-                .completedContracts(0)
                 .build();
     }
 
@@ -110,7 +97,7 @@ class AuthServicePasswordResetTest {
     void resetPassword_clearsAdminLinkAndResetChallenge() {
         when(userRepository.findByEmail("joao@email.com")).thenReturn(Optional.of(user));
         when(passwordEncoder.encode("NovaSenha@123")).thenReturn("encoded-new-password");
-        when(contractorRepository.save(any(Contractor.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         authService.resetPassword("joao@email.com", "123456", "NovaSenha@123", "NovaSenha@123");
 

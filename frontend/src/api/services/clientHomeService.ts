@@ -69,6 +69,7 @@ export interface ClientHomeResponse {
     services: ClientHomeServiceItem[];
     professionals: ClientHomeFreelancerItem[];
   };
+  weeklyMostSearchedServices: ClientHomeServiceItem[];
   featuredProfessionals: ClientHomeFreelancerItem[];
   featuredServices: ClientHomeServiceItem[];
 }

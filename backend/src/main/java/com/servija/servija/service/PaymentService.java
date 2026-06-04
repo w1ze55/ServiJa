@@ -65,6 +65,11 @@ public class PaymentService {
         ServiceRequest serviceRequest = serviceRequestRepository.findById(request.getServiceRequestId())
                 .orElseThrow(() -> new ResourceNotFoundException("Solicitação de serviço não encontrada"));
 
+        if (serviceRequest.getFreelancer() != null
+                && serviceRequest.getFreelancer().getId().equals(contractor.getId())) {
+            throw new IllegalStateException("Voce nao pode realizar pagamento para si mesmo");
+        }
+
         if (!serviceRequest.getContractor().getId().equals(contractor.getId())) {
             throw new IllegalStateException("Você não tem permissão para realizar pagamento desta solicitação");
         }
