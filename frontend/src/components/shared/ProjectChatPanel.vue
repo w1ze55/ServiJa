@@ -23,9 +23,8 @@ const loading = ref(true);
 const error = ref('');
 const userEmail = ref('');
 
-const TERMINAL_STATUSES = ['completed', 'rejected', 'archived', 'cancelled'];
 const isLocked = computed(
-  () => (conversation.value?.locked ?? false) || TERMINAL_STATUSES.includes(props.serviceStatus ?? '')
+  () => (conversation.value?.locked ?? false) || props.serviceStatus === 'completed'
 );
 
 const { onMessage, connect, disconnect } = useChatWebSocket();

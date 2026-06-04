@@ -2,6 +2,7 @@ package com.servija.servija.service;
 
 import com.servija.servija.dto.chat.ReadReceiptDTO;
 import com.servija.servija.dto.chat.SendMessageRequest;
+import com.servija.servija.dto.chat.MessageDTO;
 import com.servija.servija.exception.ResourceNotFoundException;
 import com.servija.servija.model.ServiceRequest;
 import com.servija.servija.model.User;
@@ -67,14 +68,53 @@ class ChatServiceTest {
     }
 
     @Test
-    @DisplayName("sendMessage rejeita conversa bloqueada")
-    void sendMessageRejectsLockedConversation() {
+    @DisplayName("sendMessage rejeita conversa de solicitacao concluida")
+    void sendMessageRejectsCompletedConversation() {
         Conversation conversation = conversation(true);
+        ServiceRequest request = serviceRequest(true);
+        request.setStatus(ServiceRequest.Status.COMPLETED);
         when(conversationRepository.findById("conv-1")).thenReturn(Optional.of(conversation));
+        when(serviceRequestRepository.findById(10L)).thenReturn(Optional.of(request));
 
         assertThatThrownBy(() -> service.sendMessage("conv-1", "client@test.com", new SendMessageRequest("oi", "text", null, null)))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("bloqueado");
+    }
+
+    @Test
+    @DisplayName("sendMessage reabre conversa antiga quando a solicitacao ainda nao esta concluida")
+    void sendMessageUnlocksConversationWhenRequestIsNotCompleted() {
+        Conversation conversation = conversation(true);
+        ServiceRequest request = serviceRequest(true);
+        request.setStatus(ServiceRequest.Status.DELIVERED);
+
+        when(conversationRepository.findById("conv-1")).thenReturn(Optional.of(conversation));
+        when(serviceRequestRepository.findById(10L)).thenReturn(Optional.of(request));
+        when(conversationRepository.save(any(Conversation.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(messageRepository.save(any(Message.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        MessageDTO response = service.sendMessage("conv-1", "client@test.com", new SendMessageRequest("oi", "text", null, null));
+
+        assertThat(response.content()).isEqualTo("oi");
+        assertThat(conversation.isLocked()).isFalse();
+        verify(webSocketService).notifyChatMessage("conv-1", response);
+    }
+
+    @Test
+    @DisplayName("getOrCreateConversation sincroniza bloqueio com o status atual da solicitacao")
+    void getOrCreateConversationUnlocksStaleConversation() {
+        ServiceRequest request = serviceRequest(true);
+        request.setStatus(ServiceRequest.Status.DELIVERED);
+        Conversation conversation = conversation(true);
+
+        when(serviceRequestRepository.findById(10L)).thenReturn(Optional.of(request));
+        when(conversationRepository.findByServiceRequestId(10L)).thenReturn(Optional.of(conversation));
+        when(conversationRepository.save(any(Conversation.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var dto = service.getOrCreateConversation(10L, "client@test.com");
+
+        assertThat(dto.locked()).isFalse();
+        assertThat(conversation.isLocked()).isFalse();
     }
 
     @Test
@@ -117,6 +157,7 @@ class ChatServiceTest {
                 .contractor(User.builder().email("client@test.com").name("Cliente").build())
                 .freelancer(User.builder().email("freela@test.com").name("Freela").build())
                 .chatEnabled(chatEnabled)
+                .status(ServiceRequest.Status.IN_PROGRESS)
                 .build();
     }
 
