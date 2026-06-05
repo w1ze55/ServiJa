@@ -151,6 +151,8 @@ const loadServices = async (options?: { trackSearch?: boolean }) => {
 };
 
 const normalizeRouteParam = (value: unknown) => (typeof value === 'string' ? value.trim() : '');
+const normalizeSearchMode = (value: unknown): 'services' | 'professionals' =>
+  value === 'professionals' ? 'professionals' : 'services';
 
 const resolveCategorySlugFromSubcategory = (subcategorySlug: string) =>
   categoryCatalogStore.activePublicCategories.find((category) =>
@@ -164,12 +166,14 @@ const hasExplicitSearchIntent = (query: string, categorySlug: string, subcategor
   Boolean(query.trim() || categorySlug || subcategorySlug);
 
 const getNormalizedRouteFilters = () => {
+  const mode = normalizeSearchMode(route.query.mode);
   const query = normalizeRouteParam(route.query.q);
   const subcategorySlug = normalizeRouteParam(route.query.subcategorySlug);
   const categorySlug = normalizeRouteParam(route.query.categorySlug)
     || (subcategorySlug ? resolveCategorySlugFromSubcategory(subcategorySlug) : '');
 
   return {
+    mode,
     query,
     categorySlug,
     subcategorySlug,
@@ -179,6 +183,9 @@ const getNormalizedRouteFilters = () => {
 const syncFiltersToRoute = async () => {
   const nextQuery: Record<string, string> = {};
 
+  if (searchMode.value !== 'services') {
+    nextQuery.mode = searchMode.value;
+  }
   if (searchQuery.value.trim()) {
     nextQuery.q = searchQuery.value.trim();
   }
@@ -190,13 +197,15 @@ const syncFiltersToRoute = async () => {
   }
 
   const currentQuery = {
+    mode: normalizeSearchMode(route.query.mode),
     q: normalizeRouteParam(route.query.q),
     categorySlug: normalizeRouteParam(route.query.categorySlug),
     subcategorySlug: normalizeRouteParam(route.query.subcategorySlug),
   };
 
   if (
-    currentQuery.q === (nextQuery.q || '')
+    currentQuery.mode === (nextQuery.mode || 'services')
+    && currentQuery.q === (nextQuery.q || '')
     && currentQuery.categorySlug === (nextQuery.categorySlug || '')
     && currentQuery.subcategorySlug === (nextQuery.subcategorySlug || '')
   ) {
@@ -207,8 +216,9 @@ const syncFiltersToRoute = async () => {
 };
 
 const applyRouteFilters = async () => {
-  const { query, categorySlug, subcategorySlug } = getNormalizedRouteFilters();
+  const { mode, query, categorySlug, subcategorySlug } = getNormalizedRouteFilters();
 
+  searchMode.value = mode;
   searchQuery.value = query;
   selectedCategory.value = categorySlug || 'all';
   selectedSubcategory.value = subcategorySlug || 'all';
@@ -410,6 +420,13 @@ const getInitials = (name: string) => {
 onMounted(() => {
   void categoryCatalogStore.loadPublicCategories();
 });
+
+watch(
+  searchMode,
+  () => {
+    void syncFiltersToRoute();
+  }
+);
 
 watch(
   freelancerGroups,
