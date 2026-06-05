@@ -641,7 +641,7 @@ onMounted(() => {
               <Card class="p-5">
                 <div
                   class="flex items-center gap-3 mb-4 cursor-pointer group"
-                  @click="goBack"
+                  @click="goToProviderProfile"
                 >
                   <Avatar class="h-12 w-12 border-2 border-[#286AD8]/20">
                     <AvatarImage :src="freelancer.profilePhoto" :alt="freelancer.name" />
