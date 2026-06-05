@@ -87,6 +87,7 @@ const CATEGORY_RAIL_LOOP_COPIES = 3;
 const SERVICE_ITEMS_PER_PAGE = 3;
 let categoryRailDragStartX = 0;
 let categoryRailDragStartOffset = 0;
+let activeCategoryRailPointerId: number | null = null;
 let suppressCategoryRailClick = false;
 
 const regionLabel = computed(() => homeData.value?.region?.displayName || 'toda a plataforma');
@@ -427,32 +428,40 @@ const handleCategoryRailPointerDown = (event: PointerEvent) => {
     return;
   }
 
-  isCategoryRailDragging.value = true;
+  activeCategoryRailPointerId = event.pointerId;
+  isCategoryRailDragging.value = false;
   categoryRailDragStartX = event.clientX;
   categoryRailDragStartOffset = categoryRailOffset.value;
   suppressCategoryRailClick = false;
-  categoryRailViewportRef.value.setPointerCapture(event.pointerId);
 };
 
 const handleCategoryRailPointerMove = (event: PointerEvent) => {
-  if (!isCategoryRailDragging.value) {
+  if (activeCategoryRailPointerId !== event.pointerId) {
     return;
   }
 
   const deltaX = event.clientX - categoryRailDragStartX;
 
-  if (Math.abs(deltaX) > CATEGORY_RAIL_DRAG_THRESHOLD) {
+  if (!isCategoryRailDragging.value) {
+    if (Math.abs(deltaX) <= CATEGORY_RAIL_DRAG_THRESHOLD) {
+      return;
+    }
+
+    isCategoryRailDragging.value = true;
     suppressCategoryRailClick = true;
+    categoryRailViewportRef.value?.setPointerCapture(event.pointerId);
   }
 
+  event.preventDefault();
   setCategoryRailOffset(categoryRailDragStartOffset - deltaX);
 };
 
 const endCategoryRailPointerDrag = (event?: PointerEvent) => {
-  if (!isCategoryRailDragging.value) {
+  if (activeCategoryRailPointerId === null || (event && activeCategoryRailPointerId !== event.pointerId)) {
     return;
   }
 
+  activeCategoryRailPointerId = null;
   isCategoryRailDragging.value = false;
 
   if (
@@ -516,7 +525,7 @@ const goToFeaturedServicesPage = (direction: 'previous' | 'next') => {
 
 const handleOpenCategory = (categorySlug: string) => {
   router.push({
-    path: '/explore',
+    name: 'explore',
     query: { categorySlug },
   });
 };
@@ -684,6 +693,7 @@ onBeforeUnmount(() => {
                 <button
                   v-for="category in renderedCommercialCategories"
                   :key="category.loopKey"
+                  type="button"
                   class="group inline-flex shrink-0 items-center gap-2 rounded-full px-2 py-2 text-left text-[#435574] transition-colors hover:bg-[#f6f9ff] hover:text-[#286AD8]"
                   @click="handleCategoryClick($event, category.slug)"
                 >
