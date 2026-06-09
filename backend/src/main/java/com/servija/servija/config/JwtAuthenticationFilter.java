@@ -56,6 +56,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         try {
             userEmail = jwtService.extractUsername(jwt);
 
+            // Bloqueia o token de desafio pre-2FA: ele so vale em /api/auth/2fa/verify
+            // (rota publica que nem passa por este filtro). Aceita-lo aqui permitiria
+            // pular completamente o segundo fator.
+            if (jwtService.isTotpChallengeToken(jwt)) {
+                handleInvalidToken(response, "Token de verificacao 2FA pendente nao autoriza acesso");
+                return;
+            }
+
             if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                 UserDetails userDetails = this.userDetailsService.loadUserByUsername(userEmail);
 

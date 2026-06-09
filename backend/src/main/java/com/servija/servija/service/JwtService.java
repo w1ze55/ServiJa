@@ -63,6 +63,21 @@ public class JwtService {
         return (username.equals(userDetails.getUsername())) && !isTokenExpired(token);
     }
 
+    /**
+     * Indica se o token e um desafio pre-2FA (claim {@code totp_pending=true}).
+     * Esses tokens NUNCA devem ser aceitos como token de acesso em recursos
+     * protegidos — sao validos apenas no fluxo de conclusao do 2FA
+     * ({@code POST /api/auth/2fa/verify}).
+     */
+    public boolean isTotpChallengeToken(String token) {
+        try {
+            Boolean pending = extractClaim(token, claims -> claims.get("totp_pending", Boolean.class));
+            return Boolean.TRUE.equals(pending);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     private boolean isTokenExpired(String token) {
         return extractExpiration(token).before(new Date());
     }
