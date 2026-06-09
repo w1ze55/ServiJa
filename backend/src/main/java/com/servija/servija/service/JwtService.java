@@ -78,6 +78,19 @@ public class JwtService {
         }
     }
 
+    /**
+     * Versão de credenciais embutida no token (claim {@code tv}). Comparada com a
+     * versão atual do usuário para revogar tokens após reset/troca de senha (H6).
+     * Retorna {@code null} se ausente (tokens antigos são tratados como versão 0).
+     */
+    public Integer extractTokenVersion(String token) {
+        try {
+            return extractClaim(token, claims -> claims.get("tv", Integer.class));
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     private boolean isTokenExpired(String token) {
         return extractExpiration(token).before(new Date());
     }

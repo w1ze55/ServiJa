@@ -59,41 +59,48 @@ public class WebSocketAuthChannelInterceptor implements ChannelInterceptor {
     private void authenticateConnect(StompHeaderAccessor accessor) {
         String jwt = extractToken(accessor);
 
-        if (jwt == null) {
-            log.debug("WebSocket conectado sem autenticacao JWT");
-            return;
-        }
+        if (jwt != null && !jwtService.isTotpChallengeToken(jwt)) {
+            try {
+                String userEmail = jwtService.extractUsername(jwt);
+                if (userEmail != null) {
+                    UserDetails userDetails = userDetailsService.loadUserByUsername(userEmail);
+                    if (userDetails.isEnabled()
+                            && jwtService.isTokenValid(jwt, userDetails)
+                            && isTokenVersionValid(jwt, userDetails)) {
+                        UsernamePasswordAuthenticationToken authentication =
+                                new UsernamePasswordAuthenticationToken(
+                                        userDetails, null, userDetails.getAuthorities());
 
-        try {
-            String userEmail = jwtService.extractUsername(jwt);
+                        accessor.setUser(authentication);
+                        SecurityContextHolder.getContext().setAuthentication(authentication);
 
-            // O token de desafio pre-2FA nao autentica nada — bloqueia o bypass de 2FA.
-            if (jwtService.isTotpChallengeToken(jwt)) {
-                log.warn("⚠️ Token de desafio 2FA rejeitado no WebSocket CONNECT");
-                return;
-            }
-
-            if (userEmail != null) {
-                UserDetails userDetails = userDetailsService.loadUserByUsername(userEmail);
-
-                if (userDetails.isEnabled() && jwtService.isTokenValid(jwt, userDetails)) {
-                    UsernamePasswordAuthenticationToken authentication =
-                            new UsernamePasswordAuthenticationToken(
-                                    userDetails,
-                                    null,
-                                    userDetails.getAuthorities());
-
-                    accessor.setUser(authentication);
-                    SecurityContextHolder.getContext().setAuthentication(authentication);
-
-                    log.info("✅ WebSocket autenticado para usuário: {}", userEmail);
-                } else {
-                    log.warn("⚠️ Token JWT inválido para WebSocket");
+                        log.info("✅ WebSocket autenticado para usuário: {}", userEmail);
+                    } else {
+                        log.warn("⚠️ Token JWT inválido para WebSocket");
+                    }
                 }
+            } catch (Exception e) {
+                log.error("❌ Erro ao autenticar WebSocket: {}", e.getMessage());
             }
-        } catch (Exception e) {
-            log.error("❌ Erro ao autenticar WebSocket: {}", e.getMessage());
+        } else if (jwt != null) {
+            log.warn("⚠️ Token de desafio 2FA rejeitado no WebSocket CONNECT");
         }
+
+        // H9: exige autenticação para qualquer conexão WebSocket (sem anônimos).
+        if (accessor.getUser() == null) {
+            log.warn("⛔ WebSocket CONNECT rejeitado: sem autenticação válida");
+            throw new AccessDeniedException("Autenticação obrigatória para conectar ao WebSocket");
+        }
+    }
+
+    private boolean isTokenVersionValid(String jwt, UserDetails userDetails) {
+        if (!(userDetails instanceof com.servija.servija.model.User user)) {
+            return true;
+        }
+        int current = user.getTokenVersion() != null ? user.getTokenVersion() : 0;
+        Integer claimVersion = jwtService.extractTokenVersion(jwt);
+        int presented = claimVersion != null ? claimVersion : 0;
+        return presented == current;
     }
 
     private void authorizeSubscribe(StompHeaderAccessor accessor) {

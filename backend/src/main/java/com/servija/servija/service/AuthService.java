@@ -437,6 +437,10 @@ public class AuthService {
         if (had2fa) {
             totpService.disable(user);
         }
+
+        // H6: invalida todos os tokens emitidos antes do reset de senha.
+        user.setTokenVersion((user.getTokenVersion() != null ? user.getTokenVersion() : 0) + 1);
+
         saveUser(user);
 
         if (had2fa) {
@@ -611,7 +615,8 @@ public class AuthService {
 
         return Map.of(
                 "roles", effectiveRoles.stream().map(Enum::name).toList(),
-                "active_role", user.getUserType().name());
+                "active_role", user.getUserType().name(),
+                "tv", user.getTokenVersion() != null ? user.getTokenVersion() : 0);
     }
 
     private String generateVerificationCode() {
