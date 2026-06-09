@@ -203,10 +203,6 @@ function handleServiceRequestNotification(event: Event) {
   }
 }
 
-const currentUserRole = computed<'client' | 'freelancer'>(() =>
-  user.value?.type === 'provider' ? 'freelancer' : 'client'
-);
-
 const activeServiceRequestId = computed(() => {
   const param = route.params.serviceRequestId;
   if (!param) return null;
@@ -334,12 +330,17 @@ function resolveAttachmentName(msg: MessageDTO) {
   }
 }
 
+function sameEmail(a?: string | null, b?: string | null) {
+  return !!a && !!b && a.trim().toLowerCase() === b.trim().toLowerCase();
+}
+
 function toDisplay(msg: MessageDTO): ChatMessage {
-  const isMe = msg.senderId === user.value?.email;
+  const isMe = sameEmail(msg.senderId, user.value?.email);
   const counterpartyName = activeConversation.value ? otherPartyName(activeConversation.value) : '';
   return {
     id: msg.id,
     sender: msg.senderType === 'contractor' ? 'client' : 'freelancer',
+    isOwn: isMe,
     senderName: isMe ? user.value.name : counterpartyName || displayName(msg.senderId),
     message: msg.content,
     timestamp: msg.sentAt,
@@ -941,18 +942,18 @@ const handleSearch = (query: string) => router.push({ path: '/search', query: { 
                 <div
                   v-for="msg in group.items"
                   :key="msg.id"
-                  :class="['flex', msg.sender === currentUserRole ? 'justify-end' : 'justify-start']"
+                  :class="['flex', msg.isOwn ? 'justify-end' : 'justify-start']"
                 >
                   <div
                     :class="[
                       'max-w-[75%] rounded-2xl px-3.5 py-2 shadow-sm',
-                      msg.sender === currentUserRole
+                      msg.isOwn
                         ? 'bg-[#286AD8] text-white rounded-br-sm'
                         : 'bg-white text-gray-800 border border-gray-100 rounded-bl-sm',
                     ]"
                   >
                     <p
-                      v-if="msg.sender !== currentUserRole"
+                      v-if="!msg.isOwn"
                       class="text-[11px] font-semibold mb-0.5 text-blue-600 capitalize"
                     >
                       {{ msg.senderName }}
@@ -983,8 +984,8 @@ const handleSearch = (query: string) => router.push({ path: '/search', query: { 
                           :size="att.size"
                           variant="compact"
                           :class="
-                            msg.sender === currentUserRole
-                              ? 'bg-blue-100 border-white/20 text-white'
+                            msg.isOwn
+                              ? 'bg-white text-black'
                               : ''
                           "
                         />
@@ -993,17 +994,17 @@ const handleSearch = (query: string) => router.push({ path: '/search', query: { 
                     <div
                       :class="[
                         'text-[10px] mt-1 flex items-center justify-end gap-1',
-                        msg.sender === currentUserRole ? 'text-white/70' : 'text-gray-400',
+                        msg.isOwn ? 'text-white/70' : 'text-gray-400',
                       ]"
                     >
                       <span>{{ formatHour(msg.timestamp) }}</span>
                       <CheckCheck
-                        v-if="msg.sender === currentUserRole && msg.status === 'read'"
+                        v-if="msg.isOwn && msg.status === 'read'"
                         class="h-3.5 w-3.5 text-sky-300"
                         aria-label="Visualizado"
                       />
                       <CheckCheck
-                        v-else-if="msg.sender === currentUserRole"
+                        v-else-if="msg.isOwn"
                         class="h-3.5 w-3.5 text-white/50"
                         aria-label="Enviado"
                       />

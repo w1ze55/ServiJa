@@ -9,6 +9,7 @@ import { toast } from '@/utils/toast';
 export interface ChatMessage {
   id: string;
   sender: 'client' | 'freelancer';
+  isOwn: boolean;
   senderName: string;
   message: string;
   timestamp: string;
@@ -24,7 +25,7 @@ export interface ChatMessage {
 
 interface Props {
   messages: ChatMessage[];
-  currentUserRole: 'client' | 'freelancer';
+  currentUserRole: 'client' | 'freelancer' | 'contractor' | 'provider';
   isLocked: boolean;
   isSending?: boolean;
   serviceStatus?:
@@ -153,11 +154,11 @@ const formatDate = (dateString: string) => {
       <div
         v-for="msg in messages"
         :key="msg.id"
-        :class="`flex ${msg.sender === currentUserRole ? 'justify-end' : 'justify-start'}`"
+        :class="`flex ${msg.isOwn ? 'justify-end' : 'justify-start'}`"
       >
         <div
           :class="`max-w-[80%] rounded-lg p-3 ${
-            msg.sender === currentUserRole
+            msg.isOwn
               ? 'bg-[#286AD8] text-white'
               : 'bg-gray-100 text-[#263238]'
           }`"

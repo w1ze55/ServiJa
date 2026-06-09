@@ -10,7 +10,7 @@ import { toast } from '@/utils/toast';
 
 interface Props {
   serviceRequestId: number;
-  currentUserRole: 'client' | 'freelancer';
+  currentUserRole: 'client' | 'freelancer' | 'contractor' | 'provider';
   serviceStatus?: string;
 }
 
@@ -30,6 +30,18 @@ const isLocked = computed(
 const { onMessage, connect, disconnect } = useChatWebSocket();
 
 function getUserEmail(): string {
+  try {
+    const rawUser = localStorage.getItem('user');
+    if (rawUser) {
+      const parsedUser = JSON.parse(rawUser);
+      if (parsedUser?.email) {
+        return String(parsedUser.email);
+      }
+    }
+  } catch {
+    // Fallback para o token abaixo.
+  }
+
   const token = localStorage.getItem('token');
   if (!token) return '';
   try {
@@ -38,6 +50,10 @@ function getUserEmail(): string {
   } catch {
     return '';
   }
+}
+
+function sameEmail(a?: string | null, b?: string | null) {
+  return !!a && !!b && a.trim().toLowerCase() === b.trim().toLowerCase();
 }
 
 function displayName(email: string) {
@@ -63,10 +79,11 @@ function resolveAttachmentName(msg: MessageDTO) {
 }
 
 function toDisplay(msg: MessageDTO): ChatMessage {
-  const isMe = msg.senderId === userEmail.value;
+  const isMe = sameEmail(msg.senderId, userEmail.value);
   return {
     id: msg.id,
     sender: msg.senderType === 'contractor' ? 'client' : 'freelancer',
+    isOwn: isMe,
     senderName: isMe ? 'Você' : displayName(msg.senderId),
     message: msg.content,
     timestamp: msg.sentAt,
