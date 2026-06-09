@@ -59,10 +59,14 @@ public class WebSocketAuthChannelInterceptor implements ChannelInterceptor {
     private void authenticateConnect(StompHeaderAccessor accessor) {
         String jwt = extractToken(accessor);
 
-        if (jwt != null && !jwtService.isTotpChallengeToken(jwt)) {
+        if (jwt != null) {
             try {
                 String userEmail = jwtService.extractUsername(jwt);
-                if (userEmail != null) {
+
+                if (jwtService.isTotpChallengeToken(jwt)) {
+                    // O token de desafio pré-2FA não autentica nada — bloqueia o bypass de 2FA.
+                    log.warn("⚠️ Token de desafio 2FA rejeitado no WebSocket CONNECT");
+                } else if (userEmail != null) {
                     UserDetails userDetails = userDetailsService.loadUserByUsername(userEmail);
                     if (userDetails.isEnabled()
                             && jwtService.isTokenValid(jwt, userDetails)
@@ -82,8 +86,6 @@ public class WebSocketAuthChannelInterceptor implements ChannelInterceptor {
             } catch (Exception e) {
                 log.error("❌ Erro ao autenticar WebSocket: {}", e.getMessage());
             }
-        } else if (jwt != null) {
-            log.warn("⚠️ Token de desafio 2FA rejeitado no WebSocket CONNECT");
         }
 
         // H9: exige autenticação para qualquer conexão WebSocket (sem anônimos).

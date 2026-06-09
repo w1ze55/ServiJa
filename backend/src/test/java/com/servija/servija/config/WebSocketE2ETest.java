@@ -2,6 +2,7 @@ package com.servija.servija.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.servija.servija.dto.NotificationStreamEvent;
+import com.servija.servija.repository.ConversationRepository;
 import com.servija.servija.service.JwtService;
 import com.servija.servija.service.WebSocketService;
 import org.junit.jupiter.api.AfterEach;
@@ -85,6 +86,13 @@ class WebSocketE2ETest {
                     .password("{noop}secret")
                     .authorities("ROLE_USER")
                     .build();
+        }
+
+        // Mongo está excluído neste contexto; o interceptor exige a dependência,
+        // mas tópicos de chat não são exercidos por este teste de notificações.
+        @Bean
+        ConversationRepository conversationRepository() {
+            return org.mockito.Mockito.mock(ConversationRepository.class);
         }
     }
 

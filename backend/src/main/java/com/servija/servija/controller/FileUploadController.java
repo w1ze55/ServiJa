@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -60,9 +61,11 @@ public class FileUploadController {
     @DeleteMapping("/image")
     @Operation(summary = "Deletar uma imagem")
     @SecurityRequirement(name = "bearerAuth")
-    public ResponseEntity<Map<String, String>> deleteImage(@RequestParam("url") String url) {
+    public ResponseEntity<Map<String, String>> deleteImage(@RequestParam("url") String url,
+            Authentication authentication) {
         try {
-            fileStorageService.deleteFile(url);
+            // H3: só o dono registrado do arquivo pode excluí-lo.
+            fileStorageService.deleteOwnedFile(url, authentication.getName());
             Map<String, String> response = new HashMap<>();
             response.put("message", "Imagem deletada com sucesso");
             return ResponseEntity.ok(response);

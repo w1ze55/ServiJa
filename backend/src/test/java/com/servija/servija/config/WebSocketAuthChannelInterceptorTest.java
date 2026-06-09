@@ -97,7 +97,7 @@ class WebSocketAuthChannelInterceptorTest {
     }
 
     @Test
-    @DisplayName("preSend nao autentica quando o token JWT e invalido")
+    @DisplayName("preSend rejeita CONNECT quando o token JWT e invalido (H9)")
     void preSendSkipsAuthenticationWhenTokenIsInvalid() {
         WebSocketAuthChannelInterceptor interceptor = interceptor();
         UserDetails userDetails = new User("user@test.com", "secret", List.of());
@@ -107,33 +107,27 @@ class WebSocketAuthChannelInterceptorTest {
         when(userDetailsService.loadUserByUsername("user@test.com")).thenReturn(userDetails);
         when(jwtService.isTokenValid("invalid-token", userDetails)).thenReturn(false);
 
-        Message<?> result = interceptor.preSend(
+        assertThatThrownBy(() -> interceptor.preSend(
                 connectMessage("Bearer invalid-token", null),
                 mock(MessageChannel.class)
-        );
+        )).isInstanceOf(AccessDeniedException.class);
 
-        StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(result, StompHeaderAccessor.class);
-        assertThat(accessor).isNotNull();
-        assertThat(accessor.getUser()).isNull();
         assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
     }
 
     @Test
-    @DisplayName("preSend rejeita token de desafio 2FA no CONNECT")
+    @DisplayName("preSend rejeita CONNECT com token de desafio 2FA (H9)")
     void preSendRejectsTotpChallengeToken() {
         WebSocketAuthChannelInterceptor interceptor = interceptor();
 
         when(jwtService.extractUsername("totp-token")).thenReturn("user@test.com");
         when(jwtService.isTotpChallengeToken("totp-token")).thenReturn(true);
 
-        Message<?> result = interceptor.preSend(
+        assertThatThrownBy(() -> interceptor.preSend(
                 connectMessage("Bearer totp-token", null),
                 mock(MessageChannel.class)
-        );
+        )).isInstanceOf(AccessDeniedException.class);
 
-        StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(result, StompHeaderAccessor.class);
-        assertThat(accessor).isNotNull();
-        assertThat(accessor.getUser()).isNull();
         assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
         verify(userDetailsService, never()).loadUserByUsername("user@test.com");
     }
