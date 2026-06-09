@@ -79,11 +79,18 @@ public class FileStorageService {
         String extension = getFileExtension(originalFilename);
         String newFilename = UUID.randomUUID() + extension;
 
+        // H4: nunca confiar no content-type enviado pelo cliente. Deriva o content-type
+        // da extensão (allow-list) e força download para tipos não-imagem, eliminando o
+        // vetor de XSS armazenado (HTML/SVG servidos como executáveis).
+        String safeContentType = resolveSafeContentType(extension);
+        String disposition = isImageExtension(extension) ? "inline" : "attachment";
+
         try {
             PutObjectRequest putObjectRequest = PutObjectRequest.builder()
                     .bucket(bucketName)
                     .key(newFilename)
-                    .contentType(file.getContentType())
+                    .contentType(safeContentType)
+                    .contentDisposition(disposition)
                     .build();
 
             s3Client.putObject(putObjectRequest, RequestBody.fromBytes(file.getBytes()));
@@ -123,15 +130,42 @@ public class FileStorageService {
             throw new RuntimeException("Arquivo muito grande. Maximo permitido: 10MB");
         }
 
-        String contentType = file.getContentType();
+        // H4: a extensão (allow-list) é autoritativa. O content-type do cliente NÃO é
+        // usado para autorizar nem para servir o arquivo — é derivado da extensão no
+        // servidor (resolveSafeContentType), evitando XSS armazenado via content-type
+        // malicioso (ex.: text/html, image/svg+xml).
         String extension = getFileExtension(file.getOriginalFilename()).toLowerCase();
-        boolean isAllowedByContentType = contentType != null && ALLOWED_CONTENT_TYPES.contains(contentType);
-        boolean isAllowedByExtension = ALLOWED_EXTENSIONS.contains(extension);
-
-        if (!isAllowedByContentType && !isAllowedByExtension) {
+        if (!ALLOWED_EXTENSIONS.contains(extension)) {
             throw new RuntimeException(
                     "Tipo de arquivo nao permitido. Permitidos: JPEG, PNG, GIF, WEBP, PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX e TXT");
         }
+    }
+
+    private static final java.util.Map<String, String> EXTENSION_CONTENT_TYPES = java.util.Map.ofEntries(
+            java.util.Map.entry(".jpg", "image/jpeg"),
+            java.util.Map.entry(".jpeg", "image/jpeg"),
+            java.util.Map.entry(".png", "image/png"),
+            java.util.Map.entry(".gif", "image/gif"),
+            java.util.Map.entry(".webp", "image/webp"),
+            java.util.Map.entry(".pdf", "application/pdf"),
+            java.util.Map.entry(".doc", "application/msword"),
+            java.util.Map.entry(".docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+            java.util.Map.entry(".xls", "application/vnd.ms-excel"),
+            java.util.Map.entry(".xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+            java.util.Map.entry(".ppt", "application/vnd.ms-powerpoint"),
+            java.util.Map.entry(".pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation"),
+            java.util.Map.entry(".txt", "text/plain"));
+
+    private static final java.util.List<String> IMAGE_EXTENSIONS =
+            java.util.Arrays.asList(".jpg", ".jpeg", ".png", ".gif", ".webp");
+
+    private String resolveSafeContentType(String extension) {
+        return EXTENSION_CONTENT_TYPES.getOrDefault(
+                extension != null ? extension.toLowerCase() : "", "application/octet-stream");
+    }
+
+    private boolean isImageExtension(String extension) {
+        return extension != null && IMAGE_EXTENSIONS.contains(extension.toLowerCase());
     }
 
     private String getFileExtension(String filename) {

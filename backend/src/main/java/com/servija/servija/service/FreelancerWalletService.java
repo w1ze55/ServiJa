@@ -94,7 +94,9 @@ public class FreelancerWalletService {
      */
     @Transactional
     public void deductAvailableBalance(User freelancer, BigDecimal amount) {
-        FreelancerWallet wallet = walletRepository.findByUser(freelancer)
+        // H10: lock pessimista para serializar saques concorrentes e evitar TOCTOU.
+        // A verificação de saldo e a dedução ocorrem sob o lock, dentro da transação.
+        FreelancerWallet wallet = walletRepository.findByUserIdForUpdate(freelancer.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Carteira não encontrada"));
 
         if (wallet.getAvailableBalance().compareTo(amount) < 0) {

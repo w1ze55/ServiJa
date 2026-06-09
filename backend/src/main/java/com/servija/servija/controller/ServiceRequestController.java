@@ -183,7 +183,8 @@ public class ServiceRequestController {
     @Operation(summary = "Excluir solicitação", description = "Exclui uma solicitação de orçamento")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
-        serviceRequestService.delete(id);
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        serviceRequestService.delete(id, authentication.getName());
         return ResponseEntity.noContent().build();
     }
 }

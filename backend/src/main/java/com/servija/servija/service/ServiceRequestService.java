@@ -365,6 +365,15 @@ public class ServiceRequestService {
         User actionUser = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
+        // H1: apenas as partes (contratante ou freelancer) podem alterar o status.
+        boolean isContractorParty = request.getContractor() != null
+                && request.getContractor().getId().equals(actionUser.getId());
+        boolean isFreelancerParty = request.getFreelancer() != null
+                && request.getFreelancer().getId().equals(actionUser.getId());
+        if (!isContractorParty && !isFreelancerParty) {
+            throw new ResourceNotFoundException("Solicitação não encontrada");
+        }
+
         ServiceRequest.Status newStatus = ServiceRequest.Status.valueOf(status.toUpperCase());
 
         if (newStatus == Status.DELIVERED || newStatus == Status.COMPLETED) {
@@ -433,6 +442,14 @@ public class ServiceRequestService {
 
         User freelancer = userRepository.findByEmail(freelancerEmail)
                 .orElseThrow(() -> new RuntimeException("Freelancer not found"));
+
+        // H1: somente o freelancer designado pode responder. Se a solicitação está
+        // aberta (sem freelancer), vincula quem está respondendo.
+        if (request.getFreelancer() == null) {
+            request.setFreelancer(freelancer);
+        } else if (!request.getFreelancer().getId().equals(freelancer.getId())) {
+            throw new ResourceNotFoundException("Solicitação não encontrada");
+        }
 
         validateNewNegotiatedAmount(dto.getValue());
 
@@ -521,6 +538,11 @@ public class ServiceRequestService {
         User contractor = userRepository.findByEmail(contractorEmail)
                 .orElseThrow(() -> new RuntimeException("Contractor not found"));
 
+        // H1: apenas o contratante dono da solicitação pode contrapropor.
+        if (request.getContractor() == null || !request.getContractor().getId().equals(contractor.getId())) {
+            throw new ResourceNotFoundException("Solicitação não encontrada");
+        }
+
         validateNewNegotiatedAmount(dto.getValue());
 
         request.setCounterValue(dto.getValue());
@@ -551,6 +573,11 @@ public class ServiceRequestService {
 
         User freelancer = userRepository.findByEmail(freelancerEmail)
                 .orElseThrow(() -> new RuntimeException("Freelancer not found"));
+
+        // H1: apenas o freelancer designado pode aceitar a contraproposta.
+        if (request.getFreelancer() == null || !request.getFreelancer().getId().equals(freelancer.getId())) {
+            throw new ResourceNotFoundException("Solicitação não encontrada");
+        }
 
         if (request.getCounterValue() != null) {
             BigDecimal acceptedValue = request.getCounterValue();
@@ -632,6 +659,11 @@ public class ServiceRequestService {
 
         User freelancer = userRepository.findByEmail(freelancerEmail)
                 .orElseThrow(() -> new RuntimeException("Freelancer not found"));
+
+        // H1: apenas o freelancer designado pode recusar a contraproposta.
+        if (request.getFreelancer() == null || !request.getFreelancer().getId().equals(freelancer.getId())) {
+            throw new ResourceNotFoundException("Solicitação não encontrada");
+        }
 
         // Clear counter fields
         request.setCounterValue(null);
@@ -764,9 +796,17 @@ public class ServiceRequestService {
     }
 
     @Transactional
-    public void delete(Long id) {
+    public void delete(Long id, String userEmail) {
         ServiceRequest request = serviceRequestRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Service request not found"));
+
+        User actionUser = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
+
+        // H2: apenas o contratante dono da solicitação pode excluí-la.
+        if (request.getContractor() == null || !request.getContractor().getId().equals(actionUser.getId())) {
+            throw new ResourceNotFoundException("Solicitação não encontrada");
+        }
 
         String attachments = request.getAttachments();
         ServiceRequestResponse deletedRequest = toResponse(request);
