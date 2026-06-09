@@ -105,7 +105,7 @@ export const mergeUserRoleState = (user: User, payload: any): User => {
 };
 
 export const getLandingRouteForRole = (role: UserRole): string => {
-  if (role === 'admin') return '/admin/categories';
+  if (role === 'admin') return '/dashboard';
   if (role === 'freelancer') return '/freelancer-dashboard';
   return '/cliente-home';
 };
