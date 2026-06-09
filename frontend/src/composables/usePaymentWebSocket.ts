@@ -1,6 +1,10 @@
 import { ref, onUnmounted } from 'vue';
 import { Client } from '@stomp/stompjs';
-import SockJS from 'sockjs-client';
+import {
+  createSockJsFactory,
+  describeSockJsCandidate,
+  getStompConnectHeaders,
+} from '@/utils/websocket';
 
 interface PaymentNotification {
   type: string;
@@ -17,54 +21,53 @@ export function usePaymentWebSocket(userEmail: string) {
   const connectionError = ref<string | null>(null);
 
   const connect = () => {
-    if (client.value?.connected) {
-      console.log('WebSocket de pagamentos já está conectado');
+    if (client.value?.connected || client.value?.active) {
       return;
     }
 
     if (!userEmail) {
-      console.error('❌ userEmail não fornecido para WebSocket de pagamentos');
-      connectionError.value = 'Email do usuário não disponível';
+      connectionError.value = 'Email do usuario nao disponivel';
       return;
     }
 
-    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080';
-    const wsUrl = `${apiUrl}/ws`;
+    const socketFactory = createSockJsFactory();
+    let hasConnected = false;
 
     const stompClient = new Client({
-      webSocketFactory: () => new SockJS(wsUrl),
-      debug: (str) => {
-        if (str.includes('ERROR') || str.includes('CONNECTED') || str.includes('DISCONNECT') || str.includes('SUBSCRIBE')) {
+      webSocketFactory: socketFactory.webSocketFactory,
+      connectHeaders: getStompConnectHeaders(),
+      debug: (message) => {
+        if (
+          message.includes('ERROR') ||
+          message.includes('CONNECTED') ||
+          message.includes('DISCONNECT') ||
+          message.includes('SUBSCRIBE')
+        ) {
+          return;
         }
       },
-      reconnectDelay: 5000,
+      reconnectDelay: 1000,
       heartbeatIncoming: 4000,
       heartbeatOutgoing: 4000,
     });
 
     stompClient.onConnect = () => {
+      hasConnected = true;
       connected.value = true;
       connectionError.value = null;
 
-      // Subscrever ao tópico de pagamentos do usuário (mesmo padrão das solicitações)
       const destination = `/topic/payment/${userEmail}`;
-      
       stompClient.subscribe(destination, (message) => {
-        
         try {
           const notification: PaymentNotification = JSON.parse(message.body);
           lastNotification.value = notification;
-
-          // Disparar evento customizado para o componente
           window.dispatchEvent(
             new CustomEvent('payment-notification', { detail: notification })
           );
-
         } catch (error) {
-          console.error('❌ Erro ao processar notificação de pagamento:', error);
+          console.error('Erro ao processar notificacao de pagamento:', error);
         }
       });
-
     };
 
     stompClient.onStompError = (frame) => {
@@ -74,6 +77,20 @@ export function usePaymentWebSocket(userEmail: string) {
 
     stompClient.onWebSocketClose = () => {
       connected.value = false;
+
+      if (hasConnected) {
+        return;
+      }
+
+      const failedCandidate = socketFactory.getCurrentCandidate();
+      if (!socketFactory.advanceCandidate()) {
+        connectionError.value = 'Erro ao conectar WebSocket';
+        return;
+      }
+
+      console.warn(
+        `[payment-ws] Falha ao conectar via ${describeSockJsCandidate(failedCandidate)}. Tentando ${describeSockJsCandidate(socketFactory.getCurrentCandidate())}.`
+      );
     };
 
     stompClient.activate();
