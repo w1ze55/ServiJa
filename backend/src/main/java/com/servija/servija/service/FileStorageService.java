@@ -1,10 +1,16 @@
 package com.servija.servija.service;
 
+import com.servija.servija.exception.ResourceNotFoundException;
+import com.servija.servija.model.UploadedFile;
+import com.servija.servija.repository.UploadedFileRepository;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 import software.amazon.awssdk.core.sync.RequestBody;
@@ -54,6 +60,7 @@ public class FileStorageService {
     private static final long MAX_FILE_SIZE = 10 * 1024 * 1024;
 
     private final S3Client s3Client;
+    private final UploadedFileRepository uploadedFileRepository;
 
     @Value("${aws.s3.bucket}")
     private String bucketName;
@@ -95,6 +102,9 @@ public class FileStorageService {
 
             s3Client.putObject(putObjectRequest, RequestBody.fromBytes(file.getBytes()));
 
+            // H3: registra o dono do objeto para autorizar exclusões futuras.
+            recordOwnership(newFilename);
+
             String fileUrl = String.format("https://%s.s3.%s.amazonaws.com/%s", bucketName, region, newFilename);
             log.info("Arquivo salvo no S3: {} -> {}", originalFilename, fileUrl);
             return fileUrl;
@@ -119,6 +129,60 @@ public class FileStorageService {
             log.error("Erro ao deletar arquivo do S3: {}", fileUrl, ex);
             throw new RuntimeException("Erro ao deletar arquivo do S3", ex);
         }
+    }
+
+    /**
+     * H3: exclui um arquivo verificando a propriedade. Apenas o usuário que enviou o
+     * objeto (dono registrado) pode excluí-lo. Use este método em endpoints expostos
+     * ao cliente; chamadas internas já autorizadas podem usar {@link #deleteFile}.
+     */
+    @Transactional
+    public void deleteOwnedFile(String fileUrl, String requesterEmail) {
+        String key = extractKey(fileUrl);
+        UploadedFile record = uploadedFileRepository.findByS3Key(key)
+                .orElseThrow(() -> new ResourceNotFoundException("Arquivo não encontrado"));
+
+        if (requesterEmail == null || !requesterEmail.equals(record.getOwnerEmail())) {
+            // Não revela existência para não-donos.
+            throw new ResourceNotFoundException("Arquivo não encontrado");
+        }
+
+        deleteFile(fileUrl);
+        uploadedFileRepository.delete(record);
+    }
+
+    private void recordOwnership(String s3Key) {
+        try {
+            String email = currentUserEmail();
+            if (email == null) {
+                return; // upload sem contexto autenticado: sem registro de dono
+            }
+            if (uploadedFileRepository.findByS3Key(s3Key).isEmpty()) {
+                uploadedFileRepository.save(UploadedFile.builder()
+                        .s3Key(s3Key)
+                        .ownerEmail(email)
+                        .build());
+            }
+        } catch (Exception ex) {
+            // Best-effort: não falhar o upload por causa do registro de propriedade.
+            log.warn("Não foi possível registrar a propriedade do arquivo {}: {}", s3Key, ex.getMessage());
+        }
+    }
+
+    private String currentUserEmail() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated()) {
+            return null;
+        }
+        String name = auth.getName();
+        return (name != null && !name.isBlank() && !"anonymousUser".equals(name)) ? name : null;
+    }
+
+    private String extractKey(String fileUrl) {
+        if (fileUrl == null) {
+            return "";
+        }
+        return fileUrl.substring(fileUrl.lastIndexOf('/') + 1);
     }
 
     private void validateFile(MultipartFile file) {
