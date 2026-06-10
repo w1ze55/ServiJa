@@ -1,9 +1,25 @@
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, onUnmounted } from 'vue';
 import { Client } from '@stomp/stompjs';
-import SockJS from 'sockjs-client';
+import {
+  createSockJsFactory,
+  describeSockJsCandidate,
+  getStompConnectHeaders,
+} from '@/utils/websocket';
 
 export interface ServiceRequestNotification {
-  type: 'NEW_SERVICE_REQUEST' | 'SERVICE_REQUEST_STATUS_CHANGED' | 'NEW_PROPOSAL' | 'COUNTER_PROPOSAL' | 'PROPOSAL_ACCEPTED' | 'SERVICE_REQUEST_CANCELLED' | 'NEW_REVIEW' | 'SERVICE_COMPLETED_REVIEW_PENDING' | 'COUNTER_PROPOSAL_REJECTED' | 'ADJUSTMENTS_REQUESTED' | 'ADJUSTMENT_STATUS_CHANGED' | 'ADJUSTMENT_DELETED';
+  type:
+    | 'NEW_SERVICE_REQUEST'
+    | 'SERVICE_REQUEST_STATUS_CHANGED'
+    | 'NEW_PROPOSAL'
+    | 'COUNTER_PROPOSAL'
+    | 'PROPOSAL_ACCEPTED'
+    | 'SERVICE_REQUEST_CANCELLED'
+    | 'NEW_REVIEW'
+    | 'SERVICE_COMPLETED_REVIEW_PENDING'
+    | 'COUNTER_PROPOSAL_REJECTED'
+    | 'ADJUSTMENTS_REQUESTED'
+    | 'ADJUSTMENT_STATUS_CHANGED'
+    | 'ADJUSTMENT_DELETED';
   serviceRequestId: number;
   contractorName?: string;
   freelancerName?: string;
@@ -20,7 +36,6 @@ export interface ServiceRequestNotification {
   timestamp: number;
 }
 
-
 export function useServiceRequestWebSocket(userEmail: string) {
   const client = ref<Client | null>(null);
   const connected = ref(false);
@@ -28,66 +43,84 @@ export function useServiceRequestWebSocket(userEmail: string) {
   const connectionPromise = ref<Promise<void> | null>(null);
 
   const connect = () => {
-    if (client.value?.connected) {
-      console.log('WebSocket de solicitações já está conectado');
-      return Promise.resolve();
+    if (client.value?.connected || client.value?.active) {
+      return connectionPromise.value ?? Promise.resolve();
     }
 
-    // Se já existe uma tentativa de conexão em andamento, retornar a promise existente
     if (connectionPromise.value) {
-      console.log('WebSocket já está tentando conectar, aguardando...');
       return connectionPromise.value;
     }
 
-    // Construir URL do WebSocket a partir da API URL
-    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080';
-    const wsUrl = `${apiUrl}/ws`;
-
-    // Criar uma promise que resolve quando a conexão for estabelecida
     connectionPromise.value = new Promise<void>((resolve, reject) => {
+      const socketFactory = createSockJsFactory();
+      let hasConnected = false;
+      let settled = false;
+
       const stompClient = new Client({
-        webSocketFactory: () => new SockJS(wsUrl),
-        debug: (str) => {
-        },
-        reconnectDelay: 5000,
+        webSocketFactory: socketFactory.webSocketFactory,
+        connectHeaders: getStompConnectHeaders(),
+        debug: () => {},
+        reconnectDelay: 1000,
         heartbeatIncoming: 4000,
         heartbeatOutgoing: 4000,
       });
 
       stompClient.onConnect = () => {
+        hasConnected = true;
         connected.value = true;
 
-        // Subscrever ao tópico de solicitações do usuário
         stompClient.subscribe(`/topic/service-request/${userEmail}`, (message) => {
-          
           try {
             const notification: ServiceRequestNotification = JSON.parse(message.body);
             lastNotification.value = notification;
 
-            // Disparar evento customizado para o componente
-            const event = new CustomEvent('service-request-notification', {
-              detail: notification
-            });
-            window.dispatchEvent(event);
-
+            window.dispatchEvent(
+              new CustomEvent('service-request-notification', {
+                detail: notification,
+              })
+            );
           } catch (error) {
-            console.error('❌ Erro ao processar notificação:', error);
+            console.error('Erro ao processar notificacao de solicitacao:', error);
           }
         });
 
-        // Resolver a promise quando conectado e subscrito
-        resolve();
+        if (!settled) {
+          settled = true;
+          resolve();
+        }
       };
 
-      stompClient.onStompError = (frame) => {
+      stompClient.onStompError = () => {
         connected.value = false;
         connectionPromise.value = null;
-        reject(new Error('Erro ao conectar WebSocket'));
+
+        if (!settled) {
+          settled = true;
+          reject(new Error('Erro ao conectar WebSocket'));
+        }
       };
 
       stompClient.onWebSocketClose = () => {
         connected.value = false;
+
+        if (hasConnected) {
+          connectionPromise.value = null;
+          return;
+        }
+
+        const failedCandidate = socketFactory.getCurrentCandidate();
+        if (socketFactory.advanceCandidate()) {
+          console.warn(
+            `[service-request-ws] Falha ao conectar via ${describeSockJsCandidate(failedCandidate)}. Tentando ${describeSockJsCandidate(socketFactory.getCurrentCandidate())}.`
+          );
+          return;
+        }
+
         connectionPromise.value = null;
+        if (!settled) {
+          settled = true;
+          reject(new Error('Erro ao conectar WebSocket'));
+        }
       };
 
       stompClient.activate();
@@ -102,10 +135,10 @@ export function useServiceRequestWebSocket(userEmail: string) {
       client.value.deactivate();
       client.value = null;
       connected.value = false;
+      connectionPromise.value = null;
     }
   };
 
-  // Auto-disconnect ao desmontar o componente
   onUnmounted(() => {
     disconnect();
   });
@@ -115,6 +148,6 @@ export function useServiceRequestWebSocket(userEmail: string) {
     connected,
     lastNotification,
     connect,
-    disconnect
+    disconnect,
   };
 }

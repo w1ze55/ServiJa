@@ -21,6 +21,7 @@ import {
 } from "lucide-vue-next";
 import api from "@/api/config/axios";
 import { toast } from "@/utils/toast";
+import { getAdminLoginUrl } from "@/utils/adminApp";
 
 interface ResetPasswordProps {
   email: string;
@@ -109,15 +110,7 @@ const currentResetUserType = computed<AdminResetUserType | null>(
 );
 
 const adminLoginUrl = computed(() => {
-  const configuredUrl = import.meta.env.VITE_ADMIN_APP_URL?.trim();
-  if (!configuredUrl) {
-    return "http://localhost:5174/login";
-  }
-
-  const normalizedUrl = configuredUrl.replace(/\/+$/, "");
-  return normalizedUrl.endsWith("/login")
-    ? normalizedUrl
-    : `${normalizedUrl}/login`;
+  return getAdminLoginUrl();
 });
 
 const successRedirectText = computed(() =>

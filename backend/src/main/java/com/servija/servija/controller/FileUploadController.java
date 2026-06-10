@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -60,9 +61,11 @@ public class FileUploadController {
     @DeleteMapping("/image")
     @Operation(summary = "Deletar uma imagem")
     @SecurityRequirement(name = "bearerAuth")
-    public ResponseEntity<Map<String, String>> deleteImage(@RequestParam("url") String url) {
+    public ResponseEntity<Map<String, String>> deleteImage(@RequestParam("url") String url,
+            Authentication authentication) {
         try {
-            fileStorageService.deleteFile(url);
+            // H3: só o dono registrado do arquivo pode excluí-lo.
+            fileStorageService.deleteOwnedFile(url, authentication.getName());
             Map<String, String> response = new HashMap<>();
             response.put("message", "Imagem deletada com sucesso");
             return ResponseEntity.ok(response);
@@ -73,8 +76,17 @@ public class FileUploadController {
         }
     }
 
+    private static final int MAX_FILES_PER_REQUEST = 10;
+
     private ResponseEntity<Map<String, Object>> uploadMultipleFiles(MultipartFile[] files) {
         try {
+            // L3: limita a quantidade de arquivos por requisição.
+            if (files != null && files.length > MAX_FILES_PER_REQUEST) {
+                Map<String, Object> error = new HashMap<>();
+                error.put("error", "Máximo de " + MAX_FILES_PER_REQUEST + " arquivos por requisição");
+                return ResponseEntity.badRequest().body(error);
+            }
+
             List<String> urls = new ArrayList<>();
             for (MultipartFile file : files) {
                 String url = fileStorageService.storeFile(file);
@@ -85,9 +97,9 @@ public class FileUploadController {
             response.put("urls", urls);
             return ResponseEntity.ok(response);
         } catch (Exception ex) {
+            // M4: não expor o nome da classe da exceção ao cliente.
             Map<String, Object> error = new HashMap<>();
             error.put("error", ex.getMessage());
-            error.put("type", ex.getClass().getName());
             return ResponseEntity.badRequest().body(error);
         }
     }

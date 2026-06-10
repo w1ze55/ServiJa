@@ -154,6 +154,12 @@ public class AsaasWebhookController {
             log.error("ASAAS_WEBHOOK_TOKEN não configurado — rejeitando requisição de webhook");
             return false;
         }
-        return accessToken != null && accessToken.equals(webhookToken);
+        if (accessToken == null) {
+            return false;
+        }
+        // L1: comparação em tempo constante para não vazar o token por timing.
+        return java.security.MessageDigest.isEqual(
+                accessToken.getBytes(java.nio.charset.StandardCharsets.UTF_8),
+                webhookToken.getBytes(java.nio.charset.StandardCharsets.UTF_8));
     }
 }

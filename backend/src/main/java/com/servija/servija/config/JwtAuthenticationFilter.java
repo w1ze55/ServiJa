@@ -56,6 +56,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         try {
             userEmail = jwtService.extractUsername(jwt);
 
+            // Bloqueia o token de desafio pre-2FA: ele so vale em /api/auth/2fa/verify
+            // (rota publica que nem passa por este filtro). Aceita-lo aqui permitiria
+            // pular completamente o segundo fator.
+            if (jwtService.isTotpChallengeToken(jwt)) {
+                handleInvalidToken(response, "Token de verificacao 2FA pendente nao autoriza acesso");
+                return;
+            }
+
             if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                 UserDetails userDetails = this.userDetailsService.loadUserByUsername(userEmail);
 
@@ -67,6 +75,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 if (userDetails instanceof User user && !Boolean.TRUE.equals(user.getEmailVerified())) {
                     handleUnverifiedEmail(response, user.getEmail());
                     return;
+                }
+
+                // H6: revogação de token via tokenVersion. Após reset/troca de senha, a
+                // versão do usuário é incrementada e os tokens antigos param de valer.
+                if (userDetails instanceof User user) {
+                    int current = user.getTokenVersion() != null ? user.getTokenVersion() : 0;
+                    Integer claimVersion = jwtService.extractTokenVersion(jwt);
+                    int presented = claimVersion != null ? claimVersion : 0;
+                    if (presented != current) {
+                        handleInvalidToken(response, "Sessão expirada. Faça login novamente.");
+                        return;
+                    }
                 }
 
                 if (jwtService.isTokenValid(jwt, userDetails)) {

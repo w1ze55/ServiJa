@@ -1,7 +1,11 @@
 import { ref } from 'vue';
 import { Client } from '@stomp/stompjs';
-import SockJS from 'sockjs-client';
 import type { NotificationStreamEvent } from '@/types/notifications';
+import {
+  createSockJsFactory,
+  describeSockJsCandidate,
+  getStompConnectHeaders,
+} from '@/utils/websocket';
 
 export function useNotificationsRealtime(userEmail: string) {
   const client = ref<Client | null>(null);
@@ -10,12 +14,12 @@ export function useNotificationsRealtime(userEmail: string) {
   const connectionPromise = ref<Promise<void> | null>(null);
 
   const connect = () => {
-    if (client.value?.connected) {
-      return Promise.resolve();
+    if (client.value?.connected || client.value?.active) {
+      return connectionPromise.value ?? Promise.resolve();
     }
 
     if (!userEmail) {
-      connectionError.value = 'Email do usuário não disponível';
+      connectionError.value = 'Email do usuario nao disponivel';
       return Promise.resolve();
     }
 
@@ -23,18 +27,21 @@ export function useNotificationsRealtime(userEmail: string) {
       return connectionPromise.value;
     }
 
-    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080';
-    const wsUrl = `${apiUrl}/ws`;
-
     connectionPromise.value = new Promise<void>((resolve, reject) => {
+      const socketFactory = createSockJsFactory();
+      let hasConnected = false;
+      let settled = false;
+
       const stompClient = new Client({
-        webSocketFactory: () => new SockJS(wsUrl),
-        reconnectDelay: 5000,
+        webSocketFactory: socketFactory.webSocketFactory,
+        connectHeaders: getStompConnectHeaders(),
+        reconnectDelay: 1000,
         heartbeatIncoming: 4000,
         heartbeatOutgoing: 4000,
       });
 
       stompClient.onConnect = () => {
+        hasConnected = true;
         connected.value = true;
         connectionError.value = null;
 
@@ -42,25 +49,53 @@ export function useNotificationsRealtime(userEmail: string) {
         stompClient.subscribe(destination, (message) => {
           try {
             const event: NotificationStreamEvent = JSON.parse(message.body);
-            window.dispatchEvent(new CustomEvent('notification-stream-event', { detail: event }));
+            window.dispatchEvent(
+              new CustomEvent('notification-stream-event', { detail: event })
+            );
           } catch (error) {
-            console.error('Erro ao processar evento de notificação:', error);
+            console.error('Erro ao processar evento de notificacao:', error);
           }
         });
 
-        resolve();
+        if (!settled) {
+          settled = true;
+          resolve();
+        }
       };
 
       stompClient.onStompError = (frame) => {
         connected.value = false;
         connectionError.value = frame.headers['message'] || 'Erro STOMP';
         connectionPromise.value = null;
-        reject(new Error(connectionError.value));
+
+        if (!settled) {
+          settled = true;
+          reject(new Error(connectionError.value));
+        }
       };
 
       stompClient.onWebSocketClose = () => {
         connected.value = false;
+
+        if (hasConnected) {
+          connectionPromise.value = null;
+          return;
+        }
+
+        const failedCandidate = socketFactory.getCurrentCandidate();
+        if (socketFactory.advanceCandidate()) {
+          console.warn(
+            `[notifications-ws] Falha ao conectar via ${describeSockJsCandidate(failedCandidate)}. Tentando ${describeSockJsCandidate(socketFactory.getCurrentCandidate())}.`
+          );
+          return;
+        }
+
+        connectionError.value = 'Erro ao conectar WebSocket';
         connectionPromise.value = null;
+        if (!settled) {
+          settled = true;
+          reject(new Error(connectionError.value));
+        }
       };
 
       stompClient.activate();
@@ -78,6 +113,7 @@ export function useNotificationsRealtime(userEmail: string) {
       connectionPromise.value = null;
     }
   };
+
   return {
     connected,
     connectionError,

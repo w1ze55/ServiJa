@@ -15,14 +15,17 @@ import com.servija.servija.dto.TwoFactorVerifyRequest;
 import com.servija.servija.dto.UserRoleRequest;
 import com.servija.servija.dto.VerifyEmailRequest;
 import com.servija.servija.dto.VerifyResetPasswordCodeRequest;
+import com.servija.servija.exception.TooManyAttemptsException;
 import com.servija.servija.service.AdminResetPasswordLinkService;
 import com.servija.servija.service.AuthService;
+import com.servija.servija.service.RateLimiterService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -43,6 +46,36 @@ public class AuthController {
 
     private final AuthService authService;
     private final AdminResetPasswordLinkService adminResetPasswordLinkService;
+    private final RateLimiterService rateLimiter;
+
+    private static final long WINDOW_5_MIN = 5 * 60 * 1000L;
+    private static final long WINDOW_10_MIN = 10 * 60 * 1000L;
+    private static final long WINDOW_1_HOUR = 60 * 60 * 1000L;
+
+    private String clientIp(HttpServletRequest request) {
+        String forwarded = request.getHeader("X-Forwarded-For");
+        if (forwarded != null && !forwarded.isBlank()) {
+            return forwarded.split(",")[0].trim();
+        }
+        return request.getRemoteAddr();
+    }
+
+    /**
+     * H5: aplica limite por IP e (opcionalmente) por identificador (e-mail). Lança
+     * 429 (TooManyAttemptsException) quando qualquer um dos limites é excedido.
+     */
+    private void rateLimit(String action, HttpServletRequest request, String identifier,
+            int maxPerIp, int maxPerId, long windowMillis) {
+        boolean ipOk = rateLimiter.tryConsume(
+                action + ":ip:" + clientIp(request), maxPerIp, windowMillis);
+        boolean idOk = identifier == null || identifier.isBlank()
+                || rateLimiter.tryConsume(
+                        action + ":id:" + identifier.trim().toLowerCase(), maxPerId, windowMillis);
+        if (!ipOk || !idOk) {
+            throw new TooManyAttemptsException(
+                    "Muitas tentativas. Aguarde alguns minutos e tente novamente.", 0, null);
+        }
+    }
 
     @PostMapping("/register")
     @Operation(summary = "Registrar novo usuario", description = "Cria uma nova conta de usuario no sistema. Apos o registro, um codigo de verificacao e enviado para o e-mail fornecido.")
@@ -50,7 +83,9 @@ public class AuthController {
             @ApiResponse(responseCode = "201", description = "Usuario registrado com sucesso", content = @Content(schema = @Schema(implementation = AuthResponse.class))),
             @ApiResponse(responseCode = "400", description = "Dados invalidos ou e-mail ja cadastrado", content = @Content(schema = @Schema(implementation = MessageResponse.class)))
     })
-    public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
+    public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request,
+            HttpServletRequest httpRequest) {
+        rateLimit("register", httpRequest, request.getEmail(), 10, 5, WINDOW_1_HOUR);
         AuthResponse response = authService.register(request);
         return new ResponseEntity<>(response, HttpStatus.CREATED);
     }
@@ -84,7 +119,9 @@ public class AuthController {
             @ApiResponse(responseCode = "200", description = "Login realizado com sucesso", content = @Content(schema = @Schema(implementation = AuthResponse.class))),
             @ApiResponse(responseCode = "401", description = "Credenciais invalidas", content = @Content(schema = @Schema(implementation = MessageResponse.class)))
     })
-    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
+    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request,
+            HttpServletRequest httpRequest) {
+        rateLimit("login", httpRequest, request.getEmail(), 20, 8, WINDOW_5_MIN);
         AuthResponse response = authService.login(request);
         return ResponseEntity.ok(response);
     }
@@ -95,7 +132,9 @@ public class AuthController {
             @ApiResponse(responseCode = "200", description = "Login realizado com sucesso", content = @Content(schema = @Schema(implementation = AuthResponse.class))),
             @ApiResponse(responseCode = "401", description = "Credenciais invalidas ou usuario nao administrador", content = @Content(schema = @Schema(implementation = MessageResponse.class)))
     })
-    public ResponseEntity<AuthResponse> loginAdmin(@Valid @RequestBody LoginRequest request) {
+    public ResponseEntity<AuthResponse> loginAdmin(@Valid @RequestBody LoginRequest request,
+            HttpServletRequest httpRequest) {
+        rateLimit("admin-login", httpRequest, request.getEmail(), 20, 8, WINDOW_5_MIN);
         AuthResponse response = authService.loginAdmin(request);
         return ResponseEntity.ok(response);
     }
@@ -107,7 +146,9 @@ public class AuthController {
             @ApiResponse(responseCode = "401", description = "Codigo ou token invalido", content = @Content(schema = @Schema(implementation = MessageResponse.class))),
             @ApiResponse(responseCode = "429", description = "Muitas tentativas", content = @Content(schema = @Schema(implementation = MessageResponse.class)))
     })
-    public ResponseEntity<AuthResponse> verifyTwoFactor(@Valid @RequestBody TwoFactorVerifyRequest request) {
+    public ResponseEntity<AuthResponse> verifyTwoFactor(@Valid @RequestBody TwoFactorVerifyRequest request,
+            HttpServletRequest httpRequest) {
+        rateLimit("2fa", httpRequest, null, 30, 0, WINDOW_5_MIN);
         AuthResponse response = authService.verifyTwoFactorChallenge(request.getChallengeToken(), request.getCode());
         return ResponseEntity.ok(response);
     }
@@ -131,7 +172,9 @@ public class AuthController {
             @ApiResponse(responseCode = "200", description = "E-mail verificado com sucesso", content = @Content(schema = @Schema(implementation = AuthResponse.class))),
             @ApiResponse(responseCode = "400", description = "Codigo invalido ou expirado", content = @Content(schema = @Schema(implementation = MessageResponse.class)))
     })
-    public ResponseEntity<AuthResponse> verifyEmail(@Valid @RequestBody VerifyEmailRequest request) {
+    public ResponseEntity<AuthResponse> verifyEmail(@Valid @RequestBody VerifyEmailRequest request,
+            HttpServletRequest httpRequest) {
+        rateLimit("verify-email", httpRequest, request.getEmail(), 40, 15, WINDOW_10_MIN);
         AuthResponse response = authService.verifyEmail(request.getEmail(), request.getCode());
         return ResponseEntity.ok(response);
     }
@@ -141,7 +184,9 @@ public class AuthController {
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Codigo reenviado com sucesso", content = @Content(schema = @Schema(implementation = MessageResponse.class)))
     })
-    public ResponseEntity<MessageResponse> resendVerification(@RequestParam String email) {
+    public ResponseEntity<MessageResponse> resendVerification(@RequestParam String email,
+            HttpServletRequest httpRequest) {
+        rateLimit("resend-verify", httpRequest, email, 15, 3, WINDOW_10_MIN);
         authService.resendVerificationCode(email);
         return ResponseEntity.ok(new MessageResponse("Codigo de verificacao reenviado"));
     }
@@ -151,7 +196,9 @@ public class AuthController {
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Codigo de recuperacao enviado", content = @Content(schema = @Schema(implementation = MessageResponse.class)))
     })
-    public ResponseEntity<MessageResponse> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+    public ResponseEntity<MessageResponse> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request,
+            HttpServletRequest httpRequest) {
+        rateLimit("forgot", httpRequest, request.getEmail(), 15, 3, WINDOW_10_MIN);
         authService.forgotPassword(request.getEmail());
         return ResponseEntity.ok(new MessageResponse("Se o e-mail estiver cadastrado, voce recebera um codigo de recuperacao"));
     }
@@ -163,7 +210,9 @@ public class AuthController {
             @ApiResponse(responseCode = "400", description = "Codigo invalido ou expirado", content = @Content(schema = @Schema(implementation = MessageResponse.class))),
             @ApiResponse(responseCode = "429", description = "Muitas tentativas", content = @Content(schema = @Schema(implementation = MessageResponse.class)))
     })
-    public ResponseEntity<MessageResponse> verifyResetCode(@Valid @RequestBody VerifyResetPasswordCodeRequest request) {
+    public ResponseEntity<MessageResponse> verifyResetCode(@Valid @RequestBody VerifyResetPasswordCodeRequest request,
+            HttpServletRequest httpRequest) {
+        rateLimit("verify-reset", httpRequest, request.getEmail(), 40, 15, WINDOW_10_MIN);
         authService.verifyResetPasswordCode(request.getEmail(), request.getCode());
         return ResponseEntity.ok(new MessageResponse("Codigo validado com sucesso"));
     }
@@ -188,7 +237,9 @@ public class AuthController {
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Codigo reenviado com sucesso", content = @Content(schema = @Schema(implementation = MessageResponse.class)))
     })
-    public ResponseEntity<MessageResponse> resendResetCode(@RequestParam String email) {
+    public ResponseEntity<MessageResponse> resendResetCode(@RequestParam String email,
+            HttpServletRequest httpRequest) {
+        rateLimit("resend-reset", httpRequest, email, 15, 3, WINDOW_10_MIN);
         authService.forgotPassword(email);
         return ResponseEntity.ok(new MessageResponse("Codigo de recuperacao reenviado"));
     }

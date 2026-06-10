@@ -237,9 +237,21 @@ public class AuditLogger {
     public String extractIp(HttpServletRequest request) {
         String xff = request.getHeader("X-Forwarded-For");
         if (xff != null && !xff.isBlank()) {
-            return xff.split(",")[0].trim();
+            String candidate = xff.split(",")[0].trim();
+            // L5: só aceita o valor do X-Forwarded-For se for um IP sintaticamente válido,
+            // evitando injeção de texto arbitrário no log de auditoria.
+            if (isValidIp(candidate)) {
+                return candidate;
+            }
         }
         return request.getRemoteAddr();
+    }
+
+    private boolean isValidIp(String value) {
+        if (value == null || value.isBlank() || value.length() > 45) {
+            return false;
+        }
+        return value.matches("^[0-9A-Fa-f:.]+$");
     }
 
     public String serializePayload(Object payload) {

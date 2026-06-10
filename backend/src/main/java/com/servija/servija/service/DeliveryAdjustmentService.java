@@ -3,6 +3,7 @@ package com.servija.servija.service;
 import com.servija.servija.dto.AdjustmentStatusUpdate;
 import com.servija.servija.dto.DeliveryAdjustmentRequest;
 import com.servija.servija.dto.DeliveryAdjustmentResponse;
+import com.servija.servija.exception.ResourceNotFoundException;
 import com.servija.servija.model.DeliveryAdjustment;
 import com.servija.servija.model.ServiceRequest;
 import com.servija.servija.model.ServiceRequestHistory;
@@ -93,7 +94,10 @@ public class DeliveryAdjustmentService {
     }
 
     @Transactional(readOnly = true)
-    public List<DeliveryAdjustmentResponse> getAdjustmentsByServiceRequest(Long serviceRequestId) {
+    public List<DeliveryAdjustmentResponse> getAdjustmentsByServiceRequest(Long serviceRequestId, String userEmail) {
+        ServiceRequest serviceRequest = serviceRequestRepository.findById(serviceRequestId)
+                .orElseThrow(() -> new ResourceNotFoundException("Solicitação não encontrada"));
+        assertParticipant(serviceRequest, userEmail);
         return adjustmentRepository.findByServiceRequestIdOrderByCreatedAtDesc(serviceRequestId)
                 .stream()
                 .map(this::toResponse)
@@ -117,10 +121,22 @@ public class DeliveryAdjustmentService {
     }
 
     @Transactional(readOnly = true)
-    public DeliveryAdjustmentResponse getById(Long adjustmentId) {
+    public DeliveryAdjustmentResponse getById(Long adjustmentId, String userEmail) {
         DeliveryAdjustment adjustment = adjustmentRepository.findById(adjustmentId)
-                .orElseThrow(() -> new RuntimeException("Ajuste não encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Ajuste não encontrado"));
+        assertParticipant(adjustment.getServiceRequest(), userEmail);
         return toResponse(adjustment);
+    }
+
+    // M3: leitura de ajustes exige que o solicitante seja parte da solicitação.
+    private void assertParticipant(ServiceRequest serviceRequest, String email) {
+        boolean isContractor = serviceRequest.getContractor() != null
+                && serviceRequest.getContractor().getEmail().equals(email);
+        boolean isFreelancer = serviceRequest.getFreelancer() != null
+                && serviceRequest.getFreelancer().getEmail().equals(email);
+        if (!isContractor && !isFreelancer) {
+            throw new ResourceNotFoundException("Ajuste não encontrado");
+        }
     }
 
     @Transactional

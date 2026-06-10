@@ -67,7 +67,8 @@ public class ServiceRequestController {
     @Operation(summary = "Obter detalhes da solicitação", description = "Retorna os detalhes de uma solicitação específica")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<ServiceRequestResponse> getById(@PathVariable Long id) {
-        return ResponseEntity.ok(serviceRequestService.getById(id));
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        return ResponseEntity.ok(serviceRequestService.getById(id, authentication.getName()));
     }
 
     @PatchMapping("/{id}/status")
@@ -167,6 +168,8 @@ public class ServiceRequestController {
     @Operation(summary = "Obter histórico de ações", description = "Retorna o histórico de ações realizadas em uma solicitação")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<List<ServiceRequestHistoryResponse>> getHistory(@PathVariable Long id) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        serviceRequestService.assertParticipant(id, authentication.getName());
         return ResponseEntity.ok(historyService.getHistory(id));
     }
 
@@ -183,7 +186,8 @@ public class ServiceRequestController {
     @Operation(summary = "Excluir solicitação", description = "Exclui uma solicitação de orçamento")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
-        serviceRequestService.delete(id);
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        serviceRequestService.delete(id, authentication.getName());
         return ResponseEntity.noContent().build();
     }
 }

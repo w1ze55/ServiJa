@@ -1,7 +1,11 @@
 import { ref, onUnmounted } from 'vue';
 import { Client } from '@stomp/stompjs';
-import SockJS from 'sockjs-client';
 import type { MessageDTO, ReadReceiptDTO } from '@/api/services/chatService';
+import {
+  createSockJsFactory,
+  describeSockJsCandidate,
+  getStompConnectHeaders,
+} from '@/utils/websocket';
 
 export function useChatWebSocket() {
   const client = ref<Client | null>(null);
@@ -10,17 +14,20 @@ export function useChatWebSocket() {
   const onReadReceipt = ref<((receipt: ReadReceiptDTO) => void) | null>(null);
 
   const connect = (conversationId: string) => {
-    if (client.value?.connected) return;
+    if (client.value?.connected || client.value?.active) return;
 
-    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+    const socketFactory = createSockJsFactory();
+    let hasConnected = false;
     const stompClient = new Client({
-      webSocketFactory: () => new SockJS(`${apiUrl}/ws`),
-      reconnectDelay: 5000,
+      webSocketFactory: socketFactory.webSocketFactory,
+      connectHeaders: getStompConnectHeaders(),
+      reconnectDelay: 1000,
       heartbeatIncoming: 4000,
       heartbeatOutgoing: 4000,
     });
 
     stompClient.onConnect = () => {
+      hasConnected = true;
       connected.value = true;
       stompClient.subscribe(`/topic/chat/${conversationId}`, (frame) => {
         try {
@@ -42,6 +49,18 @@ export function useChatWebSocket() {
 
     stompClient.onWebSocketClose = () => {
       connected.value = false;
+      if (hasConnected) {
+        return;
+      }
+
+      const failedCandidate = socketFactory.getCurrentCandidate();
+      if (!socketFactory.advanceCandidate()) {
+        return;
+      }
+
+      console.warn(
+        `[chat-ws] Falha ao conectar via ${describeSockJsCandidate(failedCandidate)}. Tentando ${describeSockJsCandidate(socketFactory.getCurrentCandidate())}.`
+      );
     };
 
     stompClient.activate();

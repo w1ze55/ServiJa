@@ -121,7 +121,7 @@ class FreelancerWalletServiceTest {
         @Test
         @DisplayName("deve deduzir saldo disponível")
         void shouldDeductBalance() {
-            when(walletRepository.findByUser(freelancer)).thenReturn(Optional.of(wallet));
+            when(walletRepository.findByUserIdForUpdate(freelancer.getId())).thenReturn(Optional.of(wallet));
             BigDecimal amount = new BigDecimal("300.00");
 
             walletService.deductAvailableBalance(freelancer, amount);
@@ -132,7 +132,7 @@ class FreelancerWalletServiceTest {
         @Test
         @DisplayName("deve lançar exceção se saldo insuficiente")
         void shouldThrowIfInsufficientBalance() {
-            when(walletRepository.findByUser(freelancer)).thenReturn(Optional.of(wallet));
+            when(walletRepository.findByUserIdForUpdate(freelancer.getId())).thenReturn(Optional.of(wallet));
             BigDecimal amount = new BigDecimal("2000.00"); // Mais que o disponível (1000)
 
             assertThatThrownBy(() -> walletService.deductAvailableBalance(freelancer, amount))

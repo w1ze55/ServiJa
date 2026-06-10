@@ -5,6 +5,7 @@ import {
   Download,
   Upload,
   Image as ImageIcon,
+  Volume2,
   Film,
   FileArchive,
   FileCode,
@@ -43,6 +44,13 @@ const getFileIcon = (fileName: string, mimeType?: string) => {
   
   if (mimeType?.startsWith('image/') || ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(extension || '')) {
     return ImageIcon;
+  }
+  if (
+    mimeType === 'audio' ||
+    mimeType?.startsWith('audio/') ||
+    ['mp3', 'm4a', 'wav', 'ogg', 'webm', 'aac'].includes(extension || '')
+  ) {
+    return Volume2;
   }
   if (mimeType?.startsWith('video/') || ['mp4', 'webm', 'mov', 'avi'].includes(extension || '')) {
     return Film;

@@ -186,7 +186,8 @@ public class GlobalExceptionHandler {
                 .timestamp(LocalDateTime.now())
                 .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
                 .error("Internal Server Error")
-                .message("Ocorreu um erro interno no servidor: " + ex.getMessage())
+                // M4: não expor a mensagem interna da exceção ao cliente; detalhe vai só ao log.
+                .message("Ocorreu um erro interno no servidor.")
                 .build();
         log.error("Unhandled exception in request handler", ex);
         return new ResponseEntity<>(error, HttpStatus.INTERNAL_SERVER_ERROR);

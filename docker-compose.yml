@@ -79,8 +79,6 @@ services:
       GOOGLE_PROJECT_NAME: ${GOOGLE_PROJECT_NAME:-Servija}
       GOOGLE_PROJECT_ID: ${GOOGLE_PROJECT_ID}
       GOOGLE_PROJECT_NUMBER: ${GOOGLE_PROJECT_NUMBER}
-      # Perfil local lê MONGODB_URI_LOCAL (default = container "mongo"). Perfis prod/default leem MONGODB_URI (Atlas).
-      # NÃO definir SPRING_MONGODB_URI aqui: env vars desse formato sobrescrevem o property file e quebram o perfil local.
       MONGODB_URI_LOCAL: ${MONGODB_URI_LOCAL:-mongodb://mongo:27017/servija_chat}
       MONGODB_URI: ${MONGODB_URI:-mongodb://mongo:27017/servija_chat}
       SENTRY_DSN: ${SENTRY_DSN:-}

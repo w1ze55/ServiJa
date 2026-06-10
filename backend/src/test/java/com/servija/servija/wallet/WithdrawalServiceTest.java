@@ -67,6 +67,8 @@ class WithdrawalServiceTest {
                 .id(1L)
                 .email("freelancer@test.com")
                 .name("Joao Silva")
+                .emailVerified(true)
+                .cpf("12345678900")
                 .build();
 
         tedAccount = FreelancerBankAccount.builder()

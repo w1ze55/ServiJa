@@ -53,6 +53,29 @@ class FileStorageServiceTest {
     }
 
     @Test
+    @DisplayName("storeFile aceita audio suportado e preserva o content type")
+    void storeFileUploadsSupportedAudio() {
+        ReflectionTestUtils.setField(service, "bucketName", "servija-bucket");
+        ReflectionTestUtils.setField(service, "region", "sa-east-1");
+
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "gravacao.webm",
+                "audio/webm",
+                "audio".getBytes());
+
+        String url = service.storeFile(file);
+
+        assertThat(url)
+                .startsWith("https://servija-bucket.s3.sa-east-1.amazonaws.com/")
+                .endsWith(".webm");
+
+        ArgumentCaptor<PutObjectRequest> captor = ArgumentCaptor.forClass(PutObjectRequest.class);
+        verify(s3Client).putObject(captor.capture(), any(RequestBody.class));
+        assertThat(captor.getValue().contentType()).isEqualTo("audio/webm");
+    }
+
+    @Test
     @DisplayName("storeFile rejeita arquivo vazio")
     void storeFileRejectsEmptyFile() {
         MockMultipartFile file = new MockMultipartFile("file", "empty.txt", "text/plain", new byte[0]);

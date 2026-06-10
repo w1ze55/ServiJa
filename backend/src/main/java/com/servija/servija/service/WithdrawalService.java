@@ -48,6 +48,11 @@ public class WithdrawalService {
         User freelancer = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuario nao encontrado"));
 
+        // H11: exige verificação básica de identidade (e-mail confirmado) antes do saque.
+        if (!Boolean.TRUE.equals(freelancer.getEmailVerified())) {
+            throw new IllegalStateException("Verifique sua conta antes de solicitar saques");
+        }
+
         WithdrawalRequest.WithdrawalMethod withdrawalMethod = parseWithdrawalMethod(withdrawalMethodValue);
         FreelancerBankAccount bankAccount = null;
 
@@ -70,6 +75,18 @@ public class WithdrawalService {
         if (withdrawalMethod == WithdrawalRequest.WithdrawalMethod.PIX) {
             if (pixKey == null || pixKey.isBlank()) {
                 throw new IllegalArgumentException("Informe a chave PIX");
+            }
+
+            // M9: se a chave PIX for CPF/CNPJ, deve pertencer ao titular da conta.
+            // (Chaves e-mail/telefone/aleatória ainda dependem de um cadastro verificado
+            // de chaves — ver pendência de KYC completo.)
+            String keyType = pixKeyType != null ? pixKeyType.trim().toUpperCase() : "";
+            if (keyType.equals("CPF") || keyType.equals("CNPJ")) {
+                String providedDigits = pixKey.replaceAll("\\D", "");
+                String ownerDigits = freelancer.getCpf() != null ? freelancer.getCpf().replaceAll("\\D", "") : "";
+                if (ownerDigits.isEmpty() || !providedDigits.equals(ownerDigits)) {
+                    throw new IllegalArgumentException("A chave PIX (CPF/CNPJ) deve pertencer ao titular da conta");
+                }
             }
         } else {
             if (bankAccountId == null) {
