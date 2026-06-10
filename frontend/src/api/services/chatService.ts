@@ -21,7 +21,7 @@ export interface MessageDTO {
   conversationId: string;
   senderId: string;
   senderType: 'contractor' | 'provider';
-  type: 'text' | 'image' | 'file' | 'system';
+  type: 'text' | 'image' | 'file' | 'audio' | 'system';
   content: string;
   attachmentUrl: string | null;
   attachmentName: string | null;
@@ -69,7 +69,7 @@ export const chatService = {
   async sendMessage(
     conversationId: string,
     content: string,
-    type: 'text' | 'image' | 'file' = 'text',
+    type: 'text' | 'image' | 'file' | 'audio' = 'text',
     attachmentUrl?: string,
     attachmentName?: string
   ): Promise<MessageDTO> {

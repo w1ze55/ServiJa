@@ -7,6 +7,11 @@ import type { ConversationDTO, MessageDTO } from '@/api/services/chatService';
 import { useChatWebSocket } from '@/composables/useChatWebSocket';
 import { uploadFiles } from '@/api/uploadService';
 import { toast } from '@/utils/toast';
+import {
+  getAttachmentPlaceholder,
+  resolveAttachmentKindFromFile,
+  resolveChatMessageType,
+} from '@/utils/chatAttachments';
 
 interface Props {
   serviceRequestId: number;
@@ -80,15 +85,26 @@ function resolveAttachmentName(msg: MessageDTO) {
 
 function toDisplay(msg: MessageDTO): ChatMessage {
   const isMe = sameEmail(msg.senderId, userEmail.value);
+  const messageType = resolveChatMessageType(msg.type, msg.attachmentUrl);
+
   return {
     id: msg.id,
     sender: msg.senderType === 'contractor' ? 'client' : 'freelancer',
     isOwn: isMe,
-    senderName: isMe ? 'Você' : displayName(msg.senderId),
+    senderName: isMe ? 'Voce' : displayName(msg.senderId),
+    type: messageType,
     message: msg.content,
     timestamp: msg.sentAt,
     attachments: msg.attachmentUrl
-      ? [{ id: msg.id, name: resolveAttachmentName(msg), url: msg.attachmentUrl, size: '' }]
+      ? [
+          {
+            id: msg.id,
+            name: resolveAttachmentName(msg),
+            url: msg.attachmentUrl,
+            size: '',
+            type: messageType,
+          },
+        ]
       : undefined,
   };
 }
@@ -102,15 +118,15 @@ onMounted(async () => {
     chatService.markAsRead(conversation.value.id).catch(() => {});
 
     onMessage.value = (msg: MessageDTO) => {
-      if (messages.value.some((m) => m.id === msg.id)) return;
+      if (messages.value.some((message) => message.id === msg.id)) return;
       messages.value.push(toDisplay(msg));
       chatService.markAsRead(conversation.value!.id).catch(() => {});
     };
     connect(conversation.value.id);
   } catch (e: any) {
-    const msg = e?.response?.data?.message || e?.message || '';
-    if (msg.toLowerCase().includes('habilitado')) {
-      error.value = 'O chat ainda não está disponível. Aguarde a confirmação do pagamento.';
+    const message = e?.response?.data?.message || e?.message || '';
+    if (message.toLowerCase().includes('habilitado')) {
+      error.value = 'O chat ainda não está disponível. Aguarde a confirmacao do pagamento.';
     } else {
       error.value = 'Erro ao carregar o chat.';
     }
@@ -127,23 +143,24 @@ async function handleSend(messageText: string, attachments: File[]) {
   try {
     if (messageText.trim()) {
       const msg = await chatService.sendMessage(conversation.value.id, messageText.trim());
-      if (!messages.value.some((m) => m.id === msg.id)) {
+      if (!messages.value.some((message) => message.id === msg.id)) {
         messages.value.push(toDisplay(msg));
       }
     }
     if (attachments.length > 0) {
       const urls = await uploadFiles(attachments);
       for (const [index, url] of urls.entries()) {
-        const fileName = attachments[index]?.name || 'Anexo';
-        const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(url);
+        const file = attachments[index];
+        const fileName = file?.name || 'Anexo';
+        const attachmentType = file ? resolveAttachmentKindFromFile(file) : 'file';
         const msg = await chatService.sendMessage(
           conversation.value.id,
-          isImage ? 'Imagem' : 'Arquivo',
-          isImage ? 'image' : 'file',
+          getAttachmentPlaceholder(attachmentType),
+          attachmentType,
           url,
           fileName
         );
-        if (!messages.value.some((m) => m.id === msg.id)) {
+        if (!messages.value.some((message) => message.id === msg.id)) {
           messages.value.push(toDisplay(msg));
         }
       }
@@ -158,12 +175,12 @@ async function handleSend(messageText: string, attachments: File[]) {
 
 <template>
   <div class="flex h-[32rem] min-h-[32rem] flex-col">
-    <div v-if="loading" class="flex-1 flex items-center justify-center text-gray-400 py-16">
+    <div v-if="loading" class="flex flex-1 items-center justify-center py-16 text-gray-400">
       Carregando chat...
     </div>
     <div
       v-else-if="error"
-      class="flex-1 flex items-center justify-center rounded-xl border border-dashed border-gray-200 bg-gray-50 p-10 text-center text-sm text-gray-500"
+      class="flex flex-1 items-center justify-center rounded-xl border border-dashed border-gray-200 bg-gray-50 p-10 text-center text-sm text-gray-500"
     >
       {{ error }}
     </div>

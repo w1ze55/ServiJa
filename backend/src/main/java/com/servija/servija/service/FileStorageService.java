@@ -33,6 +33,15 @@ public class FileStorageService {
             "image/png",
             "image/gif",
             "image/webp",
+            "audio/mpeg",
+            "audio/mp3",
+            "audio/mp4",
+            "audio/x-m4a",
+            "audio/wav",
+            "audio/x-wav",
+            "audio/ogg",
+            "audio/webm",
+            "audio/aac",
             "application/pdf",
             "application/msword",
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -48,6 +57,12 @@ public class FileStorageService {
             ".png",
             ".gif",
             ".webp",
+            ".mp3",
+            ".m4a",
+            ".wav",
+            ".ogg",
+            ".webm",
+            ".aac",
             ".pdf",
             ".doc",
             ".docx",
@@ -201,7 +216,7 @@ public class FileStorageService {
         String extension = getFileExtension(file.getOriginalFilename()).toLowerCase();
         if (!ALLOWED_EXTENSIONS.contains(extension)) {
             throw new RuntimeException(
-                    "Tipo de arquivo nao permitido. Permitidos: JPEG, PNG, GIF, WEBP, PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX e TXT");
+                    "Tipo de arquivo nao permitido. Permitidos: JPEG, PNG, GIF, WEBP, MP3, M4A, WAV, OGG, WEBM, AAC, PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX e TXT");
         }
     }
 
