@@ -7,6 +7,7 @@ import AvatarImage from '@/components/ui/avatar-image.vue';
 import AvatarFallback from '@/components/ui/avatar-fallback.vue';
 import type { ChatMessage } from '@/components/shared/ChatBox.vue';
 import FileAttachment from '@/components/shared/FileAttachment.vue';
+import ChatAudioPlayer from '@/components/shared/ChatAudioPlayer.vue';
 import Textarea from '@/components/ui/textarea.vue';
 import Button from '@/components/ui/button.vue';
 import { chatService } from '@/api/services/chatService';
@@ -79,7 +80,32 @@ const recorderState = ref<'idle' | 'recording' | 'stopping' | 'error'>('idle');
 const recordingError = ref('');
 const activeRecorder = ref<MediaRecorder | null>(null);
 const activeRecordingStream = ref<MediaStream | null>(null);
+const pendingSend = ref(false);
+const recordingSeconds = ref(0);
+let recordingTimer: ReturnType<typeof setInterval> | null = null;
 const audioRecordingSupported = computed(() => isAudioRecordingSupported());
+
+function startRecordingTimer() {
+  recordingSeconds.value = 0;
+  stopRecordingTimer();
+  recordingTimer = setInterval(() => {
+    recordingSeconds.value += 1;
+  }, 1000);
+}
+
+function stopRecordingTimer() {
+  if (recordingTimer) {
+    clearInterval(recordingTimer);
+    recordingTimer = null;
+  }
+}
+
+const recordingElapsed = computed(() => {
+  const total = recordingSeconds.value;
+  const minutes = Math.floor(total / 60);
+  const seconds = total % 60;
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+});
 const MAX_TOTAL_ATTACHMENT_SIZE = 25 * 1024 * 1024;
 
 // Lightbox
@@ -539,6 +565,7 @@ function onKeydown(e: KeyboardEvent) {
 
 onBeforeUnmount(() => {
   for (const url of Object.values(attachmentPreviews.value)) URL.revokeObjectURL(url);
+  stopRecordingTimer();
   const recorder = activeRecorder.value;
   if (recorder && recorder.state !== 'inactive') {
     recorder.ondataavailable = null;
@@ -652,6 +679,8 @@ function stopRecordingStream() {
 }
 
 function notifyRecordingError(message: string, scope?: string, error?: unknown) {
+  stopRecordingTimer();
+  pendingSend.value = false;
   stopRecordingStream();
   activeRecorder.value = null;
   recorderState.value = 'idle';
@@ -732,6 +761,7 @@ async function startAudioRecording() {
   };
 
   recorder.onstop = () => {
+    stopRecordingTimer();
     stopRecordingStream();
     activeRecorder.value = null;
 
@@ -744,10 +774,18 @@ async function startAudioRecording() {
     }
 
     recorderState.value = 'idle';
+
+    // Envio solicitado durante a gravacao: agora que o audio ja foi anexado,
+    // dispara o envio real (o proprio handleSend valida o conteudo).
+    if (pendingSend.value) {
+      pendingSend.value = false;
+      nextTick(handleSend);
+    }
   };
 
   try {
     recorder.start();
+    startRecordingTimer();
     recorderState.value = 'recording';
   } catch (error) {
     notifyRecordingError(
@@ -769,6 +807,16 @@ function stopAudioRecording() {
 
 async function handleSend() {
   if (isSending.value || !activeConversation.value) return;
+
+  // Se estiver gravando, finaliza a gravacao e o envio acontece apos o onstop
+  // anexar o audio (sem precisar parar manualmente antes).
+  if (recorderState.value === 'recording') {
+    pendingSend.value = true;
+    stopAudioRecording();
+    return;
+  }
+  if (recorderState.value === 'stopping') return;
+
   if (!newMessage.value.trim() && messageAttachments.value.length === 0) {
     toast.error('Digite uma mensagem ou adicione um anexo');
     return;
@@ -814,6 +862,16 @@ async function handleSend() {
 
 function onComposerKeydown(e: KeyboardEvent) {
   if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    handleSend();
+  }
+}
+
+// Enquanto grava, o botao de microfone mantem o foco; sem isto, o Enter
+// dispararia o "click" nativo do botao (parar) em vez de enviar o audio.
+function onRecordButtonKeydown(e: KeyboardEvent) {
+  if (e.key !== 'Enter' || e.shiftKey || e.isComposing) return;
+  if (recorderState.value === 'recording') {
     e.preventDefault();
     handleSend();
   }
@@ -1160,12 +1218,10 @@ const handleSearch = (query: string) => router.push({ path: '/search', query: { 
                             loading="lazy"
                           />
                         </button>
-                        <audio
+                        <ChatAudioPlayer
                           v-else-if="msg.type === 'audio' || isAudioUrl(att.url)"
                           :src="att.url"
-                          controls
-                          preload="none"
-                          class="block w-full max-w-[260px] rounded-lg"
+                          :is-own="msg.isOwn"
                         />
                         <FileAttachment
                           v-else
@@ -1222,8 +1278,11 @@ const handleSearch = (query: string) => router.push({ path: '/search', query: { 
                   v-if="recorderState === 'recording' || recorderState === 'stopping'"
                   class="flex items-center justify-between rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-700"
                 >
-                  <span v-if="recorderState === 'recording'">Gravando audio...</span>
-                  <span v-else-if="recorderState === 'stopping'">Finalizando audio...</span>
+                  <span v-if="recorderState === 'recording'" class="flex items-center gap-2">
+                    <span class="recording-dot" />
+                    Gravando áudio... {{ recordingElapsed }}
+                  </span>
+                  <span v-else-if="recorderState === 'stopping'">Finalizando áudio...</span>
                   <Button
                     v-if="recorderState === 'recording'"
                     type="button"
@@ -1312,13 +1371,14 @@ const handleSearch = (query: string) => router.push({ path: '/search', query: { 
                     :title="
                       audioRecordingSupported
                         ? recorderState === 'recording'
-                          ? 'Parar gravacao'
-                          : 'Gravar audio'
-                        : 'Gravacao de audio indisponivel neste navegador'
+                          ? 'Parar gravação'
+                          : 'Gravar áudio'
+                        : 'Gravação de áudio indisponível neste navegador'
                     "
                     variant="outline"
                     size="icon"
                     @click="recorderState === 'recording' ? stopAudioRecording() : startAudioRecording()"
+                    @keydown="onRecordButtonKeydown"
                   >
                     <Square
                       v-if="recorderState === 'recording'"
@@ -1329,11 +1389,15 @@ const handleSearch = (query: string) => router.push({ path: '/search', query: { 
                   <Button
                     @click="handleSend"
                     :disabled="
-                      (!newMessage.trim() && messageAttachments.length === 0) || isSending
+                      (!newMessage.trim() &&
+                        messageAttachments.length === 0 &&
+                        recorderState !== 'recording') ||
+                      isSending ||
+                      recorderState === 'stopping'
                     "
                     variant="default"
                     size="icon"
-                    title="Enviar"
+                    :title="recorderState === 'recording' ? 'Enviar áudio' : 'Enviar'"
                   >
                     <Send class="h-4 w-4" />
                   </Button>
@@ -1419,3 +1483,26 @@ const handleSearch = (query: string) => router.push({ path: '/search', query: { 
     </div>
   </MainLayout>
 </template>
+
+<style scoped>
+.recording-dot {
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 9999px;
+  background-color: #dc2626;
+  animation: recording-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes recording-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(0.7);
+  }
+}
+</style>

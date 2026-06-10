@@ -4,6 +4,7 @@ import { Send, Paperclip, X, Lock, MessageSquare, Mic, Square } from 'lucide-vue
 import Button from '../ui/button.vue';
 import Textarea from '../ui/textarea.vue';
 import FileAttachment from '../shared/FileAttachment.vue';
+import ChatAudioPlayer from '../shared/ChatAudioPlayer.vue';
 import { toast } from '@/utils/toast';
 import {
   CHAT_ATTACHMENT_ACCEPT,
@@ -82,6 +83,31 @@ const recorderState = ref<'idle' | 'recording' | 'stopping' | 'error'>('idle');
 const recordingError = ref('');
 const activeRecorder = ref<MediaRecorder | null>(null);
 const activeRecordingStream = ref<MediaStream | null>(null);
+const pendingSend = ref(false);
+const recordingSeconds = ref(0);
+let recordingTimer: ReturnType<typeof setInterval> | null = null;
+
+function startRecordingTimer() {
+  recordingSeconds.value = 0;
+  stopRecordingTimer();
+  recordingTimer = setInterval(() => {
+    recordingSeconds.value += 1;
+  }, 1000);
+}
+
+function stopRecordingTimer() {
+  if (recordingTimer) {
+    clearInterval(recordingTimer);
+    recordingTimer = null;
+  }
+}
+
+const recordingElapsed = computed(() => {
+  const total = recordingSeconds.value;
+  const minutes = Math.floor(total / 60);
+  const seconds = total % 60;
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+});
 
 const audioRecordingSupported = computed(() => isAudioRecordingSupported());
 
@@ -128,6 +154,18 @@ const removeAttachment = (index: number) => {
 };
 
 const send = () => {
+  // Se estiver gravando, finaliza a gravacao e o envio acontece apos o onstop
+  // anexar o audio (sem precisar parar manualmente antes).
+  if (recorderState.value === 'recording') {
+    pendingSend.value = true;
+    stopAudioRecording();
+    return;
+  }
+
+  if (recorderState.value === 'stopping') {
+    return;
+  }
+
   const message = newMessage.value.trim();
 
   if (!message && messageAttachments.value.length === 0) {
@@ -153,6 +191,16 @@ const handleComposerKeydown = (event: KeyboardEvent) => {
   }
 
   send();
+};
+
+// Enquanto grava, o botao de microfone mantem o foco; sem isto, o Enter
+// dispararia o "click" nativo do botao (parar) em vez de enviar o audio.
+const onRecordButtonKeydown = (event: KeyboardEvent) => {
+  if (event.key !== 'Enter' || event.shiftKey || event.isComposing) return;
+  if (recorderState.value === 'recording') {
+    event.preventDefault();
+    send();
+  }
 };
 
 const formatDate = (dateString: string) => {
@@ -204,14 +252,17 @@ async function startAudioRecording() {
     };
 
     recorder.onerror = () => {
+      stopRecordingTimer();
+      pendingSend.value = false;
       recorderState.value = 'error';
-      recordingError.value = 'Nao foi possivel gravar o audio.';
+      recordingError.value = 'Não foi possível gravar o áudio.';
       toast.error(recordingError.value);
       stopRecordingStream();
       activeRecorder.value = null;
     };
 
     recorder.onstop = () => {
+      stopRecordingTimer();
       stopRecordingStream();
       activeRecorder.value = null;
 
@@ -226,18 +277,28 @@ async function startAudioRecording() {
       if (recorderState.value !== 'error') {
         recorderState.value = 'idle';
       }
+
+      // Envio solicitado durante a gravacao: agora que o audio ja foi anexado,
+      // dispara o envio real (o proprio send() valida o conteudo).
+      if (pendingSend.value) {
+        pendingSend.value = false;
+        nextTick(send);
+      }
     };
 
     recorder.start();
+    startRecordingTimer();
     recorderState.value = 'recording';
   } catch (error: any) {
+    stopRecordingTimer();
+    pendingSend.value = false;
     stopRecordingStream();
     activeRecorder.value = null;
     recorderState.value = 'error';
     recordingError.value =
       error?.name === 'NotAllowedError'
-        ? 'Permissao de microfone negada.'
-        : 'Nao foi possivel acessar o microfone.';
+        ? 'Permissão de microfone negada.'
+        : 'Não foi possível acessar o microfone.';
     toast.error(recordingError.value);
   }
 }
@@ -259,6 +320,7 @@ onUnmounted(() => {
     recorder.onerror = null;
     recorder.stop();
   }
+  stopRecordingTimer();
   stopRecordingStream();
 });
 </script>
@@ -301,12 +363,10 @@ onUnmounted(() => {
           </p>
           <div v-if="msg.attachments && msg.attachments.length > 0" class="mt-3 space-y-2">
             <template v-for="att in msg.attachments" :key="att.id">
-              <audio
+              <ChatAudioPlayer
                 v-if="msg.type === 'audio'"
                 :src="att.url"
-                controls
-                preload="none"
-                class="block w-full max-w-[18rem] rounded-lg"
+                :is-own="msg.isOwn"
               />
               <FileAttachment
                 v-else
@@ -333,8 +393,11 @@ onUnmounted(() => {
             : 'border-blue-200 bg-blue-50 text-blue-700'
         "
       >
-        <span v-if="recorderState === 'recording'">Gravando audio...</span>
-        <span v-else-if="recorderState === 'stopping'">Finalizando audio...</span>
+        <span v-if="recorderState === 'recording'" class="flex items-center gap-2">
+          <span class="recording-dot" />
+          Gravando áudio... {{ recordingElapsed }}
+        </span>
+        <span v-else-if="recorderState === 'stopping'">Finalizando áudio...</span>
         <span v-else>{{ recordingError }}</span>
         <Button
           v-if="recorderState === 'recording'"
@@ -378,7 +441,14 @@ onUnmounted(() => {
         <div class="flex flex-col gap-2">
           <Button
             @click="send"
-            :disabled="(!newMessage.trim() && messageAttachments.length === 0) || isSending"
+            :disabled="
+              (!newMessage.trim() &&
+                messageAttachments.length === 0 &&
+                recorderState !== 'recording') ||
+              isSending ||
+              recorderState === 'stopping'
+            "
+            :title="recorderState === 'recording' ? 'Enviar áudio' : 'Enviar mensagem'"
             variant="default"
           >
             <Send class="h-4 w-4" />
@@ -410,13 +480,14 @@ onUnmounted(() => {
             :title="
               audioRecordingSupported
                 ? recorderState === 'recording'
-                  ? 'Parar gravacao'
-                  : 'Gravar audio'
-                : 'Gravacao de audio indisponivel neste navegador'
+                  ? 'Parar gravação'
+                  : 'Gravar áudio'
+                : 'Gravação de áudio indisponível neste navegador'
             "
             variant="outline"
             size="icon"
             @click="recorderState === 'recording' ? stopAudioRecording() : startAudioRecording()"
+            @keydown="onRecordButtonKeydown"
           >
             <Square v-if="recorderState === 'recording'" class="h-4 w-4 fill-current text-red-600" />
             <Mic v-else class="h-4 w-4" />
@@ -435,3 +506,26 @@ onUnmounted(() => {
     </div>
   </div>
 </template>
+
+<style scoped>
+.recording-dot {
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 9999px;
+  background-color: #dc2626;
+  animation: recording-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes recording-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(0.7);
+  }
+}
+</style>
