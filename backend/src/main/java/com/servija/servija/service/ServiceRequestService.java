@@ -351,10 +351,26 @@ public class ServiceRequestService {
                 .toList();
     }
 
-    public ServiceRequestResponse getById(Long id) {
+    // M3: leitura exige que o solicitante seja parte da solicitação.
+    public ServiceRequestResponse getById(Long id, String userEmail) {
+        return toResponse(loadAsParticipant(id, userEmail));
+    }
+
+    public void assertParticipant(Long id, String userEmail) {
+        loadAsParticipant(id, userEmail);
+    }
+
+    private ServiceRequest loadAsParticipant(Long id, String userEmail) {
         ServiceRequest request = serviceRequestRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Service request not found"));
-        return toResponse(request);
+                .orElseThrow(() -> new ResourceNotFoundException("Solicitação não encontrada"));
+        boolean isContractor = request.getContractor() != null
+                && request.getContractor().getEmail().equals(userEmail);
+        boolean isFreelancer = request.getFreelancer() != null
+                && request.getFreelancer().getEmail().equals(userEmail);
+        if (!isContractor && !isFreelancer) {
+            throw new ResourceNotFoundException("Solicitação não encontrada");
+        }
+        return request;
     }
 
     @Transactional
