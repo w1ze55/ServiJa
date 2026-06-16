@@ -28,6 +28,7 @@ import {
 } from 'lucide-vue-next'
 import AdminLayout from '@/layouts/AdminLayout.vue'
 import Card from '@/components/ui/card.vue'
+import DatePicker from '@/components/ui/date-picker.vue'
 import EmptyState from '@/components/ui/empty-state.vue'
 import PageHeader from '@/components/ui/page-header.vue'
 import SectionHeader from '@/components/ui/section-header.vue'
@@ -430,19 +431,19 @@ onMounted(() => {
         <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div class="space-y-1">
             <label class="text-sm font-medium text-slate-700">De</label>
-            <input
+            <DatePicker
               v-model="store.customDateFrom"
-              type="date"
-              class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+              :max="store.customDateTo || undefined"
+              placeholder="Data inicial"
             />
           </div>
 
           <div class="space-y-1">
             <label class="text-sm font-medium text-slate-700">Até</label>
-            <input
+            <DatePicker
               v-model="store.customDateTo"
-              type="date"
-              class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+              :min="store.customDateFrom || undefined"
+              placeholder="Data final"
             />
           </div>
         </div>

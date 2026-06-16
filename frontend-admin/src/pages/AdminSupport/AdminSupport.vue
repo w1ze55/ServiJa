@@ -20,6 +20,7 @@ import {
   getSupportStatusLabel,
 } from '@/constants/support';
 import Select from '@/components/ui/select.vue';
+import DatePicker from '@/components/ui/date-picker.vue';
 import SelectContent from '@/components/ui/select-content.vue';
 import SelectItem from '@/components/ui/select-item.vue';
 import SelectTrigger from '@/components/ui/select-trigger.vue';
@@ -473,19 +474,19 @@ onMounted(() => {
         >
           <div class="space-y-1">
             <label class="text-sm font-medium text-slate-700">De</label>
-            <input
+            <DatePicker
               v-model="customDateFrom"
-              type="date"
-              class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+              :max="customDateTo || undefined"
+              placeholder="Data inicial"
             />
           </div>
 
           <div class="space-y-1">
             <label class="text-sm font-medium text-slate-700">Até</label>
-            <input
+            <DatePicker
               v-model="customDateTo"
-              type="date"
-              class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+              :min="customDateFrom || undefined"
+              placeholder="Data final"
             />
           </div>
         </div>

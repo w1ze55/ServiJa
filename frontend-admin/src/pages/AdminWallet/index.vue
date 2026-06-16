@@ -19,6 +19,7 @@ import {
 } from 'lucide-vue-next'
 import AdminLayout from '@/layouts/AdminLayout.vue'
 import Card from '@/components/ui/card.vue'
+import DatePicker from '@/components/ui/date-picker.vue'
 import DropdownMenu from '@/components/ui/dropdown-menu.vue'
 import DropdownMenuContent from '@/components/ui/dropdown-menu-content.vue'
 import DropdownMenuItem from '@/components/ui/dropdown-menu-item.vue'
@@ -81,8 +82,19 @@ const wallet = computed(() => store.wallet)
 const transactions = computed(() => store.transactions)
 const bankAccounts = computed(() => store.bankAccounts)
 const transactionsSummaryLabel = computed(() => {
-  const count = transactions.value.length
+  const count = store.totalElements
   return `${count} ${count === 1 ? 'transação' : 'transações'} no recorte selecionado.`
+})
+
+const visiblePageNumbers = computed(() => {
+  const pages = store.totalPages
+  const current = store.currentPage
+  return Array.from({ length: Math.min(5, pages) }, (_, index) => {
+    if (pages <= 5) return index + 1
+    if (current <= 3) return index + 1
+    if (current >= pages - 2) return pages - 4 + index
+    return current - 2 + index
+  })
 })
 
 const hasAccounts = computed(() => bankAccounts.value.length > 0)
@@ -648,11 +660,24 @@ const handleDownloadReport = async (format: 'PDF' | 'EXCEL') => {
 watch(
   [() => store.transactionType, () => store.timeFilter, () => store.customDateFrom, () => store.customDateTo],
   () => {
+    // Evita disparos com intervalo personalizado pela metade (apenas uma das datas preenchida)
+    if (store.timeFilter === 'Intervalo personalizado') {
+      const onlyOneFilled = Boolean(store.customDateFrom) !== Boolean(store.customDateTo)
+      if (onlyOneFilled) return
+    }
+
+    store.currentPage = 1
     store.loadTransactions().catch(() => {
       toast.error(store.transactionsErrorMessage || 'Não foi possível carregar o histórico.')
     })
   }
 )
+
+const handleGoToPage = (page: number) => {
+  Promise.resolve(store.goToPage(page)).catch(() => {
+    toast.error(store.transactionsErrorMessage || 'Não foi possível carregar o histórico.')
+  })
+}
 
 watch(newPixKeyType, (value) => {
   newPixKey.value = formatPixKeyValue(newPixKey.value, value)
@@ -892,18 +917,18 @@ onMounted(() => {
           >
             <div class="space-y-1">
               <label class="text-sm font-medium text-slate-700">De</label>
-              <input
+              <DatePicker
                 v-model="store.customDateFrom"
-                type="date"
-                class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                :max="store.customDateTo || undefined"
+                placeholder="Data inicial"
               />
             </div>
             <div class="space-y-1">
               <label class="text-sm font-medium text-slate-700">Até</label>
-              <input
+              <DatePicker
                 v-model="store.customDateTo"
-                type="date"
-                class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                :min="store.customDateFrom || undefined"
+                placeholder="Data final"
               />
             </div>
           </div>
@@ -977,6 +1002,40 @@ onMounted(() => {
                 {{ transaction.amount > 0 ? '+' : '' }}{{ formatCurrency(Math.abs(transaction.amount)) }}
               </p>
             </div>
+          </div>
+
+          <div v-if="store.totalPages > 1" class="mt-6 flex items-center justify-center gap-2">
+            <button
+              type="button"
+              class="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              :disabled="store.currentPage === 1 || store.isTransactionsLoading"
+              @click="handleGoToPage(store.currentPage - 1)"
+            >
+              Anterior
+            </button>
+
+            <button
+              v-for="pageNum in visiblePageNumbers"
+              :key="pageNum"
+              type="button"
+              class="min-w-[2.25rem] rounded-lg border px-3 py-1.5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50"
+              :class="store.currentPage === pageNum
+                ? 'border-slate-900 bg-slate-900 text-white'
+                : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'"
+              :disabled="store.isTransactionsLoading"
+              @click="handleGoToPage(pageNum)"
+            >
+              {{ pageNum }}
+            </button>
+
+            <button
+              type="button"
+              class="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              :disabled="store.currentPage === store.totalPages || store.isTransactionsLoading"
+              @click="handleGoToPage(store.currentPage + 1)"
+            >
+              Próxima
+            </button>
           </div>
         </Card>
       </template>

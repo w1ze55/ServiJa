@@ -17,11 +17,15 @@ const select = inject<{
 
 const isOpen = computed(() => select?.isOpen.value || false);
 const contentRef = ref<HTMLElement | null>(null);
-const position = ref({ top: '0px', left: '0px', minWidth: '0px' });
+const position = ref({ top: '0px', left: '0px', minWidth: '0px', maxHeight: '300px' });
+
+const VIEWPORT_MARGIN = 8;
+const MAX_DROPDOWN_HEIGHT = 300;
+const MIN_DROPDOWN_HEIGHT = 140;
 
 const classes = computed(() =>
   cn(
-    'relative z-[9999] max-h-[300px] min-w-[8rem] overflow-x-hidden overflow-y-auto rounded-lg border border-slate-200 bg-white text-slate-900 shadow-lg',
+    'relative z-[9999] min-w-[8rem] overflow-x-hidden overflow-y-auto rounded-lg border border-slate-200 bg-white text-slate-900 shadow-lg',
     props.class
   )
 );
@@ -32,22 +36,31 @@ const updatePosition = () => {
   const trigger = select.triggerRef.value;
   const triggerRect = trigger.getBoundingClientRect();
 
-  let top = triggerRect.bottom + 4;
+  const spaceBelow = window.innerHeight - triggerRect.bottom - VIEWPORT_MARGIN;
+  const spaceAbove = triggerRect.top - VIEWPORT_MARGIN;
+
+  // Abre para baixo por padrão; se não couber e houver mais espaço acima, abre para cima.
+  const openUp = spaceBelow < MIN_DROPDOWN_HEIGHT && spaceAbove > spaceBelow;
+  const available = Math.max(
+    MIN_DROPDOWN_HEIGHT,
+    Math.min(MAX_DROPDOWN_HEIGHT, openUp ? spaceAbove : spaceBelow)
+  );
+
+  const top = openUp ? triggerRect.top - 4 - available : triggerRect.bottom + 4;
+
   let left = triggerRect.left;
-
-  const spaceBelow = window.innerHeight - triggerRect.bottom;
-  if (spaceBelow < 200) {
-    top = triggerRect.top - 200;
-  }
-
   if (left + triggerRect.width > window.innerWidth) {
-    left = window.innerWidth - triggerRect.width - 8;
+    left = window.innerWidth - triggerRect.width - VIEWPORT_MARGIN;
+  }
+  if (left < VIEWPORT_MARGIN) {
+    left = VIEWPORT_MARGIN;
   }
 
   position.value = {
     top: `${top}px`,
     left: `${left}px`,
     minWidth: `${triggerRect.width}px`,
+    maxHeight: `${available}px`,
   };
 };
 
@@ -101,6 +114,7 @@ onUnmounted(() => {
         top: position.top,
         left: position.left,
         minWidth: position.minWidth,
+        maxHeight: position.maxHeight,
       }"
       v-bind="$attrs"
     >
