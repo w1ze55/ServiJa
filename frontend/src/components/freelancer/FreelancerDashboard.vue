@@ -41,6 +41,7 @@ import Card from '../ui/card.vue';
 import Badge from '../ui/badge.vue';
 import Button from '../ui/button.vue';
 import Input from '../ui/input.vue';
+import DatePicker from '../ui/date-picker.vue';
 import Select from '../ui/select.vue';
 import SelectContent from '../ui/select-content.vue';
 import SelectItem from '../ui/select-item.vue';
@@ -1054,17 +1055,19 @@ onUnmounted(() => {
       >
         <div class="space-y-1">
           <label class="text-sm font-medium text-[#435574]">De</label>
-          <Input
-            type="date"
+          <DatePicker
             :model-value="customDateFrom"
+            :max="customDateTo || undefined"
+            placeholder="Data inicial"
             @update:model-value="(value: string) => customDateFrom = value"
           />
         </div>
         <div class="space-y-1">
           <label class="text-sm font-medium text-[#435574]">Até</label>
-          <Input
-            type="date"
+          <DatePicker
             :model-value="customDateTo"
+            :min="customDateFrom || undefined"
+            placeholder="Data final"
             @update:model-value="(value: string) => customDateTo = value"
           />
         </div>

@@ -57,6 +57,7 @@ import SelectItem from '../ui/select-item.vue';
 import SelectTrigger from '../ui/select-trigger.vue';
 import SelectValue from '../ui/select-value.vue';
 import Input from '../ui/input.vue';
+import DatePicker from '../ui/date-picker.vue';
 import Label from '../ui/label.vue';
 import Avatar from '../ui/avatar.vue';
 import AvatarImage from '../ui/avatar-image.vue';
@@ -1584,10 +1585,10 @@ onMounted(() => {
               </div>
             </div>
             <div v-else>
-              <Input
-                type="date"
+              <DatePicker
                 v-model="quoteDeadlineDate"
                 :min="new Date().toISOString().split('T')[0]"
+                placeholder="Selecione a data"
                 class="w-full"
               />
             </div>

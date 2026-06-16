@@ -25,6 +25,7 @@ import DropdownMenu from '../ui/dropdown-menu.vue';
 import DropdownMenuContent from '../ui/dropdown-menu-content.vue';
 import DropdownMenuItem from '../ui/dropdown-menu-item.vue';
 import Input from '../ui/input.vue';
+import DatePicker from '../ui/date-picker.vue';
 import Label from '../ui/label.vue';
 import Separator from '../ui/separator.vue';
 import Select from '../ui/select.vue';
@@ -1086,17 +1087,19 @@ onMounted(() => {
         <div v-if="timeFilter === 'Intervalo personalizado'" class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 mt-1 pt-4 border-t">
           <div class="space-y-1">
             <label class="text-sm font-medium text-[#435574]">De</label>
-            <Input
-              type="date"
+            <DatePicker
               :model-value="customDateFrom"
+              :max="customDateTo || undefined"
+              placeholder="Data inicial"
               @update:model-value="(val: string) => customDateFrom = val"
             />
           </div>
           <div class="space-y-1">
             <label class="text-sm font-medium text-[#435574]">Até</label>
-            <Input
-              type="date"
+            <DatePicker
               :model-value="customDateTo"
+              :min="customDateFrom || undefined"
+              placeholder="Data final"
               @update:model-value="(val: string) => customDateTo = val"
             />
           </div>

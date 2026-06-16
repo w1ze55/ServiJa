@@ -15,6 +15,7 @@ import Button from '../ui/button.vue';
 import Badge from '../ui/badge.vue';
 import Textarea from '../ui/textarea.vue';
 import Input from '../ui/input.vue';
+import DatePicker from '../ui/date-picker.vue';
 import Label from '../ui/label.vue';
 import AlertDialog from '../ui/alert-dialog.vue';
 import AlertDialogAction from '../ui/alert-dialog-action.vue';
@@ -492,12 +493,12 @@ const getEventIcon = (type: TimelineEvent['type']) => {
 
           <div>
             <Label for="counter-deadline">Prazo desejado *</Label>
-            <Input
+            <DatePicker
               id="counter-deadline"
-              type="date"
               :model-value="counterDeadline"
               @update:model-value="(val) => counterDeadline = val as string"
               :min="new Date().toISOString().split('T')[0]"
+              placeholder="Selecione a data"
               class="mt-2"
             />
           </div>

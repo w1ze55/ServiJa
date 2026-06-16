@@ -19,6 +19,7 @@ import {
 } from 'lucide-vue-next';
 import Button from '../ui/button.vue';
 import Input from '../ui/input.vue';
+import DatePicker from '../ui/date-picker.vue';
 import Card from '../ui/card.vue';
 import Badge from '../ui/badge.vue';
 import Avatar from '../ui/avatar.vue';
@@ -661,17 +662,19 @@ watch(currentTab, () => {
       <div v-if="timeFilter === 'Intervalo personalizado'" class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 pt-4 border-t">
         <div class="space-y-1">
           <label class="text-sm font-medium text-[#435574]">De</label>
-          <Input
-            type="date"
+          <DatePicker
             :model-value="customDateFrom"
+            :max="customDateTo || undefined"
+            placeholder="Data inicial"
             @update:model-value="(val: string) => { customDateFrom = val; currentPage = 1; }"
           />
         </div>
         <div class="space-y-1">
           <label class="text-sm font-medium text-[#435574]">Até</label>
-          <Input
-            type="date"
+          <DatePicker
             :model-value="customDateTo"
+            :min="customDateFrom || undefined"
+            placeholder="Data final"
             @update:model-value="(val: string) => { customDateTo = val; currentPage = 1; }"
           />
         </div>
@@ -1029,10 +1032,10 @@ watch(currentTab, () => {
             </div>
             <div class="space-y-2">
               <Label for="desiredDate">Data desejada</Label>
-              <Input
+              <DatePicker
                 id="desiredDate"
-                type="date"
                 :min="new Date().toISOString().split('T')[0]"
+                placeholder="Selecione a data"
                 :model-value="newRequest.desiredDate"
                 @update:model-value="(val) => newRequest.desiredDate = val as string"
               />
