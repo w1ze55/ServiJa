@@ -268,16 +268,18 @@ function nameInitials(name: string) {
   return `${parts[0].charAt(0)}${parts[1].charAt(0)}`.toUpperCase();
 }
 
-const requestDetailPath = computed(() =>
+// O chat só existe a partir do serviço em andamento, então o botão sempre
+// leva à tela de detalhes do PROJETO (tanto em andamento quanto concluído/arquivado).
+const projectDetailPath = computed(() =>
   user.value?.type === 'provider'
-    ? '/freelancer-proposal-detail'
-    : '/cliente-request-detail'
+    ? '/freelancer-project-detail'
+    : '/cliente-project-detail'
 );
 
-function goToRequestDetail() {
+function goToProjectDetail() {
   if (!activeConversation.value) return;
   router.push({
-    path: requestDetailPath.value,
+    path: projectDetailPath.value,
     query: { requestId: activeConversation.value.serviceRequestId },
   });
 }
@@ -1141,12 +1143,12 @@ const handleSearch = (query: string) => router.push({ path: '/search', query: { 
                 </p>
               </div>
               <button
-                @click="goToRequestDetail"
+                @click="goToProjectDetail"
                 class="inline-flex items-center gap-2 rounded-full border border-gray-200 px-3 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 hover:text-gray-900"
-                title="Ver solicitação"
+                title="Ver projeto"
               >
                 <ExternalLink class="h-4 w-4" />
-                <span class="hidden sm:inline">Ver solicitação</span>
+                <span class="hidden sm:inline">Ver projeto</span>
               </button>
             </header>
 
