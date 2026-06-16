@@ -7,6 +7,7 @@ import com.servija.servija.dto.AdminUserStatusRequest;
 import com.servija.servija.dto.AdminUserSummaryDto;
 import com.servija.servija.model.User;
 import com.servija.servija.service.AdminUserService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
@@ -67,7 +68,7 @@ public class AdminUserController {
     @PutMapping("/users/{id}")
     public ResponseEntity<AdminUserDetailDto> updateUser(
             @PathVariable Long id,
-            @RequestBody AdminUserEditRequest request) {
+            @Valid @RequestBody AdminUserEditRequest request) {
 
         return ResponseEntity.ok(adminUserService.updateUser(id, request));
     }

@@ -3,6 +3,7 @@ package com.servija.servija.controller;
 import com.servija.servija.dto.BankAccountDTO;
 import com.servija.servija.dto.BankAccountResponse;
 import com.servija.servija.dto.FreelancerWalletResponse;
+import com.servija.servija.dto.WalletTransactionPageResponse;
 import com.servija.servija.dto.WalletTransactionResponse;
 import com.servija.servija.dto.WithdrawalRequestDTO;
 import com.servija.servija.dto.WithdrawalResponse;
@@ -18,6 +19,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -33,6 +35,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -78,6 +83,25 @@ public class FreelancerWalletController {
         String email = authentication.getName();
         List<WalletTransactionResponse> transactions = transactionService.getTransactions(email, type);
         return ResponseEntity.ok(transactions);
+    }
+
+    @GetMapping("/transactions/paged")
+    @Operation(summary = "Listar transacoes paginadas", description = "Lista paginada de recebimentos e saques, com filtro por periodo")
+    @SecurityRequirement(name = "bearerAuth")
+    public ResponseEntity<WalletTransactionPageResponse> getTransactionsPaged(
+            Authentication authentication,
+            @RequestParam(required = false, defaultValue = "ALL") String type,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        String email = authentication.getName();
+        LocalDateTime from = dateFrom != null ? dateFrom.atStartOfDay() : null;
+        LocalDateTime to = dateTo != null ? dateTo.atTime(LocalTime.MAX) : null;
+        WalletTransactionPageResponse response =
+                transactionService.getTransactionsPaged(email, type, from, to, page, size);
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/withdraw")

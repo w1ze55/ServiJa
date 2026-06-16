@@ -316,6 +316,7 @@ const handleSubmit = async (e: Event) => {
           <Input
             id="name"
             type="text"
+            maxlength="100"
             placeholder="Digite seu nome completo"
             :value="formData.name"
             @input="(e: Event) => handleChange('name', (e.target as HTMLInputElement).value)"

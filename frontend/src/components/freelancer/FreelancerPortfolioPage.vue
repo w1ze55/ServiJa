@@ -133,6 +133,9 @@ const projectForm = ref({
 
 const tagInput = ref('');
 const isLoading = ref(false);
+
+// Data máxima selecionável: hoje (a conclusão não pode estar no futuro)
+const todayDate = computed(() => new Date().toLocaleDateString('en-CA'));
 const selectedSubcategories = computed(() =>
   categoryCatalogStore.getSubcategoriesByCategoryId(projectForm.value.categoryId)
 );
@@ -776,6 +779,7 @@ const handleTagKeyPress = (e: KeyboardEvent) => {
               <Input
                 id="completedDate"
                 type="date"
+                :max="todayDate"
                 :model-value="projectForm.completedDate"
                 @update:model-value="(val) => projectForm.completedDate = val as string"
               />

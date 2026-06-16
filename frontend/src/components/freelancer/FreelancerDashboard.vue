@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { useRouter } from 'vue-router';
 import {
   Chart as ChartJS,
   Title,
@@ -60,8 +61,22 @@ interface Props {
 const props = defineProps<Props>();
 
 let wsConnection: ReturnType<typeof useServiceRequestWebSocket> | null = null;
+const router = useRouter();
 const userStore = useUserStore();
 const proposalStore = useProposalStore();
+
+const openProposalDetail = (id: string) => {
+  proposalStore.markAsViewed(id);
+  props.onNavigate('freelancer-proposal-detail', { requestId: id });
+};
+
+const openServiceDetail = (id: string) => {
+  props.onNavigate('freelancer-project-detail', { requestId: id });
+};
+
+const openServiceChat = (id: string) => {
+  router.push(`/chat/${id}`);
+};
 const reviews = ref<ReviewResponse[]>([]);
 const pendingReviews = ref<PendingReview[]>([]);
 const walletBalance = ref<WalletBalance | null>(null);
@@ -780,7 +795,7 @@ const mostContractedServicesChartOptions = {
 
 const recentProposals = computed(() =>
   periodProposals.value
-    .filter((p) => ['pending', 'negotiating'].includes(p.status))
+    .filter((p) => ['pending'].includes(p.status))
     .sort((a, b) =>
       getApiDateTimestamp(b.updatedAt || b.receivedAt) -
       getApiDateTimestamp(a.updatedAt || a.receivedAt),
@@ -800,7 +815,7 @@ const recentProposals = computed(() =>
 
 const activeJobs = computed(() =>
   periodProposalsByActivity.value
-    .filter((p) => ['accepted', 'in_progress', 'delivered'].includes(p.status))
+    .filter((p) => ['in_progress', 'delivered'].includes(p.status))
     .sort((a, b) =>
       getApiDateTimestamp(b.updatedAt || b.receivedAt) -
       getApiDateTimestamp(a.updatedAt || a.receivedAt),
@@ -810,7 +825,7 @@ const activeJobs = computed(() =>
       id: p.id,
       clientName: p.clientName,
       service: p.service,
-      progress: p.status === 'accepted' ? 25 : p.status === 'in_progress' ? 65 : 95,
+      progress: p.status === 'in_progress' ? 65 : 95,
       deadline: p.freelancerResponse?.executionDays
         ? `${p.freelancerResponse.executionDays} dias`
         : p.deadline,
@@ -1351,7 +1366,7 @@ onUnmounted(() => {
               v-for="proposal in recentProposals"
               :key="proposal.id"
               class="p-4 rounded-lg border border-gray-200 hover:border-[#286AD8] transition-colors cursor-pointer"
-              @click="props.onNavigate('freelancer-proposals', { proposalId: proposal.id })"
+              @click="openProposalDetail(proposal.id)"
             >
               <div class="flex items-start gap-3 mb-3">
                 <Avatar class="h-10 w-10 shrink-0">
@@ -1380,8 +1395,7 @@ onUnmounted(() => {
                 </div>
               </div>
               <div class="flex gap-2">
-                <Button size="sm" variant="default" class="flex-1" @click.stop="props.onNavigate('freelancer-proposals', { proposalId: proposal.id })">Responder</Button>
-                <Button size="sm" variant="outline" class="flex-1" @click.stop="props.onNavigate('freelancer-proposals', { proposalId: proposal.id })">Recusar</Button>
+                <Button size="sm" variant="default" class="w-full" @click.stop="openProposalDetail(proposal.id)">Visualizar</Button>
               </div>
             </div>
           </div>
@@ -1402,6 +1416,7 @@ onUnmounted(() => {
               v-for="job in activeJobs"
               :key="job.id"
               class="p-4 rounded-lg border border-gray-200 hover:border-[#286AD8] transition-colors cursor-pointer"
+              @click="openServiceDetail(job.id)"
             >
               <div class="flex items-start justify-between gap-2 mb-3">
                 <div class="min-w-0">
@@ -1418,11 +1433,11 @@ onUnmounted(() => {
                 <Progress :value="job.progress" class="h-2" />
               </div>
               <div class="flex gap-2 mt-3">
-                <Button size="sm" variant="outline" class="flex-1">
+                <Button size="sm" variant="outline" class="flex-1" @click.stop="openServiceChat(job.id)">
                   <MessageSquare class="h-3 w-3 mr-1" />
                   Mensagens
                 </Button>
-                <Button size="sm" variant="outline" class="flex-1">
+                <Button size="sm" variant="outline" class="flex-1" @click.stop="openServiceDetail(job.id)">
                   <Eye class="h-3 w-3 mr-1" />
                   Ver Detalhes
                 </Button>
