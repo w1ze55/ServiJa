@@ -23,8 +23,8 @@ async function main() {
   const envFileValues = loadDotEnv(path.join(ROOT_DIR, ".env"));
   const credentials = resolveAdminCredentials(envFileValues);
   const baseUrl = normalizeBaseUrl(process.env.LOAD_BASE_URL ?? config.baseUrl);
-  const selectedProfiles = resolveProfiles(cli.profile, availableProfiles);
-  const runLabel = buildRunLabel(selectedProfiles, availableProfiles);
+  const executionPlan = resolveExecutionPlan(cli, config, availableProfiles);
+  const runLabel = executionPlan.runLabel;
   const runDir = path.join(REPORTS_DIR, `${timestampForFileName()}-${runLabel}`);
 
   await fsp.mkdir(runDir, { recursive: true });
@@ -45,10 +45,10 @@ async function main() {
   if (cli.preflightOnly) {
     const results = [];
 
-    for (const profileName of selectedProfiles) {
-      const preflight = await runPreflight(context, profileName);
+    for (const runName of executionPlan.preflightTargets) {
+      const preflight = await runPreflight(context, runName);
       results.push({
-        profile: profileName,
+        profile: runName,
         preflight
       });
     }
@@ -57,6 +57,7 @@ async function main() {
       generatedAt: new Date().toISOString(),
       baseUrl,
       mode: "preflight-only",
+      executionMode: executionPlan.mode,
       results
     };
 
@@ -67,24 +68,32 @@ async function main() {
   }
 
   const results = [];
-  for (let index = 0; index < selectedProfiles.length; index += 1) {
-    const profileName = selectedProfiles[index];
-    console.log(`Starting profile ${profileName}...`);
-    const result = await runProfile(context, profileName);
+  if (executionPlan.mode === "capacity-search") {
+    console.log("Starting capacity search...");
+    const result = await runCapacitySearch(context, executionPlan.capacitySearchConfig);
     results.push(result);
-    await writeJson(path.join(runDir, `profile-${profileName}.json`), result);
+    await writeJson(path.join(runDir, "capacity-search.json"), result);
+  } else {
+    for (let index = 0; index < executionPlan.selectedProfiles.length; index += 1) {
+      const profileName = executionPlan.selectedProfiles[index];
+      console.log(`Starting profile ${profileName}...`);
+      const result = await runProfile(context, profileName);
+      results.push(result);
+      await writeJson(path.join(runDir, `profile-${profileName}.json`), result);
 
-    if (index < selectedProfiles.length - 1) {
-      console.log(`Waiting ${config.intervalBetweenProfilesMs}ms before the next profile...`);
-      await sleep(config.intervalBetweenProfilesMs);
+      if (index < executionPlan.selectedProfiles.length - 1) {
+        console.log(`Waiting ${config.intervalBetweenProfilesMs}ms before the next profile...`);
+        await sleep(config.intervalBetweenProfilesMs);
+      }
     }
   }
 
   const summary = {
     generatedAt: new Date().toISOString(),
     baseUrl,
-    mode: "load",
-    selectedProfiles,
+    mode: executionPlan.mode === "capacity-search" ? "capacity-search" : "load",
+    executionMode: executionPlan.mode,
+    selectedProfiles: executionPlan.selectedProfiles ?? [],
     config: {
       timeoutMs: config.timeoutMs,
       thinkTimeMs: config.thinkTimeMs,
@@ -103,6 +112,7 @@ async function main() {
 function parseArgs(argv) {
   const cli = {
     profile: "all",
+    findLimit: false,
     preflightOnly: false,
     help: false,
     configPath: null
@@ -118,6 +128,11 @@ function parseArgs(argv) {
 
     if (arg === "--preflight-only") {
       cli.preflightOnly = true;
+      continue;
+    }
+
+    if (arg === "--find-limit") {
+      cli.findLimit = true;
       continue;
     }
 
@@ -150,12 +165,18 @@ function parseArgs(argv) {
 function printHelp() {
   console.log([
     "Usage:",
-    "  node tests/load/run-load.mjs [--profile 50|100|1000|10000|50000|all|comma,separated,list] [--preflight-only] [--config path]",
+    "  node tests/load/run-load.mjs [--profile <name|all|comma,separated,list>] [--find-limit] [--preflight-only] [--config path]",
+    "",
+    "Notes:",
+    "  Available profiles are loaded from the selected config file.",
+    "  --find-limit ignores named profiles and increases active workers in steps until the abort threshold is reached or the configured max is completed.",
     "",
     "Examples:",
     "  node tests/load/run-load.mjs",
     "  node tests/load/run-load.mjs --profile 50",
-    "  node tests/load/run-load.mjs --profile 10000,50000",
+    "  node tests/load/run-load.mjs --profile 5000",
+    "  node tests/load/run-load.mjs --profile 5000,10000",
+    "  node tests/load/run-load.mjs --find-limit",
     "  node tests/load/run-load.mjs --profile all --preflight-only"
   ].join("\n"));
 }
@@ -268,6 +289,65 @@ function resolveProfiles(profileArg, availableProfiles) {
   return [...new Set(requestedProfiles)];
 }
 
+function resolveExecutionPlan(cli, config, availableProfiles) {
+  if (cli.findLimit) {
+    return {
+      mode: "capacity-search",
+      runLabel: "find-limit",
+      preflightTargets: ["find-limit"],
+      selectedProfiles: [],
+      capacitySearchConfig: resolveCapacitySearchConfig(config.capacitySearch)
+    };
+  }
+
+  const selectedProfiles = resolveProfiles(cli.profile, availableProfiles);
+  return {
+    mode: "profiles",
+    runLabel: buildRunLabel(selectedProfiles, availableProfiles),
+    preflightTargets: selectedProfiles,
+    selectedProfiles,
+    capacitySearchConfig: null
+  };
+}
+
+function resolveCapacitySearchConfig(capacitySearchConfig) {
+  if (!capacitySearchConfig || typeof capacitySearchConfig !== "object") {
+    throw new Error("Config is missing capacitySearch. Add it to use --find-limit.");
+  }
+
+  const startVus = capacitySearchConfig.startVus;
+  const stepVus = capacitySearchConfig.stepVus;
+  const maxVus = capacitySearchConfig.maxVus;
+  const stepDurationMs = capacitySearchConfig.stepDurationMs;
+  const abort = capacitySearchConfig.abort ?? {};
+
+  assertPositiveInteger(startVus, "capacitySearch.startVus");
+  assertPositiveInteger(stepVus, "capacitySearch.stepVus");
+  assertPositiveInteger(maxVus, "capacitySearch.maxVus");
+  assertPositiveInteger(stepDurationMs, "capacitySearch.stepDurationMs");
+
+  if (startVus > maxVus) {
+    throw new Error("capacitySearch.startVus must be less than or equal to capacitySearch.maxVus.");
+  }
+
+  if (typeof abort.errorRateThreshold !== "number" || abort.errorRateThreshold <= 0 || abort.errorRateThreshold >= 1) {
+    throw new Error("capacitySearch.abort.errorRateThreshold must be a number between 0 and 1.");
+  }
+
+  assertPositiveInteger(abort.windowMs, "capacitySearch.abort.windowMs");
+
+  return {
+    startVus,
+    stepVus,
+    maxVus,
+    stepDurationMs,
+    abort: {
+      errorRateThreshold: abort.errorRateThreshold,
+      windowMs: abort.windowMs
+    }
+  };
+}
+
 function buildRunLabel(selectedProfiles, availableProfiles) {
   if (
     selectedProfiles.length === availableProfiles.length
@@ -312,6 +392,72 @@ function timestampForFileName() {
 
 function pad2(value) {
   return String(value).padStart(2, "0");
+}
+
+function assertPositiveInteger(value, label) {
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new Error(`${label} must be a positive integer.`);
+  }
+}
+
+function recordRequestThroughput(runtime) {
+  const secondBucket = Math.floor(Date.now() / 1000);
+  incrementMap(runtime.peaks.requestCountsBySecond, secondBucket);
+}
+
+function updatePeakActiveWorkers(runtime) {
+  runtime.peaks.maxActiveWorkers = Math.max(runtime.peaks.maxActiveWorkers, runtime.workers.size);
+}
+
+function summarizePeakRequestsPerMinute(requestCountsBySecond) {
+  const buckets = [...requestCountsBySecond.entries()].sort((left, right) => left[0] - right[0]);
+
+  if (buckets.length === 0) {
+    return {
+      requests: 0,
+      startedAt: null,
+      endedAt: null
+    };
+  }
+
+  let windowStartIndex = 0;
+  let windowRequestCount = 0;
+  let bestWindow = {
+    requests: 0,
+    startedAtSecond: buckets[0][0],
+    endedAtSecond: buckets[0][0]
+  };
+
+  for (let index = 0; index < buckets.length; index += 1) {
+    const [currentSecond, currentCount] = buckets[index];
+    windowRequestCount += currentCount;
+
+    while (buckets[windowStartIndex][0] < currentSecond - 59) {
+      windowRequestCount -= buckets[windowStartIndex][1];
+      windowStartIndex += 1;
+    }
+
+    if (windowRequestCount > bestWindow.requests) {
+      bestWindow = {
+        requests: windowRequestCount,
+        startedAtSecond: buckets[windowStartIndex][0],
+        endedAtSecond: currentSecond
+      };
+    }
+  }
+
+  return {
+    requests: bestWindow.requests,
+    startedAt: new Date(bestWindow.startedAtSecond * 1000).toISOString(),
+    endedAt: new Date(bestWindow.endedAtSecond * 1000).toISOString()
+  };
+}
+
+function buildPeakSummary(runtime) {
+  return {
+    concurrentUsers: runtime.peaks.maxActiveWorkers,
+    requestsPerMinute: summarizePeakRequestsPerMinute(runtime.peaks.requestCountsBySecond)
+  };
 }
 
 function createMetricBucket(name) {
@@ -366,6 +512,8 @@ function recordRequestMetric(runtime, endpointKey, statusLabel, durationMs, ok) 
   if (!ok) {
     runtime.recentWindow.errors += 1;
   }
+
+  recordRequestThroughput(runtime);
 }
 
 function percentileFromHistogram(histogram, totalCount, percentile) {
@@ -673,10 +821,9 @@ function assertPreflight(condition, message) {
 }
 
 function createRuntimeContext(context, profileName, preflight) {
-  const profileConfig = context.config.profiles[profileName];
   return {
     profileName,
-    profileConfig,
+    profileConfig: null,
     preflight,
     metrics: {
       overall: createMetricBucket("overall"),
@@ -693,6 +840,11 @@ function createRuntimeContext(context, profileName, preflight) {
     recentWindow: {
       requests: 0,
       errors: 0
+    },
+    capacitySearch: null,
+    peaks: {
+      maxActiveWorkers: 0,
+      requestCountsBySecond: new Map()
     }
   };
 }
@@ -700,6 +852,7 @@ function createRuntimeContext(context, profileName, preflight) {
 async function runProfile(context, profileName) {
   const preflight = await runPreflight(context, profileName);
   const runtime = createRuntimeContext(context, profileName, preflight);
+  runtime.profileConfig = context.config.profiles[profileName];
   context.runtime = runtime;
 
   const dockerBefore = captureDockerStats(context.config);
@@ -738,6 +891,7 @@ async function runProfile(context, profileName) {
 
   return {
     profile: profileName,
+    mode: "profile",
     startedAt: new Date(profileStart).toISOString(),
     endedAt: new Date(endedAt).toISOString(),
     durationMs: endedAt - profileStart,
@@ -747,9 +901,82 @@ async function runProfile(context, profileName) {
     preflight,
     phases: buildPhaseSummary(runtime.profileConfig),
     scenarioIterations: runtime.scenarioIterations,
+    peaks: buildPeakSummary(runtime),
     overall,
     perEndpoint,
     slowestEndpoints: perEndpoint.slice(0, 3),
+    docker: {
+      before: dockerBefore,
+      after: dockerAfter
+    }
+  };
+}
+
+async function runCapacitySearch(context, searchConfig) {
+  const runName = "find-limit";
+  const preflight = await runPreflight(context, runName);
+  const runtime = createRuntimeContext(context, runName, preflight);
+  runtime.profileConfig = {
+    abort: searchConfig.abort
+  };
+  runtime.capacitySearch = createCapacitySearchState(searchConfig);
+  context.runtime = runtime;
+
+  const dockerBefore = captureDockerStats(context.config);
+  const searchStart = Date.now();
+  const totalDurationMs = getCapacitySearchDurationMs(searchConfig);
+  const schedulerTickMs = context.config.schedulerTickMs;
+  const progressLogIntervalMs = context.config.progressLogIntervalMs;
+  const abortMonitor = createAbortMonitor(context, runtime);
+  const progressLogger = createProgressLogger(runtime, searchStart, progressLogIntervalMs);
+  let endedAt = searchStart;
+  let interruptedByAbort = false;
+
+  try {
+    abortMonitor.start();
+    progressLogger.start();
+
+    while (!runtime.shouldAbort && Date.now() - searchStart < totalDurationMs) {
+      const elapsedMs = Date.now() - searchStart;
+      const targetVus = computeCapacitySearchTargetVus(searchConfig, elapsedMs);
+      syncCapacitySearchStep(runtime, searchStart, targetVus);
+      reconcileWorkers(context, runtime, targetVus);
+      await sleep(schedulerTickMs);
+    }
+  } finally {
+    interruptedByAbort = runtime.shouldAbort;
+    runtime.shouldAbort = true;
+    reconcileWorkers(context, runtime, 0);
+    await waitForWorkersToStop(runtime);
+    endedAt = Date.now();
+    finalizeCapacitySearch(runtime, endedAt, interruptedByAbort ? "aborted" : "completed");
+    abortMonitor.stop();
+    progressLogger.stop();
+    context.runtime = null;
+  }
+
+  const dockerAfter = captureDockerStats(context.config);
+  const overall = summarizeMetric(runtime.metrics.overall, endedAt - searchStart);
+  const perEndpoint = [...runtime.metrics.byEndpoint.values()]
+    .map((metric) => summarizeMetric(metric, endedAt - searchStart))
+    .sort((left, right) => right.p95Ms - left.p95Ms);
+
+  return {
+    profile: runName,
+    mode: "capacity-search",
+    startedAt: new Date(searchStart).toISOString(),
+    endedAt: new Date(endedAt).toISOString(),
+    durationMs: endedAt - searchStart,
+    configuredDurationMs: totalDurationMs,
+    aborted: Boolean(runtime.abortedReason),
+    abortedReason: runtime.abortedReason,
+    preflight,
+    scenarioIterations: runtime.scenarioIterations,
+    peaks: buildPeakSummary(runtime),
+    overall,
+    perEndpoint,
+    slowestEndpoints: perEndpoint.slice(0, 3),
+    capacitySearch: buildCapacitySearchSummary(runtime.capacitySearch),
     docker: {
       before: dockerBefore,
       after: dockerAfter
@@ -801,8 +1028,117 @@ function computeTargetVus(profileConfig, elapsedMs) {
   return 0;
 }
 
+function getCapacitySearchDurationMs(searchConfig) {
+  const steps = Math.ceil((searchConfig.maxVus - searchConfig.startVus) / searchConfig.stepVus) + 1;
+  return steps * searchConfig.stepDurationMs;
+}
+
+function computeCapacitySearchTargetVus(searchConfig, elapsedMs) {
+  const stepIndex = Math.floor(Math.max(0, elapsedMs) / searchConfig.stepDurationMs);
+  return Math.min(searchConfig.maxVus, searchConfig.startVus + stepIndex * searchConfig.stepVus);
+}
+
 function lerp(start, end, progress) {
   return start + (end - start) * progress;
+}
+
+function createCapacitySearchState(searchConfig) {
+  return {
+    config: searchConfig,
+    currentStep: null,
+    steps: [],
+    highestTargetVusReached: 0,
+    lastStableTargetVus: null,
+    abortedAtTargetVus: null
+  };
+}
+
+function snapshotMetricCounts(metric) {
+  return {
+    requestCount: metric.requestCount,
+    successCount: metric.successCount,
+    errorCount: metric.errorCount
+  };
+}
+
+function createCapacitySearchStep(runtime, startedAtMs, targetVus) {
+  runtime.capacitySearch.currentStep = {
+    targetVus,
+    startedAt: new Date(startedAtMs).toISOString(),
+    startedAtMs,
+    metricSnapshot: snapshotMetricCounts(runtime.metrics.overall)
+  };
+  runtime.capacitySearch.steps.push(runtime.capacitySearch.currentStep);
+  runtime.capacitySearch.highestTargetVusReached = Math.max(runtime.capacitySearch.highestTargetVusReached, targetVus);
+}
+
+function finalizeCapacitySearchStep(runtime, endedAtMs, status) {
+  const step = runtime.capacitySearch?.currentStep;
+  if (!step) {
+    return;
+  }
+
+  const finalSnapshot = snapshotMetricCounts(runtime.metrics.overall);
+  const requestCount = finalSnapshot.requestCount - step.metricSnapshot.requestCount;
+  const successCount = finalSnapshot.successCount - step.metricSnapshot.successCount;
+  const errorCount = finalSnapshot.errorCount - step.metricSnapshot.errorCount;
+  const durationMs = endedAtMs - step.startedAtMs;
+
+  step.endedAt = new Date(endedAtMs).toISOString();
+  step.durationMs = durationMs;
+  step.completed = status === "completed";
+  step.aborted = status === "aborted";
+  step.requestCount = requestCount;
+  step.successCount = successCount;
+  step.errorCount = errorCount;
+  step.errorRate = requestCount === 0 ? 0 : errorCount / requestCount;
+  step.requestsPerSecond = durationMs > 0 ? requestCount / (durationMs / 1000) : 0;
+
+  delete step.metricSnapshot;
+  delete step.startedAtMs;
+
+  if (step.completed) {
+    runtime.capacitySearch.lastStableTargetVus = step.targetVus;
+  }
+
+  if (step.aborted) {
+    runtime.capacitySearch.abortedAtTargetVus = step.targetVus;
+  }
+
+  runtime.capacitySearch.currentStep = null;
+}
+
+function syncCapacitySearchStep(runtime, searchStartMs, targetVus) {
+  const stepStartedAtMs = Date.now();
+
+  if (!runtime.capacitySearch.currentStep) {
+    createCapacitySearchStep(runtime, stepStartedAtMs, targetVus);
+    return;
+  }
+
+  if (runtime.capacitySearch.currentStep.targetVus !== targetVus) {
+    finalizeCapacitySearchStep(runtime, stepStartedAtMs, "completed");
+    createCapacitySearchStep(runtime, stepStartedAtMs, targetVus);
+  }
+}
+
+function finalizeCapacitySearch(runtime, endedAtMs, status) {
+  if (!runtime.capacitySearch?.currentStep) {
+    return;
+  }
+
+  finalizeCapacitySearchStep(runtime, endedAtMs, status);
+}
+
+function buildCapacitySearchSummary(capacitySearch) {
+  return {
+    config: capacitySearch.config,
+    highestTargetVusReached: capacitySearch.highestTargetVusReached,
+    lastStableTargetVus: capacitySearch.lastStableTargetVus,
+    abortedAtTargetVus: capacitySearch.abortedAtTargetVus,
+    reachedConfiguredMax: capacitySearch.highestTargetVusReached >= capacitySearch.config.maxVus,
+    steps: capacitySearch.steps
+  };
 }
 
 function reconcileWorkers(context, runtime, targetVus) {
@@ -813,6 +1149,7 @@ function reconcileWorkers(context, runtime, targetVus) {
     for (let index = 0; index < missingWorkers; index += 1) {
       startWorker(context, runtime);
     }
+    updatePeakActiveWorkers(runtime);
     return;
   }
 
@@ -823,6 +1160,8 @@ function reconcileWorkers(context, runtime, targetVus) {
       candidates[index].shouldStop = true;
     }
   }
+
+  updatePeakActiveWorkers(runtime);
 }
 
 function startWorker(context, runtime) {
@@ -973,8 +1312,11 @@ function createProgressLogger(runtime, startedAt, intervalMs) {
       timer = setInterval(() => {
         const elapsedMs = Date.now() - startedAt;
         const overall = summarizeMetric(runtime.metrics.overall, elapsedMs);
+        const targetLabel = runtime.capacitySearch?.currentStep
+          ? ` targetWorkers=${runtime.capacitySearch.currentStep.targetVus}`
+          : "";
         console.log(
-          `[${runtime.profileName}] elapsed=${Math.round(elapsedMs / 1000)}s activeWorkers=${runtime.workers.size} requests=${overall.requestCount} req/s=${overall.requestsPerSecond.toFixed(2)} errorRate=${(overall.errorRate * 100).toFixed(2)}%`
+          `[${runtime.profileName}] elapsed=${Math.round(elapsedMs / 1000)}s activeWorkers=${runtime.workers.size}${targetLabel} requests=${overall.requestCount} req/s=${overall.requestsPerSecond.toFixed(2)} errorRate=${(overall.errorRate * 100).toFixed(2)}%`
         );
       }, intervalMs);
     },
@@ -1064,6 +1406,8 @@ function buildComparison(results) {
     profile: result.profile,
     durationMs: result.durationMs,
     aborted: result.aborted,
+    peakConcurrentUsers: result.peaks?.concurrentUsers ?? 0,
+    peakRequestsPerMinute: result.peaks?.requestsPerMinute?.requests ?? 0,
     requests: result.overall.requestCount,
     requestsPerSecond: result.overall.requestsPerSecond,
     errorRate: result.overall.errorRate,
@@ -1112,17 +1456,17 @@ function renderSummaryMarkdown(summary) {
 
   lines.push("## Comparison");
   lines.push("");
-  lines.push("| Profile | Duration | Aborted | Requests | Req/s | Error Rate | p95 | p99 | Max |");
-  lines.push("| --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: |");
+  lines.push("| Profile | Duration | Aborted | Peak Users | Peak RPM | Requests | Req/s | Error Rate | p95 | p99 | Max |");
+  lines.push("| --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |");
   for (const row of summary.comparison) {
     lines.push(
-      `| ${row.profile} | ${formatDuration(row.durationMs)} | ${row.aborted ? "yes" : "no"} | ${formatInteger(row.requests)} | ${formatDecimal(row.requestsPerSecond)} | ${formatPercent(row.errorRate)} | ${formatMs(row.p95Ms)} | ${formatMs(row.p99Ms)} | ${formatMs(row.maxMs)} |`
+      `| ${row.profile} | ${formatDuration(row.durationMs)} | ${row.aborted ? "yes" : "no"} | ${formatInteger(row.peakConcurrentUsers)} | ${formatInteger(row.peakRequestsPerMinute)} | ${formatInteger(row.requests)} | ${formatDecimal(row.requestsPerSecond)} | ${formatPercent(row.errorRate)} | ${formatMs(row.p95Ms)} | ${formatMs(row.p99Ms)} | ${formatMs(row.maxMs)} |`
     );
   }
   lines.push("");
 
   for (const result of summary.results) {
-    lines.push(`## Profile ${result.profile}`);
+    lines.push(result.mode === "capacity-search" ? "## Capacity Search" : `## Profile ${result.profile}`);
     lines.push("");
     lines.push(`- Started at: ${result.startedAt}`);
     lines.push(`- Ended at: ${result.endedAt}`);
@@ -1130,7 +1474,25 @@ function renderSummaryMarkdown(summary) {
     lines.push(`- Aborted: ${result.aborted ? `yes (${result.abortedReason})` : "no"}`);
     lines.push(`- Scenario iterations: public=${formatInteger(result.scenarioIterations.publicBrowse)}, admin=${formatInteger(result.scenarioIterations.adminRead)}`);
     lines.push(`- Fixtures: service=${result.preflight.fixtures.serviceId}, freelancer=${result.preflight.fixtures.freelancerId}, adminUser=${result.preflight.fixtures.adminUserId}`);
+    lines.push(`- Peak concurrent users: ${formatInteger(result.peaks?.concurrentUsers ?? 0)}`);
+    lines.push(`- Peak requests/min (rolling 60s): ${formatInteger(result.peaks?.requestsPerMinute?.requests ?? 0)}`);
+    if (result.capacitySearch) {
+      lines.push(`- Capacity search: start=${formatInteger(result.capacitySearch.config.startVus)}, step=${formatInteger(result.capacitySearch.config.stepVus)}, hold=${formatDuration(result.capacitySearch.config.stepDurationMs)}, max=${formatInteger(result.capacitySearch.config.maxVus)}`);
+      lines.push(`- Highest target reached: ${formatInteger(result.capacitySearch.highestTargetVusReached)}`);
+      lines.push(`- Last stable target: ${result.capacitySearch.lastStableTargetVus === null ? "none" : formatInteger(result.capacitySearch.lastStableTargetVus)}`);
+      lines.push(`- Failure detected at: ${result.capacitySearch.abortedAtTargetVus === null ? "not reached" : formatInteger(result.capacitySearch.abortedAtTargetVus)}`);
+    }
     lines.push("");
+    if (result.capacitySearch) {
+      lines.push("### Capacity Search Steps");
+      lines.push("");
+      lines.push("| Target Workers | Duration | Completed | Requests | Req/s | Error Rate |");
+      lines.push("| ---: | ---: | --- | ---: | ---: | ---: |");
+      for (const step of result.capacitySearch.steps) {
+        lines.push(`| ${formatInteger(step.targetVus)} | ${formatDuration(step.durationMs)} | ${step.completed ? "yes" : "no"} | ${formatInteger(step.requestCount)} | ${formatDecimal(step.requestsPerSecond)} | ${formatPercent(step.errorRate)} |`);
+      }
+      lines.push("");
+    }
     lines.push("### Overall");
     lines.push("");
     lines.push("| Requests | Req/s | Error Rate | Avg | p50 | p95 | p99 | Max |");

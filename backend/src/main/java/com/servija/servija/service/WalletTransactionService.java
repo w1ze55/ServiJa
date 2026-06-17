@@ -1,5 +1,6 @@
 package com.servija.servija.service;
 
+import com.servija.servija.dto.WalletTransactionPageResponse;
 import com.servija.servija.dto.WalletTransactionResponse;
 import com.servija.servija.exception.ResourceNotFoundException;
 import com.servija.servija.model.Payment;
@@ -12,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -32,6 +34,44 @@ public class WalletTransactionService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
 
+        return assembleTransactions(user, typeFilter, null, null);
+    }
+
+    /**
+     * Lista paginada de transações (recebimentos + saques), com filtro opcional por período.
+     */
+    @Transactional(readOnly = true)
+    public WalletTransactionPageResponse getTransactionsPaged(
+            String email, String typeFilter, LocalDateTime from, LocalDateTime to, int page, int size) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
+
+        List<WalletTransactionResponse> all = assembleTransactions(user, typeFilter, from, to);
+
+        int safeSize = size <= 0 ? 20 : size;
+        int safePage = Math.max(page, 0);
+        int total = all.size();
+        int totalPages = (int) Math.ceil((double) total / safeSize);
+
+        int fromIndex = Math.min(safePage * safeSize, total);
+        int toIndex = Math.min(fromIndex + safeSize, total);
+        List<WalletTransactionResponse> content = all.subList(fromIndex, toIndex);
+
+        return WalletTransactionPageResponse.builder()
+                .content(content)
+                .totalElements(total)
+                .totalPages(totalPages)
+                .currentPage(safePage)
+                .pageSize(safeSize)
+                .build();
+    }
+
+    /**
+     * Monta a lista unificada de transações ordenada por data (mais recente primeiro),
+     * aplicando filtro opcional por tipo e por período ({@code from}/{@code to} inclusivos).
+     */
+    private List<WalletTransactionResponse> assembleTransactions(
+            User user, String typeFilter, LocalDateTime from, LocalDateTime to) {
         List<WalletTransactionResponse> transactions = new ArrayList<>();
 
         // Recebimentos (pagamentos do freelancer com status COMPLETED)
@@ -85,8 +125,15 @@ public class WalletTransactionService {
             });
         }
 
+        // Filtro por período (inclusivo)
+        List<WalletTransactionResponse> filtered = transactions.stream()
+                .filter(t -> t.getDate() != null)
+                .filter(t -> from == null || !t.getDate().isBefore(from))
+                .filter(t -> to == null || !t.getDate().isAfter(to))
+                .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
+
         // Ordenar por data (mais recente primeiro)
-        transactions.sort(Comparator.comparing(WalletTransactionResponse::getDate).reversed());
-        return transactions;
+        filtered.sort(Comparator.comparing(WalletTransactionResponse::getDate).reversed());
+        return filtered;
     }
 }

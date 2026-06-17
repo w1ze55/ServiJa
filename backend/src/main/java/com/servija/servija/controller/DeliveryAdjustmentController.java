@@ -39,8 +39,10 @@ public class DeliveryAdjustmentController {
     @Operation(summary = "Listar ajustes da solicitação", description = "Lista todos os ajustes de uma solicitação específica")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<List<DeliveryAdjustmentResponse>> getByServiceRequest(
-            @PathVariable Long serviceRequestId) {
-        return ResponseEntity.ok(adjustmentService.getAdjustmentsByServiceRequest(serviceRequestId));
+            @PathVariable Long serviceRequestId,
+            Authentication authentication) {
+        return ResponseEntity.ok(
+                adjustmentService.getAdjustmentsByServiceRequest(serviceRequestId, authentication.getName()));
     }
 
     @GetMapping("/my-requests")
@@ -60,8 +62,9 @@ public class DeliveryAdjustmentController {
     @GetMapping("/{adjustmentId}")
     @Operation(summary = "Obter detalhes do ajuste", description = "Retorna os detalhes de um ajuste específico")
     @SecurityRequirement(name = "bearerAuth")
-    public ResponseEntity<DeliveryAdjustmentResponse> getById(@PathVariable Long adjustmentId) {
-        return ResponseEntity.ok(adjustmentService.getById(adjustmentId));
+    public ResponseEntity<DeliveryAdjustmentResponse> getById(@PathVariable Long adjustmentId,
+            Authentication authentication) {
+        return ResponseEntity.ok(adjustmentService.getById(adjustmentId, authentication.getName()));
     }
 
     @PatchMapping("/{adjustmentId}/status")

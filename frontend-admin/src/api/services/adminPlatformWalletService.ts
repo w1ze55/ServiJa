@@ -83,6 +83,19 @@ export interface AdminPlatformTransactionsParams {
   dateTo?: string
 }
 
+export interface AdminPlatformTransactionsPagedParams extends AdminPlatformTransactionsParams {
+  page?: number
+  size?: number
+}
+
+export interface AdminPlatformWalletTransactionPage {
+  content: AdminPlatformWalletTransaction[]
+  totalElements: number
+  totalPages: number
+  currentPage: number
+  pageSize: number
+}
+
 const cleanParams = (params: AdminPlatformTransactionsParams = {}) => {
   const next: Record<string, string> = {}
   if (params.type) next.type = params.type
@@ -104,6 +117,20 @@ export const adminPlatformWalletService = {
       '/admin/platform-wallet/transactions',
       {
         params: cleanParams(params),
+      }
+    )
+
+    return response.data
+  },
+
+  async getTransactionsPaged(
+    params: AdminPlatformTransactionsPagedParams = {}
+  ): Promise<AdminPlatformWalletTransactionPage> {
+    const { page = 0, size = 20, ...filters } = params
+    const response = await api.get<AdminPlatformWalletTransactionPage>(
+      '/admin/platform-wallet/transactions/paged',
+      {
+        params: { ...cleanParams(filters), page, size },
       }
     )
 

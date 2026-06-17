@@ -54,6 +54,11 @@ export const useAdminPlatformWalletStore = defineStore('adminPlatformWallet', ()
   const customDateFrom = ref('')
   const customDateTo = ref('')
 
+  const currentPage = ref(1) // 1-based na UI
+  const pageSize = ref(20)
+  const totalPages = ref(0)
+  const totalElements = ref(0)
+
   let currentTransactionsRequestId = 0
 
   const resolvedTransactionParams = computed<AdminPlatformTransactionsParams>(() => {
@@ -144,12 +149,16 @@ export const useAdminPlatformWalletStore = defineStore('adminPlatformWallet', ()
     transactionsErrorMessage.value = ''
 
     try {
-      const response = await adminPlatformWalletService.getTransactions(
-        resolvedTransactionParams.value
-      )
+      const response = await adminPlatformWalletService.getTransactionsPaged({
+        ...resolvedTransactionParams.value,
+        page: currentPage.value - 1,
+        size: pageSize.value,
+      })
 
       if (requestId === currentTransactionsRequestId) {
-        transactions.value = response
+        transactions.value = response.content
+        totalElements.value = response.totalElements
+        totalPages.value = response.totalPages
       }
     } catch (error: unknown) {
       if (requestId !== currentTransactionsRequestId) {
@@ -167,6 +176,13 @@ export const useAdminPlatformWalletStore = defineStore('adminPlatformWallet', ()
         isTransactionsLoading.value = false
       }
     }
+  }
+
+  const goToPage = (page: number) => {
+    const target = Math.min(Math.max(page, 1), Math.max(totalPages.value, 1))
+    if (target === currentPage.value) return
+    currentPage.value = target
+    return loadTransactions()
   }
 
   const loadBankAccounts = async () => {
@@ -247,6 +263,7 @@ export const useAdminPlatformWalletStore = defineStore('adminPlatformWallet', ()
     isMutating.value = true
     try {
       const withdrawal = await adminPlatformWalletService.requestWithdrawal(data)
+      currentPage.value = 1
       await refreshAfterMutation()
       return withdrawal
     } finally {
@@ -274,9 +291,14 @@ export const useAdminPlatformWalletStore = defineStore('adminPlatformWallet', ()
     timeFilter,
     customDateFrom,
     customDateTo,
+    currentPage,
+    pageSize,
+    totalPages,
+    totalElements,
     resolvedTransactionParams,
     loadWallet,
     loadTransactions,
+    goToPage,
     loadBankAccounts,
     loadWithdrawals,
     loadAll,

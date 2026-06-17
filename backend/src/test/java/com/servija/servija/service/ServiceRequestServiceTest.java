@@ -78,7 +78,7 @@ class ServiceRequestServiceTest {
 
         when(serviceRequestRepository.findById(11L)).thenReturn(Optional.of(request));
 
-        ServiceRequestResponse response = serviceRequestService.getById(11L);
+        ServiceRequestResponse response = serviceRequestService.getById(11L, "cliente@servija.com");
 
         assertThat(response.getFreelancerAttachments())
                 .containsExactly("https://cdn.servija.com/entrega-final.pdf");

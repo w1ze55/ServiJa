@@ -14,7 +14,7 @@ import java.util.List;
 @AllArgsConstructor
 public class FreelancerProfileRequest {
     
-    @Size(min = 3, max = 255, message = "Nome deve ter entre 3 e 255 caracteres")
+    @Size(min = 3, max = 100, message = "Nome deve ter entre 3 e 100 caracteres")
     private String name;
     
     @Size(max = 100, message = "Profissão deve ter no máximo 100 caracteres")

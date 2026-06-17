@@ -5,6 +5,10 @@ on:
     branches:
       - main
 
+# M15: GITHUB_TOKEN com privilégio mínimo (somente leitura do repositório).
+permissions:
+  contents: read
+
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest

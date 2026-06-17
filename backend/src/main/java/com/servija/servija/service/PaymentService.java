@@ -369,9 +369,23 @@ public class PaymentService {
         Payment payment = paymentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Pagamento não encontrado"));
 
-        payment.setStatus(Payment.PaymentStatus.valueOf(status.toUpperCase()));
+        // M2: valida o status contra o enum (rejeita valores arbitrários) e impede
+        // reverter um pagamento já concluído por esta operação manual.
+        Payment.PaymentStatus newStatus;
+        try {
+            newStatus = Payment.PaymentStatus.valueOf(status.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Status de pagamento inválido: " + status);
+        }
 
-        if (status.equalsIgnoreCase("COMPLETED") && payment.getCompletedAt() == null) {
+        if (payment.getStatus() == Payment.PaymentStatus.COMPLETED
+                && newStatus != Payment.PaymentStatus.COMPLETED) {
+            throw new IllegalStateException("Um pagamento concluído não pode ser revertido por esta operação");
+        }
+
+        payment.setStatus(newStatus);
+
+        if (newStatus == Payment.PaymentStatus.COMPLETED && payment.getCompletedAt() == null) {
             payment.setCompletedAt(LocalDateTime.now());
             walletService.addPendingBalance(payment.getFreelancer(), payment.getAmount());
         }

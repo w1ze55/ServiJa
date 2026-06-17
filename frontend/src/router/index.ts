@@ -40,6 +40,7 @@ import ClienteProjectsPage from "@/pages/ClienteProjects/index.vue";
 import ClienteDeliveryApprovalPage from "@/pages/ClienteDeliveryApproval/index.vue";
 import ClienteProjectDetailPage from "@/pages/ClienteProjectDetail/index.vue";
 import RateFreelancerPage from "@/pages/RateFreelancer/index.vue";
+import { redirectToAdminApp } from "@/utils/adminApp";
 import { getLandingRouteForRole, isOwnFreelancerProfile, normalizeStoredUser } from "@/utils/userRoles";
 import { setPendingEmailVerification } from "@/utils/pendingEmailVerification";
 
@@ -359,6 +360,11 @@ router.beforeEach((to, from, next) => {
     localStorage.removeItem("user");
     setPendingEmailVerification({ email: user.email });
     next("/login");
+    return;
+  }
+
+  if (user?.activeRole === "admin" || user?.type === "admin") {
+    redirectToAdminApp("/dashboard");
     return;
   }
 

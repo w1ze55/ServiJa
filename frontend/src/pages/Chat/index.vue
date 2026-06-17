@@ -7,6 +7,7 @@ import AvatarImage from '@/components/ui/avatar-image.vue';
 import AvatarFallback from '@/components/ui/avatar-fallback.vue';
 import type { ChatMessage } from '@/components/shared/ChatBox.vue';
 import FileAttachment from '@/components/shared/FileAttachment.vue';
+import ChatAudioPlayer from '@/components/shared/ChatAudioPlayer.vue';
 import Textarea from '@/components/ui/textarea.vue';
 import Button from '@/components/ui/button.vue';
 import { chatService } from '@/api/services/chatService';
@@ -17,14 +18,32 @@ import { uploadFiles } from '@/api/uploadService';
 import { useNavigation } from '@/utils/navigation';
 import { toast } from '@/utils/toast';
 import {
+  CHAT_ATTACHMENT_ACCEPT,
+  buildRecordedAudioFile,
+  getAudioRecordingUnavailableReason,
+  getAttachmentPlaceholder,
+  getMicrophoneAccessErrorMessage,
+  isAudioFile,
+  isAudioRecordingSupported,
+  isAudioUrl,
+  isImageFile,
+  isImageUrl,
+  logAudioRecordingError,
+  pickSupportedAudioMimeType,
+  resolveAttachmentKindFromFile,
+  resolveChatMessageType,
+  shouldHideAttachmentPlaceholder,
+} from '@/utils/chatAttachments';
+import {
   ArrowLeft,
   MessageSquare,
   Search,
   Send,
   Paperclip,
+  Mic,
+  Square,
   X,
   Lock,
-  MoreVertical,
   Download,
   ExternalLink,
   ChevronLeft,
@@ -33,14 +52,6 @@ import {
   CheckCircle2,
   CheckCheck,
 } from 'lucide-vue-next';
-
-const IMAGE_EXT_RE = /\.(jpg|jpeg|png|gif|webp|bmp|svg)(\?.*)?$/i;
-function isImageUrl(url?: string | null) {
-  return !!url && IMAGE_EXT_RE.test(url);
-}
-function isImageFile(file: File) {
-  return file.type.startsWith('image/');
-}
 
 const route = useRoute();
 const router = useRouter();
@@ -65,6 +76,37 @@ const messageAttachments = ref<File[]>([]);
 const attachmentPreviews = ref<Record<string, string>>({});
 const messageAttachmentInput = ref<HTMLInputElement | null>(null);
 const isSending = ref(false);
+const recorderState = ref<'idle' | 'recording' | 'stopping' | 'error'>('idle');
+const recordingError = ref('');
+const activeRecorder = ref<MediaRecorder | null>(null);
+const activeRecordingStream = ref<MediaStream | null>(null);
+const pendingSend = ref(false);
+const recordingSeconds = ref(0);
+let recordingTimer: ReturnType<typeof setInterval> | null = null;
+const audioRecordingSupported = computed(() => isAudioRecordingSupported());
+
+function startRecordingTimer() {
+  recordingSeconds.value = 0;
+  stopRecordingTimer();
+  recordingTimer = setInterval(() => {
+    recordingSeconds.value += 1;
+  }, 1000);
+}
+
+function stopRecordingTimer() {
+  if (recordingTimer) {
+    clearInterval(recordingTimer);
+    recordingTimer = null;
+  }
+}
+
+const recordingElapsed = computed(() => {
+  const total = recordingSeconds.value;
+  const minutes = Math.floor(total / 60);
+  const seconds = total % 60;
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+});
+const MAX_TOTAL_ATTACHMENT_SIZE = 25 * 1024 * 1024;
 
 // Lightbox
 const lightboxIndex = ref<number>(-1);
@@ -203,10 +245,6 @@ function handleServiceRequestNotification(event: Event) {
   }
 }
 
-const currentUserRole = computed<'client' | 'freelancer'>(() =>
-  user.value?.type === 'provider' ? 'freelancer' : 'client'
-);
-
 const activeServiceRequestId = computed(() => {
   const param = route.params.serviceRequestId;
   if (!param) return null;
@@ -230,16 +268,18 @@ function nameInitials(name: string) {
   return `${parts[0].charAt(0)}${parts[1].charAt(0)}`.toUpperCase();
 }
 
-const requestDetailPath = computed(() =>
+// O chat só existe a partir do serviço em andamento, então o botão sempre
+// leva à tela de detalhes do PROJETO (tanto em andamento quanto concluído/arquivado).
+const projectDetailPath = computed(() =>
   user.value?.type === 'provider'
-    ? '/freelancer-proposal-detail'
-    : '/cliente-request-detail'
+    ? '/freelancer-project-detail'
+    : '/cliente-project-detail'
 );
 
-function goToRequestDetail() {
+function goToProjectDetail() {
   if (!activeConversation.value) return;
   router.push({
-    path: requestDetailPath.value,
+    path: projectDetailPath.value,
     query: { requestId: activeConversation.value.serviceRequestId },
   });
 }
@@ -334,19 +374,32 @@ function resolveAttachmentName(msg: MessageDTO) {
   }
 }
 
+function sameEmail(a?: string | null, b?: string | null) {
+  return !!a && !!b && a.trim().toLowerCase() === b.trim().toLowerCase();
+}
+
 function toDisplay(msg: MessageDTO): ChatMessage {
-  const isMe = msg.senderId === user.value?.email;
+  const isMe = sameEmail(msg.senderId, user.value?.email);
   const counterpartyName = activeConversation.value ? otherPartyName(activeConversation.value) : '';
+  const messageType = resolveChatMessageType(msg.type, msg.attachmentUrl);
   return {
     id: msg.id,
     sender: msg.senderType === 'contractor' ? 'client' : 'freelancer',
+    isOwn: isMe,
     senderName: isMe ? user.value.name : counterpartyName || displayName(msg.senderId),
+    type: messageType,
     message: msg.content,
     timestamp: msg.sentAt,
     status: msg.status,
     readAt: msg.readAt,
     attachments: msg.attachmentUrl
-      ? [{ id: msg.id, name: resolveAttachmentName(msg), url: msg.attachmentUrl, size: '' }]
+      ? [{
+          id: msg.id,
+          name: resolveAttachmentName(msg),
+          url: msg.attachmentUrl,
+          size: '',
+          type: messageType,
+        }]
       : undefined,
   };
 }
@@ -514,6 +567,15 @@ function onKeydown(e: KeyboardEvent) {
 
 onBeforeUnmount(() => {
   for (const url of Object.values(attachmentPreviews.value)) URL.revokeObjectURL(url);
+  stopRecordingTimer();
+  const recorder = activeRecorder.value;
+  if (recorder && recorder.state !== 'inactive') {
+    recorder.ondataavailable = null;
+    recorder.onstop = null;
+    recorder.onerror = null;
+    recorder.stop();
+  }
+  activeRecordingStream.value?.getTracks().forEach((track) => track.stop());
   window.removeEventListener('keydown', onKeydown);
   window.removeEventListener('service-request-notification', handleServiceRequestNotification);
   document.removeEventListener('visibilitychange', flushPendingReads);
@@ -541,9 +603,38 @@ onMounted(async () => {
   }
 });
 
+function appendAttachments(files: File[]) {
+  const totalSize =
+    messageAttachments.value.reduce((acc, file) => acc + file.size, 0) +
+    files.reduce((acc, file) => acc + file.size, 0);
+
+  if (totalSize > MAX_TOTAL_ATTACHMENT_SIZE) {
+    toast.error('O tamanho total dos anexos nao pode exceder 25MB');
+    return false;
+  }
+
+  for (const file of files) {
+    if (isImageFile(file)) {
+      const key = fileKey(file);
+      if (!attachmentPreviews.value[key]) {
+        attachmentPreviews.value[key] = URL.createObjectURL(file);
+      }
+    }
+  }
+
+  messageAttachments.value = [...messageAttachments.value, ...files];
+  return true;
+}
+
 const handleAttachmentChange = (event: Event) => {
   const target = event.target as HTMLInputElement;
   if (!target.files) return;
+  appendAttachments(Array.from(target.files));
+  if (messageAttachmentInput.value) messageAttachmentInput.value.value = '';
+};
+
+/*
+  return;
   const newFiles = Array.from(target.files);
   const totalSize =
     messageAttachments.value.reduce((acc, f) => acc + f.size, 0) +
@@ -563,6 +654,7 @@ const handleAttachmentChange = (event: Event) => {
   messageAttachments.value = [...messageAttachments.value, ...newFiles];
   if (messageAttachmentInput.value) messageAttachmentInput.value.value = '';
 };
+*/
 
 function revokePreview(file: File) {
   const key = fileKey(file);
@@ -583,8 +675,150 @@ function clearAttachments() {
   messageAttachments.value = [];
 }
 
+function stopRecordingStream() {
+  activeRecordingStream.value?.getTracks().forEach((track) => track.stop());
+  activeRecordingStream.value = null;
+}
+
+function notifyRecordingError(message: string, scope?: string, error?: unknown) {
+  stopRecordingTimer();
+  pendingSend.value = false;
+  stopRecordingStream();
+  activeRecorder.value = null;
+  recorderState.value = 'idle';
+  recordingError.value = '';
+  if (scope) {
+    logAudioRecordingError(scope, error);
+  }
+  toast.error(message);
+}
+
+async function startAudioRecording() {
+  if (
+    isSending.value ||
+    !activeConversation.value ||
+    activeConversation.value.locked ||
+    recorderState.value === 'recording'
+  ) {
+    return;
+  }
+
+  recordingError.value = '';
+
+  if (!audioRecordingSupported.value) {
+    notifyRecordingError(getAudioRecordingUnavailableReason());
+    return;
+  }
+
+  let stream: MediaStream;
+
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch (error: any) {
+    notifyRecordingError(
+      getMicrophoneAccessErrorMessage(error),
+      'chat-page:getUserMedia',
+      error
+    );
+    return;
+  }
+
+  const chunks: BlobPart[] = [];
+  const preferredMimeType = pickSupportedAudioMimeType();
+  let recorder: MediaRecorder;
+
+  try {
+    recorder = preferredMimeType
+      ? new MediaRecorder(stream, { mimeType: preferredMimeType })
+      : new MediaRecorder(stream);
+  } catch (error) {
+    try {
+      recorder = new MediaRecorder(stream);
+    } catch (fallbackError) {
+      stream.getTracks().forEach((track) => track.stop());
+      notifyRecordingError(
+        'O navegador acessou o microfone, mas nao conseguiu iniciar a gravacao.',
+        'chat-page:mediaRecorder',
+        fallbackError
+      );
+      return;
+    }
+  }
+
+  activeRecordingStream.value = stream;
+  activeRecorder.value = recorder;
+
+  recorder.ondataavailable = (event) => {
+    if (event.data.size > 0) {
+      chunks.push(event.data);
+    }
+  };
+
+  recorder.onerror = (event) => {
+    notifyRecordingError(
+      'Nao foi possivel gravar o audio.',
+      'chat-page:recorder-runtime',
+      event
+    );
+  };
+
+  recorder.onstop = () => {
+    stopRecordingTimer();
+    stopRecordingStream();
+    activeRecorder.value = null;
+
+    if (chunks.length > 0) {
+      const audioBlob = new Blob(chunks, {
+        type: recorder.mimeType || preferredMimeType || 'audio/webm',
+      });
+      const audioFile = buildRecordedAudioFile(audioBlob);
+      appendAttachments([audioFile]);
+    }
+
+    recorderState.value = 'idle';
+
+    // Envio solicitado durante a gravacao: agora que o audio ja foi anexado,
+    // dispara o envio real (o proprio handleSend valida o conteudo).
+    if (pendingSend.value) {
+      pendingSend.value = false;
+      nextTick(handleSend);
+    }
+  };
+
+  try {
+    recorder.start();
+    startRecordingTimer();
+    recorderState.value = 'recording';
+  } catch (error) {
+    notifyRecordingError(
+      'Nao foi possivel iniciar a gravacao de audio.',
+      'chat-page:recorder-start',
+      error
+    );
+  }
+}
+
+function stopAudioRecording() {
+  if (!activeRecorder.value || recorderState.value !== 'recording') {
+    return;
+  }
+
+  recorderState.value = 'stopping';
+  activeRecorder.value.stop();
+}
+
 async function handleSend() {
   if (isSending.value || !activeConversation.value) return;
+
+  // Se estiver gravando, finaliza a gravacao e o envio acontece apos o onstop
+  // anexar o audio (sem precisar parar manualmente antes).
+  if (recorderState.value === 'recording') {
+    pendingSend.value = true;
+    stopAudioRecording();
+    return;
+  }
+  if (recorderState.value === 'stopping') return;
+
   if (!newMessage.value.trim() && messageAttachments.value.length === 0) {
     toast.error('Digite uma mensagem ou adicione um anexo');
     return;
@@ -596,7 +830,6 @@ async function handleSend() {
   const files = [...messageAttachments.value];
   newMessage.value = '';
   clearAttachments();
-
   try {
     if (text) {
       const msg = await chatService.sendMessage(activeConversation.value.id, text);
@@ -607,12 +840,13 @@ async function handleSend() {
     if (files.length > 0) {
       const urls = await uploadFiles(files);
       for (const [index, url] of urls.entries()) {
-        const fileName = files[index]?.name || 'Anexo';
-        const asImage = isImageUrl(url);
+        const file = files[index];
+        const fileName = file?.name || 'Anexo';
+        const attachmentType = file ? resolveAttachmentKindFromFile(file) : 'file';
         const msg = await chatService.sendMessage(
           activeConversation.value.id,
-          asImage ? 'Imagem' : 'Arquivo',
-          asImage ? 'image' : 'file',
+          getAttachmentPlaceholder(attachmentType),
+          attachmentType,
           url,
           fileName
         );
@@ -630,6 +864,16 @@ async function handleSend() {
 
 function onComposerKeydown(e: KeyboardEvent) {
   if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    handleSend();
+  }
+}
+
+// Enquanto grava, o botao de microfone mantem o foco; sem isto, o Enter
+// dispararia o "click" nativo do botao (parar) em vez de enviar o audio.
+function onRecordButtonKeydown(e: KeyboardEvent) {
+  if (e.key !== 'Enter' || e.shiftKey || e.isComposing) return;
+  if (recorderState.value === 'recording') {
     e.preventDefault();
     handleSend();
   }
@@ -899,12 +1143,12 @@ const handleSearch = (query: string) => router.push({ path: '/search', query: { 
                 </p>
               </div>
               <button
-                @click="goToRequestDetail"
+                @click="goToProjectDetail"
                 class="inline-flex items-center gap-2 rounded-full border border-gray-200 px-3 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 hover:text-gray-900"
-                title="Ver solicitação"
+                title="Ver projeto"
               >
                 <ExternalLink class="h-4 w-4" />
-                <span class="hidden sm:inline">Ver solicitação</span>
+                <span class="hidden sm:inline">Ver projeto</span>
               </button>
             </header>
 
@@ -941,24 +1185,24 @@ const handleSearch = (query: string) => router.push({ path: '/search', query: { 
                 <div
                   v-for="msg in group.items"
                   :key="msg.id"
-                  :class="['flex', msg.sender === currentUserRole ? 'justify-end' : 'justify-start']"
+                  :class="['flex', msg.isOwn ? 'justify-end' : 'justify-start']"
                 >
                   <div
                     :class="[
                       'max-w-[75%] rounded-2xl px-3.5 py-2 shadow-sm',
-                      msg.sender === currentUserRole
+                      msg.isOwn
                         ? 'bg-[#286AD8] text-white rounded-br-sm'
                         : 'bg-white text-gray-800 border border-gray-100 rounded-bl-sm',
                     ]"
                   >
                     <p
-                      v-if="msg.sender !== currentUserRole"
+                      v-if="!msg.isOwn"
                       class="text-[11px] font-semibold mb-0.5 text-blue-600 capitalize"
                     >
                       {{ msg.senderName }}
                     </p>
                     <p
-                      v-if="msg.message && !(msg.attachments?.length && (msg.message === 'Imagem' || msg.message === 'Arquivo'))"
+                      v-if="!shouldHideAttachmentPlaceholder(msg.message, msg.type, !!msg.attachments?.length)"
                       class="text-sm whitespace-pre-wrap break-words"
                     >{{ msg.message }}</p>
                     <div v-if="msg.attachments && msg.attachments.length > 0" class="mt-1.5 space-y-1.5">
@@ -976,15 +1220,21 @@ const handleSearch = (query: string) => router.push({ path: '/search', query: { 
                             loading="lazy"
                           />
                         </button>
+                        <ChatAudioPlayer
+                          v-else-if="msg.type === 'audio' || isAudioUrl(att.url)"
+                          :src="att.url"
+                          :is-own="msg.isOwn"
+                        />
                         <FileAttachment
                           v-else
                           :name="att.name"
                           :url="att.url"
                           :size="att.size"
+                          :type="att.type"
                           variant="compact"
                           :class="
-                            msg.sender === currentUserRole
-                              ? 'bg-blue-100 border-white/20 text-white'
+                            msg.isOwn
+                              ? 'bg-white text-black'
                               : ''
                           "
                         />
@@ -993,17 +1243,17 @@ const handleSearch = (query: string) => router.push({ path: '/search', query: { 
                     <div
                       :class="[
                         'text-[10px] mt-1 flex items-center justify-end gap-1',
-                        msg.sender === currentUserRole ? 'text-white/70' : 'text-gray-400',
+                        msg.isOwn ? 'text-white/70' : 'text-gray-400',
                       ]"
                     >
                       <span>{{ formatHour(msg.timestamp) }}</span>
                       <CheckCheck
-                        v-if="msg.sender === currentUserRole && msg.status === 'read'"
+                        v-if="msg.isOwn && msg.status === 'read'"
                         class="h-3.5 w-3.5 text-sky-300"
                         aria-label="Visualizado"
                       />
                       <CheckCheck
-                        v-else-if="msg.sender === currentUserRole"
+                        v-else-if="msg.isOwn"
                         class="h-3.5 w-3.5 text-white/50"
                         aria-label="Enviado"
                       />
@@ -1026,6 +1276,27 @@ const handleSearch = (query: string) => router.push({ path: '/search', query: { 
               </div>
 
               <div v-else class="space-y-2">
+                <div
+                  v-if="recorderState === 'recording' || recorderState === 'stopping'"
+                  class="flex items-center justify-between rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-700"
+                >
+                  <span v-if="recorderState === 'recording'" class="flex items-center gap-2">
+                    <span class="recording-dot" />
+                    Gravando áudio... {{ recordingElapsed }}
+                  </span>
+                  <span v-else-if="recorderState === 'stopping'">Finalizando áudio...</span>
+                  <Button
+                    v-if="recorderState === 'recording'"
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    class="h-8 w-8 text-red-600 hover:bg-red-100 hover:text-red-700"
+                    @click="stopAudioRecording"
+                  >
+                    <Square class="h-4 w-4 fill-current" />
+                  </Button>
+                </div>
+
                 <div v-if="messageAttachments.length > 0" class="flex flex-wrap gap-2">
                   <template v-for="(file, index) in messageAttachments" :key="fileKey(file)">
                     <!-- Preview de imagem -->
@@ -1052,7 +1323,8 @@ const handleSearch = (query: string) => router.push({ path: '/search', query: { 
                       v-else
                       class="flex items-center gap-2 bg-blue-50 border border-blue-100 px-3 py-1.5 rounded-full text-sm text-blue-700"
                     >
-                      <Paperclip class="h-3.5 w-3.5" />
+                      <Mic v-if="isAudioFile(file)" class="h-3.5 w-3.5" />
+                      <Paperclip v-else class="h-3.5 w-3.5" />
                       <span class="max-w-[150px] truncate" :title="file.name">{{ file.name }}</span>
                       <button
                         @click="removeAttachment(index)"
@@ -1070,6 +1342,7 @@ const handleSearch = (query: string) => router.push({ path: '/search', query: { 
                     ref="messageAttachmentInput"
                     type="file"
                     multiple
+                    :accept="CHAT_ATTACHMENT_ACCEPT"
                     @change="handleAttachmentChange"
                     class="hidden"
                   />
@@ -1090,13 +1363,43 @@ const handleSearch = (query: string) => router.push({ path: '/search', query: { 
                     @keydown="onComposerKeydown"
                   />
                   <Button
+                    type="button"
+                    :disabled="
+                      isSending ||
+                      activeConversation.locked ||
+                      recorderState === 'stopping' ||
+                      !audioRecordingSupported
+                    "
+                    :title="
+                      audioRecordingSupported
+                        ? recorderState === 'recording'
+                          ? 'Parar gravação'
+                          : 'Gravar áudio'
+                        : 'Gravação de áudio indisponível neste navegador'
+                    "
+                    variant="outline"
+                    size="icon"
+                    @click="recorderState === 'recording' ? stopAudioRecording() : startAudioRecording()"
+                    @keydown="onRecordButtonKeydown"
+                  >
+                    <Square
+                      v-if="recorderState === 'recording'"
+                      class="h-4 w-4 fill-current text-red-600"
+                    />
+                    <Mic v-else class="h-4 w-4" />
+                  </Button>
+                  <Button
                     @click="handleSend"
                     :disabled="
-                      (!newMessage.trim() && messageAttachments.length === 0) || isSending
+                      (!newMessage.trim() &&
+                        messageAttachments.length === 0 &&
+                        recorderState !== 'recording') ||
+                      isSending ||
+                      recorderState === 'stopping'
                     "
                     variant="default"
                     size="icon"
-                    title="Enviar"
+                    :title="recorderState === 'recording' ? 'Enviar áudio' : 'Enviar'"
                   >
                     <Send class="h-4 w-4" />
                   </Button>
@@ -1182,3 +1485,26 @@ const handleSearch = (query: string) => router.push({ path: '/search', query: { 
     </div>
   </MainLayout>
 </template>
+
+<style scoped>
+.recording-dot {
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 9999px;
+  background-color: #dc2626;
+  animation: recording-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes recording-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(0.7);
+  }
+}
+</style>

@@ -93,7 +93,7 @@ const handleSubmit = async (e: Event) => {
 <template>
   <div
     v-if="success"
-    class="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4"
+    class="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-4"
   >
     <div class="w-full max-w-md bg-white rounded-lg shadow-xl p-8">
       <div class="text-center">
@@ -125,7 +125,7 @@ const handleSubmit = async (e: Event) => {
 
   <div
     v-else
-    class="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4"
+    class="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-4"
   >
     <div class="w-full max-w-md bg-white rounded-lg shadow-xl p-8">
       <Button

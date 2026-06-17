@@ -27,6 +27,7 @@ import {
 } from "lucide-vue-next";
 import Button from "../ui/button.vue";
 import Input from "../ui/input.vue";
+import DatePicker from "../ui/date-picker.vue";
 import Card from "../ui/card.vue";
 import Badge from "../ui/badge.vue";
 import Avatar from "../ui/avatar.vue";
@@ -311,30 +312,54 @@ const proposalStatusVisuals: Record<
 
 proposalStatusVisuals.completed.cardLabel = "Conclu\u00eddas";
 
+// Contagem por status respeitando os filtros ativos (busca, categoria,
+// subcategoria e período), porém ignorando a aba de status selecionada.
+const statusCardCounts = computed(() => {
+  const counts: Record<ProposalStatusCardKey, number> = {
+    pending: 0,
+    negotiating: 0,
+    in_progress: 0,
+    rejected: 0,
+    completed: 0,
+  };
+
+  proposalStore.proposals
+    .filter((proposal) => proposalMatchesActiveFilters(proposal, false))
+    .forEach((proposal) => {
+      counts[getProposalStatusVisualKey(proposal)] += 1;
+    });
+
+  return counts;
+});
+
+const statusCardTotal = computed(() =>
+  Object.values(statusCardCounts.value).reduce((sum, count) => sum + count, 0),
+);
+
 const proposalStatusCards = computed(() => [
   {
     key: "pending" as const,
-    count: proposalStore.stats.pending,
+    count: statusCardCounts.value.pending,
     ...proposalStatusVisuals.pending,
   },
   {
     key: "negotiating" as const,
-    count: proposalStore.stats.negotiating,
+    count: statusCardCounts.value.negotiating,
     ...proposalStatusVisuals.negotiating,
   },
   {
     key: "in_progress" as const,
-    count: proposalStore.stats.inProgress,
+    count: statusCardCounts.value.in_progress,
     ...proposalStatusVisuals.in_progress,
   },
   {
     key: "rejected" as const,
-    count: proposalStore.stats.rejected,
+    count: statusCardCounts.value.rejected,
     ...proposalStatusVisuals.rejected,
   },
   {
     key: "completed" as const,
-    count: proposalStore.stats.completed,
+    count: statusCardCounts.value.completed,
     ...proposalStatusVisuals.completed,
   },
 ]);
@@ -494,108 +519,118 @@ const handlePaymentNotification = (event: any) => {
   }
 };
 
-const filteredProposals = computed(() => {
+// Filtro por período
+const matchesTimeFilter = (proposal: Proposal) => {
+  const proposalDate = new Date(proposal.receivedAt);
+  const now = new Date();
+  const startOfToday = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+  );
+
+  switch (timeFilter.value) {
+    case "Todo o período":
+      return true;
+    case "Hoje":
+      return proposalDate >= startOfToday;
+    case "Ontem": {
+      const startOfYesterday = new Date(startOfToday);
+      startOfYesterday.setDate(startOfYesterday.getDate() - 1);
+      return proposalDate >= startOfYesterday && proposalDate < startOfToday;
+    }
+    case "Últimos 7 dias": {
+      const sevenDaysAgo = new Date(startOfToday);
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      return proposalDate >= sevenDaysAgo;
+    }
+    case "Últimos 30 dias": {
+      const thirtyDaysAgo = new Date(startOfToday);
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      return proposalDate >= thirtyDaysAgo;
+    }
+    case "Mês atual":
+      return (
+        proposalDate.getMonth() === now.getMonth() &&
+        proposalDate.getFullYear() === now.getFullYear()
+      );
+    case "Último mês": {
+      const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const endOfLastMonth = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        0,
+        23,
+        59,
+        59,
+      );
+      return proposalDate >= lastMonth && proposalDate <= endOfLastMonth;
+    }
+    case "Intervalo personalizado": {
+      const from = customDateFrom.value
+        ? new Date(customDateFrom.value + "T00:00:00")
+        : null;
+      const to = customDateTo.value
+        ? new Date(customDateTo.value + "T23:59:59")
+        : null;
+      if (from && to) return proposalDate >= from && proposalDate <= to;
+      if (from) return proposalDate >= from;
+      if (to) return proposalDate <= to;
+      return true;
+    }
+    default:
+      return true;
+  }
+};
+
+const matchesStatusTab = (proposal: Proposal) =>
+  currentTab.value === "all" ||
+  (currentTab.value === "pending" && proposal.status === "pending") ||
+  (currentTab.value === "negotiating" &&
+    (proposal.status === "negotiating" || proposal.status === "accepted")) ||
+  (currentTab.value === "in_progress" &&
+    (proposal.status === "in_progress" || proposal.status === "delivered")) ||
+  (currentTab.value === "rejected" && proposal.status === "rejected") ||
+  (currentTab.value === "completed" &&
+    (proposal.status === "completed" || proposal.status === "archived"));
+
+// Aplica os filtros de busca/categoria/subcategoria/período.
+// `includeTab` controla se o filtro de aba (status) também é aplicado —
+// os cards de contagem usam `false` para refletir os demais filtros.
+const proposalMatchesActiveFilters = (
+  proposal: Proposal,
+  includeTab: boolean,
+) => {
   const normalizedSearchQuery = searchQuery.value.trim().toLowerCase();
   const hasSearchQuery = normalizedSearchQuery.length > 0;
 
-  let filtered = proposalStore.proposals.filter((proposal) => {
-    const matchesSearch =
-      !hasSearchQuery ||
-      proposal.clientName.toLowerCase().includes(normalizedSearchQuery) ||
-      proposal.service.toLowerCase().includes(normalizedSearchQuery) ||
-      proposal.description.toLowerCase().includes(normalizedSearchQuery);
-    const matchesCategory =
-      categoryFilter.value === ALL_CATEGORIES_VALUE ||
-      getCategoryFilterValue(proposal) === categoryFilter.value;
-    const matchesSubcategory =
-      subcategoryFilter.value === ALL_SUBCATEGORIES_VALUE ||
-      getSubcategoryFilterValue(proposal) === subcategoryFilter.value;
-    const matchesTab =
-      currentTab.value === "all" ||
-      (currentTab.value === "pending" && proposal.status === "pending") ||
-      (currentTab.value === "negotiating" &&
-        (proposal.status === "negotiating" ||
-          proposal.status === "accepted")) ||
-      (currentTab.value === "in_progress" &&
-        (proposal.status === "in_progress" ||
-          proposal.status === "delivered")) ||
-      (currentTab.value === "rejected" && proposal.status === "rejected") ||
-      (currentTab.value === "completed" &&
-        (proposal.status === "completed" || proposal.status === "archived"));
-    // Filtro por período
-    const matchesTime = (() => {
-      const proposalDate = new Date(proposal.receivedAt);
-      const now = new Date();
-      const startOfToday = new Date(
-        now.getFullYear(),
-        now.getMonth(),
-        now.getDate(),
-      );
+  const matchesSearch =
+    !hasSearchQuery ||
+    proposal.clientName.toLowerCase().includes(normalizedSearchQuery) ||
+    proposal.service.toLowerCase().includes(normalizedSearchQuery) ||
+    proposal.description.toLowerCase().includes(normalizedSearchQuery);
 
-      switch (timeFilter.value) {
-        case "Hoje":
-          return proposalDate >= startOfToday;
-        case "Ontem": {
-          const startOfYesterday = new Date(startOfToday);
-          startOfYesterday.setDate(startOfYesterday.getDate() - 1);
-          return (
-            proposalDate >= startOfYesterday && proposalDate < startOfToday
-          );
-        }
-        case "Últimos 7 dias": {
-          const sevenDaysAgo = new Date(startOfToday);
-          sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-          return proposalDate >= sevenDaysAgo;
-        }
-        case "Últimos 30 dias": {
-          const thirtyDaysAgo = new Date(startOfToday);
-          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-          return proposalDate >= thirtyDaysAgo;
-        }
-        case "Mês atual":
-          return (
-            proposalDate.getMonth() === now.getMonth() &&
-            proposalDate.getFullYear() === now.getFullYear()
-          );
-        case "Último mês": {
-          const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-          const endOfLastMonth = new Date(
-            now.getFullYear(),
-            now.getMonth(),
-            0,
-            23,
-            59,
-            59,
-          );
-          return proposalDate >= lastMonth && proposalDate <= endOfLastMonth;
-        }
-        case "Intervalo personalizado": {
-          const from = customDateFrom.value
-            ? new Date(customDateFrom.value + "T00:00:00")
-            : null;
-          const to = customDateTo.value
-            ? new Date(customDateTo.value + "T23:59:59")
-            : null;
-          if (from && to) return proposalDate >= from && proposalDate <= to;
-          if (from) return proposalDate >= from;
-          if (to) return proposalDate <= to;
-          return true;
-        }
-        default:
-          return true;
-      }
-    })();
+  if (hasSearchQuery) return matchesSearch;
 
-    return (
-      hasSearchQuery
-        ? matchesSearch
-        : matchesSearch &&
-            matchesCategory &&
-            matchesSubcategory &&
-            matchesTab &&
-            matchesTime
-    );
-  });
+  const matchesCategory =
+    categoryFilter.value === ALL_CATEGORIES_VALUE ||
+    getCategoryFilterValue(proposal) === categoryFilter.value;
+  const matchesSubcategory =
+    subcategoryFilter.value === ALL_SUBCATEGORIES_VALUE ||
+    getSubcategoryFilterValue(proposal) === subcategoryFilter.value;
+
+  return (
+    matchesCategory &&
+    matchesSubcategory &&
+    matchesTimeFilter(proposal) &&
+    (!includeTab || matchesStatusTab(proposal))
+  );
+};
+
+const filteredProposals = computed(() => {
+  let filtered = proposalStore.proposals.filter((proposal) =>
+    proposalMatchesActiveFilters(proposal, true),
+  );
 
   if (sortBy.value === "Mais recentes") {
     filtered.sort(
@@ -910,6 +945,7 @@ watch(totalPages, (pages) => {
             <SelectValue placeholder="Últimos 30 dias" />
           </SelectTrigger>
           <SelectContent>
+            <SelectItem value="Todo o período">Todo o período</SelectItem>
             <SelectItem value="Hoje">Hoje</SelectItem>
             <SelectItem value="Ontem">Ontem</SelectItem>
             <SelectItem value="Últimos 7 dias">Últimos 7 dias</SelectItem>
@@ -941,9 +977,10 @@ watch(totalPages, (pages) => {
       >
         <div class="space-y-1">
           <label class="text-sm font-medium text-[#435574]">De</label>
-          <Input
-            type="date"
+          <DatePicker
             :model-value="customDateFrom"
+            :max="customDateTo || undefined"
+            placeholder="Data inicial"
             @update:model-value="
               (val: string) => {
                 customDateFrom = val;
@@ -954,9 +991,10 @@ watch(totalPages, (pages) => {
         </div>
         <div class="space-y-1">
           <label class="text-sm font-medium text-[#435574]">Até</label>
-          <Input
-            type="date"
+          <DatePicker
             :model-value="customDateTo"
+            :min="customDateFrom || undefined"
+            placeholder="Data final"
             @update:model-value="
               (val: string) => {
                 customDateTo = val;
@@ -976,28 +1014,28 @@ watch(totalPages, (pages) => {
       <div class="overflow-x-auto -mx-1 px-1">
         <TabsList class="flex w-max min-w-full">
           <TabsTrigger value="all" class="flex-shrink-0 text-xs sm:text-sm"
-            >Todas ({{ proposalStore.proposals.length }})</TabsTrigger
+            >Todas ({{ statusCardTotal }})</TabsTrigger
           >
           <TabsTrigger value="pending" class="flex-shrink-0 text-xs sm:text-sm">
-            Pendentes ({{ proposalStore.stats.pending }})
+            Pendentes ({{ statusCardCounts.pending }})
           </TabsTrigger>
           <TabsTrigger
             value="negotiating"
             class="flex-shrink-0 text-xs sm:text-sm"
-            >Negociando ({{ proposalStore.stats.negotiating }})</TabsTrigger
+            >Negociando ({{ statusCardCounts.negotiating }})</TabsTrigger
           >
           <TabsTrigger
             value="in_progress"
             class="flex-shrink-0 text-xs sm:text-sm"
-            >Em Andamento ({{ proposalStore.stats.inProgress }})</TabsTrigger
+            >Em Andamento ({{ statusCardCounts.in_progress }})</TabsTrigger
           >
           <TabsTrigger value="rejected" class="flex-shrink-0 text-xs sm:text-sm"
-            >Recusadas ({{ proposalStore.stats.rejected }})</TabsTrigger
+            >Recusadas ({{ statusCardCounts.rejected }})</TabsTrigger
           >
           <TabsTrigger
             value="completed"
             class="flex-shrink-0 text-xs sm:text-sm"
-            >Concluídas ({{ proposalStore.stats.completed }})</TabsTrigger
+            >Concluídas ({{ statusCardCounts.completed }})</TabsTrigger
           >
         </TabsList>
       </div>

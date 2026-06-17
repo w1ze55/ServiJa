@@ -49,7 +49,7 @@ public class User implements UserDetails {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, length = 255)
+    @Column(nullable = false, length = 100)
     private String name;
 
     @Column(nullable = false, unique = true, length = 256)
@@ -160,6 +160,12 @@ public class User implements UserDetails {
 
     @Column(name = "totp_locked_until")
     private LocalDateTime totpLockedUntil;
+
+    // H6: versão de credenciais. Incrementada em troca/reset de senha para invalidar
+    // todos os JWTs emitidos antes (revogação de tokens stateless).
+    @Column(name = "token_version", nullable = false)
+    @lombok.Builder.Default
+    private Integer tokenVersion = 0;
 
     @OneToOne(mappedBy = "user", fetch = FetchType.LAZY)
     private Contractor contractorProfile;

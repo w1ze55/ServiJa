@@ -2,7 +2,6 @@ package com.servija.servija.service;
 
 import com.servija.servija.dto.AuthResponse;
 import com.servija.servija.dto.ChangePasswordRequest;
-import com.servija.servija.dto.DeleteAccountRequest;
 import com.servija.servija.dto.UpdateAvatarRequest;
 import com.servija.servija.exception.InvalidCredentialsException;
 import com.servija.servija.model.Contractor;
@@ -29,7 +28,6 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;

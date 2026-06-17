@@ -17,64 +17,42 @@
     "enabled": true,
     "containers": ["servija_backend", "servija_mysql", "servija_mongo"]
   },
+  "capacitySearch": {
+    "startVus": 100,
+    "stepVus": 25,
+    "maxVus": 1200,
+    "stepDurationMs": 90000,
+    "abort": {
+      "errorRateThreshold": 0.05,
+      "windowMs": 45000
+    }
+  },
   "profiles": {
-    "50": {
-      "warmup": {
-        "targetVus": 10,
-        "durationMs": 30000
-      },
-      "ramp": {
-        "targetVus": 50,
-        "durationMs": 30000
-      },
-      "sustain": {
-        "targetVus": 50,
-        "durationMs": 240000
-      },
-      "cooldown": {
-        "targetVus": 0,
-        "durationMs": 30000
-      }
+    "50": { 
+      "warmup": { "targetVus": 10, "durationMs": 30000 },
+      "ramp": { "targetVus": 50, "durationMs": 30000 },
+      "sustain": { "targetVus": 50, "durationMs": 240000 },
+      "cooldown": { "targetVus": 0, "durationMs": 30000 }
     },
     "100": {
-      "warmup": {
-        "targetVus": 10,
-        "durationMs": 30000
-      },
-      "ramp": {
-        "targetVus": 100,
-        "durationMs": 60000
-      },
-      "sustain": {
-        "targetVus": 100,
-        "durationMs": 300000
-      },
-      "cooldown": {
-        "targetVus": 0,
-        "durationMs": 60000
-      }
+      "warmup": { "targetVus": 10, "durationMs": 30000 },
+      "ramp": { "targetVus": 100, "durationMs": 60000 },
+      "sustain": { "targetVus": 100, "durationMs": 300000 },
+      "cooldown": { "targetVus": 0, "durationMs": 60000 }
     },
     "1000": {
-      "warmup": {
-        "targetVus": 20,
-        "durationMs": 60000
-      },
-      "ramp": {
-        "targetVus": 1000,
-        "durationMs": 360000
-      },
-      "sustain": {
-        "targetVus": 1000,
-        "durationMs": 240000
-      },
-      "cooldown": {
-        "targetVus": 0,
-        "durationMs": 90000
-      },
-      "abort": {
-        "errorRateThreshold": 0.25,
-        "windowMs": 60000
-      }
+      "warmup": { "targetVus": 20, "durationMs": 60000 },
+      "ramp": { "targetVus": 1000, "durationMs": 360000 },
+      "sustain": { "targetVus": 1000, "durationMs": 240000 },
+      "cooldown": { "targetVus": 0, "durationMs": 90000 },
+      "abort": { "errorRateThreshold": 0.25, "windowMs": 60000 }
+    },
+    "5000": {
+      "warmup": { "targetVus": 100, "durationMs": 90000 },
+      "ramp": { "targetVus": 5000, "durationMs": 600000 },
+      "sustain": { "targetVus": 5000, "durationMs": 180000 },
+      "cooldown": { "targetVus": 0, "durationMs": 120000 },
+      "abort": { "errorRateThreshold": 0.35, "windowMs": 60000 }
     },
     "10000": {
       "warmup": { "targetVus": 200, "durationMs": 120000 },

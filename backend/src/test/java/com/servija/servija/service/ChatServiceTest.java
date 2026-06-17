@@ -18,8 +18,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
 
 import java.time.Instant;
 import java.util.HashMap;
@@ -98,6 +96,32 @@ class ChatServiceTest {
         assertThat(response.content()).isEqualTo("oi");
         assertThat(conversation.isLocked()).isFalse();
         verify(webSocketService).notifyChatMessage("conv-1", response);
+    }
+
+    @Test
+    @DisplayName("sendMessage persiste mensagem de audio com anexo")
+    void sendMessagePersistsAudioType() {
+        Conversation conversation = conversation(false);
+        ServiceRequest request = serviceRequest(true);
+
+        when(conversationRepository.findById("conv-1")).thenReturn(Optional.of(conversation));
+        when(serviceRequestRepository.findById(10L)).thenReturn(Optional.of(request));
+        when(conversationRepository.save(any(Conversation.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(messageRepository.save(any(Message.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        MessageDTO response = service.sendMessage(
+                "conv-1",
+                "client@test.com",
+                new SendMessageRequest("Audio", "audio", "https://bucket/audio.webm", "audio.webm"));
+
+        assertThat(response.type()).isEqualTo("audio");
+        assertThat(response.attachmentUrl()).isEqualTo("https://bucket/audio.webm");
+        assertThat(response.attachmentName()).isEqualTo("audio.webm");
+
+        ArgumentCaptor<Message> captor = ArgumentCaptor.forClass(Message.class);
+        verify(messageRepository).save(captor.capture());
+        assertThat(captor.getValue().getType()).isEqualTo("audio");
+        assertThat(captor.getValue().getAttachmentName()).isEqualTo("audio.webm");
     }
 
     @Test

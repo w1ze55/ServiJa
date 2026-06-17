@@ -1,7 +1,11 @@
 import { ref } from 'vue';
 import { Client } from '@stomp/stompjs';
-import SockJS from 'sockjs-client';
 import { useUserStore } from '@/stores/userStore';
+import {
+  createSockJsFactory,
+  describeSockJsCandidate,
+  getStompConnectHeaders,
+} from '@/utils/websocket';
 
 export interface ProfileUpdateEvent {
   type: 'PROFILE_IMAGE_UPDATED';
@@ -16,12 +20,12 @@ export function useProfileWebSocket(userEmail: string) {
   const connectionPromise = ref<Promise<void> | null>(null);
 
   const connect = () => {
-    if (client.value?.connected) {
-      return Promise.resolve();
+    if (client.value?.connected || client.value?.active) {
+      return connectionPromise.value ?? Promise.resolve();
     }
 
     if (!userEmail) {
-      connectionError.value = 'Email do usuário não disponível';
+      connectionError.value = 'Email do usuario nao disponivel';
       return Promise.resolve();
     }
 
@@ -29,18 +33,21 @@ export function useProfileWebSocket(userEmail: string) {
       return connectionPromise.value;
     }
 
-    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080';
-    const wsUrl = `${apiUrl}/ws`;
-
     connectionPromise.value = new Promise<void>((resolve, reject) => {
+      const socketFactory = createSockJsFactory();
+      let hasConnected = false;
+      let settled = false;
+
       const stompClient = new Client({
-        webSocketFactory: () => new SockJS(wsUrl),
-        reconnectDelay: 5000,
+        webSocketFactory: socketFactory.webSocketFactory,
+        connectHeaders: getStompConnectHeaders(),
+        reconnectDelay: 1000,
         heartbeatIncoming: 4000,
         heartbeatOutgoing: 4000,
       });
 
       stompClient.onConnect = () => {
+        hasConnected = true;
         connected.value = true;
         connectionError.value = null;
 
@@ -52,7 +59,6 @@ export function useProfileWebSocket(userEmail: string) {
             if (event.type === 'PROFILE_IMAGE_UPDATED' && event.avatarUrl) {
               const userStore = useUserStore();
               userStore.updateUser({ avatar: event.avatarUrl });
-
               window.dispatchEvent(
                 new CustomEvent('profile-image-updated', { detail: event })
               );
@@ -62,19 +68,45 @@ export function useProfileWebSocket(userEmail: string) {
           }
         });
 
-        resolve();
+        if (!settled) {
+          settled = true;
+          resolve();
+        }
       };
 
       stompClient.onStompError = (frame) => {
         connected.value = false;
         connectionError.value = frame.headers['message'] || 'Erro STOMP';
         connectionPromise.value = null;
-        reject(new Error(connectionError.value));
+
+        if (!settled) {
+          settled = true;
+          reject(new Error(connectionError.value));
+        }
       };
 
       stompClient.onWebSocketClose = () => {
         connected.value = false;
+
+        if (hasConnected) {
+          connectionPromise.value = null;
+          return;
+        }
+
+        const failedCandidate = socketFactory.getCurrentCandidate();
+        if (socketFactory.advanceCandidate()) {
+          console.warn(
+            `[profile-ws] Falha ao conectar via ${describeSockJsCandidate(failedCandidate)}. Tentando ${describeSockJsCandidate(socketFactory.getCurrentCandidate())}.`
+          );
+          return;
+        }
+
+        connectionError.value = 'Erro ao conectar WebSocket';
         connectionPromise.value = null;
+        if (!settled) {
+          settled = true;
+          reject(new Error(connectionError.value));
+        }
       };
 
       stompClient.activate();

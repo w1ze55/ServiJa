@@ -21,7 +21,7 @@ public class Message {
     private String conversationId;
     private String senderId;
     private String senderType; // "contractor" | "provider"
-    private String type;       // "text" | "image" | "file" | "system"
+    private String type;       // "text" | "image" | "file" | "audio" | "system"
     private String content;
     private String attachmentUrl;
     private String attachmentName;

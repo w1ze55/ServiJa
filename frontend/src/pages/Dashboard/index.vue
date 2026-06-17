@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted } from 'vue';
 import { useRouter } from 'vue-router';
+import { redirectToAdminApp } from '@/utils/adminApp';
 
 const router = useRouter();
 
@@ -20,7 +21,7 @@ onMounted(() => {
   } else if (user.type === 'contractor') {
     router.push('/cliente-home');
   } else if (user.type === 'admin') {
-    router.push('/admin/categories');
+    redirectToAdminApp('/dashboard');
   } else {
     // Fallback para landing page se tipo desconhecido
     router.push('/');

@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue';
 import Button from '../ui/button.vue';
 import Input from '../ui/input.vue';
+import DatePicker from '../ui/date-picker.vue';
 import Label from '../ui/label.vue';
 import Checkbox from '../ui/checkbox.vue';
 import Alert from '../ui/alert.vue';
@@ -316,6 +317,7 @@ const handleSubmit = async (e: Event) => {
           <Input
             id="name"
             type="text"
+            maxlength="100"
             placeholder="Digite seu nome completo"
             :value="formData.name"
             @input="(e: Event) => handleChange('name', (e.target as HTMLInputElement).value)"
@@ -372,18 +374,14 @@ const handleSubmit = async (e: Event) => {
         <div class="signup-personal-data-grid">
           <div class="signup-personal-data-field">
             <Label for="birthDate">Data de nascimento *</Label>
-            <Input
+            <DatePicker
               id="birthDate"
-              type="date"
-              :value="formData.birthDate"
+              :model-value="formData.birthDate"
               :max="maxBirthDate"
-              @input="(e: Event) => handleChange('birthDate', (e.target as HTMLInputElement).value)"
-              @blur="handleBlur('birthDate')"
-              :class="[
-                'signup-personal-data-date-input',
-                errors.birthDate && touched.birthDate ? 'signup-personal-data-input-error' : '',
-              ]"
+              placeholder="Selecione a data"
               :disabled="isLoading"
+              :class="errors.birthDate && touched.birthDate ? 'border-destructive focus-visible:ring-destructive/40' : ''"
+              @update:model-value="(val: string) => { handleChange('birthDate', val); handleBlur('birthDate'); }"
             />
             <p v-if="errors.birthDate && touched.birthDate" class="signup-personal-data-error-message">
               <AlertCircle class="h-3 w-3" />

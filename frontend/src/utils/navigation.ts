@@ -1,5 +1,6 @@
 import { useRouter } from 'vue-router';
 import { useUserStore } from '@/stores/userStore';
+import { redirectToAdminApp } from '@/utils/adminApp';
 
 // Mapa de rotas para freelancers
 export const freelancerRoutes: Record<string, string> = {
@@ -49,10 +50,10 @@ export const clientRoutes: Record<string, string> = {
 };
 
 export const adminRoutes: Record<string, string> = {
-  'home': '/admin/categories',
-  'admin-categories': '/admin/categories',
-  'admin-users': '/admin/users',
-  'users': '/admin/users',
+  'home': '/dashboard',
+  'admin-categories': '/dashboard',
+  'admin-users': '/dashboard',
+  'users': '/dashboard',
 };
 
 // Função para obter a rota baseada no tipo de usuário
@@ -74,6 +75,11 @@ export function useNavigation() {
   const router = useRouter();
 
   const navigate = (page: string, userType?: 'provider' | 'contractor' | 'admin', params?: Record<string, any>) => {
+    if (userType === 'admin') {
+      redirectToAdminApp('/dashboard');
+      return;
+    }
+
     const route = getRoute(page, userType);
 
     if (params) {
