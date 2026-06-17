@@ -1,6 +1,5 @@
 package com.servija.servija.service;
 
-import com.servija.servija.dto.AdjustmentStatusUpdate;
 import com.servija.servija.dto.DeliveryAdjustmentRequest;
 import com.servija.servija.model.DeliveryAdjustment;
 import com.servija.servija.model.ServiceRequest;
