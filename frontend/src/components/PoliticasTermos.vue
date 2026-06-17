@@ -32,9 +32,19 @@ const privacidadeSections = [
     body: `<p>Utilizamos suas informações para:</p><ul class="pol-list"><li><strong>Operar a plataforma:</strong> intermediar contatos, orçamentos e contratações entre as partes.</li><li><strong>Personalizar a experiência:</strong> sugerir profissionais e categorias relevantes para você.</li><li><strong>Garantir a segurança:</strong> verificar identidade, prevenir fraudes e moderar conteúdo.</li><li><strong>Processar pagamentos:</strong> conduzir transações através de provedores autorizados.</li><li><strong>Melhorar o produto:</strong> analisar uso agregado e anônimo para evoluir funcionalidades.</li><li><strong>Comunicar:</strong> enviar notificações transacionais, atualizações e comunicações de marketing, mediante consentimento.</li></ul>`,
   },
   {
+    id: 'bases-legais',
+    title: 'Bases legais do tratamento',
+    body: `<p>Todo tratamento de dados pessoais realizado pela Servi Já está fundamentado em ao menos uma das bases legais previstas na LGPD (art. 7º). A base aplicável depende da finalidade:</p><table class="pol-table"><thead><tr><th>Base legal</th><th>Quando aplicamos</th></tr></thead><tbody><tr><td>Execução de contrato</td><td>Operar a plataforma, intermediar contratações e processar pagamentos solicitados por você.</td></tr><tr><td>Consentimento</td><td>Envio de comunicações de marketing e uso da sua localização precisa para sugerir profissionais próximos.</td></tr><tr><td>Cumprimento de obrigação legal</td><td>Retenção de registros financeiros e fiscais e atendimento a determinações de autoridades.</td></tr><tr><td>Legítimo interesse</td><td>Prevenção a fraudes, segurança da plataforma e melhoria de funcionalidades com dados agregados.</td></tr><tr><td>Exercício de direitos</td><td>Defesa em processos judiciais, administrativos ou arbitrais.</td></tr></tbody></table><p>Quando o tratamento se basear em consentimento, você poderá revogá-lo a qualquer momento, sem prejuízo das operações já realizadas.</p>`,
+  },
+  {
     id: 'compartilhamento',
     title: 'Compartilhamento com terceiros',
     body: `<p>Não vendemos seus dados pessoais. Em algumas situações, compartilhamos dados estritamente necessários com parceiros que nos ajudam a operar a plataforma:</p><ul class="pol-list"><li><strong>Provedores de pagamento</strong> regulamentados pelo Banco Central, para processar transações.</li><li><strong>Infraestrutura em nuvem</strong> (hospedagem, e-mail transacional, analytics) sob acordos de confidencialidade.</li><li><strong>Autoridades públicas</strong>, quando exigido por lei, ordem judicial ou regulação aplicável.</li></ul><p>Quando você contrata um profissional, alguns dados essenciais (nome, telefone e endereço do serviço) são compartilhados com a outra parte para a execução do trabalho.</p>`,
+  },
+  {
+    id: 'transferencia-internacional',
+    title: 'Transferência internacional de dados',
+    body: `<p>Alguns dos provedores de infraestrutura, hospedagem e analytics que utilizamos podem armazenar ou processar dados em servidores localizados fora do Brasil. Nessas situações, a transferência internacional é realizada em conformidade com a LGPD (arts. 33 a 36).</p><p>Adotamos salvaguardas para garantir um nível adequado de proteção, tais como cláusulas contratuais específicas, exigência de padrões de segurança equivalentes aos previstos na legislação brasileira e seleção de fornecedores estabelecidos em países com grau de proteção reconhecido. Você pode solicitar mais informações sobre essas transferências pelos canais de contato indicados nesta política.</p>`,
   },
   {
     id: 'cookies',
@@ -52,6 +62,11 @@ const privacidadeSections = [
     body: `<p>Adotamos medidas técnicas e administrativas para proteger seus dados contra acessos não autorizados, perda, alteração ou divulgação indevida. Entre elas: criptografia em trânsito (TLS) e em repouso, controle de acesso por perfil, monitoramento contínuo, auditorias periódicas e treinamento da equipe.</p><p>Apesar do nosso compromisso, nenhum sistema é 100% seguro. Em caso de incidente relevante, comunicaremos os titulares afetados e a ANPD nos prazos definidos pela LGPD.</p>`,
   },
   {
+    id: 'menores',
+    title: 'Dados de crianças e adolescentes',
+    body: `<p>A Servi Já é destinada exclusivamente a maiores de 18 anos. Não coletamos intencionalmente dados de crianças e adolescentes e não permitimos o cadastro de menores de idade na plataforma.</p><p>Caso identifiquemos que uma conta foi criada por um menor de idade, eliminaremos os dados associados e encerraremos o cadastro. Se você é responsável legal e acredita que um menor sob sua tutela nos forneceu dados pessoais, entre em contato pelo e-mail <a href="mailto:privacidade@servija.com.br">privacidade@servija.com.br</a> para que possamos tomar as providências cabíveis.</p>`,
+  },
+  {
     id: 'retencao',
     title: 'Retenção dos dados',
     body: `<p>Mantemos seus dados pelo tempo necessário para cumprir as finalidades descritas nesta política ou conforme exigido por lei. Quando você encerra sua conta, eliminamos ou anonimizamos seus dados em até 1 ano, exceto:</p><ul class="pol-list"><li>Registros financeiros, mantidos por 5 anos por exigência fiscal.</li><li>Histórico de transações e mensagens, retidos por 5 anos para fins de auditoria e prevenção a fraudes.</li><li>Dados sob investigação ou disputa, retidos até a conclusão do caso.</li></ul>`,
@@ -64,7 +79,7 @@ const privacidadeSections = [
   {
     id: 'contato',
     title: 'Contato',
-    body: `<p>Dúvidas, sugestões ou solicitações relacionadas a esta Política de Privacidade podem ser enviadas para:</p><ul class="pol-list"><li><strong>E-mail:</strong> <a href="mailto:privacidade@servija.com.br">privacidade@servija.com.br</a></li><li><strong>Telefone:</strong> (48) 98438-6930</li></ul>`,
+    body: `<p>A Servi Já mantém um <strong>Encarregado de Proteção de Dados (DPO)</strong>, responsável por atuar como canal de comunicação entre a empresa, os titulares e a Autoridade Nacional de Proteção de Dados (ANPD).</p><p>Dúvidas, sugestões ou solicitações relacionadas a esta Política de Privacidade, bem como o contato com o Encarregado, podem ser enviadas para:</p><ul class="pol-list"><li><strong>Encarregado (DPO):</strong> <a href="mailto:privacidade@servija.com.br">privacidade@servija.com.br</a></li><li><strong>E-mail:</strong> <a href="mailto:privacidade@servija.com.br">privacidade@servija.com.br</a></li><li><strong>Telefone:</strong> (48) 98438-6930</li></ul>`,
   },
 ];
 
@@ -72,7 +87,7 @@ const termosSections = [
   {
     id: 'aceitacao',
     title: 'Aceitação dos termos',
-    body: `<p>Ao se cadastrar, acessar ou utilizar a plataforma <strong>Servi Já</strong>, você declara ter lido, compreendido e concordado integralmente com estes Termos de Uso e com nossa Política de Privacidade. Se você não concorda com algum item, deve interromper o uso da plataforma.</p><p>Estes Termos formam um contrato vinculante entre você e a Servi Já Tecnologia Ltda., inscrita no CNPJ sob o nº 00.000.000/0001-00.</p>`,
+    body: `<p>Ao se cadastrar, acessar ou utilizar a plataforma <strong>Servi Já</strong>, você declara ter lido, compreendido e concordado integralmente com estes Termos de Uso e com nossa Política de Privacidade. Se você não concorda com algum item, deve interromper o uso da plataforma.</p><p>Estes Termos formam um contrato vinculante entre você e a Servi Já Ltda., inscrita no CNPJ sob o nº 00.000.000/0001-00.</p>`,
   },
   {
     id: 'sobre-plataforma',
@@ -107,7 +122,7 @@ const termosSections = [
   {
     id: 'propriedade-intelectual',
     title: 'Propriedade intelectual',
-    body: `<p>Marca, logotipo, layout, código-fonte, textos, design e demais elementos da plataforma são de propriedade exclusiva da Servi Já e protegidos pela legislação aplicável. Conteúdos publicados pelos usuários como fotos, descrições e avaliações permanecem de propriedade dos próprios usuários, que concedem à Servi Já licença não-exclusiva para exibi-los na plataforma.</p>`,
+    body: `<p>Marca, logotipo, layout, código-fonte, textos, design e demais elementos da plataforma são de propriedade exclusiva da Servi Já e protegidos pela legislação aplicável. Conteúdos publicados pelos usuários como fotos, descrições e avaliações permanecem de propriedade dos próprios usuários, que concedem à Servi Já licença não-exclusiva para exibi-los na plataforma.</p><p>Ao enviar qualquer conteúdo à plataforma como imagens, fotos, textos, nomes, marcas, logotipos ou outros materiais, o usuário declara e garante ser o titular dos direitos autorais e demais direitos de propriedade intelectual sobre esse conteúdo, ou possuir autorização expressa para utilizá-lo.</p><div class="pol-callout"><div class="pol-callout-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div><div class="pol-callout-body"><div class="pol-callout-title">Responsabilidade pelo conteúdo enviado</div><div class="pol-callout-text">A Servi Já não se responsabiliza por eventuais violações de direitos autorais ou de propriedade intelectual decorrentes de conteúdos enviados pelos usuários. A responsabilidade por imagens, nomes, marcas e demais materiais que possuam direitos autorais é exclusiva do usuário que realizou o upload do conteúdo, que responderá por quaisquer reivindicações de terceiros. Identificado eventual conteúdo que infrinja direitos de terceiros, a Servi Já poderá removê-lo e suspender ou encerrar a conta responsável.</div></div></div>`,
   },
   {
     id: 'limitacao',
@@ -117,7 +132,7 @@ const termosSections = [
   {
     id: 'foro',
     title: 'Legislação e foro',
-    body: `<p>Estes Termos são regidos pelas leis da República Federativa do Brasil. Fica eleito o foro da Comarca de São Paulo/SP para dirimir quaisquer controvérsias decorrentes deste instrumento, com renúncia expressa a qualquer outro, por mais privilegiado que seja.</p>`,
+    body: `<p>Estes Termos são regidos pelas leis da República Federativa do Brasil. Fica eleito o foro da Comarca de Florianópolis/SC para dirimir quaisquer controvérsias decorrentes deste instrumento, com renúncia expressa a qualquer outro, por mais privilegiado que seja.</p>`,
   },
 ];
 
@@ -215,7 +230,7 @@ onUnmounted(() => {
         <div class="pol-hero-meta">
           <div class="pol-meta-item">
             <CheckCircle :size="16" class="pol-meta-ico" />
-            <span>Última atualização: <strong>12 de maio de 2026</strong></span>
+            <span>Última atualização: <strong>17 de junho de 2026</strong></span>
           </div>
           <div class="pol-meta-item">
             <ShieldCheck :size="16" class="pol-meta-ico" />
@@ -223,7 +238,7 @@ onUnmounted(() => {
           </div>
           <div class="pol-meta-item">
             <List :size="16" class="pol-meta-ico" />
-            <span>Versão <strong>2.1</strong></span>
+            <span>Versão <strong>2.2</strong></span>
           </div>
         </div>
       </div>
