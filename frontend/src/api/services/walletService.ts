@@ -22,6 +22,22 @@ export interface WalletTransaction {
   date: string;
 }
 
+export interface WalletTransactionPage {
+  content: WalletTransaction[];
+  totalElements: number;
+  totalPages: number;
+  currentPage: number;
+  pageSize: number;
+}
+
+export interface GetTransactionsPagedParams {
+  type?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  page?: number;
+  size?: number;
+}
+
 export interface BankAccount {
   id: number;
   accountType: 'PIX_KEY' | 'BANK_ACCOUNT';
@@ -90,6 +106,14 @@ const walletService = {
   async getTransactions(type: string = 'ALL'): Promise<WalletTransaction[]> {
     const response = await axios.get('/wallet/transactions', {
       params: { type },
+    });
+    return response.data;
+  },
+
+  async getTransactionsPaged(params: GetTransactionsPagedParams = {}): Promise<WalletTransactionPage> {
+    const { type = 'ALL', dateFrom, dateTo, page = 0, size = 20 } = params;
+    const response = await axios.get('/wallet/transactions/paged', {
+      params: { type, dateFrom, dateTo, page, size },
     });
     return response.data;
   },

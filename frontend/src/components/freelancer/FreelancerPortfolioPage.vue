@@ -27,6 +27,7 @@ import {
 } from 'lucide-vue-next';
 import Button from '../ui/button.vue';
 import Input from '../ui/input.vue';
+import DatePicker from '../ui/date-picker.vue';
 import Label from '../ui/label.vue';
 import Card from '../ui/card.vue';
 import Badge from '../ui/badge.vue';
@@ -133,6 +134,9 @@ const projectForm = ref({
 
 const tagInput = ref('');
 const isLoading = ref(false);
+
+// Data máxima selecionável: hoje (a conclusão não pode estar no futuro)
+const todayDate = computed(() => new Date().toLocaleDateString('en-CA'));
 const selectedSubcategories = computed(() =>
   categoryCatalogStore.getSubcategoriesByCategoryId(projectForm.value.categoryId)
 );
@@ -773,9 +777,10 @@ const handleTagKeyPress = (e: KeyboardEvent) => {
 
             <div class="space-y-2">
               <Label for="completedDate">Data de Conclusão</Label>
-              <Input
+              <DatePicker
                 id="completedDate"
-                type="date"
+                :max="todayDate"
+                placeholder="Selecione a data"
                 :model-value="projectForm.completedDate"
                 @update:model-value="(val) => projectForm.completedDate = val as string"
               />

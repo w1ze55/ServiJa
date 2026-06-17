@@ -3,6 +3,7 @@ package com.servija.servija.controller;
 import com.servija.servija.dto.BankAccountDTO;
 import com.servija.servija.dto.BankAccountResponse;
 import com.servija.servija.dto.PlatformWalletResponse;
+import com.servija.servija.dto.PlatformWalletTransactionPageResponse;
 import com.servija.servija.dto.PlatformWalletTransactionResponse;
 import com.servija.servija.dto.PlatformWithdrawalRequestDTO;
 import com.servija.servija.dto.PlatformWithdrawalResponse;
@@ -75,6 +76,20 @@ public class AdminPlatformWalletController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo
     ) {
         return ResponseEntity.ok(platformWalletTransactionService.getTransactions(type, dateFrom, dateTo));
+    }
+
+    @GetMapping("/transactions/paged")
+    @Operation(summary = "Listar transacoes paginadas da carteira da plataforma")
+    @SecurityRequirement(name = "bearerAuth")
+    public ResponseEntity<PlatformWalletTransactionPageResponse> getTransactionsPaged(
+            @RequestParam(required = false, defaultValue = "ALL") String type,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        return ResponseEntity.ok(
+                platformWalletTransactionService.getTransactionsPaged(type, dateFrom, dateTo, page, size));
     }
 
     @GetMapping("/bank-accounts")

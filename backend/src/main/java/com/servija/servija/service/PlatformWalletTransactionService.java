@@ -1,5 +1,6 @@
 package com.servija.servija.service;
 
+import com.servija.servija.dto.PlatformWalletTransactionPageResponse;
 import com.servija.servija.dto.PlatformWalletTransactionResponse;
 import com.servija.servija.model.Payment;
 import com.servija.servija.model.PlatformWithdrawalRequest;
@@ -85,6 +86,34 @@ public class PlatformWalletTransactionService {
 
         transactions.sort(Comparator.comparing(PlatformWalletTransactionResponse::getDate).reversed());
         return transactions;
+    }
+
+    @Transactional(readOnly = true)
+    public PlatformWalletTransactionPageResponse getTransactionsPaged(
+            String typeFilter,
+            LocalDate dateFrom,
+            LocalDate dateTo,
+            int page,
+            int size
+    ) {
+        List<PlatformWalletTransactionResponse> all = getTransactions(typeFilter, dateFrom, dateTo);
+
+        int safeSize = size <= 0 ? 20 : size;
+        int safePage = Math.max(page, 0);
+        int total = all.size();
+        int totalPages = (int) Math.ceil((double) total / safeSize);
+
+        int fromIndex = Math.min(safePage * safeSize, total);
+        int toIndex = Math.min(fromIndex + safeSize, total);
+        List<PlatformWalletTransactionResponse> content = all.subList(fromIndex, toIndex);
+
+        return PlatformWalletTransactionPageResponse.builder()
+                .content(content)
+                .totalElements(total)
+                .totalPages(totalPages)
+                .currentPage(safePage)
+                .pageSize(safeSize)
+                .build();
     }
 
     private BigDecimal resolveNetPlatformFee(Payment payment) {

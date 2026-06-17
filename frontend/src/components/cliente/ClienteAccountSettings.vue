@@ -708,6 +708,7 @@ const getInitials = (name: string) => {
                 :model-value="editedPersonalData.name"
                 @update:model-value="(val) => editedPersonalData.name = val as string"
                 placeholder="Digite seu nome completo"
+                :maxlength="100"
               />
             </div>
 

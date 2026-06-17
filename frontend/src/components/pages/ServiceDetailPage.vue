@@ -29,6 +29,7 @@ import DialogTitle from '@/components/ui/dialog-title.vue';
 import ScrollArea from '@/components/ui/scroll-area.vue';
 import Textarea from '@/components/ui/textarea.vue';
 import Input from '@/components/ui/input.vue';
+import DatePicker from '@/components/ui/date-picker.vue';
 import Label from '@/components/ui/label.vue';
 import api from '@/api/config/axios';
 import { toast } from '@/utils/toast';
@@ -783,7 +784,7 @@ onMounted(() => {
                 </div>
               </div>
               <div v-else>
-                <Input type="date" v-model="quoteDeadlineDate" :min="new Date().toISOString().split('T')[0]" class="w-full" />
+                <DatePicker v-model="quoteDeadlineDate" :min="new Date().toISOString().split('T')[0]" placeholder="Selecione a data" class="w-full" />
               </div>
             </div>
 

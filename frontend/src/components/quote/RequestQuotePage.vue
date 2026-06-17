@@ -3,6 +3,7 @@ import { ref, watch, onMounted, onUnmounted } from 'vue';
 import { ArrowLeft, Upload, X, FileText, AlertCircle, Check } from 'lucide-vue-next';
 import Button from '../ui/button.vue';
 import Input from '../ui/input.vue';
+import DatePicker from '../ui/date-picker.vue';
 import Label from '../ui/label.vue';
 import Textarea from '../ui/textarea.vue';
 import Select from '../ui/select.vue';
@@ -284,13 +285,12 @@ const getFileIcon = (filename: string) => {
         <Label for="deadline" class="text-[#263238]">
           Prazo desejado <span class="text-red-500">*</span>
         </Label>
-        <Input
+        <DatePicker
           id="deadline"
-          type="date"
           :model-value="deadline"
           @update:model-value="(val) => deadline = val as string"
           :min="new Date().toISOString().split('T')[0]"
-          required
+          placeholder="Selecione a data"
         />
         <p class="text-sm text-[#435574]">Quando você precisa que o serviço seja concluído?</p>
       </div>

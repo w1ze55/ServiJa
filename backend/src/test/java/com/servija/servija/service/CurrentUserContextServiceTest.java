@@ -1,7 +1,6 @@
 package com.servija.servija.service;
 
 import com.servija.servija.exception.ResourceNotFoundException;
-import com.servija.servija.model.Contractor;
 import com.servija.servija.model.User;
 import com.servija.servija.repository.ContractorRepository;
 import com.servija.servija.repository.FreelancerRepository;

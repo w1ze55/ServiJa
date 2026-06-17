@@ -46,9 +46,13 @@ const emit = defineEmits<{
   (e: 'file-rejected', value: string): void;
 }>();
 
+const DESCRIPTION_MAX_LENGTH = 500;
+
 const fileInput = ref<HTMLInputElement | null>(null);
 const isDragging = ref(false);
 const dragDepth = ref(0);
+
+const descriptionLength = computed(() => props.description.length);
 
 const normalizedAllowedExtensions = computed(() =>
   props.allowedExtensions.map((extension) => extension.replace(/^\./, '').toLowerCase())
@@ -161,7 +165,7 @@ const removeFile = (index: number) => {
 };
 
 const updateDescription = (value: string | number) => {
-  emit('update:description', String(value ?? ''));
+  emit('update:description', String(value ?? '').slice(0, DESCRIPTION_MAX_LENGTH));
 };
 
 const formatFileSize = (size: number) => {
@@ -177,14 +181,21 @@ const formatFileSize = (size: number) => {
   <div class="space-y-4">
     <div v-if="descriptionEnabled" class="space-y-2">
       <Label for="attachment-upload-description">{{ descriptionLabel }}</Label>
-      <Textarea
-        id="attachment-upload-description"
-        :model-value="description"
-        :rows="2"
-        :disabled="disabled"
-        :placeholder="descriptionPlaceholder"
-        @update:model-value="updateDescription"
-      />
+      <div class="relative">
+        <Textarea
+          id="attachment-upload-description"
+          :model-value="description"
+          :rows="2"
+          :maxlength="DESCRIPTION_MAX_LENGTH"
+          :disabled="disabled"
+          :placeholder="descriptionPlaceholder"
+          class="pb-6"
+          @update:model-value="updateDescription"
+        />
+        <span class="pointer-events-none absolute bottom-2 right-3 text-xs text-[#435574]">
+          {{ descriptionLength }}/{{ DESCRIPTION_MAX_LENGTH }}
+        </span>
+      </div>
     </div>
 
     <div class="space-y-2">

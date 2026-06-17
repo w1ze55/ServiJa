@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import {
   Wallet,
   DollarSign,
@@ -25,6 +25,7 @@ import DropdownMenu from '../ui/dropdown-menu.vue';
 import DropdownMenuContent from '../ui/dropdown-menu-content.vue';
 import DropdownMenuItem from '../ui/dropdown-menu-item.vue';
 import Input from '../ui/input.vue';
+import DatePicker from '../ui/date-picker.vue';
 import Label from '../ui/label.vue';
 import Separator from '../ui/separator.vue';
 import Select from '../ui/select.vue';
@@ -33,7 +34,7 @@ import SelectItem from '../ui/select-item.vue';
 import SelectTrigger from '../ui/select-trigger.vue';
 import SelectValue from '../ui/select-value.vue';
 import { toast } from '@/utils/toast';
-import { formatApiDate, parseApiDate } from '@/utils/apiDate';
+import { formatApiDate } from '@/utils/apiDate';
 import { formatCPF, formatPhone, validateCPF } from '@/utils/masks';
 import walletService, {
   type WalletBalance,
@@ -64,12 +65,19 @@ defineProps<Props>();
 // State
 const loading = ref(true);
 const wallet = ref<WalletBalance | null>(null);
-const transactions = ref<WalletTransaction[]>([]);
 const bankAccounts = ref<BankAccount[]>([]);
 const transactionFilter = ref<'ALL' | 'EARNING' | 'WITHDRAWAL'>('ALL');
-const timeFilter = ref('Últimos 30 dias');
+const timeFilter = ref('Todo o período');
 const customDateFrom = ref('');
 const customDateTo = ref('');
+
+// Transações (paginadas server-side)
+const pagedTransactions = ref<WalletTransaction[]>([]);
+const currentPage = ref(1); // 1-based na UI
+const pageSize = ref(20);
+const totalPages = ref(0);
+const totalElements = ref(0);
+const isLoadingTransactions = ref(false);
 
 // Modals
 const showWithdrawModal = ref(false);
@@ -98,63 +106,103 @@ const newHolderName = ref('');
 const newHolderCpfCnpj = ref('');
 
 // Computed
-const matchesSelectedTimeFilter = (dateValue?: string | null) => {
-  const transactionDate = parseApiDate(dateValue);
+// Formata uma Date local para YYYY-MM-DD (respeitando o fuso local)
+const formatDateInput = (date: Date) => date.toLocaleDateString('en-CA');
 
-  if (Number.isNaN(transactionDate.getTime())) {
-    return false;
-  }
-
+// Converte o filtro de tempo selecionado em um intervalo { dateFrom, dateTo }
+// (YYYY-MM-DD) que é enviado ao backend. "Todo o período" não envia limites.
+const selectedDateRange = computed<{ dateFrom?: string; dateTo?: string }>(() => {
   const now = new Date();
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
   switch (timeFilter.value) {
     case 'Hoje':
-      return transactionDate >= startOfToday;
+      return { dateFrom: formatDateInput(startOfToday), dateTo: formatDateInput(startOfToday) };
     case 'Ontem': {
-      const startOfYesterday = new Date(startOfToday);
-      startOfYesterday.setDate(startOfYesterday.getDate() - 1);
-      return transactionDate >= startOfYesterday && transactionDate < startOfToday;
+      const yesterday = new Date(startOfToday);
+      yesterday.setDate(yesterday.getDate() - 1);
+      return { dateFrom: formatDateInput(yesterday), dateTo: formatDateInput(yesterday) };
     }
     case 'Últimos 7 dias': {
-      const sevenDaysAgo = new Date(startOfToday);
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-      return transactionDate >= sevenDaysAgo;
+      const from = new Date(startOfToday);
+      from.setDate(from.getDate() - 7);
+      return { dateFrom: formatDateInput(from), dateTo: formatDateInput(startOfToday) };
     }
     case 'Últimos 30 dias': {
-      const thirtyDaysAgo = new Date(startOfToday);
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      return transactionDate >= thirtyDaysAgo;
+      const from = new Date(startOfToday);
+      from.setDate(from.getDate() - 30);
+      return { dateFrom: formatDateInput(from), dateTo: formatDateInput(startOfToday) };
     }
-    case 'Mês atual':
-      return transactionDate.getMonth() === now.getMonth() && transactionDate.getFullYear() === now.getFullYear();
+    case 'Mês atual': {
+      const from = new Date(now.getFullYear(), now.getMonth(), 1);
+      return { dateFrom: formatDateInput(from), dateTo: formatDateInput(startOfToday) };
+    }
     case 'Último mês': {
-      const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
-      return transactionDate >= lastMonth && transactionDate <= endOfLastMonth;
+      const from = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const to = new Date(now.getFullYear(), now.getMonth(), 0);
+      return { dateFrom: formatDateInput(from), dateTo: formatDateInput(to) };
     }
-    case 'Intervalo personalizado': {
-      const from = customDateFrom.value ? new Date(customDateFrom.value + 'T00:00:00') : null;
-      const to = customDateTo.value ? new Date(customDateTo.value + 'T23:59:59') : null;
-
-      if (from && to) return transactionDate >= from && transactionDate <= to;
-      if (from) return transactionDate >= from;
-      if (to) return transactionDate <= to;
-      return true;
-    }
+    case 'Intervalo personalizado':
+      return {
+        dateFrom: customDateFrom.value || undefined,
+        dateTo: customDateTo.value || undefined,
+      };
+    case 'Todo o período':
     default:
-      return true;
+      return {};
+  }
+});
+
+const fetchTransactions = async () => {
+  isLoadingTransactions.value = true;
+  try {
+    const { dateFrom, dateTo } = selectedDateRange.value;
+    const result = await walletService.getTransactionsPaged({
+      type: transactionFilter.value,
+      dateFrom,
+      dateTo,
+      page: currentPage.value - 1,
+      size: pageSize.value,
+    });
+    pagedTransactions.value = result.content;
+    totalElements.value = result.totalElements;
+    totalPages.value = result.totalPages;
+  } catch (error: any) {
+    console.error('Erro ao carregar transações:', error);
+    toast.error('Erro ao carregar transações');
+  } finally {
+    isLoadingTransactions.value = false;
   }
 };
 
-const filteredTransactions = computed(() => {
-  let filtered = transactions.value;
+const goToPage = (page: number) => {
+  const target = Math.min(Math.max(page, 1), Math.max(totalPages.value, 1));
+  if (target === currentPage.value) return;
+  currentPage.value = target;
+  fetchTransactions();
+};
 
-  if (transactionFilter.value !== 'ALL') {
-    filtered = filtered.filter((transaction) => transaction.type === transactionFilter.value);
+// Páginas exibidas no controle de paginação (janela de até 5)
+const visiblePageNumbers = computed(() => {
+  const pages = totalPages.value;
+  const current = currentPage.value;
+  return Array.from({ length: Math.min(5, pages) }, (_, i) => {
+    if (pages <= 5) return i + 1;
+    if (current <= 3) return i + 1;
+    if (current >= pages - 2) return pages - 4 + i;
+    return current - 2 + i;
+  });
+});
+
+// Ao trocar qualquer filtro, volta para a primeira página e recarrega.
+watch([transactionFilter, timeFilter, customDateFrom, customDateTo], () => {
+  // Evita disparos com intervalo personalizado pela metade (apenas uma das datas preenchida)
+  if (timeFilter.value === 'Intervalo personalizado') {
+    const onlyOneFilled = Boolean(customDateFrom.value) !== Boolean(customDateTo.value);
+    if (onlyOneFilled) return;
   }
-
-  return filtered.filter((transaction) => matchesSelectedTimeFilter(transaction.date));
+  currentPage.value = 1;
+  fetchTransactions();
 });
 
 const totalBalance = computed(() => {
@@ -628,14 +676,12 @@ const openWithdrawModal = (method: 'PIX' | 'TED' = 'PIX', account?: BankAccount)
 const loadData = async () => {
   loading.value = true;
   try {
-    const [walletData, txData, accountsData] = await Promise.all([
+    const [walletData, accountsData] = await Promise.all([
       walletService.getWallet(),
-      walletService.getTransactions('ALL'),
       walletService.getBankAccounts(),
     ]);
 
     wallet.value = walletData;
-    transactions.value = txData;
     bankAccounts.value = accountsData;
 
     if (!showWithdrawModal.value) {
@@ -692,7 +738,8 @@ const handleWithdraw = async () => {
     );
     toast.success('Saque solicitado com sucesso!');
     closeWithdrawModal(true);
-    await loadData();
+    currentPage.value = 1;
+    await Promise.all([loadData(), fetchTransactions()]);
   } catch (error: any) {
     toast.error(error.response?.data?.message || 'Erro ao solicitar saque');
   } finally {
@@ -806,7 +853,10 @@ const useAccountForWithdraw = (account: BankAccount) => {
   openWithdrawModal('TED', account);
 };
 
-onMounted(loadData);
+onMounted(() => {
+  loadData();
+  fetchTransactions();
+});
 </script>
 
 <template>
@@ -987,7 +1037,7 @@ onMounted(loadData);
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
           <div>
             <h3 class="text-[#263238]">Histórico de Transações</h3>
-            <p class="text-sm text-[#435574]">{{ filteredTransactions.length }} transações encontradas</p>
+            <p class="text-sm text-[#435574]">{{ totalElements }} transações encontradas</p>
           </div>
           <div class="flex flex-col sm:flex-row gap-2 sm:items-center">
             <div class="flex gap-2 flex-wrap">
@@ -1017,9 +1067,10 @@ onMounted(loadData);
             <div class="w-full sm:w-[220px]">
               <Select :model-value="timeFilter" @update:model-value="(val: string) => timeFilter = val">
                 <SelectTrigger>
-                  <SelectValue placeholder="Últimos 30 dias" />
+                  <SelectValue placeholder="Todo o período" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="Todo o período">Todo o período</SelectItem>
                   <SelectItem value="Hoje">Hoje</SelectItem>
                   <SelectItem value="Ontem">Ontem</SelectItem>
                   <SelectItem value="Últimos 7 dias">Últimos 7 dias</SelectItem>
@@ -1036,30 +1087,36 @@ onMounted(loadData);
         <div v-if="timeFilter === 'Intervalo personalizado'" class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 mt-1 pt-4 border-t">
           <div class="space-y-1">
             <label class="text-sm font-medium text-[#435574]">De</label>
-            <Input
-              type="date"
+            <DatePicker
               :model-value="customDateFrom"
+              :max="customDateTo || undefined"
+              placeholder="Data inicial"
               @update:model-value="(val: string) => customDateFrom = val"
             />
           </div>
           <div class="space-y-1">
             <label class="text-sm font-medium text-[#435574]">Até</label>
-            <Input
-              type="date"
+            <DatePicker
               :model-value="customDateTo"
+              :min="customDateFrom || undefined"
+              placeholder="Data final"
               @update:model-value="(val: string) => customDateTo = val"
             />
           </div>
         </div>
 
-        <div v-if="filteredTransactions.length === 0" class="text-center py-12 text-[#435574]">
+        <div v-if="isLoadingTransactions" class="flex justify-center py-12">
+          <Loader2 class="h-6 w-6 animate-spin text-[#286AD8]" />
+        </div>
+
+        <div v-else-if="pagedTransactions.length === 0" class="text-center py-12 text-[#435574]">
           <DollarSign class="h-10 w-10 mx-auto mb-3 opacity-40" />
           <p class="text-sm">Nenhuma transação encontrada</p>
         </div>
 
         <div v-else class="space-y-3">
-          <div  
-            v-for="tx in filteredTransactions"
+          <div
+            v-for="tx in pagedTransactions"
             :key="`${tx.type}-${tx.id}`"
             class="flex items-center gap-4 p-4 rounded-lg border border-gray-200 hover:border-gray-300 transition-colors"
           >
@@ -1092,6 +1149,38 @@ onMounted(loadData);
               {{ tx.amount >= 0 ? '+' : '' }}{{ formatCurrency(Math.abs(tx.amount)) }}
             </p>
           </div>
+        </div>
+
+        <!-- Paginação -->
+        <div v-if="totalPages > 1" class="flex items-center justify-center gap-2 mt-6">
+          <Button
+            variant="outline"
+            size="sm"
+            :disabled="currentPage === 1 || isLoadingTransactions"
+            @click="goToPage(currentPage - 1)"
+          >
+            Anterior
+          </Button>
+
+          <Button
+            v-for="pageNum in visiblePageNumbers"
+            :key="pageNum"
+            :variant="currentPage === pageNum ? 'default' : 'outline'"
+            size="sm"
+            :disabled="isLoadingTransactions"
+            @click="goToPage(pageNum)"
+          >
+            {{ pageNum }}
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            :disabled="currentPage === totalPages || isLoadingTransactions"
+            @click="goToPage(currentPage + 1)"
+          >
+            Próxima
+          </Button>
         </div>
       </Card>
     </template>
