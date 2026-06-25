@@ -30,6 +30,7 @@ public class FileStorageService {
 
     private static final List<String> ALLOWED_CONTENT_TYPES = Arrays.asList(
             "image/jpeg",
+            "image/jfif",
             "image/png",
             "image/gif",
             "image/webp",
@@ -54,6 +55,7 @@ public class FileStorageService {
     private static final List<String> ALLOWED_EXTENSIONS = Arrays.asList(
             ".jpg",
             ".jpeg",
+            ".jfif",
             ".png",
             ".gif",
             ".webp",
@@ -216,13 +218,14 @@ public class FileStorageService {
         String extension = getFileExtension(file.getOriginalFilename()).toLowerCase();
         if (!ALLOWED_EXTENSIONS.contains(extension)) {
             throw new RuntimeException(
-                    "Tipo de arquivo nao permitido. Permitidos: JPEG, PNG, GIF, WEBP, MP3, M4A, WAV, OGG, WEBM, AAC, PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX e TXT");
+                    "Tipo de arquivo nao permitido. Permitidos: JPEG, JFIF, PNG, GIF, WEBP, MP3, M4A, WAV, OGG, WEBM, AAC, PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX e TXT");
         }
     }
 
     private static final java.util.Map<String, String> EXTENSION_CONTENT_TYPES = java.util.Map.ofEntries(
             java.util.Map.entry(".jpg", "image/jpeg"),
             java.util.Map.entry(".jpeg", "image/jpeg"),
+            java.util.Map.entry(".jfif", "image/jpeg"),
             java.util.Map.entry(".png", "image/png"),
             java.util.Map.entry(".gif", "image/gif"),
             java.util.Map.entry(".webp", "image/webp"),
@@ -242,7 +245,7 @@ public class FileStorageService {
             java.util.Map.entry(".txt", "text/plain"));
 
     private static final java.util.List<String> IMAGE_EXTENSIONS =
-            java.util.Arrays.asList(".jpg", ".jpeg", ".png", ".gif", ".webp");
+            java.util.Arrays.asList(".jpg", ".jpeg", ".jfif", ".png", ".gif", ".webp");
 
     private String resolveSafeContentType(String extension) {
         return EXTENSION_CONTENT_TYPES.getOrDefault(
