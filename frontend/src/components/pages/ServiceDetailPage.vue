@@ -15,7 +15,7 @@ import {
   Paperclip,
   Trash2,
 } from 'lucide-vue-next';
-import { uploadImages } from '@/api/uploadService';
+import { uploadImages, getUploadErrorMessage } from '@/api/uploadService';
 import Button from '@/components/ui/button.vue';
 import Card from '@/components/ui/card.vue';
 import Badge from '@/components/ui/badge.vue';
@@ -438,7 +438,13 @@ const handleSendQuote = async () => {
     let attachmentUrls: string[] = [];
     if (quoteAttachments.value.length > 0) {
       toast.info('Enviando anexos...');
-      attachmentUrls = await uploadImages(quoteAttachments.value);
+      try {
+        attachmentUrls = await uploadImages(quoteAttachments.value);
+      } catch (uploadError) {
+        console.error('Erro ao enviar anexos:', uploadError);
+        toast.error(getUploadErrorMessage(uploadError));
+        return;
+      }
     }
     await api.post('/service-requests', {
       serviceName: service.value ? `${service.value.title} - Solicitação` : 'Solicitação',

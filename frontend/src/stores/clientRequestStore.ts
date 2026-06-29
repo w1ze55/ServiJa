@@ -62,6 +62,9 @@ export interface ServiceRequest {
     desiredDate?: string;
     attachments?: ServiceRequestAttachment[];
     freelancerAttachments?: ServiceRequestAttachment[];
+    deliveryDescription?: string;
+    deliveryAttachments?: ServiceRequestAttachment[];
+    deliveredAt?: string;
     freelancerResponse?: FreelancerResponse;
     counterValue?: number;
     counterDays?: number;
@@ -190,6 +193,9 @@ export const useClientRequestStore = defineStore('clientRequest', () => {
         updatedAt: req.updatedAt || req.createdAt,
         attachments: mapAttachments(req.attachments, 'att', req.id),
         freelancerAttachments: mapFreelancerAttachments(req, 'fatt', req.id),
+        deliveryDescription: req.deliveryDescription,
+        deliveryAttachments: mapDetailedAttachments(req.deliveryAttachments, 'datt', req.id),
+        deliveredAt: req.deliveredAt,
         freelancerAvatar: req.freelancerAvatar,
         freelancerResponse: req.responseValue ? {
             value: req.responseValue,

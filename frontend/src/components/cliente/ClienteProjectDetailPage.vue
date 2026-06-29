@@ -27,7 +27,14 @@ import TabsContent from '../ui/tabs-content.vue';
 import TabsList from '../ui/tabs-list.vue';
 import TabsTrigger from '../ui/tabs-trigger.vue';
 import FileAttachment from '../shared/FileAttachment.vue';
+import AttachmentUploadField from '../shared/AttachmentUploadField.vue';
 import ProjectChatPanel from '../shared/ProjectChatPanel.vue';
+import Dialog from '../ui/dialog.vue';
+import DialogContent from '../ui/dialog-content.vue';
+import DialogDescription from '../ui/dialog-description.vue';
+import DialogFooter from '../ui/dialog-footer.vue';
+import DialogHeader from '../ui/dialog-header.vue';
+import DialogTitle from '../ui/dialog-title.vue';
 import { useClientRequestStore, type ServiceRequest } from '@/stores/clientRequestStore';
 import { useDeliveryAdjustmentStore } from '@/stores/deliveryAdjustmentStore';
 import ServiceRequestTimeline from '../service/ServiceRequestTimeline.vue';
@@ -54,7 +61,9 @@ const activeTab = ref('details');
 const activeFileTab = ref<'client' | 'freelancer'>('client');
 const showAdjustmentModal = ref(false);
 const isUploadingFiles = ref(false);
-const projectFileInput = ref<HTMLInputElement | null>(null);
+const showUploadDialog = ref(false);
+const uploadFiles = ref<File[]>([]);
+const uploadProgress = ref(0);
 let wsConnection: ReturnType<typeof useServiceRequestWebSocket> | null = null;
 
 const clientAttachments = computed(() => request.value?.attachments || []);
@@ -213,33 +222,48 @@ const handleGoToChat = () => {
   router.push(`/chat/${props.requestId}`);
 };
 
-const resetProjectFileInput = () => {
-  if (projectFileInput.value) {
-    projectFileInput.value.value = '';
-  }
+const handleUploadFileRejected = (message: string) => {
+  toast.error(message);
 };
 
-const openProjectFilePicker = () => {
+const openUploadDialog = () => {
   if (isUploadingFiles.value) return;
-  projectFileInput.value?.click();
+  uploadFiles.value = [];
+  uploadProgress.value = 0;
+  showUploadDialog.value = true;
 };
 
-const handleProjectFileSelection = async (event: Event) => {
-  const target = event.target as HTMLInputElement;
-  const files = Array.from(target.files || []);
-  resetProjectFileInput();
+const handleUploadFiles = async () => {
+  if (!request.value) {
+    toast.error('Projeto não encontrado');
+    return;
+  }
 
-  if (!request.value || files.length === 0) return;
+  if (uploadFiles.value.length === 0) {
+    toast.error('Selecione pelo menos um arquivo');
+    return;
+  }
 
   isUploadingFiles.value = true;
+  uploadProgress.value = 0;
+  let progressInterval: ReturnType<typeof setInterval> | null = null;
 
   try {
     const formData = new FormData();
-    files.forEach((file) => formData.append('files', file));
+    uploadFiles.value.forEach((file) => formData.append('files', file));
+
+    progressInterval = setInterval(() => {
+      if (uploadProgress.value < 90) uploadProgress.value += 10;
+    }, 300);
 
     const uploadResponse = await api.post('/upload/images', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
+
+    if (progressInterval) {
+      clearInterval(progressInterval);
+      progressInterval = null;
+    }
 
     const urls = uploadResponse.data.urls || [];
     if (!urls.length) {
@@ -247,15 +271,21 @@ const handleProjectFileSelection = async (event: Event) => {
     }
 
     await api.post(`/service-requests/${request.value.id}/contractor-attachments`, { urls });
+
+    uploadProgress.value = 100;
+    toast.success(uploadFiles.value.length === 1 ? 'Arquivo enviado com sucesso.' : 'Arquivos enviados com sucesso.');
+    showUploadDialog.value = false;
     await loadData(true);
     activeTab.value = 'files';
-    toast.success(files.length === 1 ? 'Arquivo enviado com sucesso.' : 'Arquivos enviados com sucesso.');
+    activeFileTab.value = 'client';
   } catch (error) {
+    if (progressInterval) {
+      clearInterval(progressInterval);
+    }
     console.error('Erro ao enviar arquivos do projeto:', error);
     toast.error('Erro ao enviar arquivos. Tente novamente.');
   } finally {
     isUploadingFiles.value = false;
-    resetProjectFileInput();
   }
 };
 
@@ -413,20 +443,12 @@ const getStatusColor = (status: string) => {
                 <Button
                   variant="outline"
                   :disabled="isUploadingFiles"
-                  @click="openProjectFilePicker"
+                  @click="openUploadDialog"
                 >
                   <Loader2 v-if="isUploadingFiles" class="h-4 w-4 mr-2 animate-spin" />
                   <Upload v-else class="h-4 w-4 mr-2" />
                   {{ isUploadingFiles ? 'Enviando...' : 'Enviar Arquivos' }}
                 </Button>
-                <input
-                  ref="projectFileInput"
-                  type="file"
-                  multiple
-                  class="hidden"
-                  :disabled="isUploadingFiles"
-                  @change="handleProjectFileSelection"
-                />
               </div>
 
               <div class="flex border-b border-gray-200 mb-4">
@@ -569,6 +591,61 @@ const getStatusColor = (status: string) => {
       :on-submit="handleRequestAdjustments"
       :on-go-to-chat="handleGoToChat"
     />
+
+    <Dialog :open="showUploadDialog" @update:open="(val) => (showUploadDialog = val)">
+      <DialogContent class="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Enviar Arquivos</DialogTitle>
+          <DialogDescription>
+            Faça upload de arquivos relacionados ao projeto
+            <template v-if="request"> "{{ request.service }}"</template>
+          </DialogDescription>
+        </DialogHeader>
+
+        <div class="space-y-4">
+          <AttachmentUploadField
+            v-model:files="uploadFiles"
+            label="Arquivos *"
+            empty-message="Clique para fazer upload ou arraste os arquivos"
+            helper-text="PDF, JPG, PNG, DOC, DOCX - Máximo 10 MB por arquivo"
+            accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+            :allowed-mime-types="[
+              'application/pdf',
+              'image/jpeg',
+              'image/png',
+              'application/msword',
+              'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+            ]"
+            :allowed-extensions="['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx']"
+            :disabled="isUploadingFiles"
+            @file-rejected="handleUploadFileRejected"
+          />
+
+          <div v-if="isUploadingFiles" class="space-y-2">
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-[#435574]">Enviando arquivos...</span>
+              <span class="text-[#263238]">{{ uploadProgress }}%</span>
+            </div>
+            <Progress :value="uploadProgress" class="h-2" />
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button @click="showUploadDialog = false" variant="outline" :disabled="isUploadingFiles">
+            Cancelar
+          </Button>
+          <Button
+            @click="handleUploadFiles"
+            :disabled="isUploadingFiles || uploadFiles.length === 0"
+            variant="default"
+          >
+            <Loader2 v-if="isUploadingFiles" class="h-4 w-4 mr-2 animate-spin" />
+            <Upload v-else class="h-4 w-4 mr-2" />
+            {{ isUploadingFiles ? 'Enviando...' : 'Enviar Arquivos' }}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   </div>
 </template>
 

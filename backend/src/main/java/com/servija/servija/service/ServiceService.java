@@ -50,6 +50,8 @@ public class ServiceService {
     private final AuditLogger auditLogger;
     private final CurrentUserContextService currentUserContextService;
     private static final BigDecimal AVERAGE_PRICE_RANGE_SPREAD = new BigDecimal("0.20");
+    private static final BigDecimal MIN_SERVICE_PRICE = new BigDecimal("40.00");
+    private static final BigDecimal MAX_SERVICE_PRICE = new BigDecimal("1000000.00");
 
     /**
      * Obter o usuário autenticado atual
@@ -100,6 +102,7 @@ public class ServiceService {
     @Transactional
     public ServiceResponse createService(ServiceRequest request) {
         Freelancer freelancer = getCurrentFreelancer();
+        validatePrice(request.getPrice(), true);
         CategoryCatalogService.CategorySelection categorySelection = resolveRequiredSelection(request);
 
         Service service = Service.builder()
@@ -158,6 +161,7 @@ public class ServiceService {
             service.setDescription(request.getDescription());
         }
         if (request.getPrice() != null) {
+            validatePrice(request.getPrice(), false);
             service.setPrice(request.getPrice());
         }
         if (request.getPriceType() != null) {
@@ -211,6 +215,27 @@ public class ServiceService {
         log.info("Serviço atualizado: {}", service.getId());
 
         return toResponse(service);
+    }
+
+    /**
+     * Valida o preço do serviço dentro dos limites da plataforma (R$ 40,00 a R$ 1.000.000,00).
+     *
+     * @param price    valor a validar
+     * @param required quando true, o preço é obrigatório (criação); quando false, null é aceito (update parcial)
+     */
+    private void validatePrice(BigDecimal price, boolean required) {
+        if (price == null) {
+            if (required) {
+                throw new IllegalArgumentException("O preço é obrigatório");
+            }
+            return;
+        }
+        if (price.compareTo(MIN_SERVICE_PRICE) < 0) {
+            throw new IllegalArgumentException("O valor mínimo é R$ 40,00");
+        }
+        if (price.compareTo(MAX_SERVICE_PRICE) > 0) {
+            throw new IllegalArgumentException("O valor máximo é R$ 1.000.000,00");
+        }
     }
 
     /**
