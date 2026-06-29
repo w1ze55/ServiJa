@@ -68,9 +68,45 @@ const showRejectDialog = ref(false);
 const rejectReason = ref('');
 const showCounterProposalDialog = ref(false);
 const counterValue = ref(0);
+const counterValueInput = ref('');
 const counterDays = ref(0);
 const counterNotes = ref('');
+const counterErrors = ref<Record<string, string>>({});
 const isSubmittingCounter = ref(false);
+
+const MAX_EXECUTION_DAYS = 365;
+
+const clearCounterError = (field: string) => {
+  if (counterErrors.value[field]) {
+    const next = { ...counterErrors.value };
+    delete next[field];
+    counterErrors.value = next;
+  }
+};
+
+// Formata dígitos (centavos) no padrão de moeda brasileiro: "R$ 1.234,56"
+const formatCurrencyFromDigits = (value: string): string => {
+  const numbers = value.replace(/\D/g, '');
+  if (!numbers) return '';
+  const formatted = (parseFloat(numbers) / 100).toLocaleString('pt-BR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+  return `R$ ${formatted}`;
+};
+
+const parseCurrencyValue = (value: string): number => {
+  const numbers = value.replace(/[^\d,]/g, '').replace(',', '.');
+  return parseFloat(numbers) || 0;
+};
+
+const handleCounterValueInput = (val: string) => {
+  counterValueInput.value = formatCurrencyFromDigits(val);
+  counterValue.value = parseCurrencyValue(counterValueInput.value);
+  clearCounterError('counterValue');
+};
+
+watch(counterDays, () => clearCounterError('counterDays'));
 const activeSection = ref<'details' | 'messages' | 'history' | 'attachments'>('details');
 const showCelebrationModal = ref(false);
 const activeFileTab = ref<'client' | 'freelancer'>('client');
@@ -83,9 +119,30 @@ const professionalAttachments = computed(() => [
 const handleOpenCounterProposalDialog = () => {
   if (!request.value || !request.value.freelancerResponse) return;
   counterValue.value = request.value.freelancerResponse.value;
+  counterValueInput.value = formatCurrencyFromDigits(String(Math.round(counterValue.value * 100)));
   counterDays.value = request.value.freelancerResponse.executionDays;
   counterNotes.value = '';
+  counterErrors.value = {};
   showCounterProposalDialog.value = true;
+};
+
+const validateCounterProposal = () => {
+  const newErrors: Record<string, string> = {};
+
+  if (!counterValue.value || counterValue.value <= 0) {
+    newErrors.counterValue = 'Informe um valor válido maior que zero';
+  } else {
+    const rangeError = validateValueRange(counterValue.value);
+    if (rangeError) newErrors.counterValue = rangeError;
+  }
+
+  if (!counterDays.value || counterDays.value <= 0) {
+    newErrors.counterDays = 'Informe um prazo válido maior que zero';
+  } else if (counterDays.value > MAX_EXECUTION_DAYS) {
+    newErrors.counterDays = `O prazo não pode ser maior que ${MAX_EXECUTION_DAYS} dias`;
+  }
+
+  return newErrors;
 };
 
 const loadData = async () => {
@@ -105,14 +162,10 @@ const loadData = async () => {
 const handleSendCounterProposal = async () => {
   if (!request.value) return;
 
-  if (counterValue.value <= 0 || counterDays.value <= 0) {
-    toast.error('Informe um valor e prazo válidos');
-    return;
-  }
-
-  const rangeError = validateValueRange(counterValue.value);
-  if (rangeError) {
-    toast.error(rangeError);
+  const errors = validateCounterProposal();
+  counterErrors.value = errors;
+  if (Object.keys(errors).length > 0) {
+    toast.error('Por favor, corrija os erros no formulário');
     return;
   }
 
@@ -761,10 +814,14 @@ const getStatusColor = (status: string) => {
               <Label for="counter-value">Novo Valor (R$)</Label>
               <Input
                 id="counter-value"
-                type="number"
-                v-model="counterValue"
-                step="0.01"
+                type="text"
+                inputmode="numeric"
+                :model-value="counterValueInput"
+                @update:model-value="(val) => handleCounterValueInput(val as string)"
+                placeholder="R$ 0,00"
+                :class="counterErrors.counterValue ? 'border-red-500' : ''"
               />
+              <p v-if="counterErrors.counterValue" class="text-sm text-red-500">{{ counterErrors.counterValue }}</p>
             </div>
             <div class="space-y-2">
               <Label for="counter-days">Novo Prazo (dias)</Label>
@@ -772,7 +829,9 @@ const getStatusColor = (status: string) => {
                 id="counter-days"
                 type="number"
                 v-model="counterDays"
+                :class="counterErrors.counterDays ? 'border-red-500' : ''"
               />
+              <p v-if="counterErrors.counterDays" class="text-sm text-red-500">{{ counterErrors.counterDays }}</p>
             </div>
           </div>
           <div class="space-y-2">
