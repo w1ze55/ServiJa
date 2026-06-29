@@ -204,7 +204,7 @@ class ServiceRequestServiceTest {
         when(paymentRepository.findByServiceRequestId(11L)).thenReturn(List.of(payment));
         when(serviceRequestRepository.save(any(ServiceRequest.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        ServiceRequestResponse response = serviceRequestService.completeService(11L, "cliente@servija.com");
+        ServiceRequestResponse response = serviceRequestService.completeService(11L, null, "cliente@servija.com");
 
         assertThat(response.getStatus()).isEqualTo("COMPLETED");
         verify(walletService).releasePendingBalance(payment);

@@ -346,9 +346,12 @@ export const useProposalStore = defineStore('proposal', () => {
     return updateStatus(id, 'accepted');
   };
 
-  const completeProposal = async (id: string): Promise<boolean> => {
+  const completeProposal = async (
+    id: string,
+    delivery?: { description: string; attachments?: { url: string; name: string }[] }
+  ): Promise<boolean> => {
     try {
-      const response = await api.patch(`/service-requests/${id}/complete`);
+      const response = await api.patch(`/service-requests/${id}/complete`, delivery);
       const updatedReq = response.data;
 
       const proposal = proposals.value.find((p) => p.id === id);

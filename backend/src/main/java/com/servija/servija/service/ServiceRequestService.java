@@ -3,6 +3,7 @@ package com.servija.servija.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.servija.servija.dto.CounterProposalDTO;
+import com.servija.servija.dto.DeliverySubmissionDTO;
 import com.servija.servija.dto.FreelancerAttachmentDTO;
 import com.servija.servija.dto.FreelancerAttachmentsRequest;
 import com.servija.servija.dto.FreelancerResponseDTO;
@@ -719,7 +720,7 @@ public class ServiceRequestService {
     }
 
     @Transactional
-    public ServiceRequestResponse completeService(Long id, String userEmail) {
+    public ServiceRequestResponse completeService(Long id, DeliverySubmissionDTO delivery, String userEmail) {
         ServiceRequest request = serviceRequestRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Solicitação não encontrada"));
 
@@ -731,6 +732,8 @@ public class ServiceRequestService {
             if (request.getStatus() != Status.IN_PROGRESS) {
                 throw new IllegalStateException("O serviço só pode ser entregue quando está em andamento");
             }
+
+            applyDeliverySubmission(request, delivery);
 
             request.setStatus(Status.DELIVERED);
             ServiceRequest saved = serviceRequestRepository.save(request);
@@ -782,6 +785,30 @@ public class ServiceRequestService {
         }
 
         throw new IllegalStateException("Usuário não autorizado a realizar esta ação");
+    }
+
+    private void applyDeliverySubmission(ServiceRequest request, DeliverySubmissionDTO delivery) {
+        if (delivery == null) {
+            return;
+        }
+
+        if (!StringUtils.hasText(delivery.getDescription())) {
+            throw new IllegalArgumentException("A descrição da entrega é obrigatória");
+        }
+
+        request.setDeliveryDescription(delivery.getDescription().trim());
+
+        if (delivery.getAttachments() != null && !delivery.getAttachments().isEmpty()) {
+            try {
+                request.setDeliveryAttachments(objectMapper.writeValueAsString(delivery.getAttachments()));
+            } catch (Exception e) {
+                throw new RuntimeException("Error serializing delivery attachments", e);
+            }
+        } else {
+            request.setDeliveryAttachments(null);
+        }
+
+        request.setDeliveredAt(LocalDateTime.now());
     }
 
     private Payment releaseFreelancerBalanceIfNeeded(ServiceRequest request) {
@@ -1237,6 +1264,9 @@ public class ServiceRequestService {
                 .counterNotes(request.getCounterNotes())
                 .cancelReason(request.getCancelReason())
                 .rejectReason(request.getRejectReason())
+                .deliveryDescription(request.getDeliveryDescription())
+                .deliveryAttachments(parseFreelancerAttachmentDetails(request.getDeliveryAttachments()))
+                .deliveredAt(request.getDeliveredAt())
                 .attachments(parseAttachmentUrls(request.getAttachments()))
                 .freelancerAttachments(parseAttachmentUrls(request.getFreelancerAttachments()))
                 .freelancerAttachmentDetails(parseFreelancerAttachmentDetails(request.getFreelancerAttachments()))

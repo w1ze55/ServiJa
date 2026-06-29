@@ -137,6 +137,15 @@ public class ServiceRequest {
     @Builder.Default
     private Boolean legacyLowValueAllowed = false;
 
+    @Column(name = "delivery_description", columnDefinition = "TEXT")
+    private String deliveryDescription;
+
+    @Column(name = "delivery_attachments", columnDefinition = "TEXT")
+    private String deliveryAttachments;
+
+    @Column(name = "delivered_at")
+    private LocalDateTime deliveredAt;
+
     @Column(name = "cancel_reason", columnDefinition = "TEXT")
     private String cancelReason;
 
