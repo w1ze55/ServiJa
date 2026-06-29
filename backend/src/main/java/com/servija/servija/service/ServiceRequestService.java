@@ -66,9 +66,11 @@ public class ServiceRequestService {
     private final CurrentUserContextService currentUserContextService;
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private static final BigDecimal MIN_NEGOTIATED_AMOUNT = new BigDecimal("20.00");
+    private static final BigDecimal MIN_NEGOTIATED_AMOUNT = new BigDecimal("40.00");
     private static final BigDecimal MAX_NEGOTIATED_AMOUNT = new BigDecimal("1000000.00");
-    private static final BigDecimal LEGACY_BUDGET_PLACEHOLDER = MIN_NEGOTIATED_AMOUNT;
+    // Mantém o valor histórico (R$ 20,00) usado como placeholder do orçamento legado,
+    // desacoplado do mínimo atual para não alterar registros antigos.
+    private static final BigDecimal LEGACY_BUDGET_PLACEHOLDER = new BigDecimal("20.00");
     private static final List<String> VALID_MILESTONE_STATUSES = List.of("pending", "in_progress", "completed");
 
     @Transactional
@@ -127,7 +129,7 @@ public class ServiceRequestService {
         // Validar orçamento (budget)
         if (dto.getBudget() != null) {
             if (dto.getBudget().compareTo(MIN_NEGOTIATED_AMOUNT) < 0) {
-                throw new IllegalArgumentException("O orçamento mínimo é R$ 20,00");
+                throw new IllegalArgumentException("O orçamento mínimo é R$ 40,00");
             }
             if (dto.getBudget().compareTo(MAX_NEGOTIATED_AMOUNT) > 0) {
                 throw new IllegalArgumentException("O orçamento máximo é R$ 1.000.000,00");
@@ -634,7 +636,7 @@ public class ServiceRequestService {
         }
 
         if (value.compareTo(MIN_NEGOTIATED_AMOUNT) < 0) {
-            throw new IllegalArgumentException("O valor mínimo é R$ 20,00");
+            throw new IllegalArgumentException("O valor mínimo é R$ 40,00");
         }
 
         if (value.compareTo(MAX_NEGOTIATED_AMOUNT) > 0) {
@@ -648,7 +650,7 @@ public class ServiceRequestService {
         }
 
         if (!legacyAllowed && isBelowMinimumNegotiatedAmount(value)) {
-            throw new IllegalStateException("O valor mínimo para novos orçamentos é R$ 20,00");
+            throw new IllegalStateException("O valor mínimo para novos orçamentos é R$ 40,00");
         }
 
         if (value.compareTo(MAX_NEGOTIATED_AMOUNT) > 0) {

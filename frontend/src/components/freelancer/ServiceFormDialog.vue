@@ -20,6 +20,7 @@ import SupportRequestModal from '@/components/support/SupportRequestModal.vue';
 import { toast } from '../../utils/toast';
 import { deleteImage } from '../../api/uploadService';
 import { useCategoryCatalogStore } from '@/stores/categoryCatalogStore';
+import { validateValueRange } from '@/utils/valueValidation';
 
 export interface ServiceFormData {
   id?: string;
@@ -277,6 +278,11 @@ const validateForm = () => {
 
   if (!formData.value.price || formData.value.price <= 0) {
     newErrors.price = 'Preço deve ser maior que zero';
+  } else {
+    const priceError = validateValueRange(formData.value.price);
+    if (priceError) {
+      newErrors.price = priceError;
+    }
   }
 
   if (!formData.value.workModel) {
