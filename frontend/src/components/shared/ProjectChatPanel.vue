@@ -91,7 +91,7 @@ function toDisplay(msg: MessageDTO): ChatMessage {
     id: msg.id,
     sender: msg.senderType === 'contractor' ? 'client' : 'freelancer',
     isOwn: isMe,
-    senderName: isMe ? 'Voce' : displayName(msg.senderId),
+    senderName: isMe ? 'Você' : displayName(msg.senderId),
     type: messageType,
     message: msg.content,
     timestamp: msg.sentAt,
@@ -126,7 +126,7 @@ onMounted(async () => {
   } catch (e: any) {
     const message = e?.response?.data?.message || e?.message || '';
     if (message.toLowerCase().includes('habilitado')) {
-      error.value = 'O chat ainda não está disponível. Aguarde a confirmacao do pagamento.';
+      error.value = 'O chat ainda não está disponível. Aguarde a confirmação do pagamento.';
     } else {
       error.value = 'Erro ao carregar o chat.';
     }

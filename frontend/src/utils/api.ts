@@ -78,7 +78,7 @@ export async function fetchWithAuth(url: string, options: RequestInit = {}) {
   const token = localStorage.getItem('token')
 
   if (token && isTokenExpired()) {
-    logout(undefined, 'Sua sessao expirou. Faca login novamente.')
+    logout(undefined, 'Sua sessão expirou. Faça login novamente.')
     throw new Error('Token expirado')
   }
 
@@ -98,7 +98,7 @@ export async function fetchWithAuth(url: string, options: RequestInit = {}) {
       const errorData = await response.json().catch(() => ({}))
 
       if (errorData.expired === true || errorData.message?.includes('expirado')) {
-        logout(undefined, 'Sua sessao expirou. Faca login novamente.')
+        logout(undefined, 'Sua sessão expirou. Faça login novamente.')
         throw new Error('Token expirado')
       }
     }
@@ -114,7 +114,7 @@ export async function fetchWithAuth(url: string, options: RequestInit = {}) {
 
 export function handleApiError(error: any): string {
   if (error.message === 'Token expirado') {
-    return 'Sua sessao expirou. Por favor, faca login novamente.'
+    return 'Sua sessão expirou. Por favor, faça login novamente.'
   }
   if (error.message) {
     return error.message
@@ -127,16 +127,16 @@ export function handleApiError(error: any): string {
 
 export function startTokenExpirationChecker(router: any) {
   if (isTokenExpired()) {
-    logout(router, 'Sua sessao expirou. Faca login novamente.')
+    logout(router, 'Sua sessão expirou. Faça login novamente.')
     return
   }
 
   const intervalId = setInterval(() => {
     if (isTokenExpired()) {
       clearInterval(intervalId)
-      logout(router, 'Sua sessao expirou. Faca login novamente.')
+      logout(router, 'Sua sessão expirou. Faça login novamente.')
     } else if (isTokenExpiringSoon()) {
-      toast.warning('Sua sessao ira expirar em breve. Salve seu trabalho.')
+      toast.warning('Sua sessão irá expirar em breve. Salve seu trabalho.')
     }
   }, 60000)
 

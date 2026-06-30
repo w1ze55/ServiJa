@@ -1,5 +1,5 @@
 <script lang="ts">
-// Compartilhado entre todas as instancias: garante que apenas um audio toca por vez.
+// Compartilhado entre todas as instâncias: garante que apenas um áudio toca por vez.
 let currentlyPlaying: HTMLAudioElement | null = null;
 </script>
 
@@ -82,7 +82,7 @@ function handleTimeUpdate() {
 
 function handlePlay() {
   isPlaying.value = true;
-  // Pausa qualquer outro audio que esteja tocando.
+  // Pausa qualquer outro áudio que esteja tocando.
   if (currentlyPlaying && currentlyPlaying !== audioRef.value) {
     currentlyPlaying.pause();
   }

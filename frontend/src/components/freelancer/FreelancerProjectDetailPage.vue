@@ -867,7 +867,7 @@ const handleUploadFiles = async () => {
             description-enabled
             label="Arquivos *"
             empty-message="Clique para fazer upload ou arraste os arquivos"
-            helper-text="PDF, JPG, PNG, ZIP - Maximo 10 MB por arquivo"
+            helper-text="PDF, JPG, PNG, ZIP - Máximo 10 MB por arquivo"
             @file-rejected="handleUploadFileRejected"
           />
 

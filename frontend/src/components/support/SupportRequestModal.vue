@@ -162,7 +162,7 @@ const validateForm = () => {
 
 const extractErrorMessage = (error: unknown) => {
   const apiMessage = (error as { response?: { data?: { message?: string; error?: string } } })?.response?.data;
-  return apiMessage?.message || apiMessage?.error || 'Nao foi possivel enviar sua Solicitação agora.';
+  return apiMessage?.message || apiMessage?.error || 'Não foi possível enviar sua solicitação agora.';
 };
 
 const handleClose = () => {
@@ -177,12 +177,12 @@ const closeModal = () => {
 
 const handleSubmit = async () => {
   if (!validateForm()) {
-    toast.error('Preencha os campos obrigatorios para continuar.');
+    toast.error('Preencha os campos obrigatórios para continuar.');
     return;
   }
 
   if (!currentUser.value?.name || !currentUser.value?.email) {
-    toast.error('Nao foi possivel identificar o usuario logado.');
+    toast.error('Não foi possível identificar o usuário logado.');
     return;
   }
 

@@ -154,8 +154,8 @@ const removeAttachment = (index: number) => {
 };
 
 const send = () => {
-  // Se estiver gravando, finaliza a gravacao e o envio acontece apos o onstop
-  // anexar o audio (sem precisar parar manualmente antes).
+  // Se estiver gravando, finaliza a gravação e o envio acontece após o onstop
+  // anexar o áudio (sem precisar parar manualmente antes).
   if (recorderState.value === 'recording') {
     pendingSend.value = true;
     stopAudioRecording();
@@ -193,8 +193,8 @@ const handleComposerKeydown = (event: KeyboardEvent) => {
   send();
 };
 
-// Enquanto grava, o botao de microfone mantem o foco; sem isto, o Enter
-// dispararia o "click" nativo do botao (parar) em vez de enviar o audio.
+// Enquanto grava, o botão de microfone mantém o foco; sem isto, o Enter
+// dispararia o "click" nativo do botão (parar) em vez de enviar o áudio.
 const onRecordButtonKeydown = (event: KeyboardEvent) => {
   if (event.key !== 'Enter' || event.shiftKey || event.isComposing) return;
   if (recorderState.value === 'recording') {
@@ -278,8 +278,8 @@ async function startAudioRecording() {
         recorderState.value = 'idle';
       }
 
-      // Envio solicitado durante a gravacao: agora que o audio ja foi anexado,
-      // dispara o envio real (o proprio send() valida o conteudo).
+      // Envio solicitado durante a gravação: agora que o áudio já foi anexado,
+      // dispara o envio real (o próprio send() valida o conteúdo).
       if (pendingSend.value) {
         pendingSend.value = false;
         nextTick(send);

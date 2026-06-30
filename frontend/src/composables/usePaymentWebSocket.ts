@@ -26,7 +26,7 @@ export function usePaymentWebSocket(userEmail: string) {
     }
 
     if (!userEmail) {
-      connectionError.value = 'Email do usuario nao disponivel';
+      connectionError.value = 'E-mail do usuário não disponível';
       return;
     }
 

@@ -314,7 +314,7 @@ const getStateAbbreviation = (stateName: string): string => {
 // Abrir mapa (navegar para a página do mapa)
 const openMap = () => {
   if (!canAccessMap.value) {
-    toast.error("Mapa disponivel apenas no perfil cliente");
+    toast.error("Mapa disponível apenas no perfil cliente");
     return;
   }
 
@@ -426,7 +426,7 @@ const switchRole = async (role: UserRole) => {
     toast.success(role === "contractor" ? "Modo cliente ativado" : "Modo freelancer ativado");
   } catch (error: any) {
     console.error("Erro ao alternar perfil:", error);
-    toast.error(error.response?.data?.message || "Nao foi possivel alternar o perfil");
+    toast.error(error.response?.data?.message || "Não foi possível alternar o perfil");
   } finally {
     isSwitchingRole.value = false;
   }
@@ -447,12 +447,12 @@ const activateSecondaryProfile = async () => {
     userStore.setUser(mergeUserRoleState(userStore.user, response.data));
     toast.success(
       missingSecondaryRole.value === "contractor"
-        ? "Perfil de cliente ativado. Agora voce pode alternar pelo toggle."
-        : "Perfil de freelancer ativado. Agora voce pode alternar pelo toggle.",
+        ? "Perfil de cliente ativado. Agora você pode alternar pelo toggle."
+        : "Perfil de freelancer ativado. Agora você pode alternar pelo toggle.",
     );
   } catch (error: any) {
     console.error("Erro ao ativar perfil secundario:", error);
-    toast.error(error.response?.data?.message || "Nao foi possivel ativar o perfil");
+    toast.error(error.response?.data?.message || "Não foi possível ativar o perfil");
   } finally {
     isActivatingProfile.value = false;
   }

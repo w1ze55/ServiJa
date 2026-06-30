@@ -317,7 +317,7 @@ const loadFreelancerData = async () => {
 
   try {
     if (isOwnFreelancerProfile(userStore.user, props.providerId)) {
-      toast.error('Voce nao pode acessar o proprio perfil publico como cliente');
+      toast.error('Você não pode acessar o próprio perfil público como cliente');
       await router.replace('/explore');
       return;
     }

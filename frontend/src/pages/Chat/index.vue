@@ -609,7 +609,7 @@ function appendAttachments(files: File[]) {
     files.reduce((acc, file) => acc + file.size, 0);
 
   if (totalSize > MAX_TOTAL_ATTACHMENT_SIZE) {
-    toast.error('O tamanho total dos anexos nao pode exceder 25MB');
+    toast.error('O tamanho total dos anexos não pode exceder 25MB');
     return false;
   }
 
@@ -737,7 +737,7 @@ async function startAudioRecording() {
     } catch (fallbackError) {
       stream.getTracks().forEach((track) => track.stop());
       notifyRecordingError(
-        'O navegador acessou o microfone, mas nao conseguiu iniciar a gravacao.',
+        'O navegador acessou o microfone, mas não conseguiu iniciar a gravação.',
         'chat-page:mediaRecorder',
         fallbackError
       );
@@ -756,7 +756,7 @@ async function startAudioRecording() {
 
   recorder.onerror = (event) => {
     notifyRecordingError(
-      'Nao foi possivel gravar o audio.',
+      'Não foi possível gravar o áudio.',
       'chat-page:recorder-runtime',
       event
     );
@@ -777,8 +777,8 @@ async function startAudioRecording() {
 
     recorderState.value = 'idle';
 
-    // Envio solicitado durante a gravacao: agora que o audio ja foi anexado,
-    // dispara o envio real (o proprio handleSend valida o conteudo).
+    // Envio solicitado durante a gravação: agora que o áudio já foi anexado,
+    // dispara o envio real (o próprio handleSend valida o conteúdo).
     if (pendingSend.value) {
       pendingSend.value = false;
       nextTick(handleSend);
@@ -791,7 +791,7 @@ async function startAudioRecording() {
     recorderState.value = 'recording';
   } catch (error) {
     notifyRecordingError(
-      'Nao foi possivel iniciar a gravacao de audio.',
+      'Não foi possível iniciar a gravação de áudio.',
       'chat-page:recorder-start',
       error
     );
@@ -810,8 +810,8 @@ function stopAudioRecording() {
 async function handleSend() {
   if (isSending.value || !activeConversation.value) return;
 
-  // Se estiver gravando, finaliza a gravacao e o envio acontece apos o onstop
-  // anexar o audio (sem precisar parar manualmente antes).
+  // Se estiver gravando, finaliza a gravação e o envio acontece após o onstop
+  // anexar o áudio (sem precisar parar manualmente antes).
   if (recorderState.value === 'recording') {
     pendingSend.value = true;
     stopAudioRecording();
@@ -869,8 +869,8 @@ function onComposerKeydown(e: KeyboardEvent) {
   }
 }
 
-// Enquanto grava, o botao de microfone mantem o foco; sem isto, o Enter
-// dispararia o "click" nativo do botao (parar) em vez de enviar o audio.
+// Enquanto grava, o botão de microfone mantém o foco; sem isto, o Enter
+// dispararia o "click" nativo do botão (parar) em vez de enviar o áudio.
 function onRecordButtonKeydown(e: KeyboardEvent) {
   if (e.key !== 'Enter' || e.shiftKey || e.isComposing) return;
   if (recorderState.value === 'recording') {

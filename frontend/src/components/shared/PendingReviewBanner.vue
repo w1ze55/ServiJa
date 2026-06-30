@@ -175,7 +175,7 @@ onUnmounted(() => {
             </p>
           </div>
 
-          <!-- Card do servico pendente -->
+          <!-- Card do serviço pendente -->
           <div class="bg-gray-50 rounded-xl p-4">
             <div class="flex items-center gap-3">
               <Avatar class="h-12 w-12 flex-shrink-0">
@@ -198,7 +198,7 @@ onUnmounted(() => {
             </p>
           </div>
 
-          <!-- Botoes -->
+          <!-- Botões -->
           <div class="space-y-3">
             <Button
               variant="default"

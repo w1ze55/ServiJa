@@ -169,8 +169,8 @@ const handleLogout = () => {
             {{ developmentFeatureTitle }}
           </AlertDialogTitle>
           <AlertDialogDescription class="text-center">
-            Esta funcionalidade ainda esta em desenvolvimento e estara disponivel em breve.
-            Agradecemos sua paciencia!
+            Esta funcionalidade ainda está em desenvolvimento e estará disponível em breve.
+            Agradecemos sua paciência!
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter class="sm:justify-center">

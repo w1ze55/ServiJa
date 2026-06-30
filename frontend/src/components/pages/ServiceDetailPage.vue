@@ -205,7 +205,7 @@ const loadData = async () => {
   error.value = '';
   try {
     if (isOwnFreelancerProfile(userStore.user, props.providerId)) {
-      toast.error('Voce nao pode acessar o proprio servico publico como cliente');
+      toast.error('Você não pode acessar o próprio serviço público como cliente');
       await router.replace('/explore');
       return;
     }

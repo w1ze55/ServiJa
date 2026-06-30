@@ -25,7 +25,7 @@ const handleClick = () => {
   syncTriggerRef();
   dropdownMenu?.toggle();
 
-  // Mantem a referencia no botao real mesmo quando o slot re-renderiza.
+  // Mantém a referência no botão real mesmo quando o slot re-renderiza.
   nextTick(syncTriggerRef);
 };
 
