@@ -37,6 +37,7 @@ import DropdownMenuSeparator from "../ui/dropdown-menu-separator.vue";
 import DropdownMenuTrigger from "../ui/dropdown-menu-trigger.vue";
 import logo from "@/assets/favicon-32x32.png";
 import api from "@/api/config/axios";
+import { chatService } from "@/api/services/chatService";
 import { useUserStore } from "@/stores/userStore";
 import { useNotificationStore } from "@/stores/notificationStore";
 import { useFavoritesStore } from "@/stores/favorites";
@@ -130,6 +131,24 @@ const isActivatingProfile = ref(false);
 let notificationConnection: ReturnType<typeof useNotificationsRealtime> | null = null;
 let profileConnection: ReturnType<typeof useProfileWebSocket> | null = null;
 
+// Mensagens de chat não lidas (ponto vermelho no menu "Mensagens")
+const chatUnreadCount = ref(0);
+const hasUnreadMessages = computed(() => chatUnreadCount.value > 0);
+
+const refreshChatUnread = async () => {
+  if (!currentUser.value?.email) return;
+  try {
+    const role = currentUser.value.type === "provider" ? "provider" : "contractor";
+    const conversations = await chatService.listConversations();
+    chatUnreadCount.value = conversations.reduce(
+      (total, conversation) => total + (conversation.unreadCount?.[role] ?? 0),
+      0,
+    );
+  } catch (error) {
+    console.error("Erro ao carregar mensagens não lidas:", error);
+  }
+};
+
 watch(
   () => [currentUser.value?.email, currentActiveRole.value] as const,
   ([email]) => {
@@ -151,8 +170,18 @@ watch(
     profileConnection.connect().catch((error) => {
       console.error("Erro ao conectar stream de perfil:", error);
     });
+
+    refreshChatUnread();
   },
   { immediate: true },
+);
+
+// Recarrega o indicador ao navegar (ex.: após abrir e ler uma conversa)
+watch(
+  () => props.currentPage,
+  () => {
+    refreshChatUnread();
+  },
 );
 
 const getInitialSidebarPinned = () => {
@@ -356,14 +385,17 @@ const handleUserLocationUpdated = (event: Event) => {
 onMounted(() => {
   initializeUserLocation();
   notificationStore.ensurePreviewLoaded();
+  refreshChatUnread();
 
   window.addEventListener("notification-stream-event", handleNotificationStreamEvent as EventListener);
   window.addEventListener(userLocationUpdatedEventName, handleUserLocationUpdated as EventListener);
+  window.addEventListener("chat-messages-read", handleChatMessagesRead as EventListener);
 });
 
 onUnmounted(() => {
   window.removeEventListener("notification-stream-event", handleNotificationStreamEvent as EventListener);
   window.removeEventListener(userLocationUpdatedEventName, handleUserLocationUpdated as EventListener);
+  window.removeEventListener("chat-messages-read", handleChatMessagesRead as EventListener);
   notificationConnection?.disconnect();
   notificationConnection = null;
   profileConnection?.disconnect();
@@ -518,6 +550,19 @@ const getInitials = (name: string) => {
 const handleNotificationStreamEvent = (event: Event) => {
   const streamEvent = (event as CustomEvent<NotificationStreamEvent>).detail;
   notificationStore.applyStreamEvent(streamEvent);
+
+  // Atualiza o indicador de mensagens não lidas em tempo real
+  if (
+    streamEvent?.notification?.category === "messages" ||
+    streamEvent?.notification?.type === "MESSAGE_RECEIVED"
+  ) {
+    refreshChatUnread();
+  }
+};
+
+// Limpa o ponto vermelho assim que as mensagens de uma conversa são lidas
+const handleChatMessagesRead = () => {
+  refreshChatUnread();
 };
 </script>
 
@@ -673,7 +718,13 @@ const handleNotificationStreamEvent = (event: Event) => {
               `"
               :title="!sidebarExpanded ? item.label : ''"
             >
-              <component :is="item.icon" class="h-5 w-5 flex-shrink-0" />
+              <span class="relative flex-shrink-0">
+                <component :is="item.icon" class="h-5 w-5" />
+                <span
+                  v-if="item.id === 'messages' && hasUnreadMessages"
+                  class="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-red-500"
+                />
+              </span>
               <span v-show="sidebarExpanded" class="whitespace-nowrap">
                 {{ item.label }}
               </span>
@@ -796,7 +847,13 @@ const handleNotificationStreamEvent = (event: Event) => {
                 }
               `"
             >
-              <component :is="item.icon" class="h-5 w-5" />
+              <span class="relative flex-shrink-0">
+                <component :is="item.icon" class="h-5 w-5" />
+                <span
+                  v-if="item.id === 'messages' && hasUnreadMessages"
+                  class="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-[#263238]"
+                />
+              </span>
               <span>{{ item.label }}</span>
             </button>
           </template>
