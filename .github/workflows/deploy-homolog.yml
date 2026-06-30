@@ -45,6 +45,40 @@ jobs:
           fi
           echo "OK: nenhum mojibake encontrado"
 
+      # ─────────────────────────────────────────────────────────────
+      # Guard de regressão: palavras pt-BR sem acento em TEXTO voltado
+      # ao usuário (mensagens, labels, templates). NÃO é um corretor
+      # ortográfico geral — é uma denylist curada de formas que, dentro
+      # de strings/texto, são quase sempre erro de acentuação. Evita
+      # de propósito homógrafos válidos sem acento (esta/publica/invalida/
+      # pagina) e identificadores. Falso positivo (slug, identificador,
+      # nome de arquivo): adicione o comentário `accent-ok` na linha.
+      # ─────────────────────────────────────────────────────────────
+      - name: Detect missing pt-BR accents (texto voltado ao usuário)
+        run: |
+          set +e
+          WL='voce|voces|tambem|porem|entao|apos|alem|atras|nao|sera|serao|disponivel|indisponivel|disponiveis|possivel|impossivel|responsavel|proprio|propria|obrigatori[oa]s?|necessari[oa]s?|historico|permissao|gravacao|configuracoes|confirmacao|notificacoes|solicitaco?es|descricao|recuperacao|verificacao|autenticacao|transacoes|relatorio|topico|comissao|conexao|sessao|maximo|minimo'
+          # Allowlist: nomes de arquivo de download + marcador inline `accent-ok`.
+          ALLOW='relatorio-carteira|accent-ok'
+
+          # Backend: dentro de strings Java ("..."), apenas código de produção.
+          BACK=$(grep -RniE --include='*.java' "\"[^\"]*\b($WL)\b[^\"]*\"" backend/src/main 2>/dev/null | grep -viE "$ALLOW")
+          # Frontend/admin: dentro de aspas ou texto de template (>...<).
+          FRONT=$(grep -RniE --include='*.vue' --include='*.ts' "[\"'>][^\"'<]*\b($WL)\b" frontend/src frontend-admin/src 2>/dev/null | grep -viE "$ALLOW|@media")
+
+          MATCHES=$(printf '%s\n%s\n' "$BACK" "$FRONT" | grep -vE '^$')
+          if [ -n "$MATCHES" ]; then
+            echo "::error::Possível palavra pt-BR sem acentuação em texto voltado ao usuário:"
+            echo "$MATCHES" | while IFS=: read -r file line content; do
+              echo "::error file=$file,line=$line::Acentuacao: ${content#"${content%%[![:space:]]*}"}"
+            done
+            echo ""
+            echo "Total de ocorrências: $(echo "$MATCHES" | wc -l)"
+            echo "Se for falso positivo (slug, identificador, verbo, nome de arquivo), adicione o comentário 'accent-ok' na linha."
+            exit 1
+          fi
+          echo "OK: nenhuma palavra sem acentuação detectada"
+
   # ─────────────────────────────────────────────────────────────────
   # Security - SAST (back + front): análise estática do código-fonte
   # Java (backend) e Vue/JS (frontend + frontend-admin) buscando bugs
