@@ -460,8 +460,8 @@ const summaryCards = computed(() => [
   },
   {
     key: 'earned',
-    title: 'Receita liquida acumulada',
-    subtitle: 'Total liquido com taxas da plataforma e acrescimos de parcelamento',
+    title: 'Receita líquida acumulada',
+    subtitle: 'Total líquido com taxas da plataforma e acréscimos de parcelamento',
     value: formatCurrency(wallet.value?.totalEarned),
     icon: ReceiptText,
     iconWrapper: 'bg-blue-100',
@@ -696,7 +696,7 @@ onMounted(() => {
     <div class="space-y-6">
       <PageHeader
         title="Carteira da Plataforma"
-        subtitle="Gerencie o saldo institucional da Servi Já, as contas globais de saque e o historico da receita liquida da plataforma."
+        subtitle="Gerencie o saldo institucional da Servi Já, as contas globais de saque e o histórico da receita líquida da plataforma."
       >
         <template #actions>
           <div class="flex flex-col gap-2 sm:flex-row">

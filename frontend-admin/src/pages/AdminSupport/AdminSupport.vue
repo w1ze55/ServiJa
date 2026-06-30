@@ -268,7 +268,7 @@ const openDetails = async (requestId: number) => {
 
 const openActionModal = (mode: SupportAdminActionMode, request: SupportRequest) => {
   if (!canModerateRequest(request)) {
-    toast.info('Esta solicitacao ja foi respondida e agora pode apenas ser visualizada.');
+    toast.info('Esta solicitação já foi respondida e agora pode apenas ser visualizada.');
     return;
   }
 
@@ -296,7 +296,7 @@ const handleActionSubmit = async (message: string) => {
   }
 
   if (!canModerateRequest(selectedRequest.value)) {
-    toast.info('Esta solicitacao ja foi respondida e agora pode apenas ser visualizada.');
+    toast.info('Esta solicitação já foi respondida e agora pode apenas ser visualizada.');
     forceCloseResponseModal();
     return;
   }
