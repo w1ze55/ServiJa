@@ -80,7 +80,7 @@ class WalletSchedulerTest {
                 sr,
                 freelancer,
                 OperationType.SERVICE_COMPLETED,
-                "Servico concluido automaticamente apos 7 dias sem aprovacao do cliente");
+                "Serviço concluído automaticamente após 7 dias sem aprovação do cliente");
         assertThat(sr.getStatus()).isEqualTo(ServiceRequest.Status.COMPLETED);
     }
 

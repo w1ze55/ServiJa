@@ -74,7 +74,7 @@ public class FreelancerWalletController {
     }
 
     @GetMapping("/transactions")
-    @Operation(summary = "Listar transacoes", description = "Lista historico de recebimentos e saques")
+    @Operation(summary = "Listar transações", description = "Lista histórico de recebimentos e saques")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<List<WalletTransactionResponse>> getTransactions(
             Authentication authentication,
@@ -86,7 +86,7 @@ public class FreelancerWalletController {
     }
 
     @GetMapping("/transactions/paged")
-    @Operation(summary = "Listar transacoes paginadas", description = "Lista paginada de recebimentos e saques, com filtro por periodo")
+    @Operation(summary = "Listar transações paginadas", description = "Lista paginada de recebimentos e saques, com filtro por período")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<WalletTransactionPageResponse> getTransactionsPaged(
             Authentication authentication,
@@ -153,7 +153,7 @@ public class FreelancerWalletController {
     }
 
     @GetMapping("/bank-accounts")
-    @Operation(summary = "Listar contas bancarias")
+    @Operation(summary = "Listar contas bancárias")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<List<BankAccountResponse>> getBankAccounts(Authentication authentication) {
         String email = authentication.getName();
@@ -161,7 +161,7 @@ public class FreelancerWalletController {
     }
 
     @PostMapping("/bank-accounts")
-    @Operation(summary = "Cadastrar conta bancaria ou chave PIX")
+    @Operation(summary = "Cadastrar conta bancária ou chave PIX")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<BankAccountResponse> addBankAccount(
             @Valid @RequestBody BankAccountDTO request,
@@ -173,7 +173,7 @@ public class FreelancerWalletController {
     }
 
     @DeleteMapping("/bank-accounts/{id}")
-    @Operation(summary = "Remover conta bancaria")
+    @Operation(summary = "Remover conta bancária")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<Void> deleteBankAccount(
             @PathVariable Long id,
@@ -185,7 +185,7 @@ public class FreelancerWalletController {
     }
 
     @PutMapping("/bank-accounts/{id}/default")
-    @Operation(summary = "Definir conta padrao")
+    @Operation(summary = "Definir conta padrão")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<BankAccountResponse> setDefaultAccount(
             @PathVariable Long id,
@@ -196,7 +196,7 @@ public class FreelancerWalletController {
     }
 
     @GetMapping("/report")
-    @Operation(summary = "Baixar relatorio da carteira em PDF ou Excel")
+    @Operation(summary = "Baixar relatório da carteira em PDF ou Excel")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<byte[]> downloadReport(
             Authentication authentication,

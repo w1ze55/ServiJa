@@ -53,7 +53,7 @@ class SupportRequestServiceTest {
     class Approve {
 
         @Test
-        @DisplayName("deve aprovar solicitacao pendente")
+        @DisplayName("deve aprovar solicitação pendente")
         void shouldApprovePendingRequest() {
             SupportRequest supportRequest = buildSupportRequest(SupportRequest.Status.PENDING);
             User admin = buildAdmin();
@@ -78,7 +78,7 @@ class SupportRequestServiceTest {
         }
 
         @Test
-        @DisplayName("deve impedir nova decisao apos solicitacao ja respondida")
+        @DisplayName("deve impedir nova decisão após solicitação já respondida")
         void shouldPreventSecondDecisionAfterRequestAnswered() {
             SupportRequest supportRequest = buildSupportRequest(SupportRequest.Status.REJECTED);
             User admin = buildAdmin();
@@ -88,7 +88,7 @@ class SupportRequestServiceTest {
 
             assertThatThrownBy(() -> supportRequestService.approve(1L, admin.getEmail(), "Nova resposta"))
                     .isInstanceOf(IllegalStateException.class)
-                    .hasMessageContaining("disponivel apenas para visualizacao");
+                    .hasMessageContaining("disponível apenas para visualização");
 
             verify(supportRequestRepository, never()).save(any());
             verify(emailService, never()).sendSupportRequestDecisionEmail(any(), any(), any(), any(), any());

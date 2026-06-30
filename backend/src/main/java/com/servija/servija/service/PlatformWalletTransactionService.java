@@ -57,7 +57,7 @@ public class PlatformWalletTransactionService {
                         .type("FEE")
                         .amount(netPlatformFee)
                         .status("COMPLETED")
-                        .description("Receita liquida da plataforma liberada")
+                        .description("Receita líquida da plataforma liberada")
                         .paymentMethod(payment.getPaymentMethod())
                         .serviceName(serviceName)
                         .referenceLabel(serviceRequestId != null ? "Serviço #" + serviceRequestId : "Pagamento #" + payment.getId())

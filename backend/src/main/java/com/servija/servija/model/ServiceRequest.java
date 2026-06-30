@@ -105,13 +105,13 @@ public class ServiceRequest {
     @Column(name = "response_milestones", columnDefinition = "LONGTEXT")
     private String responseMilestones;
 
-    @DecimalMin(value = "40.00", message = "O valor minimo e R$ 40,00")
-    @DecimalMax(value = "1000000.00", message = "O valor maximo e R$ 1.000.000,00")
+    @DecimalMin(value = "40.00", message = "O valor mínimo é R$ 40,00")
+    @DecimalMax(value = "1000000.00", message = "O valor máximo é R$ 1.000.000,00")
     @Column(name = "response_value", precision = 10, scale = 2)
     private BigDecimal responseValue;
 
-    @Min(value = 1, message = "O prazo minimo e de 1 dia")
-    @Max(value = 365, message = "O prazo maximo e de 365 dias")
+    @Min(value = 1, message = "O prazo mínimo é de 1 dia")
+    @Max(value = 365, message = "O prazo máximo é de 365 dias")
     @Column(name = "response_days")
     private Integer responseDays;
 

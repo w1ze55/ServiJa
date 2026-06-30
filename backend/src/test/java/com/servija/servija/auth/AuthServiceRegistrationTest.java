@@ -119,7 +119,7 @@ class AuthServiceRegistrationTest {
     }
 
     @Test
-    @DisplayName("Deve lancar excecao ao cadastrar email duplicado")
+    @DisplayName("Deve lançar exceção ao cadastrar email duplicado")
     void register_duplicateEmail_throwsException() {
         when(userRepository.existsByEmail("joao@email.com")).thenReturn(true);
 
@@ -132,7 +132,7 @@ class AuthServiceRegistrationTest {
     }
 
     @Test
-    @DisplayName("Deve lancar excecao ao cadastrar CPF duplicado")
+    @DisplayName("Deve lançar exceção ao cadastrar CPF duplicado")
     void register_duplicateCpf_throwsException() {
         when(userRepository.existsByEmail(anyString())).thenReturn(false);
         when(userRepository.existsByCpf("12345678901")).thenReturn(true);
@@ -145,7 +145,7 @@ class AuthServiceRegistrationTest {
     }
 
     @Test
-    @DisplayName("Deve enviar email de verificacao apos cadastro")
+    @DisplayName("Deve enviar email de verificação após cadastro")
     void register_sendsVerificationEmail() {
         setupBaseRegistrationMocks();
         when(contractorRepository.findById(anyLong())).thenReturn(Optional.empty());
@@ -157,7 +157,7 @@ class AuthServiceRegistrationTest {
     }
 
     @Test
-    @DisplayName("Deve gerar codigo de verificacao com 6 digitos")
+    @DisplayName("Deve gerar código de verificação com 6 dígitos")
     void register_generatesValidVerificationCode() {
         ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
         setupBaseRegistrationMocks();

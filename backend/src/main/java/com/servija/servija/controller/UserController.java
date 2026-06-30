@@ -64,11 +64,11 @@ public class UserController {
     }
 
     @PostMapping("/me/profiles")
-    @Operation(summary = "Ativar perfil secundario", description = "Cria o perfil solicitado na mesma conta autenticada")
+    @Operation(summary = "Ativar perfil secundário", description = "Cria o perfil solicitado na mesma conta autenticada")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Perfil ativado com sucesso", content = @Content(schema = @Schema(implementation = ProfileResponse.class))),
-            @ApiResponse(responseCode = "400", description = "Perfil invalido", content = @Content(schema = @Schema(implementation = MessageResponse.class))),
-            @ApiResponse(responseCode = "401", description = "Nao autenticado")
+            @ApiResponse(responseCode = "400", description = "Perfil inválido", content = @Content(schema = @Schema(implementation = MessageResponse.class))),
+            @ApiResponse(responseCode = "401", description = "Não autenticado")
     })
     public ResponseEntity<ProfileResponse> activateProfile(@Valid @RequestBody UserRoleRequest request) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();

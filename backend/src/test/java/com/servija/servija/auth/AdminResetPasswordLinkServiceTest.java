@@ -74,7 +74,7 @@ class AdminResetPasswordLinkServiceTest {
     }
 
     @Test
-    @DisplayName("sendResetLink deve enviar link valido e reemissao invalida o token anterior")
+    @DisplayName("sendResetLink deve enviar link válido e reemissão invalida o token anterior")
     void sendResetLink_reissueInvalidatesPreviousToken() {
         adminResetPasswordLinkService.sendResetLink(user);
         String firstHash = user.getAdminResetPasswordTokenHash();
@@ -117,7 +117,7 @@ class AdminResetPasswordLinkServiceTest {
     }
 
     @Test
-    @DisplayName("validateToken deve falhar quando o link ja foi utilizado")
+    @DisplayName("validateToken deve falhar quando o link já foi utilizado")
     void validateToken_usedLink_throwsException() {
         String token = issueLinkAndExtractToken();
         user.setAdminResetPasswordTokenExpiry(null);
@@ -128,7 +128,7 @@ class AdminResetPasswordLinkServiceTest {
     }
 
     @Test
-    @DisplayName("resetPassword deve consumir o link e limpar o fluxo por codigo")
+    @DisplayName("resetPassword deve consumir o link e limpar o fluxo por código")
     void resetPassword_consumesLinkAndClearsCodeChallenge() {
         String token = issueLinkAndExtractToken();
         when(passwordEncoder.encode("NovaSenha@123")).thenReturn("encoded-new-password");

@@ -9,6 +9,6 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class SupportRequestActionRequest {
-    @NotBlank(message = "A mensagem de resposta e obrigatoria")
+    @NotBlank(message = "A mensagem de resposta é obrigatória")
     private String responseMessage;
 }

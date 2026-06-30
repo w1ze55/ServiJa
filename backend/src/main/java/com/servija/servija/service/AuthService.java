@@ -121,7 +121,7 @@ public class AuthService {
             user = userRoleCompatibilityService.repairIfNeeded(user);
 
             if (user.getUserType() == User.UserType.ADMIN) {
-                throw new InvalidCredentialsException("Credenciais invalidas");
+                throw new InvalidCredentialsException("Credenciais inválidas");
             }
 
             if (!user.getActive()) {
@@ -182,7 +182,7 @@ public class AuthService {
         user = userRoleCompatibilityService.repairIfNeeded(user);
 
         if (user.getUserType() != User.UserType.ADMIN) {
-            throw new InvalidCredentialsException("Credenciais invalidas");
+            throw new InvalidCredentialsException("Credenciais inválidas");
         }
 
         if (!user.getActive()) {
@@ -223,7 +223,7 @@ public class AuthService {
                 .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
 
         if (!user.getActive() || !Boolean.TRUE.equals(user.getTotpEnabled())) {
-            throw new InvalidCredentialsException("Credenciais invalidas");
+            throw new InvalidCredentialsException("Credenciais inválidas");
         }
 
         // Validate the challenge token itself against the user (signature + non-expired).
@@ -529,13 +529,13 @@ public class AuthService {
     @Transactional
     public AuthResponse switchRole(String email, UserRoleRequest request) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("Usuario nao encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
 
         User.UserType requestedRole = request.getRole();
         validateInteractiveRole(requestedRole);
 
         if (!user.hasRole(requestedRole)) {
-            throw new IllegalArgumentException("Este perfil nao esta habilitado para a conta");
+            throw new IllegalArgumentException("Este perfil não está habilitado para a conta");
         }
 
         user.setActiveRole(requestedRole);
@@ -599,7 +599,7 @@ public class AuthService {
 
     private void validateInteractiveRole(User.UserType role) {
         if (role == null || role == User.UserType.ADMIN) {
-            throw new IllegalArgumentException("Perfil invalido para esta operacao");
+            throw new IllegalArgumentException("Perfil inválido para esta operação");
         }
     }
 

@@ -97,7 +97,7 @@ class WebSocketAuthChannelInterceptorTest {
     }
 
     @Test
-    @DisplayName("preSend rejeita CONNECT quando o token JWT e invalido (H9)")
+    @DisplayName("preSend rejeita CONNECT quando o token JWT é inválido (H9)")
     void preSendSkipsAuthenticationWhenTokenIsInvalid() {
         WebSocketAuthChannelInterceptor interceptor = interceptor();
         UserDetails userDetails = new User("user@test.com", "secret", List.of());
@@ -133,7 +133,7 @@ class WebSocketAuthChannelInterceptorTest {
     }
 
     @Test
-    @DisplayName("preSend permite SUBSCRIBE em topico scoped por email quando usuario e o dono")
+    @DisplayName("preSend permite SUBSCRIBE em tópico scoped por email quando usuário é o dono")
     void preSendAllowsSubscribeToOwnEmailScopedTopic() {
         WebSocketAuthChannelInterceptor interceptor = interceptor();
 
@@ -148,7 +148,7 @@ class WebSocketAuthChannelInterceptorTest {
     }
 
     @Test
-    @DisplayName("preSend bloqueia SUBSCRIBE em topico scoped por email de outro usuario")
+    @DisplayName("preSend bloqueia SUBSCRIBE em tópico scoped por email de outro usuário")
     void preSendBlocksSubscribeToForeignEmailScopedTopic() {
         WebSocketAuthChannelInterceptor interceptor = interceptor();
 
@@ -156,11 +156,11 @@ class WebSocketAuthChannelInterceptorTest {
                 subscribeMessage("/topic/notifications/other@test.com", "user@test.com"),
                 mock(MessageChannel.class)
         )).isInstanceOf(AccessDeniedException.class)
-                .hasMessageContaining("Nao autorizado");
+                .hasMessageContaining("Não autorizado");
     }
 
     @Test
-    @DisplayName("preSend permite SUBSCRIBE em topico de chat quando usuario participa da conversa")
+    @DisplayName("preSend permite SUBSCRIBE em tópico de chat quando usuário participa da conversa")
     void preSendAllowsSubscribeToConversationTopicForParticipant() {
         WebSocketAuthChannelInterceptor interceptor = interceptor();
         when(conversationRepository.findById("conv-1")).thenReturn(Optional.of(
@@ -182,7 +182,7 @@ class WebSocketAuthChannelInterceptorTest {
     }
 
     @Test
-    @DisplayName("preSend permite SUBSCRIBE em read topic do chat quando usuario participa da conversa")
+    @DisplayName("preSend permite SUBSCRIBE em read topic do chat quando usuário participa da conversa")
     void preSendAllowsSubscribeToConversationReadTopicForParticipant() {
         WebSocketAuthChannelInterceptor interceptor = interceptor();
         when(conversationRepository.findById("conv-1")).thenReturn(Optional.of(
@@ -204,7 +204,7 @@ class WebSocketAuthChannelInterceptorTest {
     }
 
     @Test
-    @DisplayName("preSend bloqueia SUBSCRIBE em topico de chat quando usuario nao participa da conversa")
+    @DisplayName("preSend bloqueia SUBSCRIBE em tópico de chat quando usuário não participa da conversa")
     void preSendBlocksSubscribeToConversationTopicForNonParticipant() {
         WebSocketAuthChannelInterceptor interceptor = interceptor();
         when(conversationRepository.findById("conv-1")).thenReturn(Optional.of(
@@ -219,7 +219,7 @@ class WebSocketAuthChannelInterceptorTest {
                 subscribeMessage("/topic/chat/conv-1", "user@test.com"),
                 mock(MessageChannel.class)
         )).isInstanceOf(AccessDeniedException.class)
-                .hasMessageContaining("Nao autorizado");
+                .hasMessageContaining("Não autorizado");
     }
 
     @Test
@@ -231,7 +231,7 @@ class WebSocketAuthChannelInterceptorTest {
                 subscribeMessage("/topic/unknown/resource", "user@test.com"),
                 mock(MessageChannel.class)
         )).isInstanceOf(AccessDeniedException.class)
-                .hasMessageContaining("Nao autorizado");
+                .hasMessageContaining("Não autorizado");
     }
 
     private WebSocketAuthChannelInterceptor interceptor() {

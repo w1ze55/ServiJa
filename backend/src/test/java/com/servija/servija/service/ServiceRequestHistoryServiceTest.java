@@ -28,7 +28,7 @@ class ServiceRequestHistoryServiceTest {
     private ServiceRequestHistoryService historyService;
 
     @Test
-    @DisplayName("Deve traduzir status de ajuste salvo em ingles ao carregar historico")
+    @DisplayName("Deve traduzir status de ajuste salvo em inglês ao carregar histórico")
     void getHistory_translatesStoredAdjustmentStatusDetails() {
         ServiceRequest request = ServiceRequest.builder()
                 .id(15L)

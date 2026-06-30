@@ -44,7 +44,7 @@ class AsaasServiceTest {
     }
 
     @Test
-    @DisplayName("Deve criar cliente com notificationDisabled=true e desativar notificacoes em lote")
+    @DisplayName("Deve criar cliente com notificationDisabled=true e desativar notificações em lote")
     @SuppressWarnings({"unchecked", "rawtypes"})
     void getOrCreateCustomer_createsCustomerWithNotificationsDisabled() {
         ArgumentCaptor<HttpEntity> createCustomerCaptor = ArgumentCaptor.forClass(HttpEntity.class);
@@ -120,7 +120,7 @@ class AsaasServiceTest {
     }
 
     @Test
-    @DisplayName("Deve rejeitar chave de sandbox configurada com URL de producao")
+    @DisplayName("Deve rejeitar chave de sandbox configurada com URL de produção")
     void getOrCreateCustomer_rejectsSandboxKeyOnProductionUrl() {
         ReflectionTestUtils.setField(asaasService, "asaasApiUrl", "https://api.asaas.com");
         ReflectionTestUtils.setField(asaasService, "asaasApiKey", "$aact_hmlg_test_key");
@@ -128,7 +128,7 @@ class AsaasServiceTest {
         assertThatThrownBy(() -> asaasService.getOrCreateCustomer("cliente@servija.com", "Cliente", "12345678901"))
                 .isInstanceOf(AsaasIntegrationException.class)
                 .hasMessageContaining("sandbox")
-                .hasMessageContaining("producao");
+                .hasMessageContaining("produção");
 
         verifyNoInteractions(restTemplate);
     }

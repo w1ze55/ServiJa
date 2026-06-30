@@ -56,11 +56,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         try {
             userEmail = jwtService.extractUsername(jwt);
 
-            // Bloqueia o token de desafio pre-2FA: ele so vale em /api/auth/2fa/verify
-            // (rota publica que nem passa por este filtro). Aceita-lo aqui permitiria
+            // Bloqueia o token de desafio pré-2FA: ele só vale em /api/auth/2fa/verify
+            // (rota pública que nem passa por este filtro). Aceitá-lo aqui permitiria
             // pular completamente o segundo fator.
             if (jwtService.isTotpChallengeToken(jwt)) {
-                handleInvalidToken(response, "Token de verificacao 2FA pendente nao autoriza acesso");
+                handleInvalidToken(response, "Token de verificação 2FA pendente não autoriza acesso");
                 return;
             }
 
@@ -162,7 +162,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         errorDetails.put("timestamp", LocalDateTime.now().toString());
         errorDetails.put("status", 403);
         errorDetails.put("error", "Forbidden");
-        errorDetails.put("message", "E-mail nao verificado. Confirme seu e-mail para concluir o acesso.");
+        errorDetails.put("message", "E-mail não verificado. Confirme seu e-mail para concluir o acesso.");
         errorDetails.put("emailVerificationRequired", true);
         errorDetails.put("email", email);
         errorDetails.put("path", "");

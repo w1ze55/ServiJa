@@ -57,7 +57,7 @@ class WebSocketServiceTest {
     }
 
     @Test
-    @DisplayName("notifyPaymentFailed publica no topico de pagamento com motivo e mensagem")
+    @DisplayName("notifyPaymentFailed publica no tópico de pagamento com motivo e mensagem")
     void notifyPaymentFailedPublishesReasonToPaymentTopic() {
         service.notifyPaymentFailed(55L, "client@test.com", "saldo insuficiente");
 
@@ -78,7 +78,7 @@ class WebSocketServiceTest {
     }
 
     @Test
-    @DisplayName("notifyChatRead publica read receipt no topico de leitura da conversa")
+    @DisplayName("notifyChatRead publica read receipt no tópico de leitura da conversa")
     void notifyChatReadPublishesToConversationReadTopic() {
         ReadReceiptDTO receipt = new ReadReceiptDTO(
                 "conv-1",
@@ -94,7 +94,7 @@ class WebSocketServiceTest {
     }
 
     @Test
-    @DisplayName("publishNotificationEvent publica evento persistido no stream do usuario")
+    @DisplayName("publishNotificationEvent publica evento persistido no stream do usuário")
     void publishNotificationEventPublishesToUserNotificationTopic() {
         NotificationStreamEvent event = NotificationStreamEvent.builder()
                 .eventType("CREATED")

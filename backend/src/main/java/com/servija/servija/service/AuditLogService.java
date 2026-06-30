@@ -37,7 +37,7 @@ public class AuditLogService {
 
     public AuditLogDto getLog(Long id) {
         AuditLog log = auditLogRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Log de auditoria nao encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Log de auditoria não encontrado"));
         return toDto(log, true);
     }
 

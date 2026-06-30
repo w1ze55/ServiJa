@@ -42,7 +42,7 @@ class AdminDashboardServiceTest {
     private AdminDashboardService adminDashboardService;
 
     @Test
-    @DisplayName("Deve montar o dashboard usando todo o periodo disponivel")
+    @DisplayName("Deve montar o dashboard usando todo o período disponível")
     void getDashboard_defaultsToAllTime() {
         LocalDate today = LocalDate.now();
         LocalDate expectedStart = LocalDate.of(2026, 1, 5);
@@ -146,7 +146,7 @@ class AdminDashboardServiceTest {
     }
 
     @Test
-    @DisplayName("Deve retornar metricas zeradas e serie diaria vazia quando nao houver dados no periodo")
+    @DisplayName("Deve retornar métricas zeradas e série diária vazia quando não houver dados no período")
     void getDashboard_returnsZeroStateForCustomRangeWithoutData() {
         LocalDate start = LocalDate.of(2026, 5, 1);
         LocalDate end = LocalDate.of(2026, 5, 7);

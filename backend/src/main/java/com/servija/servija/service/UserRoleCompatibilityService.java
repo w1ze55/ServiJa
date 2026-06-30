@@ -33,7 +33,7 @@ public class UserRoleCompatibilityService implements ApplicationRunner {
         try {
             repairLegacyData();
         } catch (Exception ex) {
-            log.warn("Nao foi possivel reparar active_role/user_roles legados automaticamente.", ex);
+            log.warn("Não foi possível reparar active_role/user_roles legados automaticamente.", ex);
         }
     }
 
@@ -58,7 +58,7 @@ public class UserRoleCompatibilityService implements ApplicationRunner {
         user.setActiveRole(resolvedActiveRole);
 
         User saved = userRepository.save(user);
-        log.info("Compatibilidade de perfis aplicada para o usuario {}", saved.getEmail());
+        log.info("Compatibilidade de perfis aplicada para o usuário {}", saved.getEmail());
         return saved;
     }
 

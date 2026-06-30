@@ -306,12 +306,12 @@ public class CategoryCatalogService {
             if (allowEmpty) {
                 return CategorySelection.empty();
             }
-            throw new IllegalArgumentException("Categoria invalida");
+            throw new IllegalArgumentException("Categoria inválida");
         }
 
         validateEntityActive(category.getActive(), requireActive, "categoria");
         if (subcategory != null && !subcategory.getCategory().getId().equals(category.getId())) {
-            throw new IllegalArgumentException("A subcategoria nao pertence a categoria informada");
+            throw new IllegalArgumentException("A subcategoria não pertence à categoria informada");
         }
         if (subcategory == null && StringUtils.hasText(subcategoryInput)) {
             subcategory = serviceSubcategoryRepository.findByNameIgnoreCaseAndCategoryId(normalizeName(subcategoryInput), category.getId())
@@ -330,10 +330,10 @@ public class CategoryCatalogService {
     @Transactional(readOnly = true)
     public CategorySelection getFallbackSelection(boolean requireActive) {
         ServiceCategory fallbackCategory = serviceCategoryRepository.findByNameIgnoreCase(FALLBACK_CATEGORY_NAME)
-                .orElseThrow(() -> new IllegalStateException("Categoria fallback nao encontrada"));
+                .orElseThrow(() -> new IllegalStateException("Categoria fallback não encontrada"));
         ServiceSubcategory fallbackSubcategory = serviceSubcategoryRepository
                 .findByNameIgnoreCaseAndCategoryId(FALLBACK_SUBCATEGORY_NAME, fallbackCategory.getId())
-                .orElseThrow(() -> new IllegalStateException("Subcategoria fallback nao encontrada"));
+                .orElseThrow(() -> new IllegalStateException("Subcategoria fallback não encontrada"));
         validateEntityActive(fallbackCategory.getActive(), requireActive, "categoria");
         validateEntityActive(fallbackSubcategory.getActive(), requireActive, "subcategoria");
         return CategorySelection.of(fallbackCategory, fallbackSubcategory);
@@ -442,7 +442,7 @@ public class CategoryCatalogService {
         }
 
         if (updatedServices + updatedFreelancers + updatedProjects + updatedRequests > 0) {
-            log.info("Backfill de catalogo concluido. services={}, freelancers={}, portfolioProjects={}, serviceRequests={}",
+            log.info("Backfill de catálogo concluído. services={}, freelancers={}, portfolioProjects={}, serviceRequests={}",
                     updatedServices, updatedFreelancers, updatedProjects, updatedRequests);
         }
     }
@@ -452,7 +452,7 @@ public class CategoryCatalogService {
             SeedCatalog seedCatalog = objectMapper.readValue(inputStream, new TypeReference<SeedCatalog>() {});
             return seedCatalog == null || seedCatalog.getCategories() == null ? List.of() : seedCatalog.getCategories();
         } catch (IOException exception) {
-            throw new IllegalStateException("Nao foi possivel carregar o seed de categorias", exception);
+            throw new IllegalStateException("Não foi possível carregar o seed de categorias", exception);
         }
     }
 
@@ -502,7 +502,7 @@ public class CategoryCatalogService {
 
     private void validateEntityActive(Boolean active, boolean requireActive, String entityName) {
         if (requireActive && !Boolean.TRUE.equals(active)) {
-            throw new IllegalArgumentException("A " + entityName + " informada esta arquivada");
+            throw new IllegalArgumentException("A " + entityName + " informada está arquivada");
         }
     }
 
@@ -511,11 +511,11 @@ public class CategoryCatalogService {
     }
 
     private ServiceCategory getCategoryOrThrow(Long categoryId) {
-        return serviceCategoryRepository.findById(categoryId).orElseThrow(() -> new IllegalArgumentException("Categoria nao encontrada"));
+        return serviceCategoryRepository.findById(categoryId).orElseThrow(() -> new IllegalArgumentException("Categoria não encontrada"));
     }
 
     private ServiceSubcategory getSubcategoryOrThrow(Long subcategoryId) {
-        return serviceSubcategoryRepository.findById(subcategoryId).orElseThrow(() -> new IllegalArgumentException("Subcategoria nao encontrada"));
+        return serviceSubcategoryRepository.findById(subcategoryId).orElseThrow(() -> new IllegalArgumentException("Subcategoria não encontrada"));
     }
 
     private CategoryTreeResponse.CategoryNode toPublicCategoryNode(ServiceCategory category) {

@@ -14,7 +14,7 @@ public class ResponseMilestoneDTO {
 
     private String id;
 
-    @NotBlank(message = "O titulo do marco e obrigatorio")
+    @NotBlank(message = "O título do marco é obrigatório")
     private String title;
 
     private String description;

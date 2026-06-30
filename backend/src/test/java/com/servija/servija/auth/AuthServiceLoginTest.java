@@ -77,7 +77,7 @@ class AuthServiceLoginTest {
     }
 
     @Test
-    @DisplayName("Deve fazer login com credenciais validas e retornar token")
+    @DisplayName("Deve fazer login com credenciais válidas e retornar token")
     void login_validCredentials_returnsToken() {
         UserDetails mockUserDetails = mock(UserDetails.class);
 
@@ -96,7 +96,7 @@ class AuthServiceLoginTest {
     }
 
     @Test
-    @DisplayName("Deve lancar excecao quando usuario nao encontrado")
+    @DisplayName("Deve lançar exceção quando usuário não encontrado")
     void login_userNotFound_throwsException() {
         when(userRepository.findByEmail("joao@email.com")).thenReturn(Optional.empty());
 
@@ -106,7 +106,7 @@ class AuthServiceLoginTest {
     }
 
     @Test
-    @DisplayName("Deve lancar excecao quando conta esta desativada")
+    @DisplayName("Deve lançar exceção quando conta está desativada")
     void login_inactiveAccount_throwsException() {
         activeUser.setActive(false);
         when(userRepository.findByEmail("joao@email.com")).thenReturn(Optional.of(activeUser));
@@ -135,14 +135,14 @@ class AuthServiceLoginTest {
     }
 
     @Test
-    @DisplayName("Login de app deve rejeitar usuario ADMIN")
+    @DisplayName("Login de app deve rejeitar usuário ADMIN")
     void login_adminUser_rejected() {
         User admin = buildUser(99L, "joao@email.com", User.UserType.ADMIN, true);
         when(userRepository.findByEmail("joao@email.com")).thenReturn(Optional.of(admin));
 
         assertThatThrownBy(() -> authService.login(loginRequest))
                 .isInstanceOf(InvalidCredentialsException.class)
-                .hasMessage("Credenciais invalidas");
+                .hasMessage("Credenciais inválidas");
     }
 
     @Test
@@ -181,7 +181,7 @@ class AuthServiceLoginTest {
 
         assertThatThrownBy(() -> authService.loginAdmin(loginRequest))
                 .isInstanceOf(InvalidCredentialsException.class)
-                .hasMessage("Credenciais invalidas");
+                .hasMessage("Credenciais inválidas");
     }
 
     @Test

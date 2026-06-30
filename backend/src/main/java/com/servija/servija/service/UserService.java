@@ -50,7 +50,7 @@ public class UserService {
     @Transactional
     public void changePassword(String email, ChangePasswordRequest request) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("Usuario nao encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
 
         LocalDateTime previousUpdatedAt = user.getUpdatedAt();
 
@@ -59,14 +59,14 @@ public class UserService {
         }
 
         if (!request.getNewPassword().equals(request.getConfirmPassword())) {
-            throw new IllegalArgumentException("As senhas nao coincidem");
+            throw new IllegalArgumentException("As senhas não coincidem");
         }
 
         String newPassword = request.getNewPassword();
         if (!isValidPassword(newPassword)) {
             throw new IllegalArgumentException(
-                    "A senha deve ter no minimo 8 caracteres e conter pelo menos: "
-                            + "1 letra maiuscula, 1 letra minuscula, 1 numero e 1 caractere especial");
+                    "A senha deve ter no mínimo 8 caracteres e conter pelo menos: "
+                            + "1 letra maiúscula, 1 letra minúscula, 1 número e 1 caractere especial");
         }
 
         user.setPassword(passwordEncoder.encode(newPassword));
@@ -86,7 +86,7 @@ public class UserService {
     @Transactional
     public AuthResponse.UserDto updateAvatar(String email, UpdateAvatarRequest request) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("Usuario nao encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
 
         String oldAvatarUrl = user.getAvatarUrl();
         String finalAvatarUrl = null;
@@ -100,7 +100,7 @@ public class UserService {
             }
 
             if (base64.length() > 6_700_000) {
-                throw new IllegalArgumentException("Imagem muito grande. Tamanho maximo: 5MB");
+                throw new IllegalArgumentException("Imagem muito grande. Tamanho máximo: 5MB");
             }
 
             if (!request.getAvatarBase64().startsWith("data:image")) {
@@ -132,7 +132,7 @@ public class UserService {
         entityManager.clear();
 
         User updatedUser = userRepository.findById(user.getId())
-                .orElseThrow(() -> new ResourceNotFoundException("Usuario nao encontrado apos atualizacao"));
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado após atualização"));
 
         webSocketService.notifyProfileImageUpdate(email, finalAvatarUrl);
         if (!Objects.equals(summarizeAvatarValue(oldAvatarUrl), summarizeAvatarValue(updatedUser.getAvatarUrl()))) {
@@ -153,10 +153,10 @@ public class UserService {
     @Transactional
     public void deleteAccount(String email, DeleteAccountRequest request) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("Usuario nao encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            throw new InvalidCredentialsException("Senha incorreta. A conta nao foi excluida.");
+            throw new InvalidCredentialsException("Senha incorreta. A conta não foi excluída.");
         }
 
         Map<String, Object> deletedUser = buildUserAuditState(user);
@@ -176,14 +176,14 @@ public class UserService {
 
     public AuthResponse.UserDto getCurrentUser(String email) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("Usuario nao encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
         return buildUserDto(user);
     }
 
     @Transactional
     public AuthResponse.UserDto updateUser(String email, UpdateUserRequest request) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("Usuario nao encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
 
         Map<String, Object> beforeState = buildUserAuditState(user);
         user.setName(request.getName());
@@ -213,17 +213,17 @@ public class UserService {
 
     public ProfileResponse getCurrentUserProfile(String email) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("Usuario nao encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
         return buildProfileResponse(user);
     }
 
     @Transactional
     public ProfileResponse activateProfile(String email, User.UserType role) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("Usuario nao encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
 
         if (role == null || role == User.UserType.ADMIN) {
-            throw new IllegalArgumentException("Perfil invalido para ativacao");
+            throw new IllegalArgumentException("Perfil inválido para ativação");
         }
 
         if (role == User.UserType.CONTRACTOR) {

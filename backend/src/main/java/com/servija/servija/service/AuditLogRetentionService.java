@@ -67,7 +67,7 @@ public class AuditLogRetentionService {
 
         RetentionSummary summary = new RetentionSummary(infoDeleted, warningDeleted, criticalDeleted);
         log.info(
-                "Audit log retention concluida: infoRemovidos={}, warningRemovidos={}, criticalRemovidos={}, totalRemovidos={}",
+                "Audit log retention concluída: infoRemovidos={}, warningRemovidos={}, criticalRemovidos={}, totalRemovidos={}",
                 summary.infoDeleted(),
                 summary.warningDeleted(),
                 summary.criticalDeleted(),
@@ -79,7 +79,7 @@ public class AuditLogRetentionService {
         try {
             return Period.parse(rawValue);
         } catch (Exception e) {
-            throw new IllegalArgumentException("Valor invalido para " + propertyName + ": " + rawValue, e);
+            throw new IllegalArgumentException("Valor inválido para " + propertyName + ": " + rawValue, e);
         }
     }
 

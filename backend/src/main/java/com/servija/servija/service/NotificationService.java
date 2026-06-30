@@ -246,7 +246,7 @@ public class NotificationService {
                 NotificationType.PAYMENT_RECEIVED,
                 NotificationCategory.PAYMENTS,
                 "Pagamento recebido",
-                "O pagamento do projeto foi confirmado e voce ja pode iniciar o trabalho.",
+                "O pagamento do projeto foi confirmado e você já pode iniciar o trabalho.",
                 paymentMetadataForFreelancer
         );
 

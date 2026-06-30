@@ -208,7 +208,7 @@ public class FileStorageService {
         }
 
         if (file.getSize() > MAX_FILE_SIZE) {
-            throw new RuntimeException("Arquivo muito grande. Maximo permitido: 10MB");
+            throw new RuntimeException("Arquivo muito grande. Máximo permitido: 10MB");
         }
 
         // H4: a extensão (allow-list) é autoritativa. O content-type do cliente NÃO é
@@ -218,7 +218,7 @@ public class FileStorageService {
         String extension = getFileExtension(file.getOriginalFilename()).toLowerCase();
         if (!ALLOWED_EXTENSIONS.contains(extension)) {
             throw new RuntimeException(
-                    "Tipo de arquivo nao permitido. Permitidos: JPEG, JFIF, PNG, GIF, WEBP, MP3, M4A, WAV, OGG, WEBM, AAC, PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX e TXT");
+                    "Tipo de arquivo não permitido. Permitidos: JPEG, JFIF, PNG, GIF, WEBP, MP3, M4A, WAV, OGG, WEBM, AAC, PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX e TXT");
         }
     }
 

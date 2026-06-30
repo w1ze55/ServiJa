@@ -98,7 +98,7 @@ public class ServiceRequestService {
         }
 
         if (freelancer != null && contractor.getId().equals(freelancer.getId())) {
-            throw new IllegalStateException("Voce nao pode enviar uma solicitacao para si mesmo");
+            throw new IllegalStateException("Você não pode enviar uma solicitação para si mesmo");
         }
 
         String normalizedAddress = StringUtils.hasText(dto.getAddress()) ? dto.getAddress().trim() : null;
@@ -514,18 +514,18 @@ public class ServiceRequestService {
         }
 
         ServiceRequest request = serviceRequestRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Solicitacao nao encontrada"));
+                .orElseThrow(() -> new ResourceNotFoundException("Solicitação não encontrada"));
 
         User freelancer = userRepository.findByEmail(freelancerEmail)
-                .orElseThrow(() -> new ResourceNotFoundException("Freelancer nao encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Freelancer não encontrado"));
 
         if (request.getFreelancer() == null || !request.getFreelancer().getId().equals(freelancer.getId())) {
-            throw new IllegalStateException("Apenas o freelancer responsavel pode atualizar marcos");
+            throw new IllegalStateException("Apenas o freelancer responsável pode atualizar marcos");
         }
 
         List<ResponseMilestoneDTO> milestones = parseResponseMilestones(request.getResponseMilestones());
         if (milestones.isEmpty()) {
-            throw new ResourceNotFoundException("Nao ha marcos cadastrados para esta solicitacao");
+            throw new ResourceNotFoundException("Não há marcos cadastrados para esta solicitação");
         }
 
         String normalizedMilestoneId = milestoneId != null ? milestoneId.trim() : "";
@@ -541,7 +541,7 @@ public class ServiceRequestService {
         }
 
         if (!updated) {
-            throw new ResourceNotFoundException("Marco nao encontrado");
+            throw new ResourceNotFoundException("Marco não encontrado");
         }
 
         request.setResponseMilestones(serializeResponseMilestones(milestones));
@@ -814,14 +814,14 @@ public class ServiceRequestService {
     private Payment releaseFreelancerBalanceIfNeeded(ServiceRequest request) {
         List<Payment> payments = paymentRepository.findByServiceRequestId(request.getId());
         if (payments.isEmpty()) {
-            log.warn("Solicitacao {} concluida sem pagamento associado para liberar saldo", request.getId());
+            log.warn("Solicitação {} concluída sem pagamento associado para liberar saldo", request.getId());
             return null;
         }
 
         Payment payment = payments.get(0);
         if (payment.getStatus() != Payment.PaymentStatus.COMPLETED) {
             log.warn(
-                    "Solicitacao {} concluida, mas pagamento {} ainda nao esta COMPLETED. Status atual: {}",
+                    "Solicitação {} concluída, mas pagamento {} ainda não está COMPLETED. Status atual: {}",
                     request.getId(),
                     payment.getId(),
                     payment.getStatus());

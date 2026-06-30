@@ -29,7 +29,7 @@ public class AdminSchemaCompatibilityService implements ApplicationRunner {
         try {
             ensureAdminUserTypeConstraint();
         } catch (Exception ex) {
-            log.warn("Nao foi possivel ajustar a constraint users.user_type antes do bootstrap do admin.", ex);
+            log.warn("Não foi possível ajustar a constraint users.user_type antes do bootstrap do admin.", ex);
         }
     }
 

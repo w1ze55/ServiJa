@@ -376,7 +376,7 @@ public class FreelancerService {
                 normalizeSearchToken(city),
                 normalizeState(state));
 
-        // serviceCities define a area atendida; endereco padrao define a posicao real no mapa.
+        // serviceCities define a área atendida; endereço padrão define a posição real no mapa.
         List<Freelancer> withServiceCities = freelancerRepository.findAllWithServiceCities();
 
         double userLat = latitude.doubleValue();
@@ -507,7 +507,7 @@ public class FreelancerService {
 
             boolean validState = ibgeLocationService.isValidState(normalizedState);
             if (!validState && !unchangedExistingCity) {
-                throw new IllegalArgumentException("Estado de atendimento invalido: " + normalizedState + ".");
+                throw new IllegalArgumentException("Estado de atendimento inválido: " + normalizedState + ".");
             }
 
             Optional<String> canonicalCity = validState

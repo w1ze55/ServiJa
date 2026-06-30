@@ -74,7 +74,7 @@ public class SupportRequestService {
         boolean isAdmin = requester.getUserType() == User.UserType.ADMIN;
 
         if (!isOwner && !isAdmin) {
-            throw new AccessDeniedException("Voce nao tem permissao para visualizar esta solicitacao");
+            throw new AccessDeniedException("Você não tem permissão para visualizar esta solicitação");
         }
 
         return toResponse(supportRequest);
@@ -111,19 +111,19 @@ public class SupportRequestService {
 
         String normalizedMessage = normalizeResponseMessage(responseMessage);
         if (normalizedMessage == null) {
-            throw new IllegalArgumentException("A mensagem de resposta e obrigatoria para esta acao");
+            throw new IllegalArgumentException("A mensagem de resposta é obrigatória para esta ação");
         }
 
         User admin = getUserByEmail(adminEmail);
         if (admin.getUserType() != User.UserType.ADMIN) {
-            throw new AccessDeniedException("Apenas administradores podem tratar solicitacoes de suporte");
+            throw new AccessDeniedException("Apenas administradores podem tratar solicitações de suporte");
         }
 
         SupportRequest supportRequest = getSupportRequestById(id);
         if (supportRequest.getStatus() != SupportRequest.Status.PENDING) {
             throw new IllegalStateException(
-                    "Esta solicitacao ja foi respondida e agora esta disponivel apenas para visualizacao. "
-                            + "Se necessario, oriente o usuario a abrir uma nova solicitacao.");
+                    "Esta solicitação já foi respondida e agora está disponível apenas para visualização. "
+                            + "Se necessário, oriente o usuário a abrir uma nova solicitação.");
         }
 
         supportRequest.setAdminUser(admin);
@@ -147,12 +147,12 @@ public class SupportRequestService {
 
     private User getUserByEmail(String email) {
         return userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("Usuario nao encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
     }
 
     private SupportRequest getSupportRequestById(Long id) {
         return supportRequestRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Solicitacao de suporte nao encontrada"));
+                .orElseThrow(() -> new ResourceNotFoundException("Solicitação de suporte não encontrada"));
     }
 
     private String normalizeResponseMessage(String responseMessage) {
@@ -172,8 +172,8 @@ public class SupportRequestService {
         try {
             return objectMapper.writeValueAsString(attachments);
         } catch (Exception ex) {
-            log.warn("Nao foi possivel serializar anexos da solicitacao de suporte", ex);
-            throw new IllegalArgumentException("Nao foi possivel processar os anexos enviados");
+            log.warn("Não foi possível serializar anexos da solicitação de suporte", ex);
+            throw new IllegalArgumentException("Não foi possível processar os anexos enviados");
         }
     }
 
@@ -185,7 +185,7 @@ public class SupportRequestService {
         try {
             return objectMapper.readValue(attachmentsJson, SUPPORT_ATTACHMENT_LIST_TYPE);
         } catch (Exception ex) {
-            log.warn("Nao foi possivel deserializar anexos da solicitacao de suporte", ex);
+            log.warn("Não foi possível deserializar anexos da solicitação de suporte", ex);
             return Collections.emptyList();
         }
     }

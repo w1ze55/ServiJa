@@ -35,14 +35,14 @@ public class ServiceSchemaCompatibilityService implements ApplicationRunner {
         try {
             ensureDeliveryUnitSupportsMonths();
         } catch (Exception ex) {
-            log.warn("Nao foi possivel ajustar a coluna services.delivery_unit para compatibilidade com MONTHS.", ex);
+            log.warn("Não foi possível ajustar a coluna services.delivery_unit para compatibilidade com MONTHS.", ex);
         }
     }
 
     private void ensureDeliveryUnitSupportsMonths() {
         List<Map<String, Object>> columns = jdbcTemplate.queryForList(DELIVERY_UNIT_COLUMN_SQL);
         if (columns.isEmpty()) {
-            log.warn("Coluna services.delivery_unit nao encontrada para verificacao de compatibilidade.");
+            log.warn("Coluna services.delivery_unit não encontrada para verificação de compatibilidade.");
             return;
         }
 
