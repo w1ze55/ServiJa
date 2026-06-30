@@ -202,7 +202,9 @@ onMounted(async () => {
   const userEmail = getUserEmail();
   if (userEmail) {
     wsConnection = useServiceRequestWebSocket(userEmail);
-    wsConnection.connect();
+    wsConnection.connect().catch((error: any) => {
+      console.error('Erro ao conectar WebSocket do detalhe da solicitação:', error);
+    });
     window.addEventListener('service-request-notification', handleServiceRequestNotification);
   }
 });
@@ -242,6 +244,17 @@ const getUserEmail = () => {
   }
 };
 
+// Recarrega a proposta atual a partir do store, preservando o histórico
+const reloadCurrentProposal = async () => {
+  if (!proposal.value) return;
+  const currentId = proposal.value.id;
+  await proposalStore.loadProposals();
+  proposal.value = proposalStore.getProposalById(currentId) || null;
+  if (proposal.value) {
+    await proposalStore.loadHistory(proposal.value.id);
+  }
+};
+
 // Lidar com notificações via WebSocket
 const handleServiceRequestNotification = async (event: any) => {
   const notification = event.detail;
@@ -255,13 +268,30 @@ const handleServiceRequestNotification = async (event: any) => {
         toast.info(`Status atualizado: ${getStatusLabel(notification.status)}`);
       }
 
-      // Recarregar dados
-      const currentId = proposal.value.id;
-      await proposalStore.loadProposals();
-      proposal.value = proposalStore.getProposalById(currentId) || null;
-      if (proposal.value) {
-        await proposalStore.loadHistory(proposal.value.id);
-      }
+      await reloadCurrentProposal();
+    }
+
+    if (notification.type === 'COUNTER_PROPOSAL') {
+      toast.info(
+        notification.counterProposalAmount
+          ? `O cliente enviou uma contra-proposta de ${notification.counterProposalAmount}`
+          : 'O cliente enviou uma contra-proposta'
+      );
+      await reloadCurrentProposal();
+    }
+
+    if (notification.type === 'PROPOSAL_ACCEPTED') {
+      toast.success(notification.message || 'O cliente aceitou sua proposta!');
+      await reloadCurrentProposal();
+    }
+
+    if (notification.type === 'SERVICE_REQUEST_CANCELLED') {
+      toast.warning(
+        notification.reason
+          ? `Solicitação cancelada pelo cliente. Motivo: ${notification.reason}`
+          : 'Solicitação cancelada pelo cliente.'
+      );
+      await reloadCurrentProposal();
     }
 
     if (notification.type === 'SERVICE_COMPLETED_REVIEW_PENDING') {

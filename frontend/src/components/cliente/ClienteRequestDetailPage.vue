@@ -1,5 +1,5 @@
 ﻿<script setup lang="ts">
-import { ref, computed, onMounted, nextTick, watch } from 'vue';
+import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue';
 import {
   ArrowLeft,
   Clock,
@@ -48,6 +48,7 @@ import AlertDialogTitle from '../ui/alert-dialog-title.vue';
 import { useClientRequestStore, type ServiceRequest } from '@/stores/clientRequestStore';
 import ServiceRequestTimeline from '../service/ServiceRequestTimeline.vue';
 import ProjectChatPanel from '../shared/ProjectChatPanel.vue';
+import { useServiceRequestWebSocket } from '@/composables/useServiceRequestWebSocket';
 import { formatApiDate } from '@/utils/apiDate';
 import { toast } from '@/utils/toast';
 import { getStatusLabel } from '@/utils/statusTranslations';
@@ -60,6 +61,8 @@ interface Props {
 
 const props = defineProps<Props>();
 const store = useClientRequestStore();
+
+let wsConnection: ReturnType<typeof useServiceRequestWebSocket> | null = null;
 
 const request = ref<ServiceRequest | null>(null);
 const showCancelDialog = ref(false);
@@ -188,8 +191,81 @@ const handleSendCounterProposal = async () => {
   }
 };
 
+// Extrair email do usuario do JWT
+const getUserEmail = () => {
+  const token = localStorage.getItem('token');
+  if (!token) return null;
+
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return payload.sub || payload.email;
+  } catch (error) {
+    console.error('Erro ao extrair email do token:', error);
+    return null;
+  }
+};
+
+// Lidar com notificacoes via WebSocket (apenas para esta solicitacao)
+const handleServiceRequestNotification = async (event: Event) => {
+  const notification = (event as CustomEvent).detail;
+
+  if (String(notification.serviceRequestId) !== props.requestId) {
+    return;
+  }
+
+  switch (notification.type) {
+    case 'NEW_PROPOSAL':
+      toast.success(`${notification.freelancerName || 'O profissional'} enviou uma proposta!`);
+      break;
+    case 'COUNTER_PROPOSAL_REJECTED':
+      toast.info(`${notification.freelancerName || 'O profissional'} recusou sua contra-proposta`);
+      break;
+    case 'PROPOSAL_ACCEPTED':
+      toast.success(notification.message || 'Proposta aceita!');
+      break;
+    case 'SERVICE_REQUEST_CANCELLED':
+      toast.warning('Solicitação cancelada');
+      break;
+    case 'SERVICE_REQUEST_STATUS_CHANGED':
+      if (notification.status === 'DELIVERED') {
+        toast.success('Serviço entregue! O freelancer marcou o serviço como concluído');
+      } else if (notification.status === 'IN_PROGRESS') {
+        toast.success('Pagamento confirmado! O serviço está em andamento');
+      } else if (notification.status === 'COMPLETED') {
+        toast.success('Serviço concluído com sucesso!');
+      } else {
+        toast.info(`Status atualizado: ${getStatusLabel(notification.status)}`);
+      }
+      break;
+    default:
+      return;
+  }
+
+  try {
+    await loadData();
+  } catch (error) {
+    console.error('Erro ao recarregar solicitação após notificação:', error);
+  }
+};
+
 onMounted(async () => {
   await loadData();
+
+  const userEmail = getUserEmail();
+  if (userEmail) {
+    wsConnection = useServiceRequestWebSocket(userEmail);
+    wsConnection.connect().catch((error: any) => {
+      console.error('Erro ao conectar WebSocket do detalhe da solicitação:', error);
+    });
+    window.addEventListener('service-request-notification', handleServiceRequestNotification);
+  }
+});
+
+onUnmounted(() => {
+  window.removeEventListener('service-request-notification', handleServiceRequestNotification);
+  if (wsConnection) {
+    wsConnection.disconnect();
+  }
 });
 
 watch(() => props.requestId, async (newId, oldId) => {

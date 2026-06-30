@@ -405,7 +405,9 @@ onMounted(() => {
 
   if (userEmail) {
     wsConnection = useServiceRequestWebSocket(userEmail);
-    wsConnection.connect();
+    wsConnection.connect().catch((error: any) => {
+      console.error("Erro ao conectar WebSocket de solicitações:", error);
+    });
 
     // Escutar notificações de solicitações
     window.addEventListener(
