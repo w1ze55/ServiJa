@@ -16,6 +16,7 @@ import com.servija.servija.repository.PaymentRepository;
 import com.servija.servija.repository.ServiceRequestHistoryRepository;
 import com.servija.servija.repository.ServiceRequestRepository;
 import com.servija.servija.repository.UserRepository;
+import com.servija.servija.util.BrazilDateRange;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -384,11 +385,11 @@ public class AdminDashboardService {
         }
 
         private LocalDateTime startDateTime() {
-            return startDate.atStartOfDay();
+            return BrazilDateRange.startOfDayUtc(startDate);
         }
 
         private LocalDateTime endExclusiveDateTime() {
-            return endDate.plusDays(1).atStartOfDay();
+            return BrazilDateRange.endExclusiveUtc(endDate);
         }
 
         private PeriodRange previousRange() {

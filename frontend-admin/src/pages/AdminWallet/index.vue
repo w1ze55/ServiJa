@@ -32,6 +32,7 @@ import SelectTrigger from '@/components/ui/select-trigger.vue'
 import SelectValue from '@/components/ui/select-value.vue'
 import StatCard from '@/components/ui/stat-card.vue'
 import { toast } from '@/utils/toast'
+import { formatApiDate } from '@/utils/apiDate'
 import {
   useAdminPlatformWalletStore,
   type AdminWalletTimeFilter,
@@ -112,16 +113,16 @@ const formatCurrency = (value: number | null | undefined) =>
 const formatDateTime = (value?: string) => {
   if (!value) return '-'
 
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '-'
-
-  return new Intl.DateTimeFormat('pt-BR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date)
+  // Timestamp em UTC (sem offset); exibe sempre em horário de Brasília.
+  return (
+    formatApiDate(value, {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    }) || '-'
+  )
 }
 
 const parseAmount = (value: string) => {

@@ -6,6 +6,7 @@ import com.servija.servija.dto.AuditSeverity;
 import com.servija.servija.exception.ResourceNotFoundException;
 import com.servija.servija.model.AuditLog;
 import com.servija.servija.repository.AuditLogRepository;
+import com.servija.servija.util.BrazilDateRange;
 import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -119,11 +120,11 @@ public class AuditLogService {
             }
 
             if (dateFrom != null) {
-                predicates.add(cb.greaterThanOrEqualTo(root.get("timestamp"), dateFrom.atStartOfDay()));
+                predicates.add(cb.greaterThanOrEqualTo(root.get("timestamp"), BrazilDateRange.startOfDayUtc(dateFrom)));
             }
 
             if (dateTo != null) {
-                predicates.add(cb.lessThan(root.get("timestamp"), dateTo.plusDays(1).atStartOfDay()));
+                predicates.add(cb.lessThan(root.get("timestamp"), BrazilDateRange.endExclusiveUtc(dateTo)));
             }
 
             return cb.and(predicates.toArray(new Predicate[0]));

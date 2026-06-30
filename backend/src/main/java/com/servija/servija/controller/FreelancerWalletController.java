@@ -14,6 +14,7 @@ import com.servija.servija.service.FreelancerWalletService;
 import com.servija.servija.service.WalletReportService;
 import com.servija.servija.service.WalletTransactionService;
 import com.servija.servija.service.WithdrawalService;
+import com.servija.servija.util.BrazilDateRange;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -37,7 +38,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -97,8 +97,8 @@ public class FreelancerWalletController {
             @RequestParam(defaultValue = "20") int size
     ) {
         String email = authentication.getName();
-        LocalDateTime from = dateFrom != null ? dateFrom.atStartOfDay() : null;
-        LocalDateTime to = dateTo != null ? dateTo.atTime(LocalTime.MAX) : null;
+        LocalDateTime from = dateFrom != null ? BrazilDateRange.startOfDayUtc(dateFrom) : null;
+        LocalDateTime to = dateTo != null ? BrazilDateRange.endExclusiveUtc(dateTo) : null;
         WalletTransactionPageResponse response =
                 transactionService.getTransactionsPaged(email, type, from, to, page, size);
         return ResponseEntity.ok(response);

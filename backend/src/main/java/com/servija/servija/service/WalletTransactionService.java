@@ -68,7 +68,8 @@ public class WalletTransactionService {
 
     /**
      * Monta a lista unificada de transações ordenada por data (mais recente primeiro),
-     * aplicando filtro opcional por tipo e por período ({@code from}/{@code to} inclusivos).
+     * aplicando filtro opcional por tipo e por período no intervalo {@code [from, to)}
+     * (limite inferior inclusivo, superior exclusivo).
      */
     private List<WalletTransactionResponse> assembleTransactions(
             User user, String typeFilter, LocalDateTime from, LocalDateTime to) {
@@ -125,11 +126,11 @@ public class WalletTransactionService {
             });
         }
 
-        // Filtro por período (inclusivo)
+        // Filtro por período: [from, to) — limite inferior inclusivo, superior exclusivo
         List<WalletTransactionResponse> filtered = transactions.stream()
                 .filter(t -> t.getDate() != null)
                 .filter(t -> from == null || !t.getDate().isBefore(from))
-                .filter(t -> to == null || !t.getDate().isAfter(to))
+                .filter(t -> to == null || t.getDate().isBefore(to))
                 .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
 
         // Ordenar por data (mais recente primeiro)

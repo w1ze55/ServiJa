@@ -20,6 +20,7 @@ import {
   type AdminUserDetail,
 } from "@/api/services/adminUserService";
 import { toast } from "@/utils/toast";
+import { formatApiDateOnly } from "@/utils/apiDate";
 import EditUserModal from "./EditUserModal.vue";
 import DeleteUserModal from "./DeleteUserModal.vue";
 const props = defineProps<{
@@ -88,7 +89,7 @@ const userTypeBadge = (type: string) => {
 };
 
 const formatDate = (dateStr: string) =>
-  new Date(dateStr).toLocaleDateString("pt-BR", {
+  formatApiDateOnly(dateStr, {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",

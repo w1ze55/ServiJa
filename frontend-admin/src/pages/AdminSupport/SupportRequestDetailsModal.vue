@@ -8,6 +8,7 @@ import {
   getSupportStatusLabel,
   isImageAttachment,
 } from '@/constants/support';
+import { formatApiDate } from '@/utils/apiDate';
 
 defineProps<{
   open: boolean;
@@ -24,7 +25,7 @@ const emit = defineEmits<{
 
 const formatDate = (value?: string | null) => {
   if (!value) return '—';
-  return new Date(value).toLocaleString('pt-BR', {
+  return formatApiDate(value, {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',

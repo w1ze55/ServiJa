@@ -44,6 +44,7 @@ import AdminLayout from "@/layouts/AdminLayout.vue";
 import AuditLogDrawer from "./AuditLogDrawer.vue";
 import SeverityBadge from "./SeverityBadge.vue";
 import { getLogSeverity, SEVERITY_LABELS } from "./severity";
+import { formatApiDate, formatApiDateOnly, formatApiTimeOnly } from "@/utils/apiDate";
 import { useAuditLogStore } from "@/stores/auditLogStore";
 import type {
   AuditLogEntry,
@@ -589,8 +590,9 @@ const actorInitials = (name: string | null) => {
 };
 
 // ---- date/time formatting ------------------------------------------------
-const fmtDate = (iso: string) => new Date(iso).toLocaleDateString("pt-BR");
-const fmtTime = (iso: string) => new Date(iso).toLocaleTimeString("pt-BR");
+// Timestamps vêm do backend em UTC (sem offset); formatamos sempre em Brasília.
+const fmtDate = (iso: string) => formatApiDateOnly(iso);
+const fmtTime = (iso: string) => formatApiTimeOnly(iso);
 
 // ---- filters -------------------------------------------------------------
 const searchInput = ref("");
@@ -905,7 +907,7 @@ const exportCsv = () => {
     ],
     ...visibleLogs.value.map((l) => [
       l.id,
-      new Date(l.timestamp).toLocaleString("pt-BR"),
+      formatApiDate(l.timestamp),
       l.actorName ?? "",
       l.actorEmail ?? "",
       l.actorType ?? "",

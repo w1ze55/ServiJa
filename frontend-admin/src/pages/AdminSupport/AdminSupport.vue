@@ -26,6 +26,7 @@ import SelectItem from '@/components/ui/select-item.vue';
 import SelectTrigger from '@/components/ui/select-trigger.vue';
 import SelectValue from '@/components/ui/select-value.vue';
 import { toast } from '@/utils/toast';
+import { formatApiDate, parseApiDate } from '@/utils/apiDate';
 import SupportAdminResponseModal from './SupportAdminResponseModal.vue';
 import SupportRequestDetailsModal from './SupportRequestDetailsModal.vue';
 
@@ -140,7 +141,8 @@ const selectedTimeFilterLabel = computed(() =>
 );
 
 const matchesSelectedTimeFilter = (dateValue: string) => {
-  const requestDate = new Date(dateValue);
+  // Timestamp do backend em UTC (sem offset); parseApiDate o lê como instante correto.
+  const requestDate = parseApiDate(dateValue);
   if (Number.isNaN(requestDate.getTime())) {
     return false;
   }
@@ -229,7 +231,7 @@ const filteredRequests = computed(() => {
 });
 
 const formatDate = (value: string) =>
-  new Date(value).toLocaleString('pt-BR', {
+  formatApiDate(value, {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',

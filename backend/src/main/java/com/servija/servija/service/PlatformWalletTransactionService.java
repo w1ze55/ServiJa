@@ -6,6 +6,7 @@ import com.servija.servija.model.Payment;
 import com.servija.servija.model.PlatformWithdrawalRequest;
 import com.servija.servija.repository.PaymentRepository;
 import com.servija.servija.repository.PlatformWithdrawalRequestRepository;
+import com.servija.servija.util.BrazilDateRange;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -145,8 +146,8 @@ public class PlatformWalletTransactionService {
             }
 
             return new DateRange(
-                    startDate != null ? startDate.atStartOfDay() : null,
-                    endDate != null ? endDate.plusDays(1).atStartOfDay() : null
+                    startDate != null ? BrazilDateRange.startOfDayUtc(startDate) : null,
+                    endDate != null ? BrazilDateRange.endExclusiveUtc(endDate) : null
             );
         }
 
