@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue';
-import { Send, Paperclip, X, Lock, MessageSquare, Mic, Square } from 'lucide-vue-next';
+import { ref, computed, onMounted, nextTick, watch } from 'vue';
+import { Send, Paperclip, X, Lock, MessageSquare, Mic, Trash2, Pause, Play } from 'lucide-vue-next';
 import Button from '../ui/button.vue';
 import Textarea from '../ui/textarea.vue';
 import FileAttachment from '../shared/FileAttachment.vue';
@@ -8,16 +8,11 @@ import ChatAudioPlayer from '../shared/ChatAudioPlayer.vue';
 import { toast } from '@/utils/toast';
 import {
   CHAT_ATTACHMENT_ACCEPT,
-  buildRecordedAudioFile,
-  getAudioRecordingUnavailableReason,
-  getMicrophoneAccessErrorMessage,
   isAudioFile,
-  isAudioRecordingSupported,
-  logAudioRecordingError,
-  pickSupportedAudioMimeType,
   shouldHideAttachmentPlaceholder,
   type ChatMessageType,
 } from '@/utils/chatAttachments';
+import { useAudioRecorder } from '@/composables/useAudioRecorder';
 
 export interface ChatMessage {
   id: string;
@@ -74,42 +69,34 @@ const emit = defineEmits<{
 }>();
 
 const MAX_TOTAL_ATTACHMENT_SIZE = 25 * 1024 * 1024;
+const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
 const newMessage = ref('');
 const messageAttachments = ref<File[]>([]);
 const messageAttachmentInput = ref<HTMLInputElement | null>(null);
 const scrollContainer = ref<HTMLElement | null>(null);
-const recorderState = ref<'idle' | 'recording' | 'stopping' | 'error'>('idle');
-const recordingError = ref('');
-const activeRecorder = ref<MediaRecorder | null>(null);
-const activeRecordingStream = ref<MediaStream | null>(null);
-const pendingSend = ref(false);
-const recordingSeconds = ref(0);
-let recordingTimer: ReturnType<typeof setInterval> | null = null;
+const {
+  recorderState,
+  recordingError,
+  recordingElapsed,
+  isSupported: audioRecordingSupported,
+  start: startAudioRecording,
+  stop: stopAudioRecording,
+  pause: pauseAudioRecording,
+  resume: resumeAudioRecording,
+  cancel: cancelAudioRecording,
+} = useAudioRecorder();
 
-function startRecordingTimer() {
-  recordingSeconds.value = 0;
-  stopRecordingTimer();
-  recordingTimer = setInterval(() => {
-    recordingSeconds.value += 1;
-  }, 1000);
-}
+const isRecording = computed(
+  () =>
+    recorderState.value === 'recording' ||
+    recorderState.value === 'paused' ||
+    recorderState.value === 'stopping'
+);
 
-function stopRecordingTimer() {
-  if (recordingTimer) {
-    clearInterval(recordingTimer);
-    recordingTimer = null;
-  }
-}
-
-const recordingElapsed = computed(() => {
-  const total = recordingSeconds.value;
-  const minutes = Math.floor(total / 60);
-  const seconds = total % 60;
-  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-});
-
-const audioRecordingSupported = computed(() => isAudioRecordingSupported());
+const hasContent = computed(
+  () => newMessage.value.trim() !== '' || messageAttachments.value.length > 0
+);
 
 async function scrollToBottom() {
   await nextTick();
@@ -120,22 +107,31 @@ async function scrollToBottom() {
 onMounted(scrollToBottom);
 watch(() => props.messages.length, scrollToBottom);
 
-function stopRecordingStream() {
-  activeRecordingStream.value?.getTracks().forEach((track) => track.stop());
-  activeRecordingStream.value = null;
-}
-
 function appendAttachments(files: File[]) {
+  // Valida o tamanho por arquivo (limite real do backend: 10MB).
+  const validFiles: File[] = [];
+  for (const file of files) {
+    if (file.size > MAX_FILE_SIZE) {
+      toast.error(`O arquivo "${file.name}" excede o tamanho máximo de 10MB.`);
+      continue;
+    }
+    validFiles.push(file);
+  }
+
+  if (validFiles.length === 0) {
+    return false;
+  }
+
   const totalSize =
     messageAttachments.value.reduce((acc, file) => acc + file.size, 0) +
-    files.reduce((acc, file) => acc + file.size, 0);
+    validFiles.reduce((acc, file) => acc + file.size, 0);
 
   if (totalSize > MAX_TOTAL_ATTACHMENT_SIZE) {
     toast.error('O tamanho total dos anexos não pode exceder 25MB');
     return false;
   }
 
-  messageAttachments.value = [...messageAttachments.value, ...files];
+  messageAttachments.value = [...messageAttachments.value, ...validFiles];
   return true;
 }
 
@@ -153,13 +149,13 @@ const removeAttachment = (index: number) => {
   messageAttachments.value.splice(index, 1);
 };
 
-const send = () => {
-  // Se estiver gravando, finaliza a gravação e o envio acontece após o onstop
-  // anexar o áudio (sem precisar parar manualmente antes).
-  if (recorderState.value === 'recording') {
-    pendingSend.value = true;
-    stopAudioRecording();
-    return;
+const send = async () => {
+  // Se estiver gravando/pausado, finaliza a gravação e anexa o áudio antes de enviar.
+  if (recorderState.value === 'recording' || recorderState.value === 'paused') {
+    const audioFile = await stopAudioRecording();
+    if (audioFile) {
+      appendAttachments([audioFile]);
+    }
   }
 
   if (recorderState.value === 'stopping') {
@@ -176,7 +172,13 @@ const send = () => {
   emit('send-message', message, [...messageAttachments.value]);
   newMessage.value = '';
   messageAttachments.value = [];
-  recordingError.value = '';
+};
+
+const handleStartRecording = async () => {
+  const started = await startAudioRecording();
+  if (!started && recordingError.value) {
+    toast.error(recordingError.value);
+  }
 };
 
 const handleComposerKeydown = (event: KeyboardEvent) => {
@@ -193,16 +195,6 @@ const handleComposerKeydown = (event: KeyboardEvent) => {
   send();
 };
 
-// Enquanto grava, o botão de microfone mantém o foco; sem isto, o Enter
-// dispararia o "click" nativo do botão (parar) em vez de enviar o áudio.
-const onRecordButtonKeydown = (event: KeyboardEvent) => {
-  if (event.key !== 'Enter' || event.shiftKey || event.isComposing) return;
-  if (recorderState.value === 'recording') {
-    event.preventDefault();
-    send();
-  }
-};
-
 const formatDate = (dateString: string) => {
   const date = new Date(dateString);
   if (isNaN(date.getTime())) return dateString;
@@ -214,115 +206,6 @@ const formatDate = (dateString: string) => {
   });
 };
 
-async function startAudioRecording() {
-  if (props.isSending || props.isLocked || recorderState.value === 'recording') {
-    return;
-  }
-
-  recordingError.value = '';
-
-  if (!audioRecordingSupported.value) {
-    recorderState.value = 'error';
-    recordingError.value = 'Gravação de áudio indisponível neste navegador.';
-    toast.error(recordingError.value);
-    return;
-  }
-
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    const chunks: BlobPart[] = [];
-    const preferredMimeType = pickSupportedAudioMimeType();
-    let recorder: MediaRecorder;
-
-    try {
-      recorder = preferredMimeType
-        ? new MediaRecorder(stream, { mimeType: preferredMimeType })
-        : new MediaRecorder(stream);
-    } catch {
-      recorder = new MediaRecorder(stream);
-    }
-
-    activeRecordingStream.value = stream;
-    activeRecorder.value = recorder;
-
-    recorder.ondataavailable = (event) => {
-      if (event.data.size > 0) {
-        chunks.push(event.data);
-      }
-    };
-
-    recorder.onerror = () => {
-      stopRecordingTimer();
-      pendingSend.value = false;
-      recorderState.value = 'error';
-      recordingError.value = 'Não foi possível gravar o áudio.';
-      toast.error(recordingError.value);
-      stopRecordingStream();
-      activeRecorder.value = null;
-    };
-
-    recorder.onstop = () => {
-      stopRecordingTimer();
-      stopRecordingStream();
-      activeRecorder.value = null;
-
-      if (chunks.length > 0) {
-        const audioBlob = new Blob(chunks, {
-          type: recorder.mimeType || preferredMimeType || 'audio/webm',
-        });
-        const audioFile = buildRecordedAudioFile(audioBlob);
-        appendAttachments([audioFile]);
-      }
-
-      if (recorderState.value !== 'error') {
-        recorderState.value = 'idle';
-      }
-
-      // Envio solicitado durante a gravação: agora que o áudio já foi anexado,
-      // dispara o envio real (o próprio send() valida o conteúdo).
-      if (pendingSend.value) {
-        pendingSend.value = false;
-        nextTick(send);
-      }
-    };
-
-    recorder.start();
-    startRecordingTimer();
-    recorderState.value = 'recording';
-  } catch (error: any) {
-    stopRecordingTimer();
-    pendingSend.value = false;
-    stopRecordingStream();
-    activeRecorder.value = null;
-    recorderState.value = 'error';
-    recordingError.value =
-      error?.name === 'NotAllowedError'
-        ? 'Permissão de microfone negada.'
-        : 'Não foi possível acessar o microfone.';
-    toast.error(recordingError.value);
-  }
-}
-
-function stopAudioRecording() {
-  if (!activeRecorder.value || recorderState.value !== 'recording') {
-    return;
-  }
-
-  recorderState.value = 'stopping';
-  activeRecorder.value.stop();
-}
-
-onUnmounted(() => {
-  const recorder = activeRecorder.value;
-  if (recorder && recorder.state !== 'inactive') {
-    recorder.ondataavailable = null;
-    recorder.onstop = null;
-    recorder.onerror = null;
-    recorder.stop();
-  }
-  stopRecordingTimer();
-  stopRecordingStream();
-});
 </script>
 
 <template>
@@ -332,7 +215,7 @@ onUnmounted(() => {
       class="flex flex-1 items-center justify-center rounded-xl border border-dashed border-gray-200 bg-gray-50 px-6 py-8 text-center"
     >
       <div>
-        <MessageSquare class="mx-auto mb-3 h-10 w-10 text-gray-300" />
+        <MessageSquare class="mx-auto mb-3 h-9 w-9 text-gray-300" />
         <p class="text-[#435574]">Nenhuma mensagem ainda</p>
       </div>
     </div>
@@ -385,30 +268,10 @@ onUnmounted(() => {
 
     <div v-if="!isLocked" class="space-y-3">
       <div
-        v-if="recorderState === 'recording' || recorderState === 'stopping' || recordingError"
-        class="flex items-center justify-between rounded-lg border px-3 py-2 text-sm"
-        :class="
-          recorderState === 'error'
-            ? 'border-red-200 bg-red-50 text-red-700'
-            : 'border-blue-200 bg-blue-50 text-blue-700'
-        "
+        v-if="recorderState === 'error' && recordingError"
+        class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
       >
-        <span v-if="recorderState === 'recording'" class="flex items-center gap-2">
-          <span class="recording-dot" />
-          Gravando áudio... {{ recordingElapsed }}
-        </span>
-        <span v-else-if="recorderState === 'stopping'">Finalizando áudio...</span>
-        <span v-else>{{ recordingError }}</span>
-        <Button
-          v-if="recorderState === 'recording'"
-          type="button"
-          variant="ghost"
-          size="icon"
-          class="h-8 w-8 text-red-600 hover:bg-red-100 hover:text-red-700"
-          @click="stopAudioRecording"
-        >
-          <Square class="h-4 w-4 fill-current" />
-        </Button>
+        {{ recordingError }}
       </div>
 
       <div v-if="messageAttachments.length > 0" class="flex flex-wrap gap-2">
@@ -430,69 +293,114 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <div class="flex gap-2">
-        <Textarea
-          v-model="newMessage"
-          placeholder="Digite sua mensagem..."
-          :rows="2"
-          class="flex-1 min-h-[5.5rem]"
-          @keydown="handleComposerKeydown"
-        />
-        <div class="flex flex-col gap-2">
-          <Button
-            @click="send"
-            :disabled="
-              (!newMessage.trim() &&
-                messageAttachments.length === 0 &&
-                recorderState !== 'recording') ||
-              isSending ||
-              recorderState === 'stopping'
-            "
-            :title="recorderState === 'recording' ? 'Enviar áudio' : 'Enviar mensagem'"
-            variant="default"
-          >
-            <Send class="h-4 w-4" />
-          </Button>
-          <input
-            ref="messageAttachmentInput"
-            type="file"
-            multiple
-            :accept="CHAT_ATTACHMENT_ACCEPT"
-            @change="handleAttachmentChange"
-            class="hidden"
-          />
-          <Button
-            @click="messageAttachmentInput?.click()"
-            variant="outline"
-            size="icon"
-            :disabled="isSending"
-          >
-            <Paperclip class="h-4 w-4" />
-          </Button>
+      <input
+        ref="messageAttachmentInput"
+        type="file"
+        multiple
+        :accept="CHAT_ATTACHMENT_ACCEPT"
+        @change="handleAttachmentChange"
+        class="hidden"
+      />
+
+      <div
+        class="flex min-h-12 w-full items-center gap-1 rounded-3xl border bg-white px-1.5 py-1 transition-colors"
+        :class="
+          isRecording
+            ? 'border-blue-200 text-blue-700'
+            : 'border-gray-200 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/30'
+        "
+      >
+        <!-- Modo gravação: controles ocupam o lugar do textarea -->
+        <template v-if="isRecording">
           <Button
             type="button"
-            :disabled="
-              isSending ||
-              isLocked ||
-              recorderState === 'stopping' ||
-              !audioRecordingSupported
-            "
+            variant="ghost"
+            size="icon"
+            class="h-10 w-10 flex-shrink-0 rounded-full text-red-600 hover:bg-red-100 hover:text-red-700 [&_svg]:!size-5"
+            :disabled="recorderState === 'stopping'"
+            title="Cancelar gravação"
+            @click="cancelAudioRecording"
+          >
+            <Trash2 />
+          </Button>
+          <div class="flex flex-1 items-center gap-2 px-2 text-sm">
+            <span v-if="recorderState !== 'paused'" class="recording-dot" />
+            <span class="font-medium tabular-nums">
+              {{ recorderState === 'stopping' ? 'Finalizando áudio...' : recordingElapsed }}
+            </span>
+          </div>
+          <Button
+            v-if="recorderState !== 'stopping'"
+            type="button"
+            variant="ghost"
+            size="icon"
+            class="h-10 w-10 flex-shrink-0 rounded-full text-blue-700 hover:bg-blue-100 [&_svg]:!size-5"
+            :title="recorderState === 'paused' ? 'Retomar' : 'Pausar'"
+            @click="recorderState === 'paused' ? resumeAudioRecording() : pauseAudioRecording()"
+          >
+            <Play v-if="recorderState === 'paused'" />
+            <Pause v-else />
+          </Button>
+          <Button
+            :disabled="recorderState === 'stopping' || isSending"
+            variant="ghost"
+            size="icon"
+            class="h-10 w-10 flex-shrink-0 rounded-full text-blue-600 hover:bg-blue-100 hover:text-blue-700 [&_svg]:!size-5"
+            title="Enviar áudio"
+            @click="send"
+          >
+            <Send />
+          </Button>
+        </template>
+
+        <!-- Modo normal: anexar + textarea + (enviar | microfone) -->
+        <template v-else>
+          <Button
+            @click="messageAttachmentInput?.click()"
+            variant="ghost"
+            size="icon"
+            class="h-10 w-10 flex-shrink-0 rounded-full text-gray-500 hover:text-gray-700 [&_svg]:!size-5"
+            :disabled="isSending"
+            title="Anexar arquivo"
+          >
+            <Paperclip />
+          </Button>
+          <Textarea
+            v-model="newMessage"
+            autosize
+            rows="1"
+            placeholder="Digite sua mensagem..."
+            class="flex-1 min-h-10 max-h-32 resize-none rounded-none border-0 bg-transparent px-2 py-1.5 leading-6 shadow-none focus-visible:ring-0"
+            @keydown="handleComposerKeydown"
+          />
+          <Button
+            v-if="hasContent"
+            :disabled="isSending"
+            variant="ghost"
+            size="icon"
+            class="h-10 w-10 flex-shrink-0 rounded-full text-blue-600 hover:bg-blue-50 hover:text-blue-700 [&_svg]:!size-5"
+            title="Enviar mensagem"
+            @click="send"
+          >
+            <Send />
+          </Button>
+          <Button
+            v-else
+            type="button"
+            :disabled="isSending || !audioRecordingSupported"
+            variant="ghost"
+            size="icon"
+            class="h-10 w-10 flex-shrink-0 rounded-full text-gray-500 hover:text-gray-700 [&_svg]:!size-5"
             :title="
               audioRecordingSupported
-                ? recorderState === 'recording'
-                  ? 'Parar gravação'
-                  : 'Gravar áudio'
+                ? 'Gravar áudio'
                 : 'Gravação de áudio indisponível neste navegador'
             "
-            variant="outline"
-            size="icon"
-            @click="recorderState === 'recording' ? stopAudioRecording() : startAudioRecording()"
-            @keydown="onRecordButtonKeydown"
+            @click="handleStartRecording"
           >
-            <Square v-if="recorderState === 'recording'" class="h-4 w-4 fill-current text-red-600" />
-            <Mic v-else class="h-4 w-4" />
+            <Mic />
           </Button>
-        </div>
+        </template>
       </div>
     </div>
     <div

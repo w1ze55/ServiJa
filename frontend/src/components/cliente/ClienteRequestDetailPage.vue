@@ -532,11 +532,15 @@ const getStatusColor = (status: string) => {
               <div v-if="request.counterValue" class="p-4 bg-blue-50 border border-blue-100 rounded-lg">
                 <p class="text-sm font-medium text-blue-900 mb-1">Você enviou uma contra proposta:</p>
                 <p class="text-sm text-blue-700">
-                  <span class="font-bold">{{ formatCurrency(request.counterValue) }}</span> | 
+                  <span class="font-bold">{{ formatCurrency(request.counterValue) }}</span> |
                   <span class="font-bold">{{ request.counterDays }} dias</span>
                 </p>
                 <p v-if="request.counterNotes" class="text-xs text-blue-600 mt-1 italic">
                   "{{ request.counterNotes }}"
+                </p>
+                <p class="text-xs text-blue-700 mt-2 flex items-start gap-1.5">
+                  <Clock class="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                  Aguardando a resposta do profissional. Você poderá aceitar ou recusar a proposta após o retorno dele.
                 </p>
               </div>
 
@@ -551,7 +555,7 @@ const getStatusColor = (status: string) => {
                 </div>
               </div>
 
-              <div class="flex items-center gap-3 flex-wrap">
+              <div v-if="!request.counterValue" class="flex items-center gap-3 flex-wrap">
                 <Button
                   @click="handleAcceptResponse"
                   variant="success"

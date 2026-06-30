@@ -32,14 +32,14 @@ export const getUploadErrorMessage = (error: unknown): string => {
   const data = axiosError?.response?.data;
 
   if (status === 413) {
-    return 'Imagem muito grande para o servidor. Reduza o tamanho ou envie menos imagens.';
+    return 'Arquivo muito grande. O tamanho máximo permitido é 10MB por arquivo.';
   }
 
   if (status === 400) {
     return data?.error || data?.message || 'Arquivo inválido. Verifique o formato e o tamanho.';
   }
 
-  return 'Não foi possível enviar a imagem. Tente novamente.';
+  return 'Não foi possível enviar o arquivo. Tente novamente.';
 };
 
 export interface UploadResponse {

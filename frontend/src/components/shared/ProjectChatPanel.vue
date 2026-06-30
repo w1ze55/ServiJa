@@ -5,7 +5,7 @@ import type { ChatMessage } from './ChatBox.vue';
 import { chatService } from '@/api/services/chatService';
 import type { ConversationDTO, MessageDTO } from '@/api/services/chatService';
 import { useChatWebSocket } from '@/composables/useChatWebSocket';
-import { uploadFiles } from '@/api/uploadService';
+import { uploadFiles, getUploadErrorMessage } from '@/api/uploadService';
 import { toast } from '@/utils/toast';
 import {
   getAttachmentPlaceholder,
@@ -165,8 +165,8 @@ async function handleSend(messageText: string, attachments: File[]) {
         }
       }
     }
-  } catch {
-    toast.error('Erro ao enviar mensagem');
+  } catch (err) {
+    toast.error(getUploadErrorMessage(err));
   } finally {
     isSending.value = false;
   }
