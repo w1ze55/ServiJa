@@ -27,6 +27,7 @@ import {
   Sparkles,
   History,
   CreditCard,
+  Package,
 } from 'lucide-vue-next';
 import AttachmentUploadField from '../shared/AttachmentUploadField.vue';
 import FileAttachment from '../shared/FileAttachment.vue';
@@ -656,7 +657,7 @@ const getStatusBadge = (currentProposal: Proposal) => {
     negotiating: { class: 'bg-purple-100 text-purple-700', label: 'Negociando', icon: MessageSquare },
     accepted: { class: 'bg-green-100 text-green-700', label: 'Aceita', icon: CheckCircle },
     in_progress: { class: 'bg-purple-100 text-purple-700', label: 'Em Andamento', icon: Clock },
-    delivered: { class: 'bg-blue-100 text-blue-700', label: 'Entregue', icon: Send },
+    delivered: { class: 'bg-amber-100 text-amber-600', label: 'Entregue', icon: Package },
     rejected: { class: 'bg-red-100 text-red-700', label: 'Recusada', icon: XCircle },
     completed: { class: 'bg-teal-100 text-teal-700', label: 'Concluída', icon: CheckCircle },
     archived: { class: 'bg-gray-100 text-gray-700', label: 'Arquivada', icon: FileText },

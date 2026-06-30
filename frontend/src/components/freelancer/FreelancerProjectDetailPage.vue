@@ -209,7 +209,7 @@ const statusColor = computed(() => {
   if (pendingAdjustment.value) return 'bg-amber-100 text-amber-700';
 
   const colors: Record<string, string> = {
-    delivered: 'bg-amber-100 text-amber-700',
+    delivered: 'bg-emerald-100 text-emerald-700',
     in_progress: 'bg-blue-100 text-blue-700',
     accepted: 'bg-green-100 text-green-700',
     completed: 'bg-teal-100 text-teal-700',
@@ -469,7 +469,7 @@ const handleUploadFiles = async () => {
             {{ project?.service || 'Carregando...' }}
           </h1>
           <Badge v-if="project" :class="statusColor">
-            {{ pendingAdjustment ? 'Ajustes solicitados' : getStatusLabel(project.status) }}
+            {{ pendingAdjustment ? 'Ajustes solicitados' : project.status === 'delivered' ? 'Aguardando aprovação' : getStatusLabel(project.status) }}
           </Badge>
         </div>
         <p class="text-[#435574]">Acompanhamento detalhado do projeto</p>
@@ -520,7 +520,7 @@ const handleUploadFiles = async () => {
             </div>
             <Progress :value="projectProgress" class="h-3 shadow-inner" />
             <p class="text-xs text-[#435574] mt-2">
-              Status atual: <span class="font-semibold">{{ getStatusLabel(project.status) }}</span>
+              Status atual: <span class="font-semibold">{{ pendingAdjustment ? 'Ajustes solicitados' : project.status === 'delivered' ? 'Aguardando aprovação' : getStatusLabel(project.status) }}</span>
             </p>
           </div>
 

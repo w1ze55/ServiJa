@@ -9,7 +9,7 @@ import {
   CheckCircle,
   AlertCircle,
   Lock,
-  Sparkles,
+  Star,
   FileText,
   Upload,
   Loader2,
@@ -57,6 +57,10 @@ const adjustmentStore = useDeliveryAdjustmentStore();
 const request = ref<ServiceRequest | null>(null);
 const freelancerRating = ref<number | null>(null);
 const freelancerTotalReviews = ref(0);
+const freelancerCompletedJobs = ref(0);
+const hasFreelancerRating = computed(
+  () => freelancerRating.value != null && freelancerTotalReviews.value > 0,
+);
 const activeTab = ref('details');
 const activeFileTab = ref<'client' | 'freelancer'>('client');
 const showAdjustmentModal = ref(false);
@@ -101,9 +105,11 @@ const loadFreelancerRating = async () => {
     const response = await api.get(`/freelancer/${freelancerId}/profile`);
     freelancerRating.value = response.data.rating ?? null;
     freelancerTotalReviews.value = response.data.totalReviews ?? 0;
+    freelancerCompletedJobs.value = response.data.completedJobs ?? 0;
   } catch {
     freelancerRating.value = null;
     freelancerTotalReviews.value = 0;
+    freelancerCompletedJobs.value = 0;
   }
 };
 
@@ -538,15 +544,19 @@ const getStatusColor = (status: string) => {
           <div class="grid grid-cols-2 gap-4 pt-4 border-t">
             <div class="text-center border-r">
               <p class="text-xs text-[#435574] uppercase mb-1 font-semibold tracking-tighter">Avaliação</p>
-              <div class="flex items-center justify-center gap-1">
-                <Sparkles class="h-3 w-3 text-amber-500" />
-                <span class="font-bold">{{ freelancerRating != null ? freelancerRating.toFixed(1) : 'N/A' }}</span>
-              </div>
-              <p class="text-[10px] text-gray-400">{{ freelancerTotalReviews }} {{ freelancerTotalReviews === 1 ? 'avaliação' : 'avaliações' }}</p>
+              <template v-if="hasFreelancerRating">
+                <div class="flex items-center justify-center gap-1">
+                  <Star class="h-3 w-3 fill-yellow-400 text-yellow-400" />
+                  <span class="font-bold">{{ freelancerRating!.toFixed(1) }}</span>
+                </div>
+                <p class="text-[10px] text-gray-400">{{ freelancerTotalReviews }} {{ freelancerTotalReviews === 1 ? 'avaliação' : 'avaliações' }}</p>
+              </template>
+              <p v-else class="text-xs text-gray-400">Sem avaliações</p>
             </div>
             <div class="text-center">
               <p class="text-xs text-[#435574] uppercase mb-1 font-semibold tracking-tighter">Serviços</p>
-              <p class="text-xs font-bold text-gray-400">{{ freelancerTotalReviews }} concluídos</p>
+              <p v-if="freelancerCompletedJobs > 0" class="text-xs text-gray-400">{{ freelancerCompletedJobs }} concluídos</p>
+              <p v-else class="text-xs text-gray-400">Nenhum serviço concluído</p>
             </div>
           </div>
 
