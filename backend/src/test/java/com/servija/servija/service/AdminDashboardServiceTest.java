@@ -8,6 +8,7 @@ import com.servija.servija.repository.PaymentRepository;
 import com.servija.servija.repository.ServiceRequestHistoryRepository;
 import com.servija.servija.repository.ServiceRequestRepository;
 import com.servija.servija.repository.UserRepository;
+import com.servija.servija.util.BrazilDateRange;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -46,12 +47,12 @@ class AdminDashboardServiceTest {
     void getDashboard_defaultsToAllTime() {
         LocalDate today = LocalDate.now();
         LocalDate expectedStart = LocalDate.of(2026, 1, 5);
-        LocalDateTime currentStart = expectedStart.atStartOfDay();
-        LocalDateTime currentEnd = today.plusDays(1).atStartOfDay();
+        LocalDateTime currentStart = BrazilDateRange.startOfDayUtc(expectedStart);
+        LocalDateTime currentEnd = BrazilDateRange.endExclusiveUtc(today);
         LocalDate previousStart = expectedStart.minusDays(today.toEpochDay() - expectedStart.toEpochDay() + 1L);
         LocalDate previousEnd = expectedStart.minusDays(1);
-        LocalDateTime previousStartDateTime = previousStart.atStartOfDay();
-        LocalDateTime previousEndDateTime = previousEnd.plusDays(1).atStartOfDay();
+        LocalDateTime previousStartDateTime = BrazilDateRange.startOfDayUtc(previousStart);
+        LocalDateTime previousEndDateTime = BrazilDateRange.endExclusiveUtc(previousEnd);
 
         when(userRepository.findEarliestCreatedAtByUserTypeIn(List.of(User.UserType.CONTRACTOR, User.UserType.FREELANCER)))
                 .thenReturn(expectedStart.atTime(8, 0));
@@ -136,7 +137,9 @@ class AdminDashboardServiceTest {
                 org.assertj.core.groups.Tuple.tuple("REFUNDED", 2L),
                 org.assertj.core.groups.Tuple.tuple("OTHERS", 1L)
         );
-        assertThat(response.getRevenueSeries()).hasSize(6);
+        int expectedMonths = (int) (java.time.temporal.ChronoUnit.MONTHS.between(
+                expectedStart.withDayOfMonth(1), today.withDayOfMonth(1)) + 1);
+        assertThat(response.getRevenueSeries()).hasSize(expectedMonths);
         assertThat(response.getRevenueSeries().get(1).getAmount()).isEqualByComparingTo("0.00");
         assertThat(response.getRevenueSeries().get(2).getAmount()).isEqualByComparingTo("700.00");
         assertThat(response.getTopContractedServices()).extracting("label", "contractsCount").containsExactly(
@@ -150,10 +153,10 @@ class AdminDashboardServiceTest {
     void getDashboard_returnsZeroStateForCustomRangeWithoutData() {
         LocalDate start = LocalDate.of(2026, 5, 1);
         LocalDate end = LocalDate.of(2026, 5, 7);
-        LocalDateTime currentStart = start.atStartOfDay();
-        LocalDateTime currentEnd = end.plusDays(1).atStartOfDay();
-        LocalDateTime previousStart = LocalDate.of(2026, 4, 24).atStartOfDay();
-        LocalDateTime previousEnd = LocalDate.of(2026, 4, 30).plusDays(1).atStartOfDay();
+        LocalDateTime currentStart = BrazilDateRange.startOfDayUtc(start);
+        LocalDateTime currentEnd = BrazilDateRange.endExclusiveUtc(end);
+        LocalDateTime previousStart = BrazilDateRange.startOfDayUtc(LocalDate.of(2026, 4, 24));
+        LocalDateTime previousEnd = BrazilDateRange.endExclusiveUtc(LocalDate.of(2026, 4, 30));
 
         when(userRepository.countByUserTypeInAndCreatedAtBetween(
                 List.of(User.UserType.CONTRACTOR, User.UserType.FREELANCER), currentStart, currentEnd))
