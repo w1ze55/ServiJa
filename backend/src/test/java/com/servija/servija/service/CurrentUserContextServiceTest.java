@@ -46,7 +46,7 @@ class CurrentUserContextServiceTest {
     }
 
     @Test
-    @DisplayName("getOptionalAuthenticatedUser retorna vazio para autenticacao anonima")
+    @DisplayName("getOptionalAuthenticatedUser retorna vazio para autenticação anônima")
     void getOptionalAuthenticatedUserReturnsEmptyForAnonymous() {
         SecurityContextHolder.getContext().setAuthentication(
                 new AnonymousAuthenticationToken("key", "anonymousUser", AuthorityUtils.createAuthorityList("ROLE_ANON")));
@@ -55,7 +55,7 @@ class CurrentUserContextServiceTest {
     }
 
     @Test
-    @DisplayName("requireContractorMarketplaceAccess retorna o usuario autenticado no contexto contractor")
+    @DisplayName("requireContractorMarketplaceAccess retorna o usuário autenticado no contexto contractor")
     void requireContractorMarketplaceAccessReturnsContractor() {
         User user = user(User.UserType.CONTRACTOR);
         SecurityContextHolder.getContext().setAuthentication(UsernamePasswordAuthenticationToken.authenticated(
@@ -66,7 +66,7 @@ class CurrentUserContextServiceTest {
     }
 
     @Test
-    @DisplayName("requireContractorProfile falha quando o perfil nao existe")
+    @DisplayName("requireContractorProfile falha quando o perfil não existe")
     void requireContractorProfileFailsWhenProfileIsMissing() {
         User user = user(User.UserType.CONTRACTOR);
         SecurityContextHolder.getContext().setAuthentication(UsernamePasswordAuthenticationToken.authenticated(
@@ -89,11 +89,11 @@ class CurrentUserContextServiceTest {
 
         assertThatThrownBy(service::denyFreelancerMarketplaceAccessIfAuthenticated)
                 .isInstanceOf(AccessDeniedException.class)
-                .hasMessageContaining("Marketplace indisponivel");
+                .hasMessageContaining("Marketplace indisponível");
     }
 
     @Test
-    @DisplayName("requireAuthenticatedUser falha quando o usuario autenticado nao pode ser carregado")
+    @DisplayName("requireAuthenticatedUser falha quando o usuário autenticado não pode ser carregado")
     void requireAuthenticatedUserFailsWhenRepositoryDoesNotReturnUser() {
         SecurityContextHolder.getContext().setAuthentication(UsernamePasswordAuthenticationToken.authenticated(
                 "ghost@test.com", "pwd", AuthorityUtils.createAuthorityList("ROLE_CONTRACTOR")));

@@ -50,7 +50,7 @@ class AuditLogServiceTest {
     }
 
     @Test
-    @DisplayName("getLog lanca ResourceNotFoundException quando o log nao existe")
+    @DisplayName("getLog lança ResourceNotFoundException quando o log não existe")
     void getLogThrowsWhenLogDoesNotExist() {
         when(auditLogRepository.findById(99L)).thenReturn(Optional.empty());
 

@@ -13,6 +13,6 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class UserRoleRequest {
 
-    @NotNull(message = "Perfil obrigatorio")
+    @NotNull(message = "Perfil obrigatório")
     private User.UserType role;
 }

@@ -93,7 +93,7 @@ class ReviewServiceTest {
     }
 
     @Test
-    @DisplayName("createReview nao chama save no cache quando freelancer ainda nao tem summary")
+    @DisplayName("createReview não chama save no cache quando freelancer ainda não tem summary")
     void createReview_doesNotCallSaveWhenNoSummaryExists() {
         User freelancerUser = buildUser(10L, "free@test.com", User.UserType.FREELANCER);
         Freelancer freelancer = buildFreelancerProfile(freelancerUser);

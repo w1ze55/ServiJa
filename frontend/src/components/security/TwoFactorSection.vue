@@ -109,7 +109,7 @@ function openCurrentAction() {
             Proteja sua conta exigindo um código do Google Authenticator no login.
           </p>
           <p v-if="isEnabled" class="mt-2 text-sm text-green-700">
-            Ativo. Voce tem {{ status?.unusedBackupCodes }} códigos de backup nao usados.
+            Ativo. Você tem {{ status?.unusedBackupCodes }} códigos de backup não usados.
           </p>
         </div>
       </div>

@@ -17,6 +17,7 @@ import com.servija.servija.repository.ReviewRepository;
 import com.servija.servija.repository.ServiceRepository;
 import com.servija.servija.repository.ServiceRequestRepository;
 import com.servija.servija.repository.UserRepository;
+import com.servija.servija.util.BrazilDateRange;
 import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -286,11 +287,11 @@ public class AdminUserService {
             }
 
             if (dateFrom != null) {
-                predicates.add(cb.greaterThanOrEqualTo(root.get("createdAt"), dateFrom.atStartOfDay()));
+                predicates.add(cb.greaterThanOrEqualTo(root.get("createdAt"), BrazilDateRange.startOfDayUtc(dateFrom)));
             }
 
             if (dateTo != null) {
-                predicates.add(cb.lessThan(root.get("createdAt"), dateTo.plusDays(1).atStartOfDay()));
+                predicates.add(cb.lessThan(root.get("createdAt"), BrazilDateRange.endExclusiveUtc(dateTo)));
             }
 
             return cb.and(predicates.toArray(new Predicate[0]));

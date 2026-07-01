@@ -27,7 +27,7 @@ class CustomUserDetailsServiceTest {
     private CustomUserDetailsService service;
 
     @Test
-    @DisplayName("loadUserByUsername retorna o usuario encontrado")
+    @DisplayName("loadUserByUsername retorna o usuário encontrado")
     void loadUserByUsernameReturnsUser() {
         User user = User.builder()
                 .id(1L)
@@ -47,7 +47,7 @@ class CustomUserDetailsServiceTest {
     }
 
     @Test
-    @DisplayName("loadUserByUsername lanca UsernameNotFoundException quando o email nao existe")
+    @DisplayName("loadUserByUsername lança UsernameNotFoundException quando o email não existe")
     void loadUserByUsernameThrowsWhenUserDoesNotExist() {
         when(userRepository.findByEmail("missing@test.com")).thenReturn(Optional.empty());
 

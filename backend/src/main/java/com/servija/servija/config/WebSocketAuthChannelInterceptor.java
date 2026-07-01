@@ -29,14 +29,14 @@ public class WebSocketAuthChannelInterceptor implements ChannelInterceptor {
     private final UserDetailsService userDetailsService;
     private final ConversationRepository conversationRepository;
 
-    /** Topicos cujo ultimo segmento e o e-mail do dono; so o proprio dono pode assinar. */
+    /** Tópicos cujo último segmento é o e-mail do dono; só o próprio dono pode assinar. */
     private static final List<String> EMAIL_SCOPED_PREFIXES = List.of(
             "/topic/payment/",
             "/topic/service-request/",
             "/topic/notifications/",
             "/topic/profile-update/");
 
-    /** Topicos de chat: /topic/chat/{conversationId} e /topic/chat/{conversationId}/read. */
+    /** Tópicos de chat: /topic/chat/{conversationId} e /topic/chat/{conversationId}/read. */
     private static final String CHAT_PREFIX = "/topic/chat/";
 
     @Override
@@ -110,16 +110,16 @@ public class WebSocketAuthChannelInterceptor implements ChannelInterceptor {
         String destination = accessor.getDestination();
 
         if (!isAuthorizedToSubscribe(user, destination)) {
-            log.warn("⛔ Subscribe negado: usuario={} destino={}",
+            log.warn("⛔ Subscribe negado: usuário={} destino={}",
                     user != null ? user.getName() : "anon", destination);
-            throw new AccessDeniedException("Nao autorizado a assinar este topico");
+            throw new AccessDeniedException("Não autorizado a assinar este tópico");
         }
     }
 
     /**
-     * Autoriza a assinatura de um topico. Topicos por e-mail exigem que o e-mail no
-     * destino seja exatamente o do usuario autenticado; topicos de chat exigem que o
-     * usuario seja participante da conversa. Qualquer outro destino e negado.
+     * Autoriza a assinatura de um tópico. Tópicos por e-mail exigem que o e-mail no
+     * destino seja exatamente o do usuário autenticado; tópicos de chat exigem que o
+     * usuário seja participante da conversa. Qualquer outro destino é negado.
      */
     private boolean isAuthorizedToSubscribe(Principal user, String destination) {
         if (user == null || destination == null) {
@@ -149,7 +149,7 @@ public class WebSocketAuthChannelInterceptor implements ChannelInterceptor {
                     .orElse(false);
         }
 
-        // Destino desconhecido: nega por padrao (fail-safe).
+        // Destino desconhecido: nega por padrão (fail-safe).
         return false;
     }
 

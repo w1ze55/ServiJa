@@ -2,6 +2,7 @@
 import { computed } from "vue";
 import { AlertTriangle, Check, Copy, LoaderCircle, X } from "lucide-vue-next";
 import type { ActorType, AuditLogEntry } from "@/api/services/auditLogService";
+import { formatApiDateOnly, formatApiTimeOnly } from "@/utils/apiDate";
 
 type JsonPrimitive = string | number | boolean | null;
 interface JsonArray extends Array<JsonValue> {}
@@ -61,11 +62,11 @@ const ENTITY_LABEL: Record<string, string> = {
 
 const formattedTimestamp = computed(() => {
   if (!props.log) return "";
-  const date = new Date(props.log.timestamp);
+  // Timestamp em UTC (sem offset); exibe sempre em horário de Brasília.
   return (
-    date.toLocaleDateString("pt-BR") +
+    formatApiDateOnly(props.log.timestamp) +
     " às " +
-    date.toLocaleTimeString("pt-BR")
+    formatApiTimeOnly(props.log.timestamp)
   );
 });
 

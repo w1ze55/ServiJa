@@ -3,6 +3,7 @@ package com.servija.servija.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.servija.servija.dto.CounterProposalDTO;
+import com.servija.servija.dto.DeliverySubmissionDTO;
 import com.servija.servija.dto.FreelancerAttachmentDTO;
 import com.servija.servija.dto.FreelancerAttachmentsRequest;
 import com.servija.servija.dto.FreelancerResponseDTO;
@@ -66,9 +67,11 @@ public class ServiceRequestService {
     private final CurrentUserContextService currentUserContextService;
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private static final BigDecimal MIN_NEGOTIATED_AMOUNT = new BigDecimal("20.00");
+    private static final BigDecimal MIN_NEGOTIATED_AMOUNT = new BigDecimal("40.00");
     private static final BigDecimal MAX_NEGOTIATED_AMOUNT = new BigDecimal("1000000.00");
-    private static final BigDecimal LEGACY_BUDGET_PLACEHOLDER = MIN_NEGOTIATED_AMOUNT;
+    // Mantém o valor histórico (R$ 20,00) usado como placeholder do orçamento legado,
+    // desacoplado do mínimo atual para não alterar registros antigos.
+    private static final BigDecimal LEGACY_BUDGET_PLACEHOLDER = new BigDecimal("20.00");
     private static final List<String> VALID_MILESTONE_STATUSES = List.of("pending", "in_progress", "completed");
 
     @Transactional
@@ -95,7 +98,7 @@ public class ServiceRequestService {
         }
 
         if (freelancer != null && contractor.getId().equals(freelancer.getId())) {
-            throw new IllegalStateException("Voce nao pode enviar uma solicitacao para si mesmo");
+            throw new IllegalStateException("Você não pode enviar uma solicitação para si mesmo");
         }
 
         String normalizedAddress = StringUtils.hasText(dto.getAddress()) ? dto.getAddress().trim() : null;
@@ -127,7 +130,7 @@ public class ServiceRequestService {
         // Validar orçamento (budget)
         if (dto.getBudget() != null) {
             if (dto.getBudget().compareTo(MIN_NEGOTIATED_AMOUNT) < 0) {
-                throw new IllegalArgumentException("O orçamento mínimo é R$ 20,00");
+                throw new IllegalArgumentException("O orçamento mínimo é R$ 40,00");
             }
             if (dto.getBudget().compareTo(MAX_NEGOTIATED_AMOUNT) > 0) {
                 throw new IllegalArgumentException("O orçamento máximo é R$ 1.000.000,00");
@@ -511,18 +514,18 @@ public class ServiceRequestService {
         }
 
         ServiceRequest request = serviceRequestRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Solicitacao nao encontrada"));
+                .orElseThrow(() -> new ResourceNotFoundException("Solicitação não encontrada"));
 
         User freelancer = userRepository.findByEmail(freelancerEmail)
-                .orElseThrow(() -> new ResourceNotFoundException("Freelancer nao encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Freelancer não encontrado"));
 
         if (request.getFreelancer() == null || !request.getFreelancer().getId().equals(freelancer.getId())) {
-            throw new IllegalStateException("Apenas o freelancer responsavel pode atualizar marcos");
+            throw new IllegalStateException("Apenas o freelancer responsável pode atualizar marcos");
         }
 
         List<ResponseMilestoneDTO> milestones = parseResponseMilestones(request.getResponseMilestones());
         if (milestones.isEmpty()) {
-            throw new ResourceNotFoundException("Nao ha marcos cadastrados para esta solicitacao");
+            throw new ResourceNotFoundException("Não há marcos cadastrados para esta solicitação");
         }
 
         String normalizedMilestoneId = milestoneId != null ? milestoneId.trim() : "";
@@ -538,7 +541,7 @@ public class ServiceRequestService {
         }
 
         if (!updated) {
-            throw new ResourceNotFoundException("Marco nao encontrado");
+            throw new ResourceNotFoundException("Marco não encontrado");
         }
 
         request.setResponseMilestones(serializeResponseMilestones(milestones));
@@ -634,7 +637,7 @@ public class ServiceRequestService {
         }
 
         if (value.compareTo(MIN_NEGOTIATED_AMOUNT) < 0) {
-            throw new IllegalArgumentException("O valor mínimo é R$ 20,00");
+            throw new IllegalArgumentException("O valor mínimo é R$ 40,00");
         }
 
         if (value.compareTo(MAX_NEGOTIATED_AMOUNT) > 0) {
@@ -648,7 +651,7 @@ public class ServiceRequestService {
         }
 
         if (!legacyAllowed && isBelowMinimumNegotiatedAmount(value)) {
-            throw new IllegalStateException("O valor mínimo para novos orçamentos é R$ 20,00");
+            throw new IllegalStateException("O valor mínimo para novos orçamentos é R$ 40,00");
         }
 
         if (value.compareTo(MAX_NEGOTIATED_AMOUNT) > 0) {
@@ -717,7 +720,7 @@ public class ServiceRequestService {
     }
 
     @Transactional
-    public ServiceRequestResponse completeService(Long id, String userEmail) {
+    public ServiceRequestResponse completeService(Long id, DeliverySubmissionDTO delivery, String userEmail) {
         ServiceRequest request = serviceRequestRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Solicitação não encontrada"));
 
@@ -729,6 +732,8 @@ public class ServiceRequestService {
             if (request.getStatus() != Status.IN_PROGRESS) {
                 throw new IllegalStateException("O serviço só pode ser entregue quando está em andamento");
             }
+
+            applyDeliverySubmission(request, delivery);
 
             request.setStatus(Status.DELIVERED);
             ServiceRequest saved = serviceRequestRepository.save(request);
@@ -782,17 +787,41 @@ public class ServiceRequestService {
         throw new IllegalStateException("Usuário não autorizado a realizar esta ação");
     }
 
+    private void applyDeliverySubmission(ServiceRequest request, DeliverySubmissionDTO delivery) {
+        if (delivery == null) {
+            return;
+        }
+
+        if (!StringUtils.hasText(delivery.getDescription())) {
+            throw new IllegalArgumentException("A descrição da entrega é obrigatória");
+        }
+
+        request.setDeliveryDescription(delivery.getDescription().trim());
+
+        if (delivery.getAttachments() != null && !delivery.getAttachments().isEmpty()) {
+            try {
+                request.setDeliveryAttachments(objectMapper.writeValueAsString(delivery.getAttachments()));
+            } catch (Exception e) {
+                throw new RuntimeException("Error serializing delivery attachments", e);
+            }
+        } else {
+            request.setDeliveryAttachments(null);
+        }
+
+        request.setDeliveredAt(LocalDateTime.now());
+    }
+
     private Payment releaseFreelancerBalanceIfNeeded(ServiceRequest request) {
         List<Payment> payments = paymentRepository.findByServiceRequestId(request.getId());
         if (payments.isEmpty()) {
-            log.warn("Solicitacao {} concluida sem pagamento associado para liberar saldo", request.getId());
+            log.warn("Solicitação {} concluída sem pagamento associado para liberar saldo", request.getId());
             return null;
         }
 
         Payment payment = payments.get(0);
         if (payment.getStatus() != Payment.PaymentStatus.COMPLETED) {
             log.warn(
-                    "Solicitacao {} concluida, mas pagamento {} ainda nao esta COMPLETED. Status atual: {}",
+                    "Solicitação {} concluída, mas pagamento {} ainda não está COMPLETED. Status atual: {}",
                     request.getId(),
                     payment.getId(),
                     payment.getStatus());
@@ -1235,6 +1264,9 @@ public class ServiceRequestService {
                 .counterNotes(request.getCounterNotes())
                 .cancelReason(request.getCancelReason())
                 .rejectReason(request.getRejectReason())
+                .deliveryDescription(request.getDeliveryDescription())
+                .deliveryAttachments(parseFreelancerAttachmentDetails(request.getDeliveryAttachments()))
+                .deliveredAt(request.getDeliveredAt())
                 .attachments(parseAttachmentUrls(request.getAttachments()))
                 .freelancerAttachments(parseAttachmentUrls(request.getFreelancerAttachments()))
                 .freelancerAttachmentDetails(parseFreelancerAttachmentDetails(request.getFreelancerAttachments()))

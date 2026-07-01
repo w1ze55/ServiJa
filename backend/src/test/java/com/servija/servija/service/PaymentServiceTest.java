@@ -98,7 +98,7 @@ class PaymentServiceTest {
 
         assertThatThrownBy(() -> paymentService.createPayment("cliente@servija.com", request))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessage("O valor minimo para pagamento e R$ 40,00");
+                .hasMessage("O valor mínimo para pagamento é R$ 40,00");
 
         verify(asaasService, never()).getOrCreateCustomer(any(), any(), any());
     }
@@ -144,7 +144,7 @@ class PaymentServiceTest {
     }
 
     @Test
-    @DisplayName("Deve criar pagamento no cartao a vista com taxa de 2,99 por cento")
+    @DisplayName("Deve criar pagamento no cartão à vista com taxa de 2,99 por cento")
     void createPayment_createsOneTimeCreditCardPayment() {
         User contractor = buildUser(1L, "cliente@servija.com", User.UserType.CONTRACTOR);
         ServiceRequest serviceRequest = buildAcceptedRequest(contractor, new BigDecimal("100.00"), false);
@@ -178,7 +178,7 @@ class PaymentServiceTest {
     }
 
     @Test
-    @DisplayName("Deve criar pagamento parcelado em 2x com acrescimo de 1,2 por cento")
+    @DisplayName("Deve criar pagamento parcelado em 2x com acréscimo de 1,2 por cento")
     void createPayment_createsTwoInstallmentCreditCardPaymentWithSurcharge() {
         User contractor = buildUser(1L, "cliente@servija.com", User.UserType.CONTRACTOR);
         ServiceRequest serviceRequest = buildAcceptedRequest(contractor, new BigDecimal("100.00"), false);
@@ -211,7 +211,7 @@ class PaymentServiceTest {
     }
 
     @Test
-    @DisplayName("Deve criar pagamento parcelado no cartao com taxa de 3,49 por cento")
+    @DisplayName("Deve criar pagamento parcelado no cartão com taxa de 3,49 por cento")
     void createPayment_createsInstallmentCreditCardPayment() {
         User contractor = buildUser(1L, "cliente@servija.com", User.UserType.CONTRACTOR);
         ServiceRequest serviceRequest = buildAcceptedRequest(contractor, new BigDecimal("100.00"), false);
@@ -244,7 +244,7 @@ class PaymentServiceTest {
     }
 
     @Test
-    @DisplayName("Deve rejeitar cartao sem quantidade de parcelas")
+    @DisplayName("Deve rejeitar cartão sem quantidade de parcelas")
     void createPayment_rejectsCreditCardWithoutInstallmentCount() {
         User contractor = buildUser(1L, "cliente@servija.com", User.UserType.CONTRACTOR);
         ServiceRequest serviceRequest = buildAcceptedRequest(contractor, new BigDecimal("100.00"), false);
@@ -269,7 +269,7 @@ class PaymentServiceTest {
     }
 
     @Test
-    @DisplayName("Deve rejeitar cartao com parcelamento acima de 6x")
+    @DisplayName("Deve rejeitar cartão com parcelamento acima de 6x")
     void createPayment_rejectsCreditCardWithUnsupportedInstallments() {
         User contractor = buildUser(1L, "cliente@servija.com", User.UserType.CONTRACTOR);
         ServiceRequest serviceRequest = buildAcceptedRequest(contractor, new BigDecimal("100.00"), false);

@@ -1,5 +1,5 @@
 ﻿<script setup lang="ts">
-import { ref, computed, onMounted, nextTick, watch } from 'vue';
+import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue';
 import {
   ArrowLeft,
   Clock,
@@ -48,6 +48,7 @@ import AlertDialogTitle from '../ui/alert-dialog-title.vue';
 import { useClientRequestStore, type ServiceRequest } from '@/stores/clientRequestStore';
 import ServiceRequestTimeline from '../service/ServiceRequestTimeline.vue';
 import ProjectChatPanel from '../shared/ProjectChatPanel.vue';
+import { useServiceRequestWebSocket } from '@/composables/useServiceRequestWebSocket';
 import { formatApiDate } from '@/utils/apiDate';
 import { toast } from '@/utils/toast';
 import { getStatusLabel } from '@/utils/statusTranslations';
@@ -61,6 +62,8 @@ interface Props {
 const props = defineProps<Props>();
 const store = useClientRequestStore();
 
+let wsConnection: ReturnType<typeof useServiceRequestWebSocket> | null = null;
+
 const request = ref<ServiceRequest | null>(null);
 const showCancelDialog = ref(false);
 const cancelReason = ref('');
@@ -68,9 +71,45 @@ const showRejectDialog = ref(false);
 const rejectReason = ref('');
 const showCounterProposalDialog = ref(false);
 const counterValue = ref(0);
+const counterValueInput = ref('');
 const counterDays = ref(0);
 const counterNotes = ref('');
+const counterErrors = ref<Record<string, string>>({});
 const isSubmittingCounter = ref(false);
+
+const MAX_EXECUTION_DAYS = 365;
+
+const clearCounterError = (field: string) => {
+  if (counterErrors.value[field]) {
+    const next = { ...counterErrors.value };
+    delete next[field];
+    counterErrors.value = next;
+  }
+};
+
+// Formata dígitos (centavos) no padrão de moeda brasileiro: "R$ 1.234,56"
+const formatCurrencyFromDigits = (value: string): string => {
+  const numbers = value.replace(/\D/g, '');
+  if (!numbers) return '';
+  const formatted = (parseFloat(numbers) / 100).toLocaleString('pt-BR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+  return `R$ ${formatted}`;
+};
+
+const parseCurrencyValue = (value: string): number => {
+  const numbers = value.replace(/[^\d,]/g, '').replace(',', '.');
+  return parseFloat(numbers) || 0;
+};
+
+const handleCounterValueInput = (val: string) => {
+  counterValueInput.value = formatCurrencyFromDigits(val);
+  counterValue.value = parseCurrencyValue(counterValueInput.value);
+  clearCounterError('counterValue');
+};
+
+watch(counterDays, () => clearCounterError('counterDays'));
 const activeSection = ref<'details' | 'messages' | 'history' | 'attachments'>('details');
 const showCelebrationModal = ref(false);
 const activeFileTab = ref<'client' | 'freelancer'>('client');
@@ -83,9 +122,30 @@ const professionalAttachments = computed(() => [
 const handleOpenCounterProposalDialog = () => {
   if (!request.value || !request.value.freelancerResponse) return;
   counterValue.value = request.value.freelancerResponse.value;
+  counterValueInput.value = formatCurrencyFromDigits(String(Math.round(counterValue.value * 100)));
   counterDays.value = request.value.freelancerResponse.executionDays;
   counterNotes.value = '';
+  counterErrors.value = {};
   showCounterProposalDialog.value = true;
+};
+
+const validateCounterProposal = () => {
+  const newErrors: Record<string, string> = {};
+
+  if (!counterValue.value || counterValue.value <= 0) {
+    newErrors.counterValue = 'Informe um valor válido maior que zero';
+  } else {
+    const rangeError = validateValueRange(counterValue.value);
+    if (rangeError) newErrors.counterValue = rangeError;
+  }
+
+  if (!counterDays.value || counterDays.value <= 0) {
+    newErrors.counterDays = 'Informe um prazo válido maior que zero';
+  } else if (counterDays.value > MAX_EXECUTION_DAYS) {
+    newErrors.counterDays = `O prazo não pode ser maior que ${MAX_EXECUTION_DAYS} dias`;
+  }
+
+  return newErrors;
 };
 
 const loadData = async () => {
@@ -105,14 +165,10 @@ const loadData = async () => {
 const handleSendCounterProposal = async () => {
   if (!request.value) return;
 
-  if (counterValue.value <= 0 || counterDays.value <= 0) {
-    toast.error('Informe um valor e prazo válidos');
-    return;
-  }
-
-  const rangeError = validateValueRange(counterValue.value);
-  if (rangeError) {
-    toast.error(rangeError);
+  const errors = validateCounterProposal();
+  counterErrors.value = errors;
+  if (Object.keys(errors).length > 0) {
+    toast.error('Por favor, corrija os erros no formulário');
     return;
   }
 
@@ -135,8 +191,81 @@ const handleSendCounterProposal = async () => {
   }
 };
 
+// Extrair email do usuario do JWT
+const getUserEmail = () => {
+  const token = localStorage.getItem('token');
+  if (!token) return null;
+
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return payload.sub || payload.email;
+  } catch (error) {
+    console.error('Erro ao extrair email do token:', error);
+    return null;
+  }
+};
+
+// Lidar com notificacoes via WebSocket (apenas para esta solicitacao)
+const handleServiceRequestNotification = async (event: Event) => {
+  const notification = (event as CustomEvent).detail;
+
+  if (String(notification.serviceRequestId) !== props.requestId) {
+    return;
+  }
+
+  switch (notification.type) {
+    case 'NEW_PROPOSAL':
+      toast.success(`${notification.freelancerName || 'O profissional'} enviou uma proposta!`);
+      break;
+    case 'COUNTER_PROPOSAL_REJECTED':
+      toast.info(`${notification.freelancerName || 'O profissional'} recusou sua contra-proposta`);
+      break;
+    case 'PROPOSAL_ACCEPTED':
+      toast.success(notification.message || 'Proposta aceita!');
+      break;
+    case 'SERVICE_REQUEST_CANCELLED':
+      toast.warning('Solicitação cancelada');
+      break;
+    case 'SERVICE_REQUEST_STATUS_CHANGED':
+      if (notification.status === 'DELIVERED') {
+        toast.success('Serviço entregue! O freelancer marcou o serviço como concluído');
+      } else if (notification.status === 'IN_PROGRESS') {
+        toast.success('Pagamento confirmado! O serviço está em andamento');
+      } else if (notification.status === 'COMPLETED') {
+        toast.success('Serviço concluído com sucesso!');
+      } else {
+        toast.info(`Status atualizado: ${getStatusLabel(notification.status)}`);
+      }
+      break;
+    default:
+      return;
+  }
+
+  try {
+    await loadData();
+  } catch (error) {
+    console.error('Erro ao recarregar solicitação após notificação:', error);
+  }
+};
+
 onMounted(async () => {
   await loadData();
+
+  const userEmail = getUserEmail();
+  if (userEmail) {
+    wsConnection = useServiceRequestWebSocket(userEmail);
+    wsConnection.connect().catch((error: any) => {
+      console.error('Erro ao conectar WebSocket do detalhe da solicitação:', error);
+    });
+    window.addEventListener('service-request-notification', handleServiceRequestNotification);
+  }
+});
+
+onUnmounted(() => {
+  window.removeEventListener('service-request-notification', handleServiceRequestNotification);
+  if (wsConnection) {
+    wsConnection.disconnect();
+  }
 });
 
 watch(() => props.requestId, async (newId, oldId) => {
@@ -479,11 +608,15 @@ const getStatusColor = (status: string) => {
               <div v-if="request.counterValue" class="p-4 bg-blue-50 border border-blue-100 rounded-lg">
                 <p class="text-sm font-medium text-blue-900 mb-1">Você enviou uma contra proposta:</p>
                 <p class="text-sm text-blue-700">
-                  <span class="font-bold">{{ formatCurrency(request.counterValue) }}</span> | 
+                  <span class="font-bold">{{ formatCurrency(request.counterValue) }}</span> |
                   <span class="font-bold">{{ request.counterDays }} dias</span>
                 </p>
                 <p v-if="request.counterNotes" class="text-xs text-blue-600 mt-1 italic">
                   "{{ request.counterNotes }}"
+                </p>
+                <p class="text-xs text-blue-700 mt-2 flex items-start gap-1.5">
+                  <Clock class="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                  Aguardando a resposta do profissional. Você poderá aceitar ou recusar a proposta após o retorno dele.
                 </p>
               </div>
 
@@ -498,7 +631,7 @@ const getStatusColor = (status: string) => {
                 </div>
               </div>
 
-              <div class="flex items-center gap-3 flex-wrap">
+              <div v-if="!request.counterValue" class="flex items-center gap-3 flex-wrap">
                 <Button
                   @click="handleAcceptResponse"
                   variant="success"
@@ -761,10 +894,14 @@ const getStatusColor = (status: string) => {
               <Label for="counter-value">Novo Valor (R$)</Label>
               <Input
                 id="counter-value"
-                type="number"
-                v-model="counterValue"
-                step="0.01"
+                type="text"
+                inputmode="numeric"
+                :model-value="counterValueInput"
+                @update:model-value="(val) => handleCounterValueInput(val as string)"
+                placeholder="R$ 0,00"
+                :class="counterErrors.counterValue ? 'border-red-500' : ''"
               />
+              <p v-if="counterErrors.counterValue" class="text-sm text-red-500">{{ counterErrors.counterValue }}</p>
             </div>
             <div class="space-y-2">
               <Label for="counter-days">Novo Prazo (dias)</Label>
@@ -772,7 +909,9 @@ const getStatusColor = (status: string) => {
                 id="counter-days"
                 type="number"
                 v-model="counterDays"
+                :class="counterErrors.counterDays ? 'border-red-500' : ''"
               />
+              <p v-if="counterErrors.counterDays" class="text-sm text-red-500">{{ counterErrors.counterDays }}</p>
             </div>
           </div>
           <div class="space-y-2">

@@ -32,7 +32,7 @@ class AdminBootstrapServiceTest {
     private AdminBootstrapService service;
 
     @Test
-    @DisplayName("run nao cria usuario quando bootstrap esta desabilitado")
+    @DisplayName("run não cria usuário quando bootstrap está desabilitado")
     void runDoesNothingWhenDisabled() {
         ReflectionTestUtils.setField(service, "enabled", false);
 
@@ -42,7 +42,7 @@ class AdminBootstrapServiceTest {
     }
 
     @Test
-    @DisplayName("run cria admin quando a configuracao esta completa")
+    @DisplayName("run cria admin quando a configuração está completa")
     void runCreatesAdminWhenConfigurationIsComplete() {
         ReflectionTestUtils.setField(service, "enabled", true);
         ReflectionTestUtils.setField(service, "name", "Admin");

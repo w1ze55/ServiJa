@@ -15,7 +15,7 @@ import java.math.BigDecimal;
 @AllArgsConstructor
 public class WithdrawalRequestDTO {
 
-    @NotNull(message = "O valor e obrigatorio")
+    @NotNull(message = "O valor é obrigatório")
     @Positive(message = "O valor deve ser positivo")
     private BigDecimal amount;
 

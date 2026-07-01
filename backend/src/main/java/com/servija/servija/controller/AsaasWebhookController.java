@@ -22,7 +22,7 @@ import java.util.Map;
 @RequestMapping("/api/webhooks/asaas")
 @RequiredArgsConstructor
 @Slf4j
-@Tag(name = "Webhooks Asaas", description = "Endpoints para receber notificacoes do Asaas")
+@Tag(name = "Webhooks Asaas", description = "Endpoints para receber notificações do Asaas")
 public class AsaasWebhookController {
 
     private final AsaasWebhookService webhookService;
@@ -35,16 +35,16 @@ public class AsaasWebhookController {
      * Endpoint principal para receber eventos comuns do Asaas.
      */
     @PostMapping
-    @Operation(summary = "Receber webhook do Asaas", description = "Endpoint para receber notificacoes de eventos do Asaas")
+    @Operation(summary = "Receber webhook do Asaas", description = "Endpoint para receber notificações de eventos do Asaas")
     public ResponseEntity<Map<String, String>> handleWebhook(
             @RequestBody Map<String, Object> payload,
             @RequestHeader(value = "asaas-access-token", required = false) String accessToken
     ) {
         try {
             if (!isValidToken(accessToken)) {
-                log.warn("Webhook recebido com token invalido");
+                log.warn("Webhook recebido com token inválido");
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                        .body(Map.of("error", "Token invalido"));
+                        .body(Map.of("error", "Token inválido"));
             }
 
             log.info("Webhook recebido do Asaas: {}", payload);
@@ -59,13 +59,13 @@ public class AsaasWebhookController {
     }
 
     /**
-     * Endpoint para o mecanismo de seguranca do Asaas que substitui a
-     * confirmacao manual via SMS/app por uma aprovacao sistêmica.
+     * Endpoint para o mecanismo de segurança do Asaas que substitui a
+     * confirmação manual via SMS/app por uma aprovação sistêmica.
      */
     @PostMapping("/transfer-authorization")
     @Operation(
             summary = "Autorizar saque do Asaas",
-            description = "Endpoint para o mecanismo de seguranca do Asaas que responde APPROVED ou REFUSED para transferencias"
+            description = "Endpoint para o mecanismo de segurança do Asaas que responde APPROVED ou REFUSED para transferências"
     )
     public ResponseEntity<Map<String, String>> handleTransferAuthorization(
             @RequestBody Map<String, Object> payload,
@@ -73,32 +73,32 @@ public class AsaasWebhookController {
     ) {
         try {
             if (!isValidToken(accessToken)) {
-                log.warn("Webhook de autorizacao de saque recebido com token invalido");
+                log.warn("Webhook de autorização de saque recebido com token inválido");
                 return ResponseEntity.ok(Map.of(
                         "status", "REFUSED",
-                        "refuseReason", "Token invalido"
+                        "refuseReason", "Token inválido"
                 ));
             }
 
-            log.info("Webhook de autorizacao de saque recebido do Asaas: {}", payload);
+            log.info("Webhook de autorização de saque recebido do Asaas: {}", payload);
             return ResponseEntity.ok(transferAuthorizationService.authorizeTransfer(payload));
 
         } catch (Exception e) {
             log.error("Erro ao autorizar saque do Asaas", e);
             return ResponseEntity.ok(Map.of(
                     "status", "REFUSED",
-                    "refuseReason", "Erro interno ao validar transferencia"
+                    "refuseReason", "Erro interno ao validar transferência"
             ));
         }
     }
 
     /**
-     * Endpoint para receber webhooks de transacoes PIX.
+     * Endpoint para receber webhooks de transações PIX.
      */
     @PostMapping("/pix-transaction")
     @Operation(
-            summary = "Receber webhook de transacao PIX",
-            description = "Endpoint para receber notificacoes de transacoes PIX recebidas via QR Code estatico ou chave PIX"
+            summary = "Receber webhook de transação PIX",
+            description = "Endpoint para receber notificações de transações PIX recebidas via QR Code estático ou chave PIX"
     )
     public ResponseEntity<Map<String, String>> handlePixTransactionWebhook(
             @RequestBody Map<String, Object> payload,
@@ -106,9 +106,9 @@ public class AsaasWebhookController {
     ) {
         try {
             if (!isValidToken(accessToken)) {
-                log.warn("Webhook PIX Transaction recebido com token invalido");
+                log.warn("Webhook PIX Transaction recebido com token inválido");
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                        .body(Map.of("error", "Token invalido"));
+                        .body(Map.of("error", "Token inválido"));
             }
 
             log.info("Webhook PIX Transaction recebido: {}", payload);
@@ -116,36 +116,36 @@ public class AsaasWebhookController {
             return ResponseEntity.ok(Map.of("status", "received"));
 
         } catch (Exception e) {
-            log.error("Erro ao processar webhook de transacao PIX", e);
+            log.error("Erro ao processar webhook de transação PIX", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("error", e.getMessage()));
         }
     }
 
     @GetMapping
-    @Operation(summary = "Validar endpoint de webhook", description = "Endpoint para validacao da URL pelo Asaas")
+    @Operation(summary = "Validar endpoint de webhook", description = "Endpoint para validação da URL pelo Asaas")
     public ResponseEntity<Map<String, String>> validateWebhook() {
         return ResponseEntity.ok(Map.of(
                 "status", "active",
-                "message", "Webhook endpoint esta funcionando"
+                "message", "Webhook endpoint está funcionando"
         ));
     }
 
     @GetMapping("/pix-transaction")
-    @Operation(summary = "Validar endpoint de webhook PIX", description = "Endpoint para validacao da URL de webhook de transacoes PIX")
+    @Operation(summary = "Validar endpoint de webhook PIX", description = "Endpoint para validação da URL de webhook de transações PIX")
     public ResponseEntity<Map<String, String>> validatePixTransactionWebhook() {
         return ResponseEntity.ok(Map.of(
                 "status", "active",
-                "message", "Webhook PIX Transaction endpoint esta funcionando"
+                "message", "Webhook PIX Transaction endpoint está funcionando"
         ));
     }
 
     @GetMapping("/transfer-authorization")
-    @Operation(summary = "Validar endpoint de autorizacao de saque", description = "Endpoint para validacao da URL do mecanismo de seguranca do Asaas")
+    @Operation(summary = "Validar endpoint de autorização de saque", description = "Endpoint para validação da URL do mecanismo de segurança do Asaas")
     public ResponseEntity<Map<String, String>> validateTransferAuthorizationWebhook() {
         return ResponseEntity.ok(Map.of(
                 "status", "active",
-                "message", "Webhook de autorizacao de saque ativo"
+                "message", "Webhook de autorização de saque ativo"
         ));
     }
 

@@ -75,7 +75,7 @@ class AuthServicePasswordResetTest {
     }
 
     @Test
-    @DisplayName("forgotPassword deve gerar codigo e enviar email do fluxo por codigo")
+    @DisplayName("forgotPassword deve gerar código e enviar email do fluxo por código")
     void forgotPassword_generatesCodeAndSendsCodeEmail() {
         when(userRepository.findByEmail("joao@email.com")).thenReturn(Optional.of(user));
         when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -93,7 +93,7 @@ class AuthServicePasswordResetTest {
     }
 
     @Test
-    @DisplayName("resetPassword por codigo deve limpar o link pendente do admin")
+    @DisplayName("resetPassword por código deve limpar o link pendente do admin")
     void resetPassword_clearsAdminLinkAndResetChallenge() {
         when(userRepository.findByEmail("joao@email.com")).thenReturn(Optional.of(user));
         when(passwordEncoder.encode("NovaSenha@123")).thenReturn("encoded-new-password");

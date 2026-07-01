@@ -51,7 +51,7 @@ class IbgeLocationServiceTest {
     }
 
     @Test
-    @DisplayName("Deve cachear cidades por UF e retornar o nome canonico")
+    @DisplayName("Deve cachear cidades por UF e retornar o nome canônico")
     void findCanonicalCity_usesCachedCitiesByState() {
         IbgeLocationService.IbgeCity saoPaulo = new IbgeLocationService.IbgeCity();
         saoPaulo.setId(3550308L);

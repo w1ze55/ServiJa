@@ -25,7 +25,7 @@ class ServiceSchemaCompatibilityServiceTest {
     private ServiceSchemaCompatibilityService service;
 
     @Test
-    @DisplayName("run ajusta enum quando a coluna delivery_unit ainda nao aceita MONTHS")
+    @DisplayName("run ajusta enum quando a coluna delivery_unit ainda não aceita MONTHS")
     void runAdjustsEnumWhenMonthsAreMissing() {
         when(jdbcTemplate.queryForList(org.mockito.ArgumentMatchers.anyString()))
                 .thenReturn(List.of(Map.of("COLUMN_TYPE", "enum('DAYS','WEEKS')")));
@@ -36,7 +36,7 @@ class ServiceSchemaCompatibilityServiceTest {
     }
 
     @Test
-    @DisplayName("run nao altera nada quando a coluna ja aceita MONTHS")
+    @DisplayName("run não altera nada quando a coluna já aceita MONTHS")
     void runSkipsWhenColumnAlreadySupportsMonths() {
         when(jdbcTemplate.queryForList(org.mockito.ArgumentMatchers.anyString()))
                 .thenReturn(List.of(Map.of("COLUMN_TYPE", "enum('DAYS','WEEKS','MONTHS')")));

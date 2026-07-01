@@ -180,7 +180,7 @@ class WithdrawalServiceTest {
         }
 
         @Test
-        @DisplayName("deve rejeitar saque TED sem conta bancaria")
+        @DisplayName("deve rejeitar saque TED sem conta bancária")
         void shouldRejectTedWithoutBankAccount() {
             when(userRepository.findByEmail("freelancer@test.com")).thenReturn(Optional.of(freelancer));
             when(walletService.hasSufficientBalance(freelancer, new BigDecimal("500.00"))).thenReturn(true);
@@ -193,7 +193,7 @@ class WithdrawalServiceTest {
                     null,
                     null
             )).isInstanceOf(IllegalArgumentException.class)
-                    .hasMessageContaining("conta bancaria");
+                    .hasMessageContaining("conta bancária");
         }
 
         @Test
@@ -241,7 +241,7 @@ class WithdrawalServiceTest {
         }
 
         @Test
-        @DisplayName("deve rejeitar usuario nao encontrado")
+        @DisplayName("deve rejeitar usuário não encontrado")
         void shouldRejectUserNotFound() {
             when(userRepository.findByEmail("nope@test.com")).thenReturn(Optional.empty());
 
@@ -281,7 +281,7 @@ class WithdrawalServiceTest {
         }
 
         @Test
-        @DisplayName("deve rejeitar cancelamento de saque nao pendente")
+        @DisplayName("deve rejeitar cancelamento de saque não pendente")
         void shouldRejectCancelNonPending() {
             WithdrawalRequest withdrawal = WithdrawalRequest.builder()
                     .id(1L)

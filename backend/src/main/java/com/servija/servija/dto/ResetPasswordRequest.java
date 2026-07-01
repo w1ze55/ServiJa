@@ -15,18 +15,18 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class ResetPasswordRequest {
 
-    @NotBlank(message = "E-mail e obrigatorio")
-    @Email(message = "E-mail invalido")
+    @NotBlank(message = "E-mail é obrigatório")
+    @Email(message = "E-mail inválido")
     private String email;
 
-    @NotBlank(message = "Codigo e obrigatorio")
-    @Pattern(regexp = "\\d{6}", message = "Codigo deve conter 6 digitos")
+    @NotBlank(message = "Código é obrigatório")
+    @Pattern(regexp = "\\d{6}", message = "Código deve conter 6 dígitos")
     private String code;
 
-    @NotBlank(message = "Nova senha e obrigatoria")
+    @NotBlank(message = "Nova senha é obrigatória")
     @Size(min = 8, max = 256, message = "Senha deve ter entre 8 e 256 caracteres")
     private String newPassword;
 
-    @NotBlank(message = "Confirmacao de senha e obrigatoria")
+    @NotBlank(message = "Confirmação de senha é obrigatória")
     private String confirmPassword;
 }

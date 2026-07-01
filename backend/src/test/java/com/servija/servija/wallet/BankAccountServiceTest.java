@@ -149,7 +149,7 @@ class BankAccountServiceTest {
 
             assertThatThrownBy(() -> bankAccountService.createAccount("freelancer@test.com", dto))
                     .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessageContaining("bancarios");
+                    .hasMessageContaining("bancários");
         }
     }
 

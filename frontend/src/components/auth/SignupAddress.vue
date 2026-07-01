@@ -305,7 +305,9 @@ const handleSubmit = async (e: Event) => {
                 maxlength="9"
                 :disabled="isLoading"
               />
-              <LoaderCircle v-if="isLoadingCEP" class="signup-address-cep-loading h-4 w-4 animate-spin" />
+              <span v-if="isLoadingCEP" class="signup-address-cep-loading">
+                <LoaderCircle class="h-4 w-4 animate-spin" />
+              </span>
             </div>
             <p v-if="errors.zipCode && touched.zipCode" class="signup-address-error-message">
               <AlertCircle class="h-3 w-3" />
@@ -522,6 +524,8 @@ const handleSubmit = async (e: Event) => {
   right: 0.75rem;
   top: 50%;
   transform: translateY(-50%);
+  display: flex;
+  align-items: center;
   color: rgb(59, 130, 246);
 }
 

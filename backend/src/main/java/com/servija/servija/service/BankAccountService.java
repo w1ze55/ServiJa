@@ -50,11 +50,11 @@ public class BankAccountService {
 
         if (accountType == FreelancerBankAccount.AccountType.PIX_KEY) {
             if (dto.getPixKey() == null || dto.getPixKey().isBlank()) {
-                throw new IllegalArgumentException("Chave PIX e obrigatoria");
+                throw new IllegalArgumentException("Chave PIX é obrigatória");
             }
         } else {
             if (dto.getBankCode() == null || dto.getAgency() == null || dto.getAccountNumber() == null) {
-                throw new IllegalArgumentException("Dados bancarios sao obrigatorios");
+                throw new IllegalArgumentException("Dados bancários são obrigatórios");
             }
         }
 
@@ -84,7 +84,7 @@ public class BankAccountService {
                 .build();
 
         account = bankAccountRepository.save(account);
-        log.info("Conta bancaria criada: {} para {}", account.getId(), email);
+        log.info("Conta bancária criada: {} para {}", account.getId(), email);
 
         BankAccountResponse response = mapToResponse(account);
 
@@ -106,10 +106,10 @@ public class BankAccountService {
     public void deleteAccount(String email, Long accountId) {
         User user = findUser(email);
         FreelancerBankAccount account = bankAccountRepository.findById(accountId)
-                .orElseThrow(() -> new ResourceNotFoundException("Conta nao encontrada"));
+                .orElseThrow(() -> new ResourceNotFoundException("Conta não encontrada"));
 
         if (!account.getUser().getId().equals(user.getId())) {
-            throw new IllegalStateException("Sem permissao para remover esta conta");
+            throw new IllegalStateException("Sem permissão para remover esta conta");
         }
 
         String entityLabel = buildAuditEntityLabel(account);
@@ -126,7 +126,7 @@ public class BankAccountService {
                     });
         }
 
-        log.info("Conta bancaria removida: {}", accountId);
+        log.info("Conta bancária removida: {}", accountId);
 
         auditLogger.recordSemantic(
                 "BANK_ACCOUNT_DELETED",
@@ -144,10 +144,10 @@ public class BankAccountService {
     public BankAccountResponse setDefault(String email, Long accountId) {
         User user = findUser(email);
         FreelancerBankAccount account = bankAccountRepository.findById(accountId)
-                .orElseThrow(() -> new ResourceNotFoundException("Conta nao encontrada"));
+                .orElseThrow(() -> new ResourceNotFoundException("Conta não encontrada"));
 
         if (!account.getUser().getId().equals(user.getId())) {
-            throw new IllegalStateException("Sem permissao");
+            throw new IllegalStateException("Sem permissão");
         }
 
         Map<String, Object> beforeState = Map.of("default", Boolean.TRUE.equals(account.getIsDefault()));
@@ -168,7 +168,7 @@ public class BankAccountService {
                     AuditStateDiffUtils.filterFields(afterState, changedFields));
         }
 
-        log.info("Conta {} definida como padrao para {}", accountId, email);
+        log.info("Conta {} definida como padrão para {}", accountId, email);
         return mapToResponse(account);
     }
 
@@ -176,10 +176,10 @@ public class BankAccountService {
     public FreelancerBankAccount getOwnedAccount(String email, Long accountId) {
         User user = findUser(email);
         FreelancerBankAccount account = bankAccountRepository.findById(accountId)
-                .orElseThrow(() -> new ResourceNotFoundException("Conta nao encontrada"));
+                .orElseThrow(() -> new ResourceNotFoundException("Conta não encontrada"));
 
         if (!account.getUser().getId().equals(user.getId())) {
-            throw new IllegalStateException("Sem permissao para usar esta conta");
+            throw new IllegalStateException("Sem permissão para usar esta conta");
         }
 
         return account;
@@ -187,12 +187,12 @@ public class BankAccountService {
 
     public FreelancerBankAccount getAccountById(Long id) {
         return bankAccountRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Conta nao encontrada"));
+                .orElseThrow(() -> new ResourceNotFoundException("Conta não encontrada"));
     }
 
     private User findUser(String email) {
         return userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("Usuario nao encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
     }
 
     private BankAccountResponse mapToResponse(FreelancerBankAccount account) {

@@ -30,7 +30,7 @@ public class PortfolioProjectRequest {
 
     private Long subcategoryId;
 
-    @Size(max = 160, message = "Subcategoria deve ter no maximo 160 caracteres")
+    @Size(max = 160, message = "Subcategoria deve ter no máximo 160 caracteres")
     private String subcategory;
     
     private List<String> tags;

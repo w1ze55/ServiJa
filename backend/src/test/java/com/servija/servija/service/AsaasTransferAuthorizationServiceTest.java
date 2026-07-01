@@ -26,7 +26,7 @@ class AsaasTransferAuthorizationServiceTest {
     private AsaasTransferAuthorizationService service;
 
     @Test
-    @DisplayName("Deve aprovar transferencia conhecida do Asaas")
+    @DisplayName("Deve aprovar transferência conhecida do Asaas")
     void shouldApproveRecognizedTransfer() {
         WithdrawalRequest withdrawal = WithdrawalRequest.builder()
                 .id(10L)
@@ -52,7 +52,7 @@ class AsaasTransferAuthorizationServiceTest {
     }
 
     @Test
-    @DisplayName("Deve recusar transferencia nao encontrada")
+    @DisplayName("Deve recusar transferência não encontrada")
     void shouldRefuseUnknownTransfer() {
         when(withdrawalRepository.findFirstByAsaasTransferId("trf_404"))
                 .thenReturn(Optional.empty());
@@ -71,7 +71,7 @@ class AsaasTransferAuthorizationServiceTest {
     }
 
     @Test
-    @DisplayName("Deve recusar transferencia com valor divergente")
+    @DisplayName("Deve recusar transferência com valor divergente")
     void shouldRefuseTransferWithDifferentValue() {
         WithdrawalRequest withdrawal = WithdrawalRequest.builder()
                 .id(10L)

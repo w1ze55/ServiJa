@@ -75,11 +75,11 @@ class AuthServiceVerificationTest {
     }
 
     @Nested
-    @DisplayName("Verificacao de Email")
+    @DisplayName("Verificação de Email")
     class EmailVerification {
 
         @Test
-        @DisplayName("Deve verificar email com codigo correto")
+        @DisplayName("Deve verificar email com código correto")
         void verifyEmail_correctCode_success() {
             UserDetails mockUserDetails = mock(UserDetails.class);
             when(userRepository.findByEmail("joao@email.com")).thenReturn(Optional.of(user));
@@ -98,7 +98,7 @@ class AuthServiceVerificationTest {
         }
 
         @Test
-        @DisplayName("Deve lancar excecao com codigo incorreto e informar tentativas restantes")
+        @DisplayName("Deve lançar exceção com código incorreto e informar tentativas restantes")
         void verifyEmail_wrongCode_throwsWithRemainingAttempts() {
             when(userRepository.findByEmail("joao@email.com")).thenReturn(Optional.of(user));
             when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -111,7 +111,7 @@ class AuthServiceVerificationTest {
         }
 
         @Test
-        @DisplayName("Deve lancar excecao com codigo expirado")
+        @DisplayName("Deve lançar exceção com código expirado")
         void verifyEmail_expiredCode_throwsException() {
             user.setVerificationCodeExpiry(LocalDateTime.now().minusHours(1));
             when(userRepository.findByEmail("joao@email.com")).thenReturn(Optional.of(user));
@@ -122,7 +122,7 @@ class AuthServiceVerificationTest {
         }
 
         @Test
-        @DisplayName("Deve lancar excecao quando email ja verificado")
+        @DisplayName("Deve lançar exceção quando email já verificado")
         void verifyEmail_alreadyVerified_throwsException() {
             user.setEmailVerified(true);
             when(userRepository.findByEmail("joao@email.com")).thenReturn(Optional.of(user));
@@ -138,7 +138,7 @@ class AuthServiceVerificationTest {
     class LockoutAndAttempts {
 
         @Test
-        @DisplayName("Deve aplicar lockout de 30 minutos apos 5 tentativas erradas")
+        @DisplayName("Deve aplicar lockout de 30 minutos após 5 tentativas erradas")
         void verifyEmail_maxAttempts_triggersLockout() {
             user.setVerificationAttempts(4);
             when(userRepository.findByEmail("joao@email.com")).thenReturn(Optional.of(user));
@@ -153,7 +153,7 @@ class AuthServiceVerificationTest {
         }
 
         @Test
-        @DisplayName("Deve bloquear requisicao durante lockout ativo")
+        @DisplayName("Deve bloquear requisição durante lockout ativo")
         void verifyEmail_duringLockout_throwsException() {
             user.setVerificationLockUntil(LocalDateTime.now().plusMinutes(20));
             user.setVerificationAttempts(5);
@@ -203,11 +203,11 @@ class AuthServiceVerificationTest {
     }
 
     @Nested
-    @DisplayName("Reenvio de Codigo")
+    @DisplayName("Reenvio de Código")
     class ResendCode {
 
         @Test
-        @DisplayName("Deve gerar novo codigo, resetar tentativas e lockout ao reenviar")
+        @DisplayName("Deve gerar novo código, resetar tentativas e lockout ao reenviar")
         void resendCode_success() {
             String originalCode = user.getVerificationCode();
             user.setVerificationAttempts(3);
@@ -228,7 +228,7 @@ class AuthServiceVerificationTest {
         }
 
         @Test
-        @DisplayName("Deve lancar excecao ao reenviar para email ja verificado")
+        @DisplayName("Deve lançar exceção ao reenviar para email já verificado")
         void resendCode_alreadyVerified_throwsException() {
             user.setEmailVerified(true);
             when(userRepository.findByEmail("joao@email.com")).thenReturn(Optional.of(user));
@@ -239,7 +239,7 @@ class AuthServiceVerificationTest {
         }
 
         @Test
-        @DisplayName("Deve lancar excecao ao reenviar para email inexistente")
+        @DisplayName("Deve lançar exceção ao reenviar para email inexistente")
         void resendCode_emailNotFound_throwsException() {
             when(userRepository.findByEmail("inexistente@email.com")).thenReturn(Optional.empty());
 

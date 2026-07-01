@@ -27,6 +27,7 @@ import {
   Sparkles,
   History,
   CreditCard,
+  Package,
 } from 'lucide-vue-next';
 import AttachmentUploadField from '../shared/AttachmentUploadField.vue';
 import FileAttachment from '../shared/FileAttachment.vue';
@@ -98,6 +99,16 @@ const proposalForm = ref({
   notes: '',
   attachments: [] as File[],
 });
+
+const proposalErrors = ref<Record<string, string>>({});
+
+const clearProposalError = (field: string) => {
+  if (proposalErrors.value[field]) {
+    const next = { ...proposalErrors.value };
+    delete next[field];
+    proposalErrors.value = next;
+  }
+};
 
 const milestones = ref<Array<Omit<Milestone, 'status'> & { status?: Milestone['status'] }>>([]);
 const milestoneForm = ref({
@@ -192,7 +203,9 @@ onMounted(async () => {
   const userEmail = getUserEmail();
   if (userEmail) {
     wsConnection = useServiceRequestWebSocket(userEmail);
-    wsConnection.connect();
+    wsConnection.connect().catch((error: any) => {
+      console.error('Erro ao conectar WebSocket do detalhe da solicitação:', error);
+    });
     window.addEventListener('service-request-notification', handleServiceRequestNotification);
   }
 });
@@ -232,6 +245,17 @@ const getUserEmail = () => {
   }
 };
 
+// Recarrega a proposta atual a partir do store, preservando o histórico
+const reloadCurrentProposal = async () => {
+  if (!proposal.value) return;
+  const currentId = proposal.value.id;
+  await proposalStore.loadProposals();
+  proposal.value = proposalStore.getProposalById(currentId) || null;
+  if (proposal.value) {
+    await proposalStore.loadHistory(proposal.value.id);
+  }
+};
+
 // Lidar com notificações via WebSocket
 const handleServiceRequestNotification = async (event: any) => {
   const notification = event.detail;
@@ -245,13 +269,30 @@ const handleServiceRequestNotification = async (event: any) => {
         toast.info(`Status atualizado: ${getStatusLabel(notification.status)}`);
       }
 
-      // Recarregar dados
-      const currentId = proposal.value.id;
-      await proposalStore.loadProposals();
-      proposal.value = proposalStore.getProposalById(currentId) || null;
-      if (proposal.value) {
-        await proposalStore.loadHistory(proposal.value.id);
-      }
+      await reloadCurrentProposal();
+    }
+
+    if (notification.type === 'COUNTER_PROPOSAL') {
+      toast.info(
+        notification.counterProposalAmount
+          ? `O cliente enviou uma contra-proposta de ${notification.counterProposalAmount}`
+          : 'O cliente enviou uma contra-proposta'
+      );
+      await reloadCurrentProposal();
+    }
+
+    if (notification.type === 'PROPOSAL_ACCEPTED') {
+      toast.success(notification.message || 'O cliente aceitou sua proposta!');
+      await reloadCurrentProposal();
+    }
+
+    if (notification.type === 'SERVICE_REQUEST_CANCELLED') {
+      toast.warning(
+        notification.reason
+          ? `Solicitação cancelada pelo cliente. Motivo: ${notification.reason}`
+          : 'Solicitação cancelada pelo cliente.'
+      );
+      await reloadCurrentProposal();
     }
 
     if (notification.type === 'SERVICE_COMPLETED_REVIEW_PENDING') {
@@ -378,28 +419,36 @@ const handleExecutionDaysKeydown = (event: KeyboardEvent) => {
 };
 
 const validateProposal = () => {
-  const errors: string[] = [];
+  const newErrors: Record<string, string> = {};
 
-  if (!proposalForm.value.value) errors.push('Valor da proposta é obrigatório');
-  if (!proposalForm.value.executionDays) errors.push('Prazo de execução é obrigatório');
-  if (!proposalForm.value.scope) errors.push('Escopo do trabalho é obrigatório');
-
-  const value = parseCurrencyValue(proposalForm.value.value);
-  if (isNaN(value) || value <= 0) {
-    errors.push('Valor da proposta deve ser um número válido maior que zero');
+  if (!proposalForm.value.value) {
+    newErrors.value = 'Valor da proposta é obrigatório';
   } else {
-    const rangeError = validateValueRange(value);
-    if (rangeError) errors.push(rangeError);
+    const value = parseCurrencyValue(proposalForm.value.value);
+    if (isNaN(value) || value <= 0) {
+      newErrors.value = 'Valor da proposta deve ser um número válido maior que zero';
+    } else {
+      const rangeError = validateValueRange(value);
+      if (rangeError) newErrors.value = rangeError;
+    }
   }
 
-  const days = parseInt(proposalForm.value.executionDays);
-  if (isNaN(days) || days <= 0) {
-    errors.push('Prazo de execução deve ser um número válido maior que zero');
-  } else if (days > MAX_EXECUTION_DAYS) {
-    errors.push(`Prazo de execução não pode ser maior que ${MAX_EXECUTION_DAYS} dias`);
+  if (!proposalForm.value.executionDays) {
+    newErrors.executionDays = 'Prazo de execução é obrigatório';
+  } else {
+    const days = parseInt(proposalForm.value.executionDays);
+    if (isNaN(days) || days <= 0) {
+      newErrors.executionDays = 'Prazo de execução deve ser um número válido maior que zero';
+    } else if (days > MAX_EXECUTION_DAYS) {
+      newErrors.executionDays = `Prazo de execução não pode ser maior que ${MAX_EXECUTION_DAYS} dias`;
+    }
   }
 
-  return errors;
+  if (!proposalForm.value.scope) {
+    newErrors.scope = 'Escopo do trabalho é obrigatório';
+  }
+
+  return newErrors;
 };
 
 const handleAddMilestone = () => {
@@ -432,9 +481,10 @@ const handleProposalAttachmentReject = (message: string) => {
 
 const handlePrepareProposal = () => {
   const errors = validateProposal();
+  proposalErrors.value = errors;
 
-  if (errors.length > 0) {
-    toast.error(errors[0]);
+  if (Object.keys(errors).length > 0) {
+    toast.error('Por favor, corrija os erros no formulário');
     return;
   }
 
@@ -500,6 +550,7 @@ const handleConfirmSendProposal = async () => {
       notes: '',
       attachments: [],
     };
+    proposalErrors.value = {};
     milestones.value = [];
     
     proposal.value = proposalStore.getProposalById(proposal.value.id) || null;
@@ -606,7 +657,7 @@ const getStatusBadge = (currentProposal: Proposal) => {
     negotiating: { class: 'bg-purple-100 text-purple-700', label: 'Negociando', icon: MessageSquare },
     accepted: { class: 'bg-green-100 text-green-700', label: 'Aceita', icon: CheckCircle },
     in_progress: { class: 'bg-purple-100 text-purple-700', label: 'Em Andamento', icon: Clock },
-    delivered: { class: 'bg-blue-100 text-blue-700', label: 'Entregue', icon: Send },
+    delivered: { class: 'bg-amber-100 text-amber-600', label: 'Entregue', icon: Package },
     rejected: { class: 'bg-red-100 text-red-700', label: 'Recusada', icon: XCircle },
     completed: { class: 'bg-teal-100 text-teal-700', label: 'Concluída', icon: CheckCircle },
     archived: { class: 'bg-gray-100 text-gray-700', label: 'Arquivada', icon: FileText },
@@ -1092,9 +1143,11 @@ const getStatusBadge = (currentProposal: Proposal) => {
               <Input
                 id="value"
                 :model-value="proposalForm.value"
-                @update:model-value="(val) => proposalForm.value = handleCurrencyInput(val as string)"
+                @update:model-value="(val) => { proposalForm.value = handleCurrencyInput(val as string); clearProposalError('value'); }"
                 placeholder="R$ 0,00"
+                :class="proposalErrors.value ? 'border-red-500' : ''"
               />
+              <p v-if="proposalErrors.value" class="text-sm text-red-500">{{ proposalErrors.value }}</p>
               <div
                 v-if="shouldShowProposalNetValue"
                 class="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm"
@@ -1117,10 +1170,10 @@ const getStatusBadge = (currentProposal: Proposal) => {
                   maxlength="3"
                   inputmode="numeric"
                   :model-value="proposalForm.executionDays"
-                  @update:model-value="(val) => handleExecutionDaysInput(val as string)"
+                  @update:model-value="(val) => { handleExecutionDaysInput(val as string); clearProposalError('executionDays'); }"
                   @keydown="handleExecutionDaysKeydown"
                   placeholder="Quantidade de dias"
-                  class="pr-24"
+                  :class="['pr-24', proposalErrors.executionDays ? 'border-red-500' : '']"
                 />
                 <div class="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2 pointer-events-none">
                   <span class="text-xs text-gray-400 font-medium">dia(s)</span>
@@ -1129,6 +1182,7 @@ const getStatusBadge = (currentProposal: Proposal) => {
                   </Badge>
                 </div>
               </div>
+              <p v-if="proposalErrors.executionDays" class="text-sm text-red-500">{{ proposalErrors.executionDays }}</p>
             </div>
           </div>
 
@@ -1138,10 +1192,12 @@ const getStatusBadge = (currentProposal: Proposal) => {
             <Textarea
               id="scope"
               :model-value="proposalForm.scope"
-              @update:model-value="(val) => proposalForm.scope = val as string"
+              @update:model-value="(val) => { proposalForm.scope = val as string; clearProposalError('scope'); }"
               placeholder="Descreva detalhadamente o que será realizado..."
               :rows="6"
+              :class="proposalErrors.scope ? 'border-red-500' : ''"
             />
+            <p v-if="proposalErrors.scope" class="text-sm text-red-500">{{ proposalErrors.scope }}</p>
           </div>
 
           <!-- Milestones -->

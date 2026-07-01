@@ -65,7 +65,7 @@ class ClientHomeServiceTest {
     }
 
     @Test
-    @DisplayName("Deve montar a home do cliente com regiao, interesses e destaques")
+    @DisplayName("Deve montar a home do cliente com região, interesses e destaques")
     void getHome_buildsRegionalHomePayload() {
         User contractor = buildContractor(10L, "cliente@servija.com");
         Freelancer regionalFreelancer = buildFreelancer(21L, "Ana UX", true, "Sao Paulo", "SP");
@@ -142,7 +142,7 @@ class ClientHomeServiceTest {
     }
 
     @Test
-    @DisplayName("Deve usar fallback global quando o cliente nao possui endereco")
+    @DisplayName("Deve usar fallback global quando o cliente não possui endereço")
     void getHome_fallsBackToGlobalRankingWithoutAddress() {
         User contractor = buildContractor(11L, "cliente2@servija.com");
         Freelancer freelancer = buildFreelancer(31L, "Clara Produto", true, "Curitiba", "PR");
@@ -170,7 +170,7 @@ class ClientHomeServiceTest {
     }
 
     @Test
-    @DisplayName("Deve retornar apenas servicos semanais que continuam ativos e publicos")
+    @DisplayName("Deve retornar apenas serviços semanais que continuam ativos e públicos")
     void getHome_filtersWeeklyMostSearchedServicesAgainstCurrentCatalog() {
         User contractor = buildContractor(12L, "cliente3@servija.com");
         Freelancer freelancer = buildFreelancer(41L, "Marina Dev", true, "Recife", "PE");

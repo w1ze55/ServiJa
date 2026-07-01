@@ -59,6 +59,10 @@ public class ServiceRequestResponse {
     private String cancelReason;
     private String rejectReason;
 
+    private String deliveryDescription;
+    private List<FreelancerAttachmentDTO> deliveryAttachments;
+    private LocalDateTime deliveredAt;
+
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

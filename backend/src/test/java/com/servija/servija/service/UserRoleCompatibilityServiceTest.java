@@ -40,7 +40,7 @@ class UserRoleCompatibilityServiceTest {
     private UserRoleCompatibilityService service;
 
     @Test
-    @DisplayName("repairIfNeeded retorna o mesmo usuario quando nada precisa ser ajustado")
+    @DisplayName("repairIfNeeded retorna o mesmo usuário quando nada precisa ser ajustado")
     void repairIfNeededReturnsUserWhenAlreadyConsistent() {
         User user = User.builder()
                 .id(1L)
@@ -59,7 +59,7 @@ class UserRoleCompatibilityServiceTest {
     }
 
     @Test
-    @DisplayName("repairIfNeeded adiciona roles inferidas e persiste quando encontra divergencia")
+    @DisplayName("repairIfNeeded adiciona roles inferidas e persiste quando encontra divergência")
     void repairIfNeededPersistsResolvedRoles() {
         User user = User.builder()
                 .id(1L)
@@ -79,7 +79,7 @@ class UserRoleCompatibilityServiceTest {
     }
 
     @Test
-    @DisplayName("run captura falhas de compatibilidade sem propagar excecao")
+    @DisplayName("run captura falhas de compatibilidade sem propagar exceção")
     void runSwallowsCompatibilityFailures() {
         when(jdbcTemplate.update(any(String.class))).thenThrow(new RuntimeException("boom"));
 

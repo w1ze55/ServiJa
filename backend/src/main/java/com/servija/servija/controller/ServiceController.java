@@ -12,6 +12,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -87,7 +88,7 @@ public class ServiceController {
             @ApiResponse(responseCode = "400", description = "Dados inválidos"),
             @ApiResponse(responseCode = "401", description = "Não autenticado")
     })
-    public ResponseEntity<ServiceResponse> createService(@RequestBody ServiceRequest request) {
+    public ResponseEntity<ServiceResponse> createService(@Valid @RequestBody ServiceRequest request) {
         try {
             ServiceResponse service = serviceService.createService(request);
             return ResponseEntity.ok(service);
@@ -107,7 +108,7 @@ public class ServiceController {
     })
     public ResponseEntity<ServiceResponse> updateService(
             @Parameter(description = "ID do serviço", required = true) @PathVariable Long id,
-            @RequestBody ServiceRequest request) {
+            @Valid @RequestBody ServiceRequest request) {
         try {
             ServiceResponse service = serviceService.updateService(id, request);
             return ResponseEntity.ok(service);

@@ -1,4 +1,4 @@
-export const MIN_VALUE = 20;
+export const MIN_VALUE = 40;
 export const MAX_VALUE = 1_000_000;
 
 export const VALUE_ERRORS = {

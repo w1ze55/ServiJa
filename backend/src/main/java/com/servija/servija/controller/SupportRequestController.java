@@ -23,13 +23,13 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/support-requests")
 @RequiredArgsConstructor
-@Tag(name = "Support Requests", description = "Endpoints de solicitacoes de suporte")
+@Tag(name = "Support Requests", description = "Endpoints de solicitações de suporte")
 public class SupportRequestController {
 
     private final SupportRequestService supportRequestService;
 
     @PostMapping
-    @Operation(summary = "Criar solicitacao de suporte")
+    @Operation(summary = "Criar solicitação de suporte")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<SupportRequestResponse> create(
             @Valid @RequestBody SupportRequestCreateRequest request,
@@ -39,14 +39,14 @@ public class SupportRequestController {
     }
 
     @GetMapping("/my")
-    @Operation(summary = "Listar solicitacoes do usuario autenticado")
+    @Operation(summary = "Listar solicitações do usuário autenticado")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<List<SupportRequestResponse>> getMyRequests(Authentication authentication) {
         return ResponseEntity.ok(supportRequestService.getMyRequests(authentication.getName()));
     }
 
     @GetMapping("/{id}")
-    @Operation(summary = "Obter detalhes de uma solicitacao do usuario autenticado")
+    @Operation(summary = "Obter detalhes de uma solicitação do usuário autenticado")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<SupportRequestResponse> getById(
             @PathVariable Long id,

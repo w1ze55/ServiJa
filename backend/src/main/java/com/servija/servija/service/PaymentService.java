@@ -67,7 +67,7 @@ public class PaymentService {
 
         if (serviceRequest.getFreelancer() != null
                 && serviceRequest.getFreelancer().getId().equals(contractor.getId())) {
-            throw new IllegalStateException("Voce nao pode realizar pagamento para si mesmo");
+            throw new IllegalStateException("Você não pode realizar pagamento para si mesmo");
         }
 
         if (!serviceRequest.getContractor().getId().equals(contractor.getId())) {
@@ -216,13 +216,13 @@ public class PaymentService {
 
     private void validateMinimumPaymentAmount(BigDecimal agreedAmount) {
         if (agreedAmount.compareTo(MIN_NEGOTIATED_AMOUNT) < 0) {
-            throw new IllegalStateException("O valor minimo para pagamento e R$ 40,00");
+            throw new IllegalStateException("O valor mínimo para pagamento é R$ 40,00");
         }
     }
 
     private String normalizePaymentMethod(String paymentMethod) {
         if (paymentMethod == null || paymentMethod.isBlank()) {
-            throw new IllegalArgumentException("Metodo de pagamento invalido");
+            throw new IllegalArgumentException("Método de pagamento inválido");
         }
         return paymentMethod.trim().toLowerCase();
     }
@@ -274,7 +274,7 @@ public class PaymentService {
                         .setScale(2, RoundingMode.HALF_UP);
             }
             case "wallet" -> BigDecimal.ZERO;
-            default -> throw new IllegalArgumentException("Metodo de pagamento invalido");
+            default -> throw new IllegalArgumentException("Método de pagamento inválido");
         };
     }
 

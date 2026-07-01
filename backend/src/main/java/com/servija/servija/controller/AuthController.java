@@ -41,7 +41,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
-@Tag(name = "Autenticacao", description = "Endpoints para autenticacao e gerenciamento de usuarios")
+@Tag(name = "Autenticação", description = "Endpoints para autenticação e gerenciamento de usuários")
 public class AuthController {
 
     private final AuthService authService;
@@ -78,10 +78,10 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    @Operation(summary = "Registrar novo usuario", description = "Cria uma nova conta de usuario no sistema. Apos o registro, um codigo de verificacao e enviado para o e-mail fornecido.")
+    @Operation(summary = "Registrar novo usuário", description = "Cria uma nova conta de usuário no sistema. Após o registro, um código de verificação é enviado para o e-mail fornecido.")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "201", description = "Usuario registrado com sucesso", content = @Content(schema = @Schema(implementation = AuthResponse.class))),
-            @ApiResponse(responseCode = "400", description = "Dados invalidos ou e-mail ja cadastrado", content = @Content(schema = @Schema(implementation = MessageResponse.class)))
+            @ApiResponse(responseCode = "201", description = "Usuário registrado com sucesso", content = @Content(schema = @Schema(implementation = AuthResponse.class))),
+            @ApiResponse(responseCode = "400", description = "Dados inválidos ou e-mail já cadastrado", content = @Content(schema = @Schema(implementation = MessageResponse.class)))
     })
     public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request,
             HttpServletRequest httpRequest) {
@@ -91,11 +91,11 @@ public class AuthController {
     }
 
     @PostMapping("/validate-registration")
-    @Operation(summary = "Validar dados de cadastro", description = "Valida os dados do cadastro antes de prosseguir para a confirmacao da conta.")
+    @Operation(summary = "Validar dados de cadastro", description = "Valida os dados do cadastro antes de prosseguir para a confirmação da conta.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Dados validados com sucesso", content = @Content(schema = @Schema(implementation = MessageResponse.class))),
-            @ApiResponse(responseCode = "400", description = "Dados invalidos", content = @Content(schema = @Schema(implementation = MessageResponse.class))),
-            @ApiResponse(responseCode = "409", description = "E-mail ou CPF ja cadastrado", content = @Content(schema = @Schema(implementation = MessageResponse.class)))
+            @ApiResponse(responseCode = "400", description = "Dados inválidos", content = @Content(schema = @Schema(implementation = MessageResponse.class))),
+            @ApiResponse(responseCode = "409", description = "E-mail ou CPF já cadastrado", content = @Content(schema = @Schema(implementation = MessageResponse.class)))
     })
     public ResponseEntity<MessageResponse> validateRegistration(@Valid @RequestBody RegistrationValidationRequest request) {
         authService.validateRegistrationData(request);
@@ -114,10 +114,10 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    @Operation(summary = "Fazer login", description = "Autentica um usuario e retorna um token JWT para acesso as rotas protegidas")
+    @Operation(summary = "Fazer login", description = "Autentica um usuário e retorna um token JWT para acesso às rotas protegidas")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Login realizado com sucesso", content = @Content(schema = @Schema(implementation = AuthResponse.class))),
-            @ApiResponse(responseCode = "401", description = "Credenciais invalidas", content = @Content(schema = @Schema(implementation = MessageResponse.class)))
+            @ApiResponse(responseCode = "401", description = "Credenciais inválidas", content = @Content(schema = @Schema(implementation = MessageResponse.class)))
     })
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request,
             HttpServletRequest httpRequest) {
@@ -127,10 +127,10 @@ public class AuthController {
     }
 
     @PostMapping("/admin/login")
-    @Operation(summary = "Login do painel administrativo", description = "Autentica apenas usuarios com perfil ADMIN. Demais tipos recebem erro de credenciais.")
+    @Operation(summary = "Login do painel administrativo", description = "Autentica apenas usuários com perfil ADMIN. Demais tipos recebem erro de credenciais.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Login realizado com sucesso", content = @Content(schema = @Schema(implementation = AuthResponse.class))),
-            @ApiResponse(responseCode = "401", description = "Credenciais invalidas ou usuario nao administrador", content = @Content(schema = @Schema(implementation = MessageResponse.class)))
+            @ApiResponse(responseCode = "401", description = "Credenciais inválidas ou usuário não administrador", content = @Content(schema = @Schema(implementation = MessageResponse.class)))
     })
     public ResponseEntity<AuthResponse> loginAdmin(@Valid @RequestBody LoginRequest request,
             HttpServletRequest httpRequest) {
@@ -140,10 +140,10 @@ public class AuthController {
     }
 
     @PostMapping("/2fa/verify")
-    @Operation(summary = "Concluir login com 2FA", description = "Valida o codigo TOTP ou backup code e retorna o JWT definitivo")
+    @Operation(summary = "Concluir login com 2FA", description = "Valida o código TOTP ou backup code e retorna o JWT definitivo")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Codigo validado, login concluido", content = @Content(schema = @Schema(implementation = AuthResponse.class))),
-            @ApiResponse(responseCode = "401", description = "Codigo ou token invalido", content = @Content(schema = @Schema(implementation = MessageResponse.class))),
+            @ApiResponse(responseCode = "200", description = "Código validado, login concluído", content = @Content(schema = @Schema(implementation = AuthResponse.class))),
+            @ApiResponse(responseCode = "401", description = "Código ou token inválido", content = @Content(schema = @Schema(implementation = MessageResponse.class))),
             @ApiResponse(responseCode = "429", description = "Muitas tentativas", content = @Content(schema = @Schema(implementation = MessageResponse.class)))
     })
     public ResponseEntity<AuthResponse> verifyTwoFactor(@Valid @RequestBody TwoFactorVerifyRequest request,
@@ -154,11 +154,11 @@ public class AuthController {
     }
 
     @PostMapping("/switch-role")
-    @Operation(summary = "Alternar perfil ativo", description = "Atualiza o papel ativo do usuario autenticado e retorna um novo token JWT")
+    @Operation(summary = "Alternar perfil ativo", description = "Atualiza o papel ativo do usuário autenticado e retorna um novo token JWT")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Perfil ativo alterado com sucesso", content = @Content(schema = @Schema(implementation = AuthResponse.class))),
-            @ApiResponse(responseCode = "400", description = "Perfil invalido ou nao habilitado", content = @Content(schema = @Schema(implementation = MessageResponse.class))),
-            @ApiResponse(responseCode = "401", description = "Nao autenticado", content = @Content(schema = @Schema(implementation = MessageResponse.class)))
+            @ApiResponse(responseCode = "400", description = "Perfil inválido ou não habilitado", content = @Content(schema = @Schema(implementation = MessageResponse.class))),
+            @ApiResponse(responseCode = "401", description = "Não autenticado", content = @Content(schema = @Schema(implementation = MessageResponse.class)))
     })
     public ResponseEntity<AuthResponse> switchRole(@Valid @RequestBody UserRoleRequest request) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -167,10 +167,10 @@ public class AuthController {
     }
 
     @PostMapping("/verify-email")
-    @Operation(summary = "Verificar e-mail", description = "Verifica o e-mail do usuario usando o codigo enviado durante o registro e retorna um token JWT para autenticacao automatica")
+    @Operation(summary = "Verificar e-mail", description = "Verifica o e-mail do usuário usando o código enviado durante o registro e retorna um token JWT para autenticação automática")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "E-mail verificado com sucesso", content = @Content(schema = @Schema(implementation = AuthResponse.class))),
-            @ApiResponse(responseCode = "400", description = "Codigo invalido ou expirado", content = @Content(schema = @Schema(implementation = MessageResponse.class)))
+            @ApiResponse(responseCode = "400", description = "Código inválido ou expirado", content = @Content(schema = @Schema(implementation = MessageResponse.class)))
     })
     public ResponseEntity<AuthResponse> verifyEmail(@Valid @RequestBody VerifyEmailRequest request,
             HttpServletRequest httpRequest) {
@@ -180,48 +180,48 @@ public class AuthController {
     }
 
     @PostMapping("/resend-verification")
-    @Operation(summary = "Reenviar codigo de verificacao", description = "Reenvia o codigo de verificacao de e-mail para o usuario")
+    @Operation(summary = "Reenviar código de verificação", description = "Reenvia o código de verificação de e-mail para o usuário")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Codigo reenviado com sucesso", content = @Content(schema = @Schema(implementation = MessageResponse.class)))
+            @ApiResponse(responseCode = "200", description = "Código reenviado com sucesso", content = @Content(schema = @Schema(implementation = MessageResponse.class)))
     })
     public ResponseEntity<MessageResponse> resendVerification(@RequestParam String email,
             HttpServletRequest httpRequest) {
         rateLimit("resend-verify", httpRequest, email, 15, 3, WINDOW_10_MIN);
         authService.resendVerificationCode(email);
-        return ResponseEntity.ok(new MessageResponse("Codigo de verificacao reenviado"));
+        return ResponseEntity.ok(new MessageResponse("Código de verificação reenviado"));
     }
 
     @PostMapping("/forgot-password")
-    @Operation(summary = "Solicitar recuperacao de senha", description = "Inicia o processo de recuperacao de senha enviando um codigo para o e-mail do usuario")
+    @Operation(summary = "Solicitar recuperação de senha", description = "Inicia o processo de recuperação de senha enviando um código para o e-mail do usuário")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Codigo de recuperacao enviado", content = @Content(schema = @Schema(implementation = MessageResponse.class)))
+            @ApiResponse(responseCode = "200", description = "Código de recuperação enviado", content = @Content(schema = @Schema(implementation = MessageResponse.class)))
     })
     public ResponseEntity<MessageResponse> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request,
             HttpServletRequest httpRequest) {
         rateLimit("forgot", httpRequest, request.getEmail(), 15, 3, WINDOW_10_MIN);
         authService.forgotPassword(request.getEmail());
-        return ResponseEntity.ok(new MessageResponse("Se o e-mail estiver cadastrado, voce recebera um codigo de recuperacao"));
+        return ResponseEntity.ok(new MessageResponse("Se o e-mail estiver cadastrado, você receberá um código de recuperação"));
     }
 
     @PostMapping("/verify-reset-code")
-    @Operation(summary = "Validar codigo de recuperacao", description = "Valida o codigo de recuperacao de senha antes da redefinicao da senha")
+    @Operation(summary = "Validar código de recuperação", description = "Valida o código de recuperação de senha antes da redefinição da senha")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Codigo validado com sucesso", content = @Content(schema = @Schema(implementation = MessageResponse.class))),
-            @ApiResponse(responseCode = "400", description = "Codigo invalido ou expirado", content = @Content(schema = @Schema(implementation = MessageResponse.class))),
+            @ApiResponse(responseCode = "200", description = "Código validado com sucesso", content = @Content(schema = @Schema(implementation = MessageResponse.class))),
+            @ApiResponse(responseCode = "400", description = "Código inválido ou expirado", content = @Content(schema = @Schema(implementation = MessageResponse.class))),
             @ApiResponse(responseCode = "429", description = "Muitas tentativas", content = @Content(schema = @Schema(implementation = MessageResponse.class)))
     })
     public ResponseEntity<MessageResponse> verifyResetCode(@Valid @RequestBody VerifyResetPasswordCodeRequest request,
             HttpServletRequest httpRequest) {
         rateLimit("verify-reset", httpRequest, request.getEmail(), 40, 15, WINDOW_10_MIN);
         authService.verifyResetPasswordCode(request.getEmail(), request.getCode());
-        return ResponseEntity.ok(new MessageResponse("Codigo validado com sucesso"));
+        return ResponseEntity.ok(new MessageResponse("Código validado com sucesso"));
     }
 
     @PostMapping("/reset-password")
-    @Operation(summary = "Redefinir senha", description = "Redefine a senha do usuario usando o codigo de recuperacao enviado por e-mail")
+    @Operation(summary = "Redefinir senha", description = "Redefine a senha do usuário usando o código de recuperação enviado por e-mail")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Senha redefinida com sucesso", content = @Content(schema = @Schema(implementation = MessageResponse.class))),
-            @ApiResponse(responseCode = "400", description = "Codigo invalido ou senhas nao coincidem", content = @Content(schema = @Schema(implementation = MessageResponse.class)))
+            @ApiResponse(responseCode = "400", description = "Código inválido ou senhas não coincidem", content = @Content(schema = @Schema(implementation = MessageResponse.class)))
     })
     public ResponseEntity<MessageResponse> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
         authService.resetPassword(
@@ -233,22 +233,22 @@ public class AuthController {
     }
 
     @PostMapping("/resend-reset-code")
-    @Operation(summary = "Reenviar codigo de recuperacao", description = "Reenvia o codigo de recuperacao de senha para o e-mail do usuario")
+    @Operation(summary = "Reenviar código de recuperação", description = "Reenvia o código de recuperação de senha para o e-mail do usuário")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Codigo reenviado com sucesso", content = @Content(schema = @Schema(implementation = MessageResponse.class)))
+            @ApiResponse(responseCode = "200", description = "Código reenviado com sucesso", content = @Content(schema = @Schema(implementation = MessageResponse.class)))
     })
     public ResponseEntity<MessageResponse> resendResetCode(@RequestParam String email,
             HttpServletRequest httpRequest) {
         rateLimit("resend-reset", httpRequest, email, 15, 3, WINDOW_10_MIN);
         authService.forgotPassword(email);
-        return ResponseEntity.ok(new MessageResponse("Codigo de recuperacao reenviado"));
+        return ResponseEntity.ok(new MessageResponse("Código de recuperação reenviado"));
     }
 
     @PostMapping("/admin-reset-link/validate")
-    @Operation(summary = "Validar link de reset do admin", description = "Valida um link unico de redefinicao de senha enviado pelo painel administrativo")
+    @Operation(summary = "Validar link de reset do admin", description = "Valida um link único de redefinição de senha enviado pelo painel administrativo")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Link valido", content = @Content(schema = @Schema(implementation = AdminResetPasswordLinkValidationResponse.class))),
-            @ApiResponse(responseCode = "400", description = "Link invalido, expirado ou ja utilizado", content = @Content(schema = @Schema(implementation = MessageResponse.class)))
+            @ApiResponse(responseCode = "200", description = "Link válido", content = @Content(schema = @Schema(implementation = AdminResetPasswordLinkValidationResponse.class))),
+            @ApiResponse(responseCode = "400", description = "Link inválido, expirado ou já utilizado", content = @Content(schema = @Schema(implementation = MessageResponse.class)))
     })
     public ResponseEntity<AdminResetPasswordLinkValidationResponse> validateAdminResetLink(
             @Valid @RequestBody AdminResetPasswordLinkValidateRequest request) {
@@ -256,10 +256,10 @@ public class AuthController {
     }
 
     @PostMapping("/admin-reset-link/reset-password")
-    @Operation(summary = "Redefinir senha por link do admin", description = "Redefine a senha usando um link unico enviado por um administrador")
+    @Operation(summary = "Redefinir senha por link do admin", description = "Redefine a senha usando um link único enviado por um administrador")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Senha redefinida com sucesso", content = @Content(schema = @Schema(implementation = MessageResponse.class))),
-            @ApiResponse(responseCode = "400", description = "Link invalido, expirado, ja utilizado ou senha invalida", content = @Content(schema = @Schema(implementation = MessageResponse.class)))
+            @ApiResponse(responseCode = "400", description = "Link inválido, expirado, já utilizado ou senha inválida", content = @Content(schema = @Schema(implementation = MessageResponse.class)))
     })
     public ResponseEntity<MessageResponse> resetPasswordByAdminLink(
             @Valid @RequestBody AdminResetPasswordLinkResetRequest request) {

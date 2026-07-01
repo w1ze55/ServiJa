@@ -49,7 +49,7 @@ class AsaasNotificationBackfillServiceTest {
     }
 
     @Test
-    @DisplayName("Nao deve executar backfill quando a flag estiver desligada")
+    @DisplayName("Não deve executar backfill quando a flag estiver desligada")
     void runBackfillOnStartup_skipsWhenDisabled() {
         ReflectionTestUtils.setField(backfillService, "backfillOnStartup", false);
 

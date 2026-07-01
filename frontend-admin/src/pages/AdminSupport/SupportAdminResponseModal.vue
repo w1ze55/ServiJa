@@ -27,17 +27,17 @@ watch(
 );
 
 const title = computed(() =>
-  props.mode === 'approve' ? 'Aprovar solicitacao' : 'Recusar solicitacao'
+  props.mode === 'approve' ? 'Aprovar solicitação' : 'Recusar solicitação'
 );
 
 const description = computed(() => {
   if (!props.request) return '';
 
   if (props.mode === 'approve') {
-    return `Escreva a mensagem que sera enviada por e-mail ao usuario para aprovar a solicitacao #${props.request.id}.`;
+    return `Escreva a mensagem que será enviada por e-mail ao usuário para aprovar a solicitação #${props.request.id}.`;
   }
 
-  return `Explique por e-mail o motivo da recusa da solicitacao #${props.request.id}.`;
+  return `Explique por e-mail o motivo da recusa da solicitação #${props.request.id}.`;
 });
 
 const confirmLabel = computed(() => (props.mode === 'approve' ? 'Aprovar' : 'Recusar'));
@@ -51,13 +51,13 @@ const buttonClasses = computed(() =>
 
 const placeholder = computed(() =>
   props.mode === 'approve'
-    ? 'Ex: Solicitacao aprovada. Nossa equipe seguira com a analise do seu pedido.'
-    : 'Explique o motivo da recusa para o usuario.'
+    ? 'Ex: Solicitação aprovada. Nossa equipe seguirá com a análise do seu pedido.'
+    : 'Explique o motivo da recusa para o usuário.'
 );
 
 const handleSubmit = () => {
   if (!message.value.trim()) {
-    error.value = 'A mensagem e obrigatoria para continuar.';
+    error.value = 'A mensagem é obrigatória para continuar.';
     return;
   }
 
@@ -87,7 +87,7 @@ const handleSubmit = () => {
           </div>
           <div>
             <p class="text-sm font-medium text-slate-900">
-              {{ request?.userName || 'Solicitacao de suporte' }}
+              {{ request?.userName || 'Solicitação de suporte' }}
             </p>
             <p class="mt-1 text-sm text-slate-600">{{ description }}</p>
           </div>

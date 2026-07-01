@@ -14,26 +14,21 @@ import { chatService } from '@/api/services/chatService';
 import type { ConversationDTO, MessageDTO } from '@/api/services/chatService';
 import { useChatWebSocket } from '@/composables/useChatWebSocket';
 import { useServiceRequestWebSocket, type ServiceRequestNotification } from '@/composables/useServiceRequestWebSocket';
-import { uploadFiles } from '@/api/uploadService';
+import { uploadFiles, getUploadErrorMessage } from '@/api/uploadService';
 import { useNavigation } from '@/utils/navigation';
 import { toast } from '@/utils/toast';
 import {
   CHAT_ATTACHMENT_ACCEPT,
-  buildRecordedAudioFile,
-  getAudioRecordingUnavailableReason,
   getAttachmentPlaceholder,
-  getMicrophoneAccessErrorMessage,
   isAudioFile,
-  isAudioRecordingSupported,
   isAudioUrl,
   isImageFile,
   isImageUrl,
-  logAudioRecordingError,
-  pickSupportedAudioMimeType,
   resolveAttachmentKindFromFile,
   resolveChatMessageType,
   shouldHideAttachmentPlaceholder,
 } from '@/utils/chatAttachments';
+import { useAudioRecorder } from '@/composables/useAudioRecorder';
 import {
   ArrowLeft,
   MessageSquare,
@@ -41,7 +36,9 @@ import {
   Send,
   Paperclip,
   Mic,
-  Square,
+  Trash2,
+  Pause,
+  Play,
   X,
   Lock,
   Download,
@@ -76,37 +73,31 @@ const messageAttachments = ref<File[]>([]);
 const attachmentPreviews = ref<Record<string, string>>({});
 const messageAttachmentInput = ref<HTMLInputElement | null>(null);
 const isSending = ref(false);
-const recorderState = ref<'idle' | 'recording' | 'stopping' | 'error'>('idle');
-const recordingError = ref('');
-const activeRecorder = ref<MediaRecorder | null>(null);
-const activeRecordingStream = ref<MediaStream | null>(null);
-const pendingSend = ref(false);
-const recordingSeconds = ref(0);
-let recordingTimer: ReturnType<typeof setInterval> | null = null;
-const audioRecordingSupported = computed(() => isAudioRecordingSupported());
+const {
+  recorderState,
+  recordingError,
+  recordingElapsed,
+  isSupported: audioRecordingSupported,
+  start: startAudioRecording,
+  stop: stopAudioRecording,
+  pause: pauseAudioRecording,
+  resume: resumeAudioRecording,
+  cancel: cancelAudioRecording,
+} = useAudioRecorder();
 
-function startRecordingTimer() {
-  recordingSeconds.value = 0;
-  stopRecordingTimer();
-  recordingTimer = setInterval(() => {
-    recordingSeconds.value += 1;
-  }, 1000);
-}
+const isRecording = computed(
+  () =>
+    recorderState.value === 'recording' ||
+    recorderState.value === 'paused' ||
+    recorderState.value === 'stopping'
+);
 
-function stopRecordingTimer() {
-  if (recordingTimer) {
-    clearInterval(recordingTimer);
-    recordingTimer = null;
-  }
-}
+const hasContent = computed(
+  () => newMessage.value.trim() !== '' || messageAttachments.value.length > 0
+);
 
-const recordingElapsed = computed(() => {
-  const total = recordingSeconds.value;
-  const minutes = Math.floor(total / 60);
-  const seconds = total % 60;
-  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-});
 const MAX_TOTAL_ATTACHMENT_SIZE = 25 * 1024 * 1024;
+const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
 // Lightbox
 const lightboxIndex = ref<number>(-1);
@@ -567,15 +558,6 @@ function onKeydown(e: KeyboardEvent) {
 
 onBeforeUnmount(() => {
   for (const url of Object.values(attachmentPreviews.value)) URL.revokeObjectURL(url);
-  stopRecordingTimer();
-  const recorder = activeRecorder.value;
-  if (recorder && recorder.state !== 'inactive') {
-    recorder.ondataavailable = null;
-    recorder.onstop = null;
-    recorder.onerror = null;
-    recorder.stop();
-  }
-  activeRecordingStream.value?.getTracks().forEach((track) => track.stop());
   window.removeEventListener('keydown', onKeydown);
   window.removeEventListener('service-request-notification', handleServiceRequestNotification);
   document.removeEventListener('visibilitychange', flushPendingReads);
@@ -604,16 +586,30 @@ onMounted(async () => {
 });
 
 function appendAttachments(files: File[]) {
-  const totalSize =
-    messageAttachments.value.reduce((acc, file) => acc + file.size, 0) +
-    files.reduce((acc, file) => acc + file.size, 0);
+  // Valida o tamanho por arquivo (limite real do backend: 10MB).
+  const validFiles: File[] = [];
+  for (const file of files) {
+    if (file.size > MAX_FILE_SIZE) {
+      toast.error(`O arquivo "${file.name}" excede o tamanho máximo de 10MB.`);
+      continue;
+    }
+    validFiles.push(file);
+  }
 
-  if (totalSize > MAX_TOTAL_ATTACHMENT_SIZE) {
-    toast.error('O tamanho total dos anexos nao pode exceder 25MB');
+  if (validFiles.length === 0) {
     return false;
   }
 
-  for (const file of files) {
+  const totalSize =
+    messageAttachments.value.reduce((acc, file) => acc + file.size, 0) +
+    validFiles.reduce((acc, file) => acc + file.size, 0);
+
+  if (totalSize > MAX_TOTAL_ATTACHMENT_SIZE) {
+    toast.error('O tamanho total dos anexos não pode exceder 25MB');
+    return false;
+  }
+
+  for (const file of validFiles) {
     if (isImageFile(file)) {
       const key = fileKey(file);
       if (!attachmentPreviews.value[key]) {
@@ -622,7 +618,7 @@ function appendAttachments(files: File[]) {
     }
   }
 
-  messageAttachments.value = [...messageAttachments.value, ...files];
+  messageAttachments.value = [...messageAttachments.value, ...validFiles];
   return true;
 }
 
@@ -675,147 +671,25 @@ function clearAttachments() {
   messageAttachments.value = [];
 }
 
-function stopRecordingStream() {
-  activeRecordingStream.value?.getTracks().forEach((track) => track.stop());
-  activeRecordingStream.value = null;
-}
-
-function notifyRecordingError(message: string, scope?: string, error?: unknown) {
-  stopRecordingTimer();
-  pendingSend.value = false;
-  stopRecordingStream();
-  activeRecorder.value = null;
-  recorderState.value = 'idle';
-  recordingError.value = '';
-  if (scope) {
-    logAudioRecordingError(scope, error);
-  }
-  toast.error(message);
-}
-
-async function startAudioRecording() {
-  if (
-    isSending.value ||
-    !activeConversation.value ||
-    activeConversation.value.locked ||
-    recorderState.value === 'recording'
-  ) {
+const handleStartRecording = async () => {
+  if (isSending.value || !activeConversation.value || activeConversation.value.locked) {
     return;
   }
-
-  recordingError.value = '';
-
-  if (!audioRecordingSupported.value) {
-    notifyRecordingError(getAudioRecordingUnavailableReason());
-    return;
+  const started = await startAudioRecording();
+  if (!started && recordingError.value) {
+    toast.error(recordingError.value);
   }
-
-  let stream: MediaStream;
-
-  try {
-    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-  } catch (error: any) {
-    notifyRecordingError(
-      getMicrophoneAccessErrorMessage(error),
-      'chat-page:getUserMedia',
-      error
-    );
-    return;
-  }
-
-  const chunks: BlobPart[] = [];
-  const preferredMimeType = pickSupportedAudioMimeType();
-  let recorder: MediaRecorder;
-
-  try {
-    recorder = preferredMimeType
-      ? new MediaRecorder(stream, { mimeType: preferredMimeType })
-      : new MediaRecorder(stream);
-  } catch (error) {
-    try {
-      recorder = new MediaRecorder(stream);
-    } catch (fallbackError) {
-      stream.getTracks().forEach((track) => track.stop());
-      notifyRecordingError(
-        'O navegador acessou o microfone, mas nao conseguiu iniciar a gravacao.',
-        'chat-page:mediaRecorder',
-        fallbackError
-      );
-      return;
-    }
-  }
-
-  activeRecordingStream.value = stream;
-  activeRecorder.value = recorder;
-
-  recorder.ondataavailable = (event) => {
-    if (event.data.size > 0) {
-      chunks.push(event.data);
-    }
-  };
-
-  recorder.onerror = (event) => {
-    notifyRecordingError(
-      'Nao foi possivel gravar o audio.',
-      'chat-page:recorder-runtime',
-      event
-    );
-  };
-
-  recorder.onstop = () => {
-    stopRecordingTimer();
-    stopRecordingStream();
-    activeRecorder.value = null;
-
-    if (chunks.length > 0) {
-      const audioBlob = new Blob(chunks, {
-        type: recorder.mimeType || preferredMimeType || 'audio/webm',
-      });
-      const audioFile = buildRecordedAudioFile(audioBlob);
-      appendAttachments([audioFile]);
-    }
-
-    recorderState.value = 'idle';
-
-    // Envio solicitado durante a gravacao: agora que o audio ja foi anexado,
-    // dispara o envio real (o proprio handleSend valida o conteudo).
-    if (pendingSend.value) {
-      pendingSend.value = false;
-      nextTick(handleSend);
-    }
-  };
-
-  try {
-    recorder.start();
-    startRecordingTimer();
-    recorderState.value = 'recording';
-  } catch (error) {
-    notifyRecordingError(
-      'Nao foi possivel iniciar a gravacao de audio.',
-      'chat-page:recorder-start',
-      error
-    );
-  }
-}
-
-function stopAudioRecording() {
-  if (!activeRecorder.value || recorderState.value !== 'recording') {
-    return;
-  }
-
-  recorderState.value = 'stopping';
-  activeRecorder.value.stop();
-}
+};
 
 async function handleSend() {
   if (isSending.value || !activeConversation.value) return;
 
-  // Se estiver gravando, finaliza a gravacao e o envio acontece apos o onstop
-  // anexar o audio (sem precisar parar manualmente antes).
-  if (recorderState.value === 'recording') {
-    pendingSend.value = true;
-    stopAudioRecording();
-    return;
+  // Se estiver gravando/pausado, finaliza a gravação e anexa o áudio antes de enviar.
+  if (recorderState.value === 'recording' || recorderState.value === 'paused') {
+    const audioFile = await stopAudioRecording();
+    if (audioFile) {
+      appendAttachments([audioFile]);
+    }
   }
   if (recorderState.value === 'stopping') return;
 
@@ -855,8 +729,8 @@ async function handleSend() {
         }
       }
     }
-  } catch {
-    toast.error('Erro ao enviar mensagem');
+  } catch (err) {
+    toast.error(getUploadErrorMessage(err));
   } finally {
     isSending.value = false;
   }
@@ -864,16 +738,6 @@ async function handleSend() {
 
 function onComposerKeydown(e: KeyboardEvent) {
   if (e.key === 'Enter' && !e.shiftKey) {
-    e.preventDefault();
-    handleSend();
-  }
-}
-
-// Enquanto grava, o botao de microfone mantem o foco; sem isto, o Enter
-// dispararia o "click" nativo do botao (parar) em vez de enviar o audio.
-function onRecordButtonKeydown(e: KeyboardEvent) {
-  if (e.key !== 'Enter' || e.shiftKey || e.isComposing) return;
-  if (recorderState.value === 'recording') {
     e.preventDefault();
     handleSend();
   }
@@ -951,7 +815,7 @@ const handleSearch = (query: string) => router.push({ path: '/search', query: { 
               v-else-if="filteredConversations.length === 0"
               class="text-center py-12 px-4 text-gray-400"
             >
-              <MessageSquare class="h-10 w-10 mx-auto mb-3 text-gray-200" />
+              <MessageSquare class="h-9 w-9 mx-auto mb-3 text-gray-200" />
               <p class="text-sm font-medium">Nenhuma conversa</p>
               <p class="text-xs mt-1">
                 As conversas aparecem após a confirmação do pagamento.
@@ -971,7 +835,7 @@ const handleSearch = (query: string) => router.push({ path: '/search', query: { 
                         : 'border-transparent',
                     ]"
                   >
-                    <Avatar class="h-10 w-10 flex-shrink-0">
+                    <Avatar class="h-9 w-9 flex-shrink-0">
                       <AvatarImage
                         :src="otherPartyAvatarUrlForConversation(conv)"
                         :alt="otherPartyName(conv)"
@@ -1038,7 +902,7 @@ const handleSearch = (query: string) => router.push({ path: '/search', query: { 
                           : 'border-transparent',
                       ]"
                     >
-                      <Avatar class="h-10 w-10 flex-shrink-0">
+                      <Avatar class="h-9 w-9 flex-shrink-0">
                         <AvatarImage
                           :src="otherPartyAvatarUrlForConversation(conv)"
                           :alt="otherPartyName(conv)"
@@ -1099,7 +963,7 @@ const handleSearch = (query: string) => router.push({ path: '/search', query: { 
             v-else-if="error"
             class="flex-1 flex flex-col items-center justify-center text-center px-8"
           >
-            <Lock class="h-10 w-10 text-gray-300 mb-3" />
+            <Lock class="h-9 w-9 text-gray-300 mb-3" />
             <p class="text-sm text-gray-500 max-w-sm">{{ error }}</p>
             <button
               @click="
@@ -1125,7 +989,7 @@ const handleSearch = (query: string) => router.push({ path: '/search', query: { 
               >
                 <ArrowLeft class="h-5 w-5 text-gray-600" />
               </button>
-              <Avatar class="h-10 w-10 flex-shrink-0">
+              <Avatar class="h-9 w-9 flex-shrink-0">
                 <AvatarImage
                   :src="activeOtherPartyAvatarUrl"
                   :alt="otherPartyDisplayName || otherPartyEmail"
@@ -1168,7 +1032,7 @@ const handleSearch = (query: string) => router.push({ path: '/search', query: { 
                 v-if="messages.length === 0"
                 class="flex min-h-full flex-col items-center justify-center text-center text-gray-400"
               >
-                <MessageSquare class="h-10 w-10 mx-auto mb-3 text-gray-200" />
+                <MessageSquare class="h-9 w-9 mx-auto mb-3 text-gray-200" />
                 <p class="text-sm">Nenhuma mensagem ainda. Diga olá!</p>
               </div>
 
@@ -1276,27 +1140,6 @@ const handleSearch = (query: string) => router.push({ path: '/search', query: { 
               </div>
 
               <div v-else class="space-y-2">
-                <div
-                  v-if="recorderState === 'recording' || recorderState === 'stopping'"
-                  class="flex items-center justify-between rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-700"
-                >
-                  <span v-if="recorderState === 'recording'" class="flex items-center gap-2">
-                    <span class="recording-dot" />
-                    Gravando áudio... {{ recordingElapsed }}
-                  </span>
-                  <span v-else-if="recorderState === 'stopping'">Finalizando áudio...</span>
-                  <Button
-                    v-if="recorderState === 'recording'"
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    class="h-8 w-8 text-red-600 hover:bg-red-100 hover:text-red-700"
-                    @click="stopAudioRecording"
-                  >
-                    <Square class="h-4 w-4 fill-current" />
-                  </Button>
-                </div>
-
                 <div v-if="messageAttachments.length > 0" class="flex flex-wrap gap-2">
                   <template v-for="(file, index) in messageAttachments" :key="fileKey(file)">
                     <!-- Preview de imagem -->
@@ -1337,72 +1180,113 @@ const handleSearch = (query: string) => router.push({ path: '/search', query: { 
                   </template>
                 </div>
 
-                <div class="flex items-end gap-2">
-                  <input
-                    ref="messageAttachmentInput"
-                    type="file"
-                    multiple
-                    :accept="CHAT_ATTACHMENT_ACCEPT"
-                    @change="handleAttachmentChange"
-                    class="hidden"
-                  />
-                  <Button
-                    @click="messageAttachmentInput?.click()"
-                    variant="outline"
-                    size="icon"
-                    :disabled="isSending"
-                    title="Anexar arquivo"
-                  >
-                    <Paperclip class="h-4 w-4" />
-                  </Button>
-                  <Textarea
-                    v-model="newMessage"
-                    placeholder="Digite sua mensagem..."
-                    :rows="1"
-                    class="flex-1 resize-none min-h-9 max-h-32 py-1.5 leading-6"
-                    @keydown="onComposerKeydown"
-                  />
-                  <Button
-                    type="button"
-                    :disabled="
-                      isSending ||
-                      activeConversation.locked ||
-                      recorderState === 'stopping' ||
-                      !audioRecordingSupported
-                    "
-                    :title="
-                      audioRecordingSupported
-                        ? recorderState === 'recording'
-                          ? 'Parar gravação'
-                          : 'Gravar áudio'
-                        : 'Gravação de áudio indisponível neste navegador'
-                    "
-                    variant="outline"
-                    size="icon"
-                    @click="recorderState === 'recording' ? stopAudioRecording() : startAudioRecording()"
-                    @keydown="onRecordButtonKeydown"
-                  >
-                    <Square
-                      v-if="recorderState === 'recording'"
-                      class="h-4 w-4 fill-current text-red-600"
+                <input
+                  ref="messageAttachmentInput"
+                  type="file"
+                  multiple
+                  :accept="CHAT_ATTACHMENT_ACCEPT"
+                  @change="handleAttachmentChange"
+                  class="hidden"
+                />
+
+                <div
+                  class="flex min-h-12 w-full items-center gap-1 rounded-3xl border bg-white px-1.5 py-1 transition-colors"
+                  :class="
+                    isRecording
+                      ? 'border-blue-200 text-blue-700'
+                      : 'border-gray-200 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/30'
+                  "
+                >
+                  <template v-if="isRecording">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      class="h-10 w-10 flex-shrink-0 rounded-full text-red-600 hover:bg-red-100 hover:text-red-700 [&_svg]:!size-5"
+                      :disabled="recorderState === 'stopping'"
+                      title="Cancelar gravação"
+                      @click="cancelAudioRecording"
+                    >
+                      <Trash2 />
+                    </Button>
+                    <div class="flex flex-1 items-center gap-2 px-2 text-sm">
+                      <span v-if="recorderState !== 'paused'" class="recording-dot" />
+                      <span class="font-medium tabular-nums">
+                        {{ recorderState === 'stopping' ? 'Finalizando áudio...' : recordingElapsed }}
+                      </span>
+                    </div>
+                    <Button
+                      v-if="recorderState !== 'stopping'"
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      class="h-10 w-10 flex-shrink-0 rounded-full text-blue-700 hover:bg-blue-100 [&_svg]:!size-5"
+                      :title="recorderState === 'paused' ? 'Retomar' : 'Pausar'"
+                      @click="recorderState === 'paused' ? resumeAudioRecording() : pauseAudioRecording()"
+                    >
+                      <Play v-if="recorderState === 'paused'" />
+                      <Pause v-else />
+                    </Button>
+                    <Button
+                      :disabled="recorderState === 'stopping' || isSending"
+                      variant="ghost"
+                      size="icon"
+                      class="h-10 w-10 flex-shrink-0 rounded-full text-blue-600 hover:bg-blue-100 hover:text-blue-700 [&_svg]:!size-5"
+                      title="Enviar áudio"
+                      @click="handleSend"
+                    >
+                      <Send />
+                    </Button>
+                  </template>
+
+                  <!-- Modo normal: anexar + textarea + (enviar | microfone) -->
+                  <template v-else>
+                    <Button
+                      @click="messageAttachmentInput?.click()"
+                      variant="ghost"
+                      size="icon"
+                      class="h-10 w-10 flex-shrink-0 rounded-full text-gray-500 hover:text-gray-700 [&_svg]:!size-5"
+                      :disabled="isSending"
+                      title="Anexar arquivo"
+                    >
+                      <Paperclip />
+                    </Button>
+                    <Textarea
+                      v-model="newMessage"
+                      autosize
+                      rows="1"
+                      placeholder="Digite sua mensagem..."
+                      class="flex-1 min-h-10 max-h-32 resize-none rounded-none border-0 bg-transparent px-2 py-1.5 leading-6 shadow-none focus-visible:ring-0"
+                      @keydown="onComposerKeydown"
                     />
-                    <Mic v-else class="h-4 w-4" />
-                  </Button>
-                  <Button
-                    @click="handleSend"
-                    :disabled="
-                      (!newMessage.trim() &&
-                        messageAttachments.length === 0 &&
-                        recorderState !== 'recording') ||
-                      isSending ||
-                      recorderState === 'stopping'
-                    "
-                    variant="default"
-                    size="icon"
-                    :title="recorderState === 'recording' ? 'Enviar áudio' : 'Enviar'"
-                  >
-                    <Send class="h-4 w-4" />
-                  </Button>
+                    <Button
+                      v-if="hasContent"
+                      :disabled="isSending || activeConversation.locked"
+                      variant="ghost"
+                      size="icon"
+                      class="h-10 w-10 flex-shrink-0 rounded-full text-blue-600 hover:bg-blue-50 hover:text-blue-700 [&_svg]:!size-5"
+                      title="Enviar"
+                      @click="handleSend"
+                    >
+                      <Send />
+                    </Button>
+                    <Button
+                      v-else
+                      type="button"
+                      :disabled="isSending || activeConversation.locked || !audioRecordingSupported"
+                      :title="
+                        audioRecordingSupported
+                          ? 'Gravar áudio'
+                          : 'Gravação de áudio indisponível neste navegador'
+                      "
+                      variant="ghost"
+                      size="icon"
+                      class="h-10 w-10 flex-shrink-0 rounded-full text-gray-500 hover:text-gray-700 [&_svg]:!size-5"
+                      @click="handleStartRecording"
+                    >
+                      <Mic />
+                    </Button>
+                  </template>
                 </div>
               </div>
             </footer>
@@ -1430,7 +1314,7 @@ const handleSearch = (query: string) => router.push({ path: '/search', query: { 
         <button
           @click="downloadFromUrl(lightboxUrl)"
           :disabled="isDownloading"
-          class="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center disabled:opacity-50"
+          class="h-9 w-9 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center disabled:opacity-50"
           title="Baixar"
         >
           <Download class="h-5 w-5" />
@@ -1439,14 +1323,14 @@ const handleSearch = (query: string) => router.push({ path: '/search', query: { 
           :href="lightboxUrl"
           target="_blank"
           rel="noopener"
-          class="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center"
+          class="h-9 w-9 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center"
           title="Abrir em nova guia"
         >
           <ExternalLink class="h-5 w-5" />
         </a>
         <button
           @click="closeLightbox"
-          class="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center"
+          class="h-9 w-9 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center"
           title="Fechar"
         >
           <X class="h-5 w-5" />

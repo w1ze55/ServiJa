@@ -46,7 +46,7 @@ public class WithdrawalService {
             Long bankAccountId
     ) {
         User freelancer = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("Usuario nao encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
 
         // H11: exige verificação básica de identidade (e-mail confirmado) antes do saque.
         if (!Boolean.TRUE.equals(freelancer.getEmailVerified())) {
@@ -58,13 +58,13 @@ public class WithdrawalService {
 
         if (amount.compareTo(MIN_WITHDRAWAL_AMOUNT) < 0) {
             throw new IllegalArgumentException(
-                    "Valor minimo para saque e R$ " + MIN_WITHDRAWAL_AMOUNT
+                    "Valor mínimo para saque é R$ " + MIN_WITHDRAWAL_AMOUNT
             );
         }
 
         if (amount.compareTo(MAX_WITHDRAWAL_AMOUNT) > 0) {
             throw new IllegalArgumentException(
-                    "Valor maximo para saque e R$ " + MAX_WITHDRAWAL_AMOUNT
+                    "Valor máximo para saque é R$ " + MAX_WITHDRAWAL_AMOUNT
             );
         }
 
@@ -90,12 +90,12 @@ public class WithdrawalService {
             }
         } else {
             if (bankAccountId == null) {
-                throw new IllegalArgumentException("Selecione uma conta bancaria para TED");
+                throw new IllegalArgumentException("Selecione uma conta bancária para TED");
             }
 
             bankAccount = bankAccountService.getOwnedAccount(email, bankAccountId);
             if (bankAccount.getAccountType() != FreelancerBankAccount.AccountType.BANK_ACCOUNT) {
-                throw new IllegalArgumentException("A conta selecionada nao pode ser usada para saque TED");
+                throw new IllegalArgumentException("A conta selecionada não pode ser usada para saque TED");
             }
 
             validateTedBankAccount(bankAccount);
@@ -132,7 +132,7 @@ public class WithdrawalService {
 
         walletService.deductAvailableBalance(freelancer, amount);
 
-        log.info("Solicitacao de saque criada: {} - R$ {}", withdrawal.getId(), amount);
+        log.info("Solicitação de saque criada: {} - R$ {}", withdrawal.getId(), amount);
 
         processWithdrawal(withdrawal.getId());
 
@@ -145,10 +145,10 @@ public class WithdrawalService {
     @Transactional
     public void processWithdrawal(Long withdrawalId) {
         WithdrawalRequest withdrawal = withdrawalRepository.findById(withdrawalId)
-                .orElseThrow(() -> new ResourceNotFoundException("Solicitacao nao encontrada"));
+                .orElseThrow(() -> new ResourceNotFoundException("Solicitação não encontrada"));
 
         if (withdrawal.getStatus() != WithdrawalRequest.WithdrawalStatus.PENDING) {
-            throw new IllegalStateException("Solicitacao ja foi processada");
+            throw new IllegalStateException("Solicitação já foi processada");
         }
 
         withdrawal.setStatus(WithdrawalRequest.WithdrawalStatus.PROCESSING);
@@ -185,7 +185,7 @@ public class WithdrawalService {
      */
     public List<WithdrawalRequest> getMyWithdrawals(String email) {
         User freelancer = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("Usuario nao encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
 
         return withdrawalRepository.findByFreelancerIdOrderByCreatedAtDesc(freelancer.getId());
     }
@@ -205,17 +205,17 @@ public class WithdrawalService {
     @Transactional
     public void cancelWithdrawal(Long withdrawalId, String email) {
         WithdrawalRequest withdrawal = withdrawalRepository.findById(withdrawalId)
-                .orElseThrow(() -> new ResourceNotFoundException("Solicitacao nao encontrada"));
+                .orElseThrow(() -> new ResourceNotFoundException("Solicitação não encontrada"));
 
         User freelancer = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("Usuario nao encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
 
         if (!withdrawal.getFreelancer().getId().equals(freelancer.getId())) {
-            throw new IllegalStateException("Voce nao tem permissao para cancelar esta solicitacao");
+            throw new IllegalStateException("Você não tem permissão para cancelar esta solicitação");
         }
 
         if (withdrawal.getStatus() != WithdrawalRequest.WithdrawalStatus.PENDING) {
-            throw new IllegalStateException("Apenas solicitacoes pendentes podem ser canceladas");
+            throw new IllegalStateException("Apenas solicitações pendentes podem ser canceladas");
         }
 
         withdrawal.setStatus(WithdrawalRequest.WithdrawalStatus.CANCELLED);
@@ -223,7 +223,7 @@ public class WithdrawalService {
 
         walletService.addPendingBalance(freelancer, withdrawal.getAmount());
 
-        log.info("Solicitacao de saque cancelada: {}", withdrawalId);
+        log.info("Solicitação de saque cancelada: {}", withdrawalId);
 
         auditLogger.recordSemantic(
                 "WITHDRAWAL_CANCELLED",
@@ -245,7 +245,7 @@ public class WithdrawalService {
         try {
             return WithdrawalRequest.WithdrawalMethod.valueOf(withdrawalMethodValue.trim().toUpperCase());
         } catch (IllegalArgumentException ex) {
-            throw new IllegalArgumentException("Metodo de saque invalido");
+            throw new IllegalArgumentException("Método de saque inválido");
         }
     }
 
@@ -256,7 +256,7 @@ public class WithdrawalService {
                 || bankAccount.getAccountBankType() == null
                 || isBlank(bankAccount.getHolderName())
                 || isBlank(bankAccount.getHolderCpfCnpj())) {
-            throw new IllegalStateException("A conta bancaria selecionada esta incompleta para saque TED");
+            throw new IllegalStateException("A conta bancária selecionada está incompleta para saque TED");
         }
     }
 
@@ -266,7 +266,7 @@ public class WithdrawalService {
         if (withdrawal.getWithdrawalMethod() == WithdrawalRequest.WithdrawalMethod.TED) {
             FreelancerBankAccount bankAccount = withdrawal.getBankAccount();
             if (bankAccount == null) {
-                throw new IllegalStateException("Conta bancaria do saque TED nao encontrada");
+                throw new IllegalStateException("Conta bancária do saque TED não encontrada");
             }
 
             return asaasService.createTedTransfer(

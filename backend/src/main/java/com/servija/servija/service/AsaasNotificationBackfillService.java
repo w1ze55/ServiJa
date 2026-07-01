@@ -24,13 +24,13 @@ public class AsaasNotificationBackfillService {
     @EventListener(ApplicationReadyEvent.class)
     public void runBackfillOnStartup() {
         if (!backfillOnStartup) {
-            log.info("Backfill de notificacoes do Asaas desativado no startup.");
+            log.info("Backfill de notificações do Asaas desativado no startup.");
             return;
         }
 
         List<String> customerIds = paymentRepository.findDistinctAsaasCustomerIds();
         if (customerIds.isEmpty()) {
-            log.info("Nenhum cliente Asaas encontrado para backfill de notificacoes.");
+            log.info("Nenhum cliente Asaas encontrado para backfill de notificações.");
             return;
         }
 
@@ -43,12 +43,12 @@ public class AsaasNotificationBackfillService {
                 successCount++;
             } catch (Exception e) {
                 failureCount++;
-                log.error("Falha ao aplicar backfill de notificacoes para o cliente Asaas {}", customerId, e);
+                log.error("Falha ao aplicar backfill de notificações para o cliente Asaas {}", customerId, e);
             }
         }
 
         log.info(
-                "Backfill de notificacoes do Asaas finalizado. Clientes processados: {}, sucessos: {}, falhas: {}",
+                "Backfill de notificações do Asaas finalizado. Clientes processados: {}, sucessos: {}, falhas: {}",
                 customerIds.size(),
                 successCount,
                 failureCount);

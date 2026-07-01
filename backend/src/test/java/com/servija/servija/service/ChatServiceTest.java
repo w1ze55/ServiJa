@@ -47,7 +47,7 @@ class ChatServiceTest {
     private ChatService service;
 
     @Test
-    @DisplayName("getOrCreateConversation cria conversa quando o chat esta habilitado")
+    @DisplayName("getOrCreateConversation cria conversa quando o chat está habilitado")
     void getOrCreateConversationCreatesConversation() {
         ServiceRequest request = serviceRequest(true);
         when(serviceRequestRepository.findById(10L)).thenReturn(Optional.of(request));
@@ -66,7 +66,7 @@ class ChatServiceTest {
     }
 
     @Test
-    @DisplayName("sendMessage rejeita conversa de solicitacao concluida")
+    @DisplayName("sendMessage rejeita conversa de solicitação concluída")
     void sendMessageRejectsCompletedConversation() {
         Conversation conversation = conversation(true);
         ServiceRequest request = serviceRequest(true);
@@ -80,7 +80,7 @@ class ChatServiceTest {
     }
 
     @Test
-    @DisplayName("sendMessage reabre conversa antiga quando a solicitacao ainda nao esta concluida")
+    @DisplayName("sendMessage reabre conversa antiga quando a solicitação ainda não está concluída")
     void sendMessageUnlocksConversationWhenRequestIsNotCompleted() {
         Conversation conversation = conversation(true);
         ServiceRequest request = serviceRequest(true);
@@ -99,7 +99,7 @@ class ChatServiceTest {
     }
 
     @Test
-    @DisplayName("sendMessage persiste mensagem de audio com anexo")
+    @DisplayName("sendMessage persiste mensagem de áudio com anexo")
     void sendMessagePersistsAudioType() {
         Conversation conversation = conversation(false);
         ServiceRequest request = serviceRequest(true);
@@ -125,7 +125,7 @@ class ChatServiceTest {
     }
 
     @Test
-    @DisplayName("getOrCreateConversation sincroniza bloqueio com o status atual da solicitacao")
+    @DisplayName("getOrCreateConversation sincroniza bloqueio com o status atual da solicitação")
     void getOrCreateConversationUnlocksStaleConversation() {
         ServiceRequest request = serviceRequest(true);
         request.setStatus(ServiceRequest.Status.DELIVERED);
@@ -142,7 +142,7 @@ class ChatServiceTest {
     }
 
     @Test
-    @DisplayName("markAsRead zera unread e publica recibo quando ha mensagens nao lidas")
+    @DisplayName("markAsRead zera unread e publica recibo quando há mensagens não lidas")
     void markAsReadMarksMessagesAndNotifies() {
         Conversation conversation = conversation(false);
         when(conversationRepository.findById("conv-1")).thenReturn(Optional.of(conversation));
@@ -166,7 +166,7 @@ class ChatServiceTest {
     }
 
     @Test
-    @DisplayName("getMessages falha para usuario que nao participa da conversa")
+    @DisplayName("getMessages falha para usuário que não participa da conversa")
     void getMessagesFailsForNonParticipant() {
         when(conversationRepository.findById("conv-1")).thenReturn(Optional.of(conversation(false)));
 

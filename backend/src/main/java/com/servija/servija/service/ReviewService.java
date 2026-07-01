@@ -66,7 +66,7 @@ public class ReviewService {
         User reviewed = serviceRequest.getFreelancer();
 
         if (reviewed != null && reviewed.getId().equals(reviewer.getId())) {
-            throw new IllegalStateException("Voce nao pode avaliar a si mesmo");
+            throw new IllegalStateException("Você não pode avaliar a si mesmo");
         }
 
         String tagsString = request.getTags() != null && !request.getTags().isEmpty()

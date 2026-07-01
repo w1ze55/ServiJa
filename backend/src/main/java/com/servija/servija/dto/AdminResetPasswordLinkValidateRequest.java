@@ -12,6 +12,6 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class AdminResetPasswordLinkValidateRequest {
 
-    @NotBlank(message = "Token e obrigatorio")
+    @NotBlank(message = "Token é obrigatório")
     private String token;
 }

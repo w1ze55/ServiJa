@@ -64,9 +64,9 @@ public class JwtService {
     }
 
     /**
-     * Indica se o token e um desafio pre-2FA (claim {@code totp_pending=true}).
+     * Indica se o token é um desafio pré-2FA (claim {@code totp_pending=true}).
      * Esses tokens NUNCA devem ser aceitos como token de acesso em recursos
-     * protegidos — sao validos apenas no fluxo de conclusao do 2FA
+     * protegidos — são válidos apenas no fluxo de conclusão do 2FA
      * ({@code POST /api/auth/2fa/verify}).
      */
     public boolean isTotpChallengeToken(String token) {
