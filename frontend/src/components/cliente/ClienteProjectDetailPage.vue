@@ -76,6 +76,16 @@ const professionalAttachments = computed(() => [
   ...(request.value?.freelancerAttachments || []),
 ]);
 const adjustmentAlreadyUsed = computed(() => adjustmentStore.adjustments.length > 0);
+const pendingAdjustment = computed(() => {
+  if (!request.value) return null;
+  return (
+    adjustmentStore.adjustments.find(
+      (adjustment) =>
+        adjustment.serviceRequestId.toString() === props.requestId &&
+        (adjustment.status === 'PENDING' || adjustment.status === 'ACKNOWLEDGED')
+    ) ?? null
+  );
+});
 
 const loadData = async (preserveCurrent = false) => {
   const loadedRequest = await store.loadRequestById(props.requestId);
@@ -128,15 +138,16 @@ const getUserEmail = () => {
 
 const handleServiceRequestNotification = async (event: Event) => {
   const notification = (event as CustomEvent<ServiceRequestNotification>).detail;
+  const relevantTypes = ['SERVICE_REQUEST_STATUS_CHANGED', 'ADJUSTMENT_STATUS_CHANGED'];
   if (
-    notification.type !== 'SERVICE_REQUEST_STATUS_CHANGED' ||
+    !relevantTypes.includes(notification.type) ||
     String(notification.serviceRequestId) !== props.requestId
   ) {
     return;
   }
 
   try {
-    await loadData(true);
+    await Promise.all([loadData(true), loadAdjustments()]);
   } catch (error) {
     console.error('Erro ao recarregar detalhes do projeto após atualização:', error);
   }
@@ -343,7 +354,7 @@ const getStatusColor = (status: string) => {
         </div>
         <p class="text-[#435574]">Acompanhamento detalhado do seu projeto</p>
       </div>
-      <div v-if="request?.status === 'delivered'" class="flex items-center gap-2">
+      <div v-if="request?.status === 'delivered' && !pendingAdjustment" class="flex items-center gap-2">
         <Button
           @click="handleOpenAdjustmentModal"
           variant="warning"
@@ -355,6 +366,20 @@ const getStatusColor = (status: string) => {
           <CheckCircle class="h-4 w-4 mr-2" />
           Aprovar Entrega
         </Button>
+      </div>
+    </div>
+
+    <div v-if="pendingAdjustment" class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+      <div class="flex items-start gap-3">
+        <AlertCircle class="h-5 w-5 text-yellow-600 mt-0.5 shrink-0" />
+        <div>
+          <h4 class="text-sm font-semibold text-yellow-800 mb-1">
+            Ajustes solicitados — aguardando reenvio do profissional
+          </h4>
+          <p class="text-sm text-yellow-700">
+            Você poderá aprovar a entrega assim que o profissional reenviar o trabalho com os ajustes solicitados.
+          </p>
+        </div>
       </div>
     </div>
 

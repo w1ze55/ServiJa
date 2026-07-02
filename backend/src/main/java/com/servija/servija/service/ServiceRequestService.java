@@ -12,10 +12,12 @@ import com.servija.servija.dto.ResponseMilestoneDTO;
 import com.servija.servija.dto.ServiceRequestDTO;
 import com.servija.servija.dto.ServiceRequestResponse;
 import com.servija.servija.exception.ResourceNotFoundException;
+import com.servija.servija.model.DeliveryAdjustment;
 import com.servija.servija.model.Payment;
 import com.servija.servija.model.ServiceRequest;
 import com.servija.servija.model.ServiceRequest.Status;
 import com.servija.servija.model.ServiceRequestHistory.OperationType;
+import com.servija.servija.repository.DeliveryAdjustmentRepository;
 import com.servija.servija.repository.PaymentRepository;
 import com.servija.servija.repository.ServiceRepository;
 import com.servija.servija.model.User;
@@ -52,6 +54,7 @@ public class ServiceRequestService {
             "^\\[Solicitação referente ao serviço: [^\\]]+\\]");
 
     private final ServiceRequestRepository serviceRequestRepository;
+    private final DeliveryAdjustmentRepository deliveryAdjustmentRepository;
     private final PaymentRepository paymentRepository;
     private final UserRepository userRepository;
     private final ServiceRepository serviceRepository;
@@ -754,6 +757,14 @@ public class ServiceRequestService {
         if (request.getContractor().getId().equals(user.getId())) {
             if (request.getStatus() != Status.DELIVERED) {
                 throw new IllegalStateException("O serviço só pode ser concluído após a entrega pelo profissional");
+            }
+
+            boolean hasActiveAdjustment = deliveryAdjustmentRepository.existsByServiceRequestIdAndStatusIn(
+                    request.getId(),
+                    java.util.List.of(DeliveryAdjustment.Status.PENDING, DeliveryAdjustment.Status.ACKNOWLEDGED));
+            if (hasActiveAdjustment) {
+                throw new IllegalStateException(
+                        "Aguarde o profissional reenviar a entrega com os ajustes solicitados antes de aprovar");
             }
 
             request.setStatus(Status.COMPLETED);
