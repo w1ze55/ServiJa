@@ -6,6 +6,7 @@ import com.servija.servija.dto.ServiceRequestResponse;
 import com.servija.servija.model.Payment;
 import com.servija.servija.model.ServiceRequest;
 import com.servija.servija.model.User;
+import com.servija.servija.repository.DeliveryAdjustmentRepository;
 import com.servija.servija.repository.PaymentRepository;
 import com.servija.servija.repository.ServiceRepository;
 import com.servija.servija.repository.ServiceRequestRepository;
@@ -67,6 +68,9 @@ class ServiceRequestServiceTest {
 
     @Mock
     private ChatService chatService;
+
+    @Mock
+    private DeliveryAdjustmentRepository deliveryAdjustmentRepository;
 
     @InjectMocks
     private ServiceRequestService serviceRequestService;
