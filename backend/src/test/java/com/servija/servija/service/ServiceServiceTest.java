@@ -13,6 +13,7 @@ import com.servija.servija.repository.FreelancerRepository;
 import com.servija.servija.repository.ReviewRepository;
 import com.servija.servija.repository.ServiceRepository;
 import com.servija.servija.repository.ServiceRequestRepository;
+import com.servija.servija.repository.ServiceSearchWeeklyMetricRepository;
 import com.servija.servija.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.AfterEach;
@@ -54,6 +55,7 @@ class ServiceServiceTest {
     @Mock private ServiceSearchWeeklyMetricService serviceSearchWeeklyMetricService;
     @Mock private AuditLogger auditLogger;
     @Mock private CurrentUserContextService currentUserContextService;
+    @Mock private ServiceSearchWeeklyMetricRepository serviceSearchWeeklyMetricRepository;
 
     @InjectMocks
     private ServiceService serviceService;
