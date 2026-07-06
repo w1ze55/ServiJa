@@ -578,12 +578,12 @@ const handleUploadFiles = async () => {
                   Escopo e Descrição
                 </h3>
                 <div class="prose prose-blue max-w-none text-[#435574]">
-                  <p class="whitespace-pre-line">{{ project.description }}</p>
+                  <p class="whitespace-pre-line break-words">{{ project.description }}</p>
                 </div>
 
                 <div v-if="project.freelancerResponse?.scope" class="mt-8 pt-6 border-t font-medium text-[#263238]">
                   <h4 class="mb-3">Sua proposta:</h4>
-                  <p class="text-sm text-[#435574] italic bg-gray-50 p-4 rounded-lg border border-dashed">
+                  <p class="text-sm text-[#435574] italic bg-gray-50 p-4 rounded-lg border border-dashed whitespace-pre-line break-words">
                     "{{ project.freelancerResponse.scope }}"
                   </p>
                 </div>

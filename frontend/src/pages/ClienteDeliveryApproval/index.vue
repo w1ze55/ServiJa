@@ -191,15 +191,15 @@ onMounted(async () => {
     return;
   }
 
-  if (store.requests.length === 0) {
-    store.loadRequests();
-  }
-
   if (!requestId.value) {
     toast.error('ID da solicitação não fornecido');
     router.push('/cliente-projects');
     return;
   }
+
+  // Sempre recarregar a solicitação para refletir a descrição/anexos da entrega mais
+  // recente (o freelancer pode ter reenviado após um ajuste com uma nova descrição).
+  await store.loadRequestById(requestId.value);
 
   await adjustmentStore.getAdjustmentsByServiceRequest(parseInt(requestId.value));
 
