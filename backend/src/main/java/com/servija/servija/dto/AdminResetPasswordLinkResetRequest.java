@@ -13,13 +13,13 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class AdminResetPasswordLinkResetRequest {
 
-    @NotBlank(message = "Token e obrigatorio")
+    @NotBlank(message = "Token é obrigatório")
     private String token;
 
-    @NotBlank(message = "Nova senha e obrigatoria")
+    @NotBlank(message = "Nova senha é obrigatória")
     @Size(min = 8, max = 256, message = "Senha deve ter entre 8 e 256 caracteres")
     private String newPassword;
 
-    @NotBlank(message = "Confirmacao de senha e obrigatoria")
+    @NotBlank(message = "Confirmação de senha é obrigatória")
     private String confirmPassword;
 }

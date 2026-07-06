@@ -72,7 +72,7 @@ class DeliveryAdjustmentServiceTest {
     }
 
     @Test
-    @DisplayName("requestAdjustment rejeita solicitacao quando o servico nao esta entregue")
+    @DisplayName("requestAdjustment rejeita solicitação quando o serviço não está entregue")
     void requestAdjustmentRejectsWrongStatus() {
         ServiceRequest request = deliveredRequest();
         request.setStatus(ServiceRequest.Status.IN_PROGRESS);
@@ -85,7 +85,7 @@ class DeliveryAdjustmentServiceTest {
     }
 
     @Test
-    @DisplayName("deleteAdjustment rejeita ajuste nao pendente")
+    @DisplayName("deleteAdjustment rejeita ajuste não pendente")
     void deleteAdjustmentRejectsNonPendingAdjustment() {
         DeliveryAdjustment adjustment = DeliveryAdjustment.builder()
                 .id(1L)

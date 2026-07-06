@@ -55,7 +55,7 @@ public class PlatformWalletService {
         if (netPlatformFee.compareTo(BigDecimal.ZERO) <= 0) {
             lockedPayment.setPlatformFeeReleasedAt(LocalDateTime.now());
             paymentRepository.save(lockedPayment);
-            log.warn("Pagamento {} nao possui receita liquida para liberar na carteira da plataforma", lockedPayment.getId());
+            log.warn("Pagamento {} não possui receita líquida para liberar na carteira da plataforma", lockedPayment.getId());
             return false;
         }
 
@@ -66,7 +66,7 @@ public class PlatformWalletService {
         platformWalletRepository.save(wallet);
         paymentRepository.save(lockedPayment);
 
-        log.info("Receita liquida da plataforma liberada para pagamento {}: R$ {}", lockedPayment.getId(), netPlatformFee);
+        log.info("Receita líquida da plataforma liberada para pagamento {}: R$ {}", lockedPayment.getId(), netPlatformFee);
         return true;
     }
 

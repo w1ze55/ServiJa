@@ -18,8 +18,9 @@ import Badge from '../ui/badge.vue';
 import ImageUploadField from '../shared/ImageUploadField.vue';
 import SupportRequestModal from '@/components/support/SupportRequestModal.vue';
 import { toast } from '../../utils/toast';
-import { uploadImages, deleteImage } from '../../api/uploadService';
+import { deleteImage } from '../../api/uploadService';
 import { useCategoryCatalogStore } from '@/stores/categoryCatalogStore';
+import { validateValueRange } from '@/utils/valueValidation';
 
 export interface ServiceFormData {
   id?: string;
@@ -73,9 +74,6 @@ const formData = ref<ServiceFormData>({
 
 const tagInput = ref('');
 const errors = ref<Record<string, string>>({});
-const isUploading = ref(false);
-const isDragOver = ref(false);
-const dragCounter = ref(0);
 const showSupportRequestModal = ref(false);
 
 const categories = computed(() => categoryCatalogStore.activePublicCategories);
@@ -280,6 +278,11 @@ const validateForm = () => {
 
   if (!formData.value.price || formData.value.price <= 0) {
     newErrors.price = 'Preço deve ser maior que zero';
+  } else {
+    const priceError = validateValueRange(formData.value.price);
+    if (priceError) {
+      newErrors.price = priceError;
+    }
   }
 
   if (!formData.value.workModel) {
@@ -342,54 +345,6 @@ const handleClose = () => {
 
 const handleOpenSupportModal = () => {
   showSupportRequestModal.value = true;
-};
-
-const uploadSelectedImages = async (files: File[]) => {
-  if (files.length === 0 || isUploading.value) {
-    return;
-  }
-
-  if (formData.value.images.length + files.length > 5) {
-    toast.error('Máximo de 5 imagens permitido');
-    return;
-  }
-
-  const invalidFiles = files.filter((file) => !file.type.startsWith('image/'));
-  if (invalidFiles.length > 0) {
-    toast.error('Envie apenas arquivos de imagem');
-    return;
-  }
-
-  const oversizedFiles = files.filter((file) => file.size > 10 * 1024 * 1024);
-  if (oversizedFiles.length > 0) {
-    toast.error('Cada imagem deve ter no máximo 10MB');
-    return;
-  }
-
-  isUploading.value = true;
-  try {
-    const uploadedUrls = await uploadImages(files);
-    handleInputChange('images', [...formData.value.images, ...uploadedUrls]);
-    toast.success(`${files.length} imagem(ns) enviada(s) com sucesso`);
-  } catch (error) {
-    console.error('Erro ao fazer upload:', error);
-    toast.error('Erro ao enviar imagem(ns). Tente novamente.');
-  } finally {
-    isUploading.value = false;
-  }
-};
-
-const hasDraggedFiles = (e: DragEvent) => {
-  return Array.from(e.dataTransfer?.types || []).includes('Files');
-};
-
-const handleDragEnter = (e: DragEvent) => {
-  if (isUploading.value || !hasDraggedFiles(e)) {
-    return;
-  }
-
-  dragCounter.value += 1;
-  isDragOver.value = true;
 };
 
 const handleRemovedImage = async (imageUrl: string) => {

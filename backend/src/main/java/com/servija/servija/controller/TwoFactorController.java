@@ -35,7 +35,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/users/me/2fa")
 @RequiredArgsConstructor
-@Tag(name = "Autenticacao 2FA", description = "Endpoints para gerenciar o segundo fator de autenticacao (TOTP)")
+@Tag(name = "Autenticação 2FA", description = "Endpoints para gerenciar o segundo fator de autenticação (TOTP)")
 @SecurityRequirement(name = "bearerAuth")
 public class TwoFactorController {
 
@@ -46,7 +46,7 @@ public class TwoFactorController {
     private final AuditLogger auditLogger;
 
     @GetMapping("/status")
-    @Operation(summary = "Status do 2FA do usuario logado")
+    @Operation(summary = "Status do 2FA do usuário logado")
     public ResponseEntity<TwoFactorStatusResponse> status() {
         User user = currentUser();
         int unused = backupCodeRepository.findByUserAndUsedAtIsNull(user).size();
@@ -58,11 +58,11 @@ public class TwoFactorController {
     }
 
     @PostMapping("/setup")
-    @Operation(summary = "Inicia o setup do 2FA", description = "Gera um segredo pendente e retorna QR code. Nao ativa ate /enable.")
+    @Operation(summary = "Inicia o setup do 2FA", description = "Gera um segredo pendente e retorna QR code. Não ativa até /enable.")
     public ResponseEntity<TwoFactorSetupResponse> setup() {
         User user = currentUser();
         if (Boolean.TRUE.equals(user.getTotpEnabled())) {
-            throw new IllegalStateException("2FA ja esta ativado");
+            throw new IllegalStateException("2FA já está ativado");
         }
         TotpService.SetupResult result = totpService.beginSetup(user);
         auditLogger.recordFor(
@@ -80,7 +80,7 @@ public class TwoFactorController {
     }
 
     @PostMapping("/enable")
-    @Operation(summary = "Confirma o codigo TOTP e ativa o 2FA", description = "Retorna os backup codes uma unica vez.")
+    @Operation(summary = "Confirma o código TOTP e ativa o 2FA", description = "Retorna os backup codes uma única vez.")
     public ResponseEntity<TwoFactorBackupCodesResponse> enable(@Valid @RequestBody TwoFactorEnableRequest request) {
         User user = currentUser();
         List<String> backupCodes = totpService.confirmSetup(user, request.getCode());
@@ -98,18 +98,18 @@ public class TwoFactorController {
     }
 
     @PostMapping("/disable")
-    @Operation(summary = "Desativa o 2FA", description = "Requer senha + codigo TOTP/backup atual.")
+    @Operation(summary = "Desativa o 2FA", description = "Requer senha + código TOTP/backup atual.")
     public ResponseEntity<MessageResponse> disable(@Valid @RequestBody TwoFactorDisableRequest request) {
         User user = currentUser();
         if (!Boolean.TRUE.equals(user.getTotpEnabled())) {
-            throw new IllegalStateException("2FA nao esta ativado");
+            throw new IllegalStateException("2FA não está ativado");
         }
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            throw new InvalidCredentialsException("Senha invalida");
+            throw new InvalidCredentialsException("Senha inválida");
         }
         TotpService.VerifyResult result = totpService.verifyChallenge(user, request.getCode());
         if (result == TotpService.VerifyResult.INVALID || result == TotpService.VerifyResult.LOCKED) {
-            throw new InvalidCredentialsException("Codigo invalido");
+            throw new InvalidCredentialsException("Código inválido");
         }
         totpService.disable(user);
         auditLogger.recordFor(
@@ -124,18 +124,18 @@ public class TwoFactorController {
     }
 
     @PostMapping("/backup-codes/regenerate")
-    @Operation(summary = "Gera novos backup codes", description = "Invalida os antigos. Requer senha + codigo TOTP/backup atual.")
+    @Operation(summary = "Gera novos backup codes", description = "Invalida os antigos. Requer senha + código TOTP/backup atual.")
     public ResponseEntity<TwoFactorBackupCodesResponse> regenerate(@Valid @RequestBody TwoFactorDisableRequest request) {
         User user = currentUser();
         if (!Boolean.TRUE.equals(user.getTotpEnabled())) {
-            throw new IllegalStateException("2FA nao esta ativado");
+            throw new IllegalStateException("2FA não está ativado");
         }
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            throw new InvalidCredentialsException("Senha invalida");
+            throw new InvalidCredentialsException("Senha inválida");
         }
         TotpService.VerifyResult result = totpService.verifyChallenge(user, request.getCode());
         if (result == TotpService.VerifyResult.INVALID || result == TotpService.VerifyResult.LOCKED) {
-            throw new InvalidCredentialsException("Codigo invalido");
+            throw new InvalidCredentialsException("Código inválido");
         }
         List<String> codes = totpService.rotateBackupCodes(user);
         auditLogger.recordFor(
@@ -155,6 +155,6 @@ public class TwoFactorController {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         String email = auth.getName();
         return userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("Usuario nao encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
     }
 }

@@ -11,13 +11,13 @@ class PasswordPolicyServiceTest {
     private final PasswordPolicyService service = new PasswordPolicyService();
 
     @Test
-    @DisplayName("validateNewPassword aceita senha forte com confirmacao igual")
+    @DisplayName("validateNewPassword aceita senha forte com confirmação igual")
     void validateNewPasswordAcceptsStrongPassword() {
         service.validateNewPassword("Senha@123", "Senha@123");
     }
 
     @Test
-    @DisplayName("validateNewPassword rejeita confirmacao divergente")
+    @DisplayName("validateNewPassword rejeita confirmação divergente")
     void validateNewPasswordRejectsMismatchedConfirmation() {
         assertThatThrownBy(() -> service.validateNewPassword("Senha@123", "Outra@123"))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -25,7 +25,7 @@ class PasswordPolicyServiceTest {
     }
 
     @Test
-    @DisplayName("isValidPassword exige maiuscula minuscula numero e especial")
+    @DisplayName("isValidPassword exige maiúscula minúscula número e especial")
     void isValidPasswordRequiresAllCharacterGroups() {
         assertThat(service.isValidPassword("Senha@123")).isTrue();
         assertThat(service.isValidPassword("senha@123")).isFalse();

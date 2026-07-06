@@ -58,17 +58,17 @@ public class AdminBootstrapService implements ApplicationRunner {
                 || !StringUtils.hasText(normalizedName)
                 || !StringUtils.hasText(normalizedCpf)
                 || !StringUtils.hasText(normalizedPhone)) {
-            log.warn("Bootstrap de admin habilitado, mas configuracao incompleta. Nenhum admin foi criado.");
+            log.warn("Bootstrap de admin habilitado, mas configuração incompleta. Nenhum admin foi criado.");
             return;
         }
 
         if (userRepository.existsByEmail(normalizedEmail)) {
-            log.info("Bootstrap de admin ignorado. Usuario {} ja existe.", normalizedEmail);
+            log.info("Bootstrap de admin ignorado. Usuário {} já existe.", normalizedEmail);
             return;
         }
 
         if (userRepository.existsByCpf(normalizedCpf)) {
-            log.warn("Bootstrap de admin ignorado. CPF {} ja esta cadastrado em outro usuario.", normalizedCpf);
+            log.warn("Bootstrap de admin ignorado. CPF {} já está cadastrado em outro usuário.", normalizedCpf);
             return;
         }
 
@@ -87,9 +87,9 @@ public class AdminBootstrapService implements ApplicationRunner {
 
         try {
             userRepository.saveAndFlush(admin);
-            log.info("Usuario admin bootstrap criado: {}", admin.getEmail());
+            log.info("Usuário admin bootstrap criado: {}", admin.getEmail());
         } catch (DataIntegrityViolationException ex) {
-            log.error("Falha ao criar admin bootstrap {}. O startup seguira sem esse usuario.", admin.getEmail(), ex);
+            log.error("Falha ao criar admin bootstrap {}. O startup seguirá sem esse usuário.", admin.getEmail(), ex);
         }
     }
 }

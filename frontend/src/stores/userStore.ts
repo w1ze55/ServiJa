@@ -32,7 +32,7 @@ export const useUserStore = defineStore('user', () => {
       const normalizedUser = normalizeStoredUser(parsedUser);
       persistUser(normalizedUser);
     } catch (error) {
-      console.error('Erro ao parsear usuario do localStorage:', error);
+      console.error('Erro ao parsear usuário do localStorage:', error);
       user.value = null;
       localStorage.removeItem('user');
     }

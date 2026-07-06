@@ -68,7 +68,7 @@ public class AdminPlatformWalletController {
     }
 
     @GetMapping("/transactions")
-    @Operation(summary = "Listar transacoes da carteira da plataforma")
+    @Operation(summary = "Listar transações da carteira da plataforma")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<List<PlatformWalletTransactionResponse>> getTransactions(
             @RequestParam(required = false, defaultValue = "ALL") String type,
@@ -79,7 +79,7 @@ public class AdminPlatformWalletController {
     }
 
     @GetMapping("/transactions/paged")
-    @Operation(summary = "Listar transacoes paginadas da carteira da plataforma")
+    @Operation(summary = "Listar transações paginadas da carteira da plataforma")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<PlatformWalletTransactionPageResponse> getTransactionsPaged(
             @RequestParam(required = false, defaultValue = "ALL") String type,
@@ -107,7 +107,7 @@ public class AdminPlatformWalletController {
     }
 
     @PutMapping("/bank-accounts/{id}/default")
-    @Operation(summary = "Definir conta global padrao")
+    @Operation(summary = "Definir conta global padrão")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<BankAccountResponse> setDefaultAccount(@PathVariable Long id) {
         return ResponseEntity.ok(platformBankAccountService.setDefault(id));
@@ -142,7 +142,7 @@ public class AdminPlatformWalletController {
     }
 
     @GetMapping("/report")
-    @Operation(summary = "Baixar relatorio da carteira da plataforma")
+    @Operation(summary = "Baixar relatório da carteira da plataforma")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<byte[]> downloadReport(
             @RequestParam(defaultValue = "EXCEL") PlatformWalletReportService.ReportFormat format,

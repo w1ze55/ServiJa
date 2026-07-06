@@ -42,7 +42,7 @@ class AddressServiceTest {
     private AddressService addressService;
 
     @Test
-    @DisplayName("Deve persistir latitude e longitude ao criar endereco")
+    @DisplayName("Deve persistir latitude e longitude ao criar endereço")
     void createAddress_persistsCoordinates() {
         User user = buildUser(1L);
         AddressRequest request = AddressRequest.builder()
@@ -76,7 +76,7 @@ class AddressServiceTest {
     }
 
     @Test
-    @DisplayName("Deve preencher coordenadas ausentes ao listar enderecos antigos")
+    @DisplayName("Deve preencher coordenadas ausentes ao listar endereços antigos")
     void getUserAddresses_backfillsMissingCoordinates() {
         User user = buildUser(1L);
         Address address = Address.builder()
@@ -109,7 +109,7 @@ class AddressServiceTest {
     }
 
     @Test
-    @DisplayName("Nao deve geocodificar novamente endereco que ja possui coordenadas")
+    @DisplayName("Não deve geocodificar novamente endereço que já possui coordenadas")
     void getUserAddresses_reusesStoredCoordinates() {
         User user = buildUser(1L);
         Address address = Address.builder()

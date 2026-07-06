@@ -29,7 +29,7 @@ class FileStorageServiceTest {
     private FileStorageService service;
 
     @Test
-    @DisplayName("storeFile envia o arquivo ao S3 e retorna a URL publica")
+    @DisplayName("storeFile envia o arquivo ao S3 e retorna a URL pública")
     void storeFileUploadsFileToS3() {
         ReflectionTestUtils.setField(service, "bucketName", "servija-bucket");
         ReflectionTestUtils.setField(service, "region", "sa-east-1");
@@ -53,7 +53,7 @@ class FileStorageServiceTest {
     }
 
     @Test
-    @DisplayName("storeFile aceita audio suportado e preserva o content type")
+    @DisplayName("storeFile aceita áudio suportado e preserva o content type")
     void storeFileUploadsSupportedAudio() {
         ReflectionTestUtils.setField(service, "bucketName", "servija-bucket");
         ReflectionTestUtils.setField(service, "region", "sa-east-1");
@@ -86,7 +86,7 @@ class FileStorageServiceTest {
     }
 
     @Test
-    @DisplayName("storeFile rejeita tipo de arquivo nao permitido")
+    @DisplayName("storeFile rejeita tipo de arquivo não permitido")
     void storeFileRejectsUnsupportedFileType() {
         MockMultipartFile file = new MockMultipartFile(
                 "file",
@@ -100,7 +100,7 @@ class FileStorageServiceTest {
     }
 
     @Test
-    @DisplayName("deleteFile remove o objeto do S3 com a key extraida da URL")
+    @DisplayName("deleteFile remove o objeto do S3 com a key extraída da URL")
     void deleteFileDeletesObjectUsingKeyFromUrl() {
         ReflectionTestUtils.setField(service, "bucketName", "servija-bucket");
 

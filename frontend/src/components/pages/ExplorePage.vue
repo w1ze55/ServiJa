@@ -363,7 +363,7 @@ const isFavoriteFreelancer = (id: number | string) => favoritesStore.isFavoriteF
 
 const handleViewProfile = (providerId: string | number) => {
   if (isOwnFreelancerProfile(userStore.user, providerId)) {
-    toast.error('Voce nao pode acessar o proprio perfil publico como cliente');
+    toast.error('Você não pode acessar o próprio perfil público como cliente');
     return;
   }
 
@@ -372,7 +372,7 @@ const handleViewProfile = (providerId: string | number) => {
 
 const handleViewService = (params: { providerId: number; serviceId: number }) => {
   if (isOwnFreelancerProfile(userStore.user, params.providerId)) {
-    toast.error('Voce nao pode acessar o proprio servico publico como cliente');
+    toast.error('Você não pode acessar o próprio serviço público como cliente');
     return;
   }
 

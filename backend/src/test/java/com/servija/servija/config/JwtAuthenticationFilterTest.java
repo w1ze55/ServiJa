@@ -62,7 +62,7 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
-    @DisplayName("Deve ignorar rotas publicas de autenticacao diferentes de switch-role")
+    @DisplayName("Deve ignorar rotas públicas de autenticação diferentes de switch-role")
     void shouldSkipPublicAuthEndpoints() throws Exception {
         JwtAuthenticationFilter filter = new JwtAuthenticationFilter(jwtService, userDetailsService, new ObjectMapper());
         MockHttpServletRequest request = new MockHttpServletRequest();

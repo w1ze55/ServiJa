@@ -4,7 +4,12 @@ import { Loader2, Upload, X } from 'lucide-vue-next';
 import Button from '../ui/button.vue';
 import Label from '../ui/label.vue';
 import { toast } from '@/utils/toast';
-import { uploadImages } from '@/api/uploadService';
+import {
+  uploadImages,
+  getUploadErrorMessage,
+  isAcceptedImageFile,
+  ACCEPTED_IMAGE_ACCEPT_ATTR,
+} from '@/api/uploadService';
 
 interface Props {
   modelValue: string[];
@@ -68,9 +73,9 @@ const validateFiles = (files: File[]) => {
     return false;
   }
 
-  const invalidFiles = files.filter((file) => !file.type.startsWith('image/'));
+  const invalidFiles = files.filter((file) => !isAcceptedImageFile(file));
   if (invalidFiles.length > 0) {
-    toast.error('Envie apenas arquivos de imagem');
+    toast.error('Envie apenas arquivos de imagem (PNG, JPG, JFIF, WEBP ou GIF)');
     return false;
   }
 
@@ -96,7 +101,7 @@ const uploadSelectedImages = async (files: File[]) => {
     toast.success(`${files.length} imagem(ns) enviada(s) com sucesso`);
   } catch (error) {
     console.error('Erro ao fazer upload:', error);
-    toast.error('Erro ao enviar imagem(ns). Tente novamente.');
+    toast.error(getUploadErrorMessage(error));
   } finally {
     isUploading.value = false;
   }
@@ -210,7 +215,7 @@ const removeImage = (index: number) => {
             ref="fileInput"
             type="file"
             multiple
-            accept="image/*"
+            :accept="ACCEPTED_IMAGE_ACCEPT_ATTR"
             class="hidden"
             :disabled="isDisabled"
             @change="handleInputChange"

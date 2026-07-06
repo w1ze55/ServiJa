@@ -12,7 +12,9 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.*;
@@ -22,6 +24,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/services")
 @RequiredArgsConstructor
+@Slf4j
 @Tag(name = "Serviços", description = "Endpoints para gerenciamento de serviços oferecidos pelos freelancers")
 public class ServiceController {
 
@@ -87,7 +90,7 @@ public class ServiceController {
             @ApiResponse(responseCode = "400", description = "Dados inválidos"),
             @ApiResponse(responseCode = "401", description = "Não autenticado")
     })
-    public ResponseEntity<ServiceResponse> createService(@RequestBody ServiceRequest request) {
+    public ResponseEntity<ServiceResponse> createService(@Valid @RequestBody ServiceRequest request) {
         try {
             ServiceResponse service = serviceService.createService(request);
             return ResponseEntity.ok(service);
@@ -107,7 +110,7 @@ public class ServiceController {
     })
     public ResponseEntity<ServiceResponse> updateService(
             @Parameter(description = "ID do serviço", required = true) @PathVariable Long id,
-            @RequestBody ServiceRequest request) {
+            @Valid @RequestBody ServiceRequest request) {
         try {
             ServiceResponse service = serviceService.updateService(id, request);
             return ResponseEntity.ok(service);
@@ -131,6 +134,7 @@ public class ServiceController {
             serviceService.deleteService(id);
             return ResponseEntity.noContent().build();
         } catch (Exception e) {
+            log.error("Erro ao excluir serviço {}", id, e);
             return ResponseEntity.badRequest().build();
         }
     }

@@ -15,6 +15,7 @@ import {
   Check,
 } from 'lucide-vue-next';
 import AttachmentUploadField from '../shared/AttachmentUploadField.vue';
+import DeliverySubmissionModal from './DeliverySubmissionModal.vue';
 import FileAttachment from '../shared/FileAttachment.vue';
 import ProjectChatPanel from '../shared/ProjectChatPanel.vue';
 import ServiceRequestTimeline from '../service/ServiceRequestTimeline.vue';
@@ -54,6 +55,7 @@ import { formatApiDate } from '@/utils/apiDate';
 import { getStatusLabel } from '@/utils/statusTranslations';
 import { toast } from '@/utils/toast';
 import api from '@/api/config/axios';
+import { uploadFiles as uploadFilesToServer } from '@/api/uploadService';
 
 interface Props {
   onNavigate: (page: string, params?: any) => void;
@@ -207,7 +209,7 @@ const statusColor = computed(() => {
   if (pendingAdjustment.value) return 'bg-amber-100 text-amber-700';
 
   const colors: Record<string, string> = {
-    delivered: 'bg-amber-100 text-amber-700',
+    delivered: 'bg-emerald-100 text-emerald-700',
     in_progress: 'bg-blue-100 text-blue-700',
     accepted: 'bg-green-100 text-green-700',
     completed: 'bg-teal-100 text-teal-700',
@@ -308,32 +310,45 @@ const handleMilestoneComplete = async (milestone: Milestone) => {
   toast.error('Erro ao atualizar marco.');
 };
 
-const handleCompleteDelivery = async () => {
-  if (!project.value) return;
+const uploadDeliveryAttachments = async (
+  files: File[]
+): Promise<{ url: string; name: string }[]> => {
+  if (!files || files.length === 0) return [];
+  const urls = await uploadFilesToServer(files);
+  return urls.map((url, idx) => ({ url, name: files[idx]?.name || `Arquivo ${idx + 1}` }));
+};
+
+const handleCompleteDelivery = async (payload: { description: string; files: File[] }) => {
+  if (!project.value) return false;
 
   isCompleting.value = true;
   const currentId = project.value.id;
 
   try {
-    const success = await proposalStore.completeProposal(currentId);
+    const attachments = await uploadDeliveryAttachments(payload.files);
+    const success = await proposalStore.completeProposal(currentId, {
+      description: payload.description,
+      attachments,
+    });
 
     if (success) {
-      toast.success('Entrega concluída com sucesso! O cliente será notificado.');
-      showCompleteDialog.value = false;
+      toast.success('Entrega enviada com sucesso! O cliente será notificado.');
       await loadData();
-      return;
+      return true;
     }
 
-    toast.error('Erro ao concluir a entrega. Tente novamente.');
+    toast.error('Erro ao enviar a entrega. Tente novamente.');
+    return false;
   } catch {
-    toast.error('Erro ao concluir a entrega. Tente novamente.');
+    toast.error('Erro ao enviar a entrega. Tente novamente.');
+    return false;
   } finally {
     isCompleting.value = false;
   }
 };
 
-const handleCompleteAdjustment = async () => {
-  if (!project.value || !pendingAdjustment.value) return;
+const handleCompleteAdjustment = async (payload: { description: string; files: File[] }) => {
+  if (!project.value || !pendingAdjustment.value) return false;
 
   isCompletingAdjustment.value = true;
   const currentId = project.value.id;
@@ -346,16 +361,24 @@ const handleCompleteAdjustment = async () => {
     );
 
     if (successAdjustment) {
-      await proposalStore.completeProposal(currentId);
-      toast.success('Ajustes finalizados e enviados ao cliente para nova avaliação.');
-      showCompleteAdjustmentDialog.value = false;
-      await loadData();
-      return;
+      const attachments = await uploadDeliveryAttachments(payload.files);
+      const success = await proposalStore.completeProposal(currentId, {
+        description: payload.description,
+        attachments,
+      });
+
+      if (success) {
+        toast.success('Ajustes finalizados e enviados ao cliente para nova avaliação.');
+        await loadData();
+        return true;
+      }
     }
 
     toast.error('Erro ao finalizar ajuste. Tente novamente.');
+    return false;
   } catch {
     toast.error('Erro ao finalizar ajuste. Tente novamente.');
+    return false;
   } finally {
     isCompletingAdjustment.value = false;
   }
@@ -446,7 +469,7 @@ const handleUploadFiles = async () => {
             {{ project?.service || 'Carregando...' }}
           </h1>
           <Badge v-if="project" :class="statusColor">
-            {{ pendingAdjustment ? 'Ajustes solicitados' : getStatusLabel(project.status) }}
+            {{ pendingAdjustment ? 'Ajustes solicitados' : project.status === 'delivered' ? 'Aguardando aprovação' : getStatusLabel(project.status) }}
           </Badge>
         </div>
         <p class="text-[#435574]">Acompanhamento detalhado do projeto</p>
@@ -497,7 +520,7 @@ const handleUploadFiles = async () => {
             </div>
             <Progress :value="projectProgress" class="h-3 shadow-inner" />
             <p class="text-xs text-[#435574] mt-2">
-              Status atual: <span class="font-semibold">{{ getStatusLabel(project.status) }}</span>
+              Status atual: <span class="font-semibold">{{ pendingAdjustment ? 'Ajustes solicitados' : project.status === 'delivered' ? 'Aguardando aprovação' : getStatusLabel(project.status) }}</span>
             </p>
           </div>
 
@@ -555,12 +578,12 @@ const handleUploadFiles = async () => {
                   Escopo e Descrição
                 </h3>
                 <div class="prose prose-blue max-w-none text-[#435574]">
-                  <p class="whitespace-pre-line">{{ project.description }}</p>
+                  <p class="whitespace-pre-line break-words">{{ project.description }}</p>
                 </div>
 
                 <div v-if="project.freelancerResponse?.scope" class="mt-8 pt-6 border-t font-medium text-[#263238]">
                   <h4 class="mb-3">Sua proposta:</h4>
-                  <p class="text-sm text-[#435574] italic bg-gray-50 p-4 rounded-lg border border-dashed">
+                  <p class="text-sm text-[#435574] italic bg-gray-50 p-4 rounded-lg border border-dashed whitespace-pre-line break-words">
                     "{{ project.freelancerResponse.scope }}"
                   </p>
                 </div>
@@ -813,66 +836,19 @@ const handleUploadFiles = async () => {
       </div>
     </template>
 
-    <AlertDialog :open="showCompleteDialog" @update:open="(val) => (showCompleteDialog = val)">
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Concluir Entrega do Projeto</AlertDialogTitle>
-          <AlertDialogDescription>
-            <template v-if="project">
-              Você está prestes a marcar o projeto <strong>"{{ project.service }}"</strong> como concluído.
-              <br /><br />
-              O cliente será notificado e poderá revisar a entrega. Certifique-se de que todos os arquivos
-              e marcos estão finalizados antes de confirmar.
-              <br /><br />
-              <span class="text-amber-600 font-medium">Esta ação nao pode ser desfeita.</span>
-            </template>
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel @click="showCompleteDialog = false" :disabled="isCompleting">
-            Cancelar
-          </AlertDialogCancel>
-          <AlertDialogAction @click="handleCompleteDelivery" :disabled="isCompleting">
-            <Loader2 v-if="isCompleting" class="h-4 w-4 mr-2 animate-spin" />
-            <Check v-else class="h-4 w-4 mr-2" />
-            {{ isCompleting ? 'Concluindo...' : 'Confirmar Conclusão' }}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+    <DeliverySubmissionModal
+      v-model:open="showCompleteDialog"
+      :service-name="project?.service"
+      :is-loading="isCompleting"
+      :on-submit="handleCompleteDelivery"
+    />
 
-    <AlertDialog
-      :open="showCompleteAdjustmentDialog"
-      @update:open="(val) => (showCompleteAdjustmentDialog = val)"
-    >
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Finalizar e Reenviar Projeto</AlertDialogTitle>
-          <AlertDialogDescription>
-            <template v-if="project">
-              Você está prestes a finalizar os ajustes do projeto
-              <strong>"{{ project.service }}"</strong>. <br /><br />
-              Certifique-se de que todas as correções solicitadas pelo cliente foram realizadas e que você fez
-              o upload dos novos arquivos, caso necessário. <br /><br />
-              O projeto será novamente enviado para avaliação e aprovação final do cliente.
-            </template>
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter class="sm:justify-between">
-          <AlertDialogCancel @click="showCompleteAdjustmentDialog = false" :disabled="isCompletingAdjustment">
-            Cancelar
-          </AlertDialogCancel>
-          <AlertDialogAction
-            @click="handleCompleteAdjustment"
-            :disabled="isCompletingAdjustment"
-          >
-            <Loader2 v-if="isCompletingAdjustment" class="h-4 w-4 mr-2 animate-spin" />
-            <CheckCircle v-else class="h-4 w-4 mr-2" />
-            {{ isCompletingAdjustment ? 'Finalizando...' : 'Confirmar Envio' }}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+    <DeliverySubmissionModal
+      v-model:open="showCompleteAdjustmentDialog"
+      :service-name="project?.service"
+      :is-loading="isCompletingAdjustment"
+      :on-submit="handleCompleteAdjustment"
+    />
 
     <Dialog :open="showUploadDialog" @update:open="(val) => (showUploadDialog = val)">
       <DialogContent class="sm:max-w-lg">
@@ -891,7 +867,7 @@ const handleUploadFiles = async () => {
             description-enabled
             label="Arquivos *"
             empty-message="Clique para fazer upload ou arraste os arquivos"
-            helper-text="PDF, JPG, PNG, ZIP - Maximo 10 MB por arquivo"
+            helper-text="PDF, JPG, PNG, ZIP - Máximo 10 MB por arquivo"
             @file-rejected="handleUploadFileRejected"
           />
 

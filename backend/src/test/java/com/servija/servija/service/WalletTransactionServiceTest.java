@@ -100,7 +100,7 @@ class WalletTransactionServiceTest {
     }
 
     @Test
-    @DisplayName("getTransactions falha quando o usuario nao existe")
+    @DisplayName("getTransactions falha quando o usuário não existe")
     void getTransactionsFailsWhenUserDoesNotExist() {
         when(userRepository.findByEmail("missing@test.com")).thenReturn(Optional.empty());
 

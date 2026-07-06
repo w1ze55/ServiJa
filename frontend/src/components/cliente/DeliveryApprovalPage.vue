@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import {
   ArrowLeft,
   Download,
@@ -9,6 +9,8 @@ import {
   CheckCircle2,
   AlertCircle,
   Eye,
+  History,
+  Headset,
 } from 'lucide-vue-next';
 import Button from '../ui/button.vue';
 import Card from '../ui/card.vue';
@@ -26,6 +28,8 @@ import AlertDialogDescription from '../ui/alert-dialog-description.vue';
 import AlertDialogFooter from '../ui/alert-dialog-footer.vue';
 import AlertDialogHeader from '../ui/alert-dialog-header.vue';
 import AlertDialogTitle from '../ui/alert-dialog-title.vue';
+import ServiceRequestTimeline from '../service/ServiceRequestTimeline.vue';
+import SupportRequestModal from '../support/SupportRequestModal.vue';
 import { toast } from '../../utils/toast';
 
 const win = window;
@@ -59,7 +63,19 @@ const props = defineProps<Props>();
 
 const showApprovalDialog = ref(false);
 const showAdjustmentsModal = ref(false);
+const showSupportModal = ref(false);
+const activeTab = ref<'description' | 'history'>('description');
 const previewFile = ref<DeliveryFile | null>(null);
+const previewPdfUrl = ref<string | null>(null);
+const previewLoading = ref(false);
+
+const deliveryDescriptionDisplay = computed(() => {
+  const description = props.deliveryDescription?.trim();
+  if (description) return description;
+
+  const firstName = props.freelancerName?.trim().split(' ')[0] || 'O freelancer';
+  return `${firstName} não adicionou uma descrição de entrega.`;
+});
 
 const getFileIcon = (type: DeliveryFile['type']) => {
   switch (type) {
@@ -92,9 +108,49 @@ const canPreview = (file: DeliveryFile) => {
   return file.type === 'image' || file.type === 'video' || file.type === 'document';
 };
 
-const handleDownloadFile = async (url: string, fileName: string) => {
+const isPdf = (file: DeliveryFile) => {
+  const target = (file.url || file.name || '').toLowerCase().split('?')[0];
+  return target.endsWith('.pdf');
+};
+
+const closePreview = () => {
+  if (previewPdfUrl.value) {
+    window.URL.revokeObjectURL(previewPdfUrl.value);
+    previewPdfUrl.value = null;
+  }
+  previewLoading.value = false;
+  previewFile.value = null;
+};
+
+const openPreview = async (file: DeliveryFile) => {
+  closePreview();
+  previewFile.value = file;
+
+  if (!isPdf(file)) return;
+
+  // Busca o PDF como blob e exibe via object URL, garantindo a renderização inline
+  // mesmo quando o storage serve o arquivo com Content-Disposition: attachment.
+  previewLoading.value = true;
   try {
-    toast.info(`Iniciando download de ${fileName}...`);
+    const response = await fetch(file.url);
+    const blob = await response.blob();
+    const pdfBlob = blob.type === 'application/pdf' ? blob : new Blob([blob], { type: 'application/pdf' });
+
+    // Evita aplicar o resultado se o usuário já fechou ou trocou de arquivo.
+    if (previewFile.value?.id === file.id) {
+      previewPdfUrl.value = window.URL.createObjectURL(pdfBlob);
+    }
+  } catch {
+    // Mantém previewPdfUrl nulo → exibe mensagem de fallback.
+  } finally {
+    if (previewFile.value?.id === file.id) {
+      previewLoading.value = false;
+    }
+  }
+};
+
+const downloadFile = async (url: string, fileName: string) => {
+  try {
     const response = await fetch(url);
     const blob = await response.blob();
     const blobUrl = window.URL.createObjectURL(blob);
@@ -111,7 +167,12 @@ const handleDownloadFile = async (url: string, fileName: string) => {
   }
 };
 
-const handleDownloadAll = () => {
+const handleDownloadFile = async (url: string, fileName: string) => {
+  toast.info(`Iniciando download de ${fileName}...`);
+  await downloadFile(url, fileName);
+};
+
+const handleDownloadAll = async () => {
   if (!props.files || props.files.length === 0) {
     toast.warning('Não há arquivos para baixar.');
     return;
@@ -119,9 +180,11 @@ const handleDownloadAll = () => {
 
   toast.success('Download de todos os arquivos iniciado');
 
-  props.files.forEach(file => {
-    win.open(file.url, '_blank');
-  });
+  // Baixa os arquivos sequencialmente (via blob) para não esbarrar no bloqueio
+  // de múltiplos popups que ocorre com window.open em loop.
+  for (const file of props.files) {
+    await downloadFile(file.url, file.name);
+  }
 };
 </script>
 
@@ -163,11 +226,43 @@ const handleDownloadAll = () => {
 
       <Separator class="my-4" />
 
-      <!-- Delivery Description -->
-      <div class="space-y-2">
-        <h3 class="text-[#263238]">Descrição da Entrega</h3>
-        <p class="text-[#435574] whitespace-pre-wrap">{{ props.deliveryDescription }}</p>
+      <!-- Tabs: Descrição da Entrega / Histórico -->
+      <div class="flex gap-2 border-b border-gray-200 mb-4">
+        <button
+          @click="activeTab = 'description'"
+          :class="`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'description'
+              ? 'border-[#286AD8] text-[#286AD8]'
+              : 'border-transparent text-[#435574] hover:text-[#263238]'
+          }`"
+        >
+          <FileText class="h-4 w-4 mr-1 inline" />
+          Descrição da Entrega
+        </button>
+        <button
+          @click="activeTab = 'history'"
+          :class="`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'history'
+              ? 'border-[#286AD8] text-[#286AD8]'
+              : 'border-transparent text-[#435574] hover:text-[#263238]'
+          }`"
+        >
+          <History class="h-4 w-4 mr-1 inline" />
+          Histórico
+        </button>
       </div>
+
+      <!-- Delivery Description -->
+      <div v-if="activeTab === 'description'" class="space-y-2">
+        <p class="text-[#435574] whitespace-pre-wrap">{{ deliveryDescriptionDisplay }}</p>
+      </div>
+
+      <!-- History -->
+      <ServiceRequestTimeline
+        v-else
+        :request-id="props.serviceId"
+        title="Histórico da Solicitação"
+      />
     </Card>
 
     <!-- Files Section -->
@@ -180,11 +275,6 @@ const handleDownloadAll = () => {
           :key="file.id"
           class="border border-gray-200 rounded-lg p-4 hover:border-[#286AD8] transition-colors"
         >
-          <!-- File Preview -->
-          <div v-if="file.thumbnail" class="mb-3 bg-gray-100 rounded-lg overflow-hidden aspect-video flex items-center justify-center">
-            <img :src="file.thumbnail" :alt="file.name" class="w-full h-full object-cover" />
-          </div>
-
           <!-- File Info -->
           <div class="flex items-start gap-3">
             <div class="flex-shrink-0 mt-1">
@@ -200,7 +290,7 @@ const handleDownloadAll = () => {
           <div class="flex gap-2 mt-3">
             <Button
               v-if="canPreview(file)"
-              @click="previewFile = file"
+              @click="openPreview(file)"
               variant="outline"
               size="sm"
               class="flex-1"
@@ -228,13 +318,23 @@ const handleDownloadAll = () => {
           class="w-full text-primary border-primary"
         >
           <Download class="h-4 w-4 mr-2" />
-          Visualizar Todos os Arquivos
+          Fazer download de todos os Arquivos
         </Button>
       </div>
     </Card>
 
     <!-- Action Buttons -->
-    <div class="flex gap-4">
+    <div class="flex gap-4 flex-wrap">
+      <Button
+        @click="showSupportModal = true"
+        :disabled="props.isLoading"
+        variant="outline"
+        class="flex-1"
+        size="lg"
+      >
+        <Headset class="h-4 w-4 mr-2" />
+        Reportar Problema
+      </Button>
       <Button
         @click="showAdjustmentsModal = true"
         :disabled="props.isLoading"
@@ -294,39 +394,57 @@ const handleDownloadAll = () => {
       :on-go-to-chat="props.onGoToChat"
     />
 
+    <SupportRequestModal
+      :open="showSupportModal"
+      :default-category="'SERVICE_ISSUE'"
+      :on-close="() => (showSupportModal = false)"
+    />
+
     <!-- File Preview Modal -->
-    <template v-if="previewFile">
+    <Teleport to="body">
       <div
-        class="fixed inset-0 bg-black/80 z-50"
-        @click="previewFile = null"
-      />
-      <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
+        v-if="previewFile"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+        @click.self="closePreview"
+      >
         <Card class="max-w-4xl w-full max-h-[90vh] overflow-auto">
           <div class="p-6">
             <div class="flex items-center justify-between mb-4">
               <h3 class="text-[#263238]">{{ previewFile.name }}</h3>
-              <Button @click="previewFile = null" variant="ghost" size="sm">
+              <Button @click="closePreview" variant="ghost" size="sm">
                 Fechar
               </Button>
             </div>
             <div class="bg-gray-100 rounded-lg p-4 flex items-center justify-center min-h-[400px]">
               <img
-                v-if="previewFile.type === 'image' && previewFile.thumbnail"
-                :src="previewFile.thumbnail"
+                v-if="previewFile.type === 'image'"
+                :src="previewFile.thumbnail || previewFile.url"
                 :alt="previewFile.name"
                 class="max-w-full max-h-[600px] object-contain"
               />
               <video v-else-if="previewFile.type === 'video'" controls class="max-w-full max-h-[600px]">
                 <source :src="previewFile.url" />
               </video>
-              <p v-else-if="previewFile.type === 'document'" class="text-[#435574]">
+              <template v-else-if="isPdf(previewFile)">
+                <iframe
+                  v-if="previewPdfUrl"
+                  :src="previewPdfUrl"
+                  :title="previewFile.name"
+                  class="w-full h-[70vh] rounded border-0 bg-white"
+                />
+                <p v-else-if="previewLoading" class="text-[#435574]">Carregando preview...</p>
+                <p v-else class="text-[#435574]">
+                  Não foi possível carregar o preview. Faça o download para visualizar.
+                </p>
+              </template>
+              <p v-else class="text-[#435574]">
                 Preview de documento não disponível. Faça o download para visualizar.
               </p>
             </div>
           </div>
         </Card>
       </div>
-    </template>
+    </Teleport>
   </div>
 </template>
 

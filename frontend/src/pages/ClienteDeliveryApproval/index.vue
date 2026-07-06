@@ -40,9 +40,12 @@ const request = computed(() => {
 const adjustmentAlreadyUsed = computed(() => adjustmentStore.adjustments.length > 0);
 
 const deliveryFiles = computed((): DeliveryFile[] => {
-  if (!request.value?.freelancerAttachments) return [];
+  const source = request.value?.deliveryAttachments?.length
+    ? request.value.deliveryAttachments
+    : request.value?.freelancerAttachments;
+  if (!source) return [];
 
-  return request.value.freelancerAttachments.map((att, idx) => {
+  return source.map((att, idx) => {
     const extension = att.name.split('.').pop()?.toLowerCase() || '';
     let type: DeliveryFile['type'] = 'other';
 
@@ -188,15 +191,15 @@ onMounted(async () => {
     return;
   }
 
-  if (store.requests.length === 0) {
-    store.loadRequests();
-  }
-
   if (!requestId.value) {
     toast.error('ID da solicitação não fornecido');
     router.push('/cliente-projects');
     return;
   }
+
+  // Sempre recarregar a solicitação para refletir a descrição/anexos da entrega mais
+  // recente (o freelancer pode ter reenviado após um ajuste com uma nova descrição).
+  await store.loadRequestById(requestId.value);
 
   await adjustmentStore.getAdjustmentsByServiceRequest(parseInt(requestId.value));
 
@@ -252,8 +255,8 @@ onUnmounted(() => {
       :service-name="request.service"
       :freelancer-name="request.freelancerName || 'Freelancer'"
       :freelancer-avatar="request.freelancerAvatar"
-      :delivery-description="request.description || 'Entrega final do servico'"
-      :delivery-date="formatDate(request.createdAt)"
+      :delivery-description="request.deliveryDescription || ''"
+      :delivery-date="formatDate(request.deliveredAt || request.createdAt)"
       :files="deliveryFiles"
       :adjustment-already-used="adjustmentAlreadyUsed"
       :is-loading="adjustmentStore.isLoading"

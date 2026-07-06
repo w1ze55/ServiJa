@@ -36,7 +36,7 @@ import { useProposalStore, type Proposal } from '@/stores/proposalStore';
 import reviewService, { type ReviewResponse, type PendingReview } from '@/api/services/reviewService';
 import walletService, { type WalletBalance, type WalletTransaction } from '@/api/services/walletService';
 import { useUserStore } from '@/stores/userStore';
-import { formatTimeAgoFromApiDate, getApiDateTimestamp } from '@/utils/apiDate';
+import { formatTimeAgoFromApiDate, getApiDateTimestamp, parseApiDate } from '@/utils/apiDate';
 import Card from '../ui/card.vue';
 import Badge from '../ui/badge.vue';
 import Button from '../ui/button.vue';
@@ -99,8 +99,9 @@ const customDateFrom = ref('');
 const customDateTo = ref('');
 const MILLISECONDS_PER_DAY = 1000 * 60 * 60 * 24;
 
-const parseDate = (value: string) => {
-  const parsed = new Date(value);
+const parseDate = (value: string | null | undefined) => {
+  if (!value) return null;
+  const parsed = parseApiDate(value);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 };
 
@@ -264,6 +265,23 @@ const previousPeriodProposals = computed(() => {
   );
 });
 
+// Proposals whose activity (updatedAt) falls in the period — used for
+// completion/conversion metrics, which must key on when work was concluded, not
+// when the request was received.
+const periodProposalsByCompletion = computed(() => {
+  const range = currentPeriodRange.value;
+  return proposalStore.proposals.filter((proposal) =>
+    isDateInRange(proposal.updatedAt || proposal.receivedAt, range),
+  );
+});
+
+const previousPeriodProposalsByCompletion = computed(() => {
+  const range = previousPeriodRange.value;
+  return proposalStore.proposals.filter((proposal) =>
+    isDateInRange(proposal.updatedAt || proposal.receivedAt, range),
+  );
+});
+
 const periodReviews = computed(() => {
   const range = currentPeriodRange.value;
   return reviews.value.filter((review) => isDateInRange(review.createdAt, range));
@@ -321,13 +339,13 @@ const getRevenueFromProposals = (proposals: Proposal[]) =>
 const currentPeriodRevenue = computed(() =>
   hasRecordedWalletEarnings.value
     ? periodEarnings.value.reduce((sum, transaction) => sum + transaction.amount, 0)
-    : getRevenueFromProposals(periodProposals.value),
+    : getRevenueFromProposals(periodProposalsByCompletion.value),
 );
 
 const previousPeriodRevenue = computed(() =>
   hasRecordedWalletEarnings.value
     ? previousPeriodEarnings.value.reduce((sum, transaction) => sum + transaction.amount, 0)
-    : getRevenueFromProposals(previousPeriodProposals.value),
+    : getRevenueFromProposals(previousPeriodProposalsByCompletion.value),
 );
 
 const comparisonLabel = computed(() => {
@@ -348,23 +366,47 @@ const comparisonLabel = computed(() => {
   }
 });
 
+// Conversion is bounded 0–100%: numerator = proposals converted in the period
+// (by updatedAt), denominator = distinct proposals considered in the period,
+// i.e. received in the period (receivedAt) OR converted in the period (updatedAt).
+const countConversion = (
+  receivedProposals: Proposal[],
+  activityProposals: Proposal[],
+) => {
+  const convertedInPeriod = activityProposals.filter((p) =>
+    closedContractStatuses.includes(p.status),
+  );
+  const consideredIds = new Set<string>();
+  receivedProposals.forEach((p) => consideredIds.add(p.id));
+  convertedInPeriod.forEach((p) => consideredIds.add(p.id));
+  return {
+    hired: convertedInPeriod.length,
+    total: consideredIds.size,
+    rate: calculateRate(convertedInPeriod.length, consideredIds.size),
+  };
+};
+
 const stats = computed(() => {
   const activeStatuses: Proposal['status'][] = ['accepted', 'in_progress', 'delivered'];
   const completedStatuses: Proposal['status'][] = ['completed'];
   const revenueNow = currentPeriodRevenue.value;
   const revenuePrev = previousPeriodRevenue.value;
 
-  const currentActiveServices = periodProposals.value.filter((p) => activeStatuses.includes(p.status)).length;
-  const previousActiveServices = previousPeriodProposals.value.filter((p) => activeStatuses.includes(p.status)).length;
+  // Active services and completed jobs key on activity date (updatedAt) so work
+  // concluded in the period is counted even if the request was received earlier.
+  const currentActiveServices = periodProposalsByCompletion.value.filter((p) => activeStatuses.includes(p.status)).length;
+  const previousActiveServices = previousPeriodProposalsByCompletion.value.filter((p) => activeStatuses.includes(p.status)).length;
 
-  const currentCompletedJobs = periodProposals.value.filter((p) => completedStatuses.includes(p.status)).length;
-  const previousCompletedJobs = previousPeriodProposals.value.filter((p) => completedStatuses.includes(p.status)).length;
+  const currentCompletedJobs = periodProposalsByCompletion.value.filter((p) => completedStatuses.includes(p.status)).length;
+  const previousCompletedJobs = previousPeriodProposalsByCompletion.value.filter((p) => completedStatuses.includes(p.status)).length;
 
-  const currentConvertedRequests = periodProposals.value.filter((p) => closedContractStatuses.includes(p.status)).length;
-  const previousConvertedRequests = previousPeriodProposals.value.filter((p) => closedContractStatuses.includes(p.status)).length;
+  const currentConversion = countConversion(periodProposals.value, periodProposalsByCompletion.value);
+  const previousConversion = countConversion(previousPeriodProposals.value, previousPeriodProposalsByCompletion.value);
 
-  const currentConversionRate = calculateRate(currentConvertedRequests, periodProposals.value.length);
-  const previousConversionRate = calculateRate(previousConvertedRequests, previousPeriodProposals.value.length);
+  const currentConvertedRequests = currentConversion.hired;
+
+  const currentConversionRate = currentConversion.rate;
+  const previousConversionRate = previousConversion.rate;
 
   const currentRating = averageRating(periodReviews.value);
   const previousRating = averageRating(previousPeriodReviews.value);
@@ -390,12 +432,16 @@ const stats = computed(() => {
       previous: previousConversionRate,
       change: calculateChange(currentConversionRate, previousConversionRate),
       hiredCurrent: currentConvertedRequests,
-      totalCurrent: periodProposals.value.length,
+      totalCurrent: currentConversion.total,
     },
     rating: {
-      current: currentRating,
+      // Big number is the all-time average across every review received.
+      current: averageRating(reviews.value),
       previous: previousRating,
+      // Trend badge compares the current vs previous period's new reviews, and is
+      // only shown when both periods actually have reviews (see showRatingTrend).
       change: calculateChange(currentRating, previousRating),
+      showTrend: periodReviews.value.length > 0 && previousPeriodReviews.value.length > 0,
     },
   };
 });
@@ -500,10 +546,10 @@ const revenueTimeline = computed(() => {
   });
 
   if (!hasRecordedWalletEarnings.value) {
-    periodProposals.value
+    periodProposalsByCompletion.value
       .filter((proposal) => revenueProposalStatuses.includes(proposal.status))
       .forEach((proposal) => {
-        const date = parseDate(proposal.receivedAt);
+        const date = parseDate(proposal.updatedAt || proposal.receivedAt);
         if (!date) return;
         const bucket = bucketMap.get(getBucketKey(date));
         if (bucket) bucket.value += getProposalAmount(proposal);
@@ -643,7 +689,7 @@ const serviceRevenueBreakdown = computed(() => {
       revenue.set(serviceName, (revenue.get(serviceName) || 0) + transaction.amount);
     });
   } else {
-    periodProposals.value
+    periodProposalsByCompletion.value
       .filter((proposal) => revenueProposalStatuses.includes(proposal.status))
       .forEach((proposal) => {
         const serviceName = proposal.service?.trim() || 'Sem serviço';
@@ -728,7 +774,7 @@ const doughnutOptions = {
 const mostContractedServices = computed(() => {
   const counts = new Map<string, number>();
 
-  periodProposals.value
+  periodProposalsByCompletion.value
     .filter((proposal) => closedContractStatuses.includes(proposal.status))
     .forEach((proposal) => {
       const serviceName = proposal.service?.trim() || 'Sem serviço';
@@ -859,7 +905,7 @@ const recentActivities = computed(() => {
   const range = currentPeriodRange.value;
   const reviewItems = reviews.value
     .filter((r) => isDateInRange(r.createdAt, range))
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .sort((a, b) => getApiDateTimestamp(b.createdAt) - getApiDateTimestamp(a.createdAt))
     .slice(0, 3)
     .map((r) => ({
       id: `review-${r.id}`,
@@ -869,7 +915,7 @@ const recentActivities = computed(() => {
       time: formatTimeAgoFromApiDate(r.createdAt).replace('Atualizado ', ''),
       color: 'text-yellow-600',
       bgColor: 'bg-yellow-100',
-      sortKey: new Date(r.createdAt).getTime(),
+      sortKey: getApiDateTimestamp(r.createdAt),
     }));
 
   return [...proposalItems, ...reviewItems]
@@ -882,7 +928,7 @@ const recentActivities = computed(() => {
 const recentTransactions = computed(() =>
   periodTransactions.value
     .slice()
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    .sort((a, b) => getApiDateTimestamp(b.date) - getApiDateTimestamp(a.date))
     .slice(0, 5),
 );
 
@@ -894,6 +940,11 @@ const isDashboardLoading = computed(() =>
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+
+const formatTransactionDate = (value: string) => {
+  const date = parseDate(value);
+  return date ? date.toLocaleDateString('pt-BR') : '';
+};
 
 const formatCurrencyAxis = (value: number) => {
   const absoluteValue = Math.abs(value);
@@ -1163,6 +1214,7 @@ onUnmounted(() => {
           <p class="text-2xl text-[#263238]">{{ stats.rating.current.toFixed(1) }}</p>
           <p class="text-xs text-[#435574] mt-1 pr-20">{{ reviews.length }} {{ reviews.length === 1 ? 'avaliação' : 'avaliações' }} no total</p>
           <Badge
+            v-if="stats.rating.showTrend"
             :class="[
               'absolute bottom-6 right-6',
               stats.rating.change >= 0
@@ -1485,7 +1537,7 @@ onUnmounted(() => {
                 <p :class="tx.type === 'EARNING' ? 'text-green-600' : 'text-red-600'" class="text-sm font-semibold">
                   {{ tx.type === 'EARNING' ? '+' : '-' }}{{ formatCurrency(tx.amount) }}
                 </p>
-                <p class="text-xs text-[#435574]">{{ new Date(tx.date).toLocaleDateString('pt-BR') }}</p>
+                <p class="text-xs text-[#435574]">{{ formatTransactionDate(tx.date) }}</p>
               </div>
             </div>
           </div>

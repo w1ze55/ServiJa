@@ -19,7 +19,7 @@ class CatalogBootstrapServiceTest {
     private CatalogBootstrapService service;
 
     @Test
-    @DisplayName("run executa seed e backfill do catalogo")
+    @DisplayName("run executa seed e backfill do catálogo")
     void runExecutesSeedAndBackfill() {
         service.run(null);
 

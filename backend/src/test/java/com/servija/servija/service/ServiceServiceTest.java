@@ -13,6 +13,7 @@ import com.servija.servija.repository.FreelancerRepository;
 import com.servija.servija.repository.ReviewRepository;
 import com.servija.servija.repository.ServiceRepository;
 import com.servija.servija.repository.ServiceRequestRepository;
+import com.servija.servija.repository.ServiceSearchWeeklyMetricRepository;
 import com.servija.servija.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.AfterEach;
@@ -54,6 +55,7 @@ class ServiceServiceTest {
     @Mock private ServiceSearchWeeklyMetricService serviceSearchWeeklyMetricService;
     @Mock private AuditLogger auditLogger;
     @Mock private CurrentUserContextService currentUserContextService;
+    @Mock private ServiceSearchWeeklyMetricRepository serviceSearchWeeklyMetricRepository;
 
     @InjectMocks
     private ServiceService serviceService;
@@ -69,7 +71,7 @@ class ServiceServiceTest {
     }
 
     @Test
-    @DisplayName("Deve retornar faixa media de preco quando houver servicos concluidos com valor")
+    @DisplayName("Deve retornar faixa média de preço quando houver serviços concluídos com valor")
     void getPublicServiceByIdWithPricing_returnsAverageRange() {
         Service service = buildService(7L, new BigDecimal("200.00"));
 
@@ -93,7 +95,7 @@ class ServiceServiceTest {
     }
 
     @Test
-    @DisplayName("Deve manter o preco cadastrado quando nao houver historico concluido")
+    @DisplayName("Deve manter o preço cadastrado quando não houver histórico concluído")
     void getPublicServiceByIdWithPricing_keepsRegisteredPriceWithoutHistory() {
         Service service = buildService(9L, new BigDecimal("180.00"));
 
@@ -116,7 +118,7 @@ class ServiceServiceTest {
     }
 
     @Test
-    @DisplayName("Deve retornar faixa media de preco nas listagens publicas quando houver historico concluido")
+    @DisplayName("Deve retornar faixa média de preço nas listagens públicas quando houver histórico concluído")
     void getAllActiveServices_returnsAverageRangeForPublicListings() {
         Service service = buildService(11L, new BigDecimal("80.00"));
 
@@ -141,7 +143,7 @@ class ServiceServiceTest {
     }
 
     @Test
-    @DisplayName("Deve manter o preco cadastrado nas listagens publicas quando nao houver historico concluido")
+    @DisplayName("Deve manter o preço cadastrado nas listagens públicas quando não houver histórico concluído")
     void getAllActiveServices_keepsRegisteredPriceWithoutHistory() {
         Service service = buildService(12L, new BigDecimal("150.00"));
 
@@ -165,7 +167,7 @@ class ServiceServiceTest {
     }
 
     @Test
-    @DisplayName("Deve ocultar servico publico quando o freelancer esta bloqueado")
+    @DisplayName("Deve ocultar serviço público quando o freelancer está bloqueado")
     void getVisiblePublicServiceByIdWithPricing_hidesBlockedFreelancer() {
         Service service = buildService(13L, new BigDecimal("120.00"));
         service.getFreelancer().setActive(false);
@@ -179,7 +181,7 @@ class ServiceServiceTest {
     }
 
     @Test
-    @DisplayName("Deve remover da listagem publica servicos de freelancers bloqueados")
+    @DisplayName("Deve remover da listagem pública serviços de freelancers bloqueados")
     void getAllActiveServices_filtersBlockedFreelancerServices() {
         Service visibleService = buildService(14L, new BigDecimal("90.00"));
         Service hiddenService = buildService(15L, new BigDecimal("110.00"));
@@ -196,7 +198,7 @@ class ServiceServiceTest {
     }
 
     @Test
-    @DisplayName("Deve filtrar servicos por nome do profissional quando houver categoria selecionada")
+    @DisplayName("Deve filtrar serviços por nome do profissional quando houver categoria selecionada")
     void getActiveServices_filtersByFreelancerNameWithCategorySelection() {
         Service matchingService = buildService(21L, new BigDecimal("95.00"));
         matchingService.getFreelancer().setName("Joao Silva");
@@ -217,7 +219,7 @@ class ServiceServiceTest {
     }
 
     @Test
-    @DisplayName("Deve registrar metricas semanais quando a busca publica for rastreavel")
+    @DisplayName("Deve registrar métricas semanais quando a busca pública for rastreável")
     void getActiveServices_tracksWeeklySearchResultsWhenRequested() {
         Service firstService = buildService(23L, new BigDecimal("90.00"));
         Service secondService = buildService(24L, new BigDecimal("130.00"));
@@ -238,7 +240,7 @@ class ServiceServiceTest {
     }
 
     @Test
-    @DisplayName("Nao deve registrar metricas quando a busca publica nao for rastreavel")
+    @DisplayName("Não deve registrar métricas quando a busca pública não for rastreável")
     void getActiveServices_skipsWeeklySearchTrackingWithoutIntent() {
         Service service = buildService(25L, new BigDecimal("75.00"));
 
@@ -254,7 +256,7 @@ class ServiceServiceTest {
     }
 
     @Test
-    @DisplayName("Deve gerar auditoria semantica com diff ao atualizar o titulo do servico")
+    @DisplayName("Deve gerar auditoria semântica com diff ao atualizar o título do serviço")
     void updateService_recordsSemanticAuditForTitleChange() {
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken("freela@servija.com", "secret"));
@@ -292,7 +294,7 @@ class ServiceServiceTest {
     }
 
     @Test
-    @DisplayName("Deve fazer soft delete quando o servico possui solicitacoes associadas")
+    @DisplayName("Deve fazer soft delete quando o serviço possui solicitações associadas")
     void deleteService_softDeletesWhenServiceHasRequests() {
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken("freela@servija.com", "secret"));
@@ -317,7 +319,7 @@ class ServiceServiceTest {
     }
 
     @Test
-    @DisplayName("Deve fazer hard delete quando o servico nao possui solicitacoes associadas")
+    @DisplayName("Deve fazer hard delete quando o serviço não possui solicitações associadas")
     void deleteService_hardDeletesWhenServiceHasNoRequests() {
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken("freela@servija.com", "secret"));

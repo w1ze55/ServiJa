@@ -36,7 +36,7 @@ class AsaasWebhookControllerTest {
     }
 
     @Test
-    @DisplayName("Deve responder REFUSED no webhook de autorizacao quando token for invalido")
+    @DisplayName("Deve responder REFUSED no webhook de autorização quando token for inválido")
     void shouldRefuseTransferAuthorizationWhenTokenIsInvalid() {
         ResponseEntity<Map<String, String>> response = controller.handleTransferAuthorization(
                 Map.of("type", "TRANSFER"),
@@ -45,12 +45,12 @@ class AsaasWebhookControllerTest {
 
         assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
         assertThat(response.getBody()).containsEntry("status", "REFUSED");
-        assertThat(response.getBody()).containsEntry("refuseReason", "Token invalido");
+        assertThat(response.getBody()).containsEntry("refuseReason", "Token inválido");
         verifyNoInteractions(transferAuthorizationService);
     }
 
     @Test
-    @DisplayName("Deve encaminhar autorizacao valida ao servico")
+    @DisplayName("Deve encaminhar autorização válida ao serviço")
     void shouldDelegateTransferAuthorizationToService() {
         when(transferAuthorizationService.authorizeTransfer(Map.of("type", "TRANSFER")))
                 .thenReturn(Map.of("status", "APPROVED"));

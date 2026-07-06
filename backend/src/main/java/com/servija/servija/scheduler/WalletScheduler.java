@@ -17,7 +17,7 @@ import java.util.List;
 
 /**
  * Scheduler para liberar automaticamente o saldo pendente quando o cliente
- * nao aprova a entrega dentro de 7 dias.
+ * não aprova a entrega dentro de 7 dias.
  */
 @Component
 @RequiredArgsConstructor
@@ -32,9 +32,9 @@ public class WalletScheduler {
     private static final int AUTO_RELEASE_DAYS = 7;
 
     /**
-     * Executa a cada hora para verificar pagamentos pendentes de liberacao.
-     * Regra: Se o servico foi entregue (DELIVERED) ha mais de 7 dias
-     * e o cliente nao aprovou, o saldo e liberado automaticamente.
+     * Executa a cada hora para verificar pagamentos pendentes de liberação.
+     * Regra: Se o serviço foi entregue (DELIVERED) há mais de 7 dias
+     * e o cliente não aprovou, o saldo é liberado automaticamente.
      */
     @Scheduled(fixedRate = 3600000)
     @Transactional
@@ -71,7 +71,7 @@ public class WalletScheduler {
                             serviceRequest,
                             payment.getFreelancer(),
                             com.servija.servija.model.ServiceRequestHistory.OperationType.SERVICE_COMPLETED,
-                            "Servico concluido automaticamente apos 7 dias sem aprovacao do cliente");
+                            "Serviço concluído automaticamente após 7 dias sem aprovação do cliente");
 
                     released++;
                     log.info(

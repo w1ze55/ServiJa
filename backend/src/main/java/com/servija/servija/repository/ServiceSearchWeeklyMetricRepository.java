@@ -15,6 +15,8 @@ public interface ServiceSearchWeeklyMetricRepository extends JpaRepository<Servi
 
     List<ServiceSearchWeeklyMetric> findByService_IdInAndWeekStartDate(List<Long> serviceIds, LocalDate weekStartDate);
 
+    void deleteByService_Id(Long serviceId);
+
     @Query("""
             select metric.service.id
             from ServiceSearchWeeklyMetric metric

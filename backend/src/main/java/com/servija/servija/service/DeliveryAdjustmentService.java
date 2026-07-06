@@ -68,12 +68,26 @@ public class DeliveryAdjustmentService {
 
         adjustment = adjustmentRepository.save(adjustment);
 
+        // Voltar o serviço para "em andamento" enquanto o freelancer refaz a entrega.
+        // Isso impede que o cliente aprove antes do reenvio e libera o fluxo de
+        // reenvio pelo freelancer (que exige status IN_PROGRESS).
+        serviceRequest.setStatus(ServiceRequest.Status.IN_PROGRESS);
+        serviceRequestRepository.save(serviceRequest);
+
         // Registrar no histórico
         historyService.record(
                 serviceRequest,
                 contractor,
                 ServiceRequestHistory.OperationType.ADJUSTMENTS_REQUESTED,
                 "Ajustes solicitados"
+        );
+
+        // Notificar mudança de status para ambas as partes
+        notificationService.notifyServiceRequestStatusChange(
+                serviceRequestId,
+                ServiceRequest.Status.IN_PROGRESS.name(),
+                contractor.getEmail(),
+                serviceRequest.getFreelancer() != null ? serviceRequest.getFreelancer().getEmail() : null
         );
 
         // Notificar freelancer via WebSocket

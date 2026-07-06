@@ -37,7 +37,7 @@ class AdminDashboardControllerTest {
     }
 
     @Test
-    @DisplayName("Deve converter os parametros de data e retornar 200 no dashboard admin")
+    @DisplayName("Deve converter os parâmetros de data e retornar 200 no dashboard admin")
     void getDashboard_returnsOk() throws Exception {
         when(adminDashboardService.getDashboard(LocalDate.of(2026, 5, 1), LocalDate.of(2026, 5, 31)))
                 .thenReturn(AdminDashboardResponse.builder().build());

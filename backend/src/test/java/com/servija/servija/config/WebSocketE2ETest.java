@@ -131,7 +131,7 @@ class WebSocketE2ETest {
     }
 
     @Test
-    @DisplayName("cliente autenticado via SockJS XHR recebe evento no topico de notificacoes")
+    @DisplayName("cliente autenticado via SockJS XHR recebe evento no tópico de notificações")
     void authenticatedSockJsClientReceivesNotificationEvent() throws Exception {
         UserDetails userDetails = User.withUsername("user@test.com")
                 .password("secret")

@@ -1179,7 +1179,7 @@ onUnmounted(() => {
             class="flex items-center justify-between rounded-xl border border-gray-200 px-4 py-3 cursor-pointer"
           >
             <span class="text-sm font-medium text-[#263238]"
-              >Somente disponiveis</span
+              >Somente disponíveis</span
             >
             <input
               type="checkbox"

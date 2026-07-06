@@ -6,6 +6,7 @@ import com.servija.servija.dto.ServiceRequestResponse;
 import com.servija.servija.model.Payment;
 import com.servija.servija.model.ServiceRequest;
 import com.servija.servija.model.User;
+import com.servija.servija.repository.DeliveryAdjustmentRepository;
 import com.servija.servija.repository.PaymentRepository;
 import com.servija.servija.repository.ServiceRepository;
 import com.servija.servija.repository.ServiceRequestRepository;
@@ -68,6 +69,9 @@ class ServiceRequestServiceTest {
     @Mock
     private ChatService chatService;
 
+    @Mock
+    private DeliveryAdjustmentRepository deliveryAdjustmentRepository;
+
     @InjectMocks
     private ServiceRequestService serviceRequestService;
 
@@ -125,8 +129,8 @@ class ServiceRequestServiceTest {
     }
 
     @Test
-    @DisplayName("Deve rejeitar proposta do freelancer abaixo de R$ 20,00")
-    void respondToRequest_rejectsValueBelowTwenty() {
+    @DisplayName("Deve rejeitar proposta do freelancer abaixo de R$ 40,00")
+    void respondToRequest_rejectsValueBelowMinimum() {
         ServiceRequest request = buildRequest(null);
 
         when(serviceRequestRepository.findById(11L)).thenReturn(Optional.of(request));
@@ -135,21 +139,21 @@ class ServiceRequestServiceTest {
         assertThatThrownBy(() -> serviceRequestService.respondToRequest(
                 11L,
                 com.servija.servija.dto.FreelancerResponseDTO.builder()
-                        .value(new BigDecimal("19.99"))
+                        .value(new BigDecimal("39.99"))
                         .executionDays(5)
                         .scope("Escopo")
                         .notes("Notas")
                         .build(),
                 "freela@servija.com"))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("O valor mínimo é R$ 20,00");
+                .hasMessage("O valor mínimo é R$ 40,00");
 
         verify(serviceRequestRepository, never()).save(any(ServiceRequest.class));
     }
 
     @Test
-    @DisplayName("Deve rejeitar contra proposta abaixo de R$ 20,00")
-    void counterProposal_rejectsValueBelowTwenty() {
+    @DisplayName("Deve rejeitar contra proposta abaixo de R$ 40,00")
+    void counterProposal_rejectsValueBelowMinimum() {
         ServiceRequest request = buildRequest(null);
 
         when(serviceRequestRepository.findById(11L)).thenReturn(Optional.of(request));
@@ -158,13 +162,13 @@ class ServiceRequestServiceTest {
         assertThatThrownBy(() -> serviceRequestService.counterProposal(
                 11L,
                 com.servija.servija.dto.CounterProposalDTO.builder()
-                        .value(new BigDecimal("18.00"))
+                        .value(new BigDecimal("38.00"))
                         .executionDays(7)
                         .notes("Posso ajustar")
                         .build(),
                 "cliente@servija.com"))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("O valor mínimo é R$ 20,00");
+                .hasMessage("O valor mínimo é R$ 40,00");
 
         verify(serviceRequestRepository, never()).save(any(ServiceRequest.class));
     }
@@ -204,7 +208,7 @@ class ServiceRequestServiceTest {
         when(paymentRepository.findByServiceRequestId(11L)).thenReturn(List.of(payment));
         when(serviceRequestRepository.save(any(ServiceRequest.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        ServiceRequestResponse response = serviceRequestService.completeService(11L, "cliente@servija.com");
+        ServiceRequestResponse response = serviceRequestService.completeService(11L, null, "cliente@servija.com");
 
         assertThat(response.getStatus()).isEqualTo("COMPLETED");
         verify(walletService).releasePendingBalance(payment);

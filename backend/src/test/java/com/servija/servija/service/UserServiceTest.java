@@ -104,7 +104,7 @@ class UserServiceTest {
     }
 
     @Test
-    @DisplayName("updateAvatar aceita base64, atualiza o usuario e publica websocket")
+    @DisplayName("updateAvatar aceita base64, atualiza o usuário e publica websocket")
     void updateAvatarUpdatesAvatarAndNotifiesSocket() {
         User user = baseUser();
         User updated = baseUser();

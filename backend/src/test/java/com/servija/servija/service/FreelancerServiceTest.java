@@ -301,7 +301,7 @@ class FreelancerServiceTest {
     }
 
     @Test
-    @DisplayName("Deve usar cidade atendida para elegibilidade e endereco padrao para marker")
+    @DisplayName("Deve usar cidade atendida para elegibilidade e endereço padrão para marker")
     void findNearbyFreelancers_usesDefaultAddressForMarkerAndServiceCityForCoverage() {
         Freelancer servesPalhoca = buildNearbyFreelancer(1L, "Ana Costa", -27.6455, -48.6697);
         Freelancer servesOnlyFlorianopolis = buildNearbyFreelancer(2L, "Bruno Lima", -27.5949, -48.5482);

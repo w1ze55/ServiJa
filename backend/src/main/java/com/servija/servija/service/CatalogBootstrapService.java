@@ -19,6 +19,6 @@ public class CatalogBootstrapService implements ApplicationRunner {
     public void run(ApplicationArguments args) {
         categoryCatalogService.seedCatalogIfNeeded();
         categoryCatalogService.backfillLegacyAssignments();
-        log.info("Catalogo de categorias inicializado");
+        log.info("Catálogo de categorias inicializado");
     }
 }

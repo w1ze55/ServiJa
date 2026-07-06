@@ -36,7 +36,7 @@ class WalletReportServiceTest {
     private WalletReportService service;
 
     @Test
-    @DisplayName("generateReport gera planilha Excel com resumo e transacoes")
+    @DisplayName("generateReport gera planilha Excel com resumo e transações")
     void generateReportGeneratesExcel() throws Exception {
         User user = User.builder().id(1L).name("Freela").email("freela@test.com").build();
         when(userRepository.findByEmail(user.getEmail())).thenReturn(Optional.of(user));
@@ -61,13 +61,13 @@ class WalletReportServiceTest {
         assertThat(report.contentType()).contains("spreadsheetml");
         try (XSSFWorkbook workbook = new XSSFWorkbook(new ByteArrayInputStream(report.content()))) {
             assertThat(workbook.getSheet("Resumo")).isNotNull();
-            assertThat(workbook.getSheet("Transacoes")).isNotNull();
-            assertThat(workbook.getSheet("Transacoes").getRow(1).getCell(0).getStringCellValue()).isEqualTo("Recebimento");
+            assertThat(workbook.getSheet("Transações")).isNotNull();
+            assertThat(workbook.getSheet("Transações").getRow(1).getCell(0).getStringCellValue()).isEqualTo("Recebimento");
         }
     }
 
     @Test
-    @DisplayName("generateReport gera PDF com header valido")
+    @DisplayName("generateReport gera PDF com header válido")
     void generateReportGeneratesPdf() {
         User user = User.builder().id(1L).name("Freela").email("freela@test.com").build();
         when(userRepository.findByEmail(user.getEmail())).thenReturn(Optional.of(user));

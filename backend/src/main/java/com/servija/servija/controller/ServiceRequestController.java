@@ -1,6 +1,7 @@
 package com.servija.servija.controller;
 
 import com.servija.servija.dto.CounterProposalDTO;
+import com.servija.servija.dto.DeliverySubmissionDTO;
 import com.servija.servija.dto.FreelancerAttachmentsRequest;
 import com.servija.servija.dto.FreelancerResponseDTO;
 import com.servija.servija.dto.ProjectAttachmentsRequest;
@@ -176,10 +177,12 @@ public class ServiceRequestController {
     @PatchMapping("/{id}/complete")
     @Operation(summary = "Marcar serviço como concluído", description = "Cliente marca o serviço como concluído após execução pelo freelancer")
     @SecurityRequirement(name = "bearerAuth")
-    public ResponseEntity<ServiceRequestResponse> completeService(@PathVariable Long id) {
+    public ResponseEntity<ServiceRequestResponse> completeService(
+            @PathVariable Long id,
+            @Valid @RequestBody(required = false) DeliverySubmissionDTO delivery) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String email = authentication.getName();
-        return ResponseEntity.ok(serviceRequestService.completeService(id, email));
+        return ResponseEntity.ok(serviceRequestService.completeService(id, delivery, email));
     }
 
     @DeleteMapping("/{id}")

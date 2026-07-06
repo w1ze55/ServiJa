@@ -23,8 +23,8 @@ public interface FavoriteRepository extends JpaRepository<Favorite, Long> {
 
     boolean existsByUserIdAndFreelancerId(Long userId, Long freelancerId);
 
-    // Remove todos os favoritos que apontam para um servico (ao excluir o servico).
-    // Bulk delete imediato para garantir a ordem em relacao a remocao do servico (FK).
+    // Remove todos os favoritos que apontam para um serviço (ao excluir o serviço).
+    // Bulk delete imediato para garantir a ordem em relação à remoção do serviço (FK).
     @Modifying
     @Query("delete from Favorite f where f.service.id = :serviceId")
     void deleteByServiceId(@Param("serviceId") Long serviceId);

@@ -118,23 +118,23 @@ export function isAudioRecordingSupported() {
 
 export function getAudioRecordingUnavailableReason() {
   if (typeof window === 'undefined' || typeof navigator === 'undefined') {
-    return 'Gravacao de audio indisponivel neste contexto.';
+    return 'Gravação de áudio indisponível neste contexto.';
   }
   if (!window.isSecureContext) {
-    return 'O microfone so funciona em HTTPS ou localhost.';
+    return 'O microfone só funciona em HTTPS ou localhost.';
   }
   if (!navigator.mediaDevices?.getUserMedia) {
-    return 'O navegador nao disponibiliza acesso ao microfone.';
+    return 'O navegador não disponibiliza acesso ao microfone.';
   }
   if (typeof MediaRecorder === 'undefined') {
-    return 'Este navegador nao suporta gravacao de audio.';
+    return 'Este navegador não suporta gravação de áudio.';
   }
-  return 'Gravacao de audio indisponivel neste navegador.';
+  return 'Gravação de áudio indisponível neste navegador.';
 }
 
 export function getMicrophoneAccessErrorMessage(error: unknown) {
   if (typeof window !== 'undefined' && !window.isSecureContext) {
-    return 'O microfone so funciona em HTTPS ou localhost.';
+    return 'O microfone só funciona em HTTPS ou localhost.';
   }
 
   const errorName =
@@ -145,24 +145,24 @@ export function getMicrophoneAccessErrorMessage(error: unknown) {
   switch (errorName) {
     case 'NotAllowedError':
     case 'PermissionDeniedError':
-      return 'Permissao do microfone negada ou bloqueada pelo navegador.';
+      return 'Permissão do microfone negada ou bloqueada pelo navegador.';
     case 'SecurityError':
-      return 'O navegador bloqueou o acesso ao microfone nesta pagina.';
+      return 'O navegador bloqueou o acesso ao microfone nesta página.';
     case 'NotFoundError':
     case 'DevicesNotFoundError':
       return 'Nenhum microfone foi encontrado no dispositivo.';
     case 'NotReadableError':
     case 'TrackStartError':
-      return 'O microfone esta em uso por outro aplicativo ou indisponivel.';
+      return 'O microfone está em uso por outro aplicativo ou indisponível.';
     case 'OverconstrainedError':
     case 'ConstraintNotSatisfiedError':
-      return 'Nao foi possivel iniciar o microfone com as configuracoes atuais.';
+      return 'Não foi possível iniciar o microfone com as configurações atuais.';
     case 'AbortError':
-      return 'A captura de audio foi interrompida antes de iniciar.';
+      return 'A captura de áudio foi interrompida antes de iniciar.';
     case 'TypeError':
-      return 'O microfone so funciona em HTTPS ou localhost.';
+      return 'O microfone só funciona em HTTPS ou localhost.';
     default:
-      return 'Nao foi possivel acessar o microfone.';
+      return 'Não foi possível acessar o microfone.';
   }
 }
 
@@ -178,7 +178,7 @@ export function logAudioRecordingError(scope: string, error: unknown) {
           preferredMimeType: pickSupportedAudioMimeType(),
         };
 
-  console.error(`[${scope}] Falha ao iniciar gravacao de audio`, {
+  console.error(`[${scope}] Falha ao iniciar gravação de áudio`, {
     error,
     ...browserContext,
   });

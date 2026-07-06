@@ -19,7 +19,7 @@ export function useNotificationsRealtime(userEmail: string) {
     }
 
     if (!userEmail) {
-      connectionError.value = 'Email do usuario nao disponivel';
+      connectionError.value = 'E-mail do usuário não disponível';
       return Promise.resolve();
     }
 

@@ -43,7 +43,7 @@ class CryptoServiceTest {
     }
 
     @Test
-    @DisplayName("init rejeita chave que nao decodifica 32 bytes")
+    @DisplayName("init rejeita chave que não decodifica 32 bytes")
     void initRejectsInvalidKeyLength() {
         CryptoService service = new CryptoService();
         ReflectionTestUtils.setField(service, "base64Key", Base64.getEncoder().encodeToString(new byte[16]));

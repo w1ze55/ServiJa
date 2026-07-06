@@ -84,5 +84,12 @@ export const chatService = {
 
   async markAsRead(conversationId: string): Promise<void> {
     await api.put(`/chat/conversations/${conversationId}/read`);
+    // Notifica a aplicação que as mensagens desta conversa foram lidas,
+    // para atualizar indicadores (ex.: ponto vermelho no menu) em tempo real.
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('chat-messages-read', { detail: { conversationId } })
+      );
+    }
   },
 };

@@ -39,7 +39,7 @@ public class CurrentUserContextService {
 
     public User requireAuthenticatedUser() {
         return getOptionalAuthenticatedUser()
-                .orElseThrow(() -> new ResourceNotFoundException("Usuario autenticado nao encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário autenticado não encontrado"));
     }
 
     public User requireActiveRole(User.UserType role) {
@@ -53,21 +53,21 @@ public class CurrentUserContextService {
     public Contractor requireContractorProfile() {
         User user = requireActiveRole(User.UserType.CONTRACTOR);
         return contractorRepository.findById(user.getId())
-                .orElseThrow(() -> new IllegalStateException("Perfil de cliente nao encontrado"));
+                .orElseThrow(() -> new IllegalStateException("Perfil de cliente não encontrado"));
     }
 
     public Freelancer requireFreelancerProfile() {
         User user = requireActiveRole(User.UserType.FREELANCER);
         return freelancerRepository.findById(user.getId())
-                .orElseThrow(() -> new IllegalStateException("Perfil de freelancer nao encontrado"));
+                .orElseThrow(() -> new IllegalStateException("Perfil de freelancer não encontrado"));
     }
 
     public User requireContractorMarketplaceAccess() {
         User user = getOptionalAuthenticatedUser()
                 .orElseThrow(() -> new AccessDeniedException(
-                        "Marketplace disponivel apenas para clientes autenticados"));
+                        "Marketplace disponível apenas para clientes autenticados"));
         if (user.getUserType() != User.UserType.CONTRACTOR) {
-            throw new AccessDeniedException("Marketplace disponivel apenas no contexto de cliente");
+            throw new AccessDeniedException("Marketplace disponível apenas no contexto de cliente");
         }
         return user;
     }
@@ -77,7 +77,7 @@ public class CurrentUserContextService {
                 .filter(user -> user.getUserType() == User.UserType.FREELANCER)
                 .ifPresent(user -> {
                     throw new AccessDeniedException(
-                            "Marketplace indisponivel no contexto de freelancer");
+                            "Marketplace indisponível no contexto de freelancer");
                 });
     }
 
@@ -87,15 +87,15 @@ public class CurrentUserContextService {
                 .filter(user -> user.getUserType() == User.UserType.CONTRACTOR)
                 .ifPresent(user -> {
                     throw new AccessDeniedException(
-                            "Voce nao pode acessar o proprio perfil publico de freelancer neste contexto");
+                            "Você não pode acessar o próprio perfil público de freelancer neste contexto");
                 });
     }
 
     private String messageForRole(User.UserType role) {
         return switch (role) {
-            case CONTRACTOR -> "Usuario nao esta no contexto de cliente";
-            case FREELANCER -> "Usuario nao esta no contexto de freelancer";
-            case ADMIN -> "Usuario nao esta no contexto de administrador";
+            case CONTRACTOR -> "Usuário não está no contexto de cliente";
+            case FREELANCER -> "Usuário não está no contexto de freelancer";
+            case ADMIN -> "Usuário não está no contexto de administrador";
         };
     }
 }

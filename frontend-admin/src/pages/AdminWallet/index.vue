@@ -32,6 +32,7 @@ import SelectTrigger from '@/components/ui/select-trigger.vue'
 import SelectValue from '@/components/ui/select-value.vue'
 import StatCard from '@/components/ui/stat-card.vue'
 import { toast } from '@/utils/toast'
+import { formatApiDate } from '@/utils/apiDate'
 import {
   useAdminPlatformWalletStore,
   type AdminWalletTimeFilter,
@@ -112,16 +113,16 @@ const formatCurrency = (value: number | null | undefined) =>
 const formatDateTime = (value?: string) => {
   if (!value) return '-'
 
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '-'
-
-  return new Intl.DateTimeFormat('pt-BR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date)
+  // Timestamp em UTC (sem offset); exibe sempre em horário de Brasília.
+  return (
+    formatApiDate(value, {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    }) || '-'
+  )
 }
 
 const parseAmount = (value: string) => {
@@ -459,8 +460,8 @@ const summaryCards = computed(() => [
   },
   {
     key: 'earned',
-    title: 'Receita liquida acumulada',
-    subtitle: 'Total liquido com taxas da plataforma e acrescimos de parcelamento',
+    title: 'Receita líquida acumulada',
+    subtitle: 'Total líquido com taxas da plataforma e acréscimos de parcelamento',
     value: formatCurrency(wallet.value?.totalEarned),
     icon: ReceiptText,
     iconWrapper: 'bg-blue-100',
@@ -695,7 +696,7 @@ onMounted(() => {
     <div class="space-y-6">
       <PageHeader
         title="Carteira da Plataforma"
-        subtitle="Gerencie o saldo institucional da Servi Já, as contas globais de saque e o historico da receita liquida da plataforma."
+        subtitle="Gerencie o saldo institucional da Servi Já, as contas globais de saque e o histórico da receita líquida da plataforma."
       >
         <template #actions>
           <div class="flex flex-col gap-2 sm:flex-row">

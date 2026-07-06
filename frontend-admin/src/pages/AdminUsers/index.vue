@@ -5,6 +5,7 @@ import AdminLayout from '@/layouts/AdminLayout.vue';
 import UserDrawer from './UserDrawer.vue';
 import { useAdminUserStore } from '@/stores/adminUserStore';
 import { type AdminUserSummary } from '@/api/services/adminUserService';
+import { formatApiDateOnly } from '@/utils/apiDate';
 import Select from '@/components/ui/select.vue';
 import DatePicker from '@/components/ui/date-picker.vue';
 import SelectContent from '@/components/ui/select-content.vue';
@@ -167,11 +168,10 @@ const userTypeBadge = (type: string) => {
   }
 };
 
-const formatDate = (dateStr: string) => {
-  return new Date(dateStr).toLocaleDateString('pt-BR', {
+const formatDate = (dateStr: string) =>
+  formatApiDateOnly(dateStr, {
     day: '2-digit', month: '2-digit', year: 'numeric',
   });
-};
 
 const pageNumbers = computed(() => {
   const total = store.totalPages;

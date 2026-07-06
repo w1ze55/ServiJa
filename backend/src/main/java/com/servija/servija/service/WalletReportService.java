@@ -58,7 +58,7 @@ public class WalletReportService {
 
     public ReportFile generateReport(String email, ReportFormat format) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("Usuario nao encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
 
         List<WalletTransactionResponse> transactions = transactionService.getTransactions(email, "ALL");
         Map<String, BigDecimal> wallet = walletService.getWalletBalance(email);
@@ -85,7 +85,7 @@ public class WalletReportService {
     ) {
         try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
             Sheet resumoSheet = workbook.createSheet("Resumo");
-            Sheet transacoesSheet = workbook.createSheet("Transacoes");
+            Sheet transacoesSheet = workbook.createSheet("Transações");
 
             CellStyle headerStyle = workbook.createCellStyle();
             org.apache.poi.ss.usermodel.Font headerFont = workbook.createFont();
@@ -94,18 +94,18 @@ public class WalletReportService {
             headerStyle.setAlignment(HorizontalAlignment.LEFT);
 
             int resumoRowIndex = 0;
-            resumoRowIndex = createKeyValueRow(resumoSheet, resumoRowIndex, "Relatorio da carteira", "Servija", headerStyle);
+            resumoRowIndex = createKeyValueRow(resumoSheet, resumoRowIndex, "Relatório da carteira", "Servija", headerStyle);
             resumoRowIndex = createKeyValueRow(resumoSheet, resumoRowIndex, "Freelancer", user.getName(), null);
             resumoRowIndex = createKeyValueRow(resumoSheet, resumoRowIndex, "Email", email, null);
-            resumoRowIndex = createKeyValueRow(resumoSheet, resumoRowIndex, "Data do relatorio", LocalDateTime.now().format(DATE_FMT), null);
+            resumoRowIndex = createKeyValueRow(resumoSheet, resumoRowIndex, "Data do relatório", LocalDateTime.now().format(DATE_FMT), null);
             resumoRowIndex++;
             resumoRowIndex = createKeyValueRow(resumoSheet, resumoRowIndex, "Saldo total", formatBRL(wallet.get("totalEarned")), headerStyle);
-            resumoRowIndex = createKeyValueRow(resumoSheet, resumoRowIndex, "Disponivel para saque", formatBRL(wallet.get("availableBalance")), null);
+            resumoRowIndex = createKeyValueRow(resumoSheet, resumoRowIndex, "Disponível para saque", formatBRL(wallet.get("availableBalance")), null);
             resumoRowIndex = createKeyValueRow(resumoSheet, resumoRowIndex, "Pendente", formatBRL(wallet.get("pendingBalance")), null);
             createKeyValueRow(resumoSheet, resumoRowIndex, "Total sacado", formatBRL(wallet.get("totalWithdrawn")), null);
 
             Row headerRow = transacoesSheet.createRow(0);
-            String[] headers = {"Tipo", "Descricao", "Valor", "Status", "Forma de pagamento", "Data"};
+            String[] headers = {"Tipo", "Descrição", "Valor", "Status", "Forma de pagamento", "Data"};
             for (int i = 0; i < headers.length; i++) {
                 Cell cell = headerRow.createCell(i);
                 cell.setCellValue(headers[i]);
@@ -133,8 +133,8 @@ public class WalletReportService {
             workbook.write(baos);
             return baos.toByteArray();
         } catch (IOException e) {
-            log.error("Erro ao gerar relatorio em Excel", e);
-            throw new RuntimeException("Erro ao gerar relatorio: " + e.getMessage());
+            log.error("Erro ao gerar relatório em Excel", e);
+            throw new RuntimeException("Erro ao gerar relatório: " + e.getMessage());
         }
     }
 
@@ -149,14 +149,14 @@ public class WalletReportService {
             PdfWriter.getInstance(document, baos);
             document.open();
 
-            document.add(new Paragraph("Relatorio da Carteira - Servija", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 16)));
+            document.add(new Paragraph("Relatório da Carteira - Servija", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 16)));
             document.add(new Paragraph("Freelancer: " + user.getName()));
             document.add(new Paragraph("Email: " + email));
-            document.add(new Paragraph("Data do relatorio: " + LocalDateTime.now().format(DATE_FMT)));
+            document.add(new Paragraph("Data do relatório: " + LocalDateTime.now().format(DATE_FMT)));
             document.add(new Paragraph(" "));
             document.add(new Paragraph("Resumo", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12)));
             document.add(new Paragraph("Saldo total: " + formatBRL(wallet.get("totalEarned"))));
-            document.add(new Paragraph("Disponivel para saque: " + formatBRL(wallet.get("availableBalance"))));
+            document.add(new Paragraph("Disponível para saque: " + formatBRL(wallet.get("availableBalance"))));
             document.add(new Paragraph("Pendente: " + formatBRL(wallet.get("pendingBalance"))));
             document.add(new Paragraph("Total sacado: " + formatBRL(wallet.get("totalWithdrawn"))));
             document.add(new Paragraph(" "));
@@ -164,7 +164,7 @@ public class WalletReportService {
             PdfPTable table = new PdfPTable(new float[]{1.5f, 4f, 2f, 2f, 2f, 2.5f});
             table.setWidthPercentage(100);
             addPdfHeaderCell(table, "Tipo");
-            addPdfHeaderCell(table, "Descricao");
+            addPdfHeaderCell(table, "Descrição");
             addPdfHeaderCell(table, "Valor");
             addPdfHeaderCell(table, "Status");
             addPdfHeaderCell(table, "Forma de pagamento");
@@ -183,8 +183,8 @@ public class WalletReportService {
             document.close();
             return baos.toByteArray();
         } catch (DocumentException | IOException e) {
-            log.error("Erro ao gerar relatorio em PDF", e);
-            throw new RuntimeException("Erro ao gerar relatorio: " + e.getMessage());
+            log.error("Erro ao gerar relatório em PDF", e);
+            throw new RuntimeException("Erro ao gerar relatório: " + e.getMessage());
         }
     }
 
@@ -224,7 +224,7 @@ public class WalletReportService {
     private String translateStatus(String status) {
         if (status == null) return "-";
         return switch (status) {
-            case "COMPLETED" -> "Concluido";
+            case "COMPLETED" -> "Concluído";
             case "PENDING" -> "Pendente";
             case "PROCESSING" -> "Processando";
             case "FAILED" -> "Falhou";
