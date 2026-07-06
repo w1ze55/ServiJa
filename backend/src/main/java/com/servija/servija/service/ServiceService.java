@@ -14,6 +14,7 @@ import com.servija.servija.repository.FreelancerRepository;
 import com.servija.servija.repository.ReviewRepository;
 import com.servija.servija.repository.ServiceRepository;
 import com.servija.servija.repository.ServiceRequestRepository;
+import com.servija.servija.repository.ServiceSearchWeeklyMetricRepository;
 import com.servija.servija.repository.UserRepository;
 import com.servija.servija.util.PublicVisibilityRules;
 import lombok.RequiredArgsConstructor;
@@ -47,6 +48,7 @@ public class ServiceService {
     private final ObjectMapper objectMapper;
     private final CategoryCatalogService categoryCatalogService;
     private final ServiceSearchWeeklyMetricService serviceSearchWeeklyMetricService;
+    private final ServiceSearchWeeklyMetricRepository serviceSearchWeeklyMetricRepository;
     private final AuditLogger auditLogger;
     private final CurrentUserContextService currentUserContextService;
     private static final BigDecimal AVERAGE_PRICE_RANGE_SPREAD = new BigDecimal("0.20");
@@ -275,7 +277,10 @@ public class ServiceService {
             serviceRepository.save(service);
             log.info("Serviço marcado como excluído (soft delete): {}", id);
         } else {
-            // Hard delete: remove o registro e as imagens no S3
+            // Hard delete: remove o registro e as imagens no S3.
+            // Métricas de busca são dados descartáveis; removemos explicitamente para
+            // liberar a FK (em produção a constraint foi criada sem ON DELETE CASCADE).
+            serviceSearchWeeklyMetricRepository.deleteByService_Id(id);
             List<String> imageUrls = fromJson(service.getImages());
             serviceRepository.delete(service);
             log.info("Serviço excluído: {}", id);
