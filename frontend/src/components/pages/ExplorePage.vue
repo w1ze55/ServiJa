@@ -28,6 +28,7 @@ import SelectValue from '../ui/select-value.vue';
 import Tabs from '../ui/tabs.vue';
 import TabsList from '../ui/tabs-list.vue';
 import TabsTrigger from '../ui/tabs-trigger.vue';
+import PaginationBar from '../ui/pagination-bar.vue';
 import ServiceCard from '../service/ServiceCard.vue';
 import FreelancerCard from '../freelancer/FreelancerCard.vue';
 import api from '@/api/config/axios';
@@ -35,7 +36,7 @@ import { toast } from '@/utils/toast';
 import { useFavoritesStore } from '@/stores/favorites';
 import { useUserStore } from '@/stores/userStore';
 import { useCategoryCatalogStore } from '@/stores/categoryCatalogStore';
-import { getServicePriceDisplay, getServicePriceSortValue, type ServicePriceRangeData } from '@/utils/servicePricing';
+import { getServicePriceDisplay, type ServicePriceRangeData } from '@/utils/servicePricing';
 import { formatServiceRatingDisplay, hasServiceRating, type ServiceReviewSummary } from '@/utils/serviceReviews';
 import { isOwnFreelancerProfile } from '@/utils/userRoles';
 
@@ -43,29 +44,33 @@ interface ServiceItem extends ServicePriceRangeData, ServiceReviewSummary {
   id: number;
   freelancerId: number;
   freelancerName: string;
+  freelancerProfilePhoto?: string;
   title: string;
   category: string;
-  categorySlug?: string | null;
-  subcategory?: string | null;
-  subcategorySlug?: string | null;
   description: string;
   deliveryTime: number;
   deliveryUnit: string;
   workModel?: string | null;
-  freelancerProfilePhoto?: string;
-  tags: string[];
   images: string[];
-  isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
 }
 
-interface FreelancerProfileData {
+interface FreelancerCardItem {
   id: number;
+  name: string;
+  avatar?: string | null;
   location?: string | null;
-  rating?: number | null;
-  totalReviews?: number | null;
-  available?: boolean | null;
+  categories: string[];
+  servicesCount: number;
+  rating: number | null;
+  reviewCount: number;
+}
+
+interface PageResponse<T> {
+  content: T[];
+  totalElements: number;
+  totalPages: number;
+  currentPage: number;
+  pageSize: number;
 }
 
 interface Props {
@@ -76,7 +81,10 @@ const props = defineProps<Props>();
 const route = useRoute();
 const router = useRouter();
 
+const PAGE_SIZE = 20;
+
 const services = ref<ServiceItem[]>([]);
+const freelancers = ref<FreelancerCardItem[]>([]);
 const isLoading = ref(false);
 const error = ref('');
 const searchQuery = ref('');
@@ -85,7 +93,18 @@ const selectedSubcategory = ref('all');
 const sortBy = ref('recent');
 const searchMode = ref<'services' | 'professionals'>('services');
 const viewMode = ref<'grid' | 'list'>('grid');
-const freelancerProfiles = ref<Record<number, FreelancerProfileData>>({});
+
+// Páginas são 1-based na UI e 0-based na API
+const servicesPage = ref(1);
+const servicesTotalPages = ref(0);
+const servicesTotalElements = ref(0);
+const freelancersPage = ref(1);
+const freelancersTotalPages = ref(0);
+const freelancersTotalElements = ref(0);
+
+const servicesLoaded = ref(false);
+const freelancersLoaded = ref(false);
+const lastFiltersSignature = ref<string | null>(null);
 const lastTrackedSearchSignature = ref<string | null>(null);
 
 const favoritesStore = useFavoritesStore();
@@ -124,19 +143,30 @@ const sortOptions = [
   { value: 'name-asc', label: 'Nome (A-Z)' },
 ];
 
+const buildFilterParams = () => ({
+  categorySlug: selectedCategory.value !== 'all' ? selectedCategory.value : undefined,
+  subcategorySlug: selectedSubcategory.value !== 'all' ? selectedSubcategory.value : undefined,
+  q: searchQuery.value.trim() || undefined,
+});
+
 const loadServices = async (options?: { trackSearch?: boolean }) => {
   isLoading.value = true;
   error.value = '';
   try {
-    const response = await api.get('/services/public/all', {
+    const response = await api.get<PageResponse<ServiceItem>>('/services/public/all', {
       params: {
-        categorySlug: selectedCategory.value !== 'all' ? selectedCategory.value : undefined,
-        subcategorySlug: selectedSubcategory.value !== 'all' ? selectedSubcategory.value : undefined,
-        q: searchQuery.value.trim() || undefined,
+        ...buildFilterParams(),
+        sort: sortBy.value,
+        page: servicesPage.value - 1,
+        size: PAGE_SIZE,
         trackSearch: options?.trackSearch ? true : undefined,
       },
     });
-    services.value = response.data || [];
+    const data = response.data;
+    services.value = data?.content ?? [];
+    servicesTotalPages.value = data?.totalPages ?? 0;
+    servicesTotalElements.value = data?.totalElements ?? 0;
+    servicesLoaded.value = true;
 
     if (!favoritesStore.initialized) {
       favoritesStore.fetchFavorites();
@@ -147,6 +177,43 @@ const loadServices = async (options?: { trackSearch?: boolean }) => {
     toast.error('Erro ao carregar serviços');
   } finally {
     isLoading.value = false;
+  }
+};
+
+const loadFreelancers = async () => {
+  isLoading.value = true;
+  error.value = '';
+  try {
+    const response = await api.get<PageResponse<FreelancerCardItem>>('/services/public/freelancers', {
+      params: {
+        ...buildFilterParams(),
+        page: freelancersPage.value - 1,
+        size: PAGE_SIZE,
+      },
+    });
+    const data = response.data;
+    freelancers.value = data?.content ?? [];
+    freelancersTotalPages.value = data?.totalPages ?? 0;
+    freelancersTotalElements.value = data?.totalElements ?? 0;
+    freelancersLoaded.value = true;
+
+    if (!favoritesStore.initialized) {
+      favoritesStore.fetchFavorites();
+    }
+  } catch (err: any) {
+    console.error('Erro ao carregar profissionais:', err);
+    error.value = 'Não foi possível carregar os profissionais. Tente novamente.';
+    toast.error('Erro ao carregar profissionais');
+  } finally {
+    isLoading.value = false;
+  }
+};
+
+const retryLoad = () => {
+  if (searchMode.value === 'professionals') {
+    void loadFreelancers();
+  } else {
+    void loadServices();
   }
 };
 
@@ -223,42 +290,60 @@ const applyRouteFilters = async () => {
   selectedCategory.value = categorySlug || 'all';
   selectedSubcategory.value = subcategorySlug || 'all';
 
-  const signature = buildSearchSignature(query, categorySlug, subcategorySlug);
-  const shouldTrackSearch = hasExplicitSearchIntent(query, categorySlug, subcategorySlug)
-    && signature !== lastTrackedSearchSignature.value;
+  const filtersSignature = buildSearchSignature(query, categorySlug, subcategorySlug);
+  if (filtersSignature !== lastFiltersSignature.value) {
+    lastFiltersSignature.value = filtersSignature;
+    servicesPage.value = 1;
+    freelancersPage.value = 1;
+    servicesLoaded.value = false;
+    freelancersLoaded.value = false;
+    services.value = [];
+    freelancers.value = [];
+  }
 
-  lastTrackedSearchSignature.value = hasExplicitSearchIntent(query, categorySlug, subcategorySlug)
-    ? signature
-    : null;
-
-  await loadServices({ trackSearch: shouldTrackSearch });
-};
-
-const loadFreelancerProfiles = async (freelancerIds: number[]) => {
-  const visibleFreelancerIds = freelancerIds.filter(
-    (freelancerId) => !isOwnFreelancerProfile(userStore.user, freelancerId),
-  );
-
-  if (visibleFreelancerIds.length === 0) {
-    freelancerProfiles.value = {};
+  if (searchMode.value === 'professionals') {
+    if (!freelancersLoaded.value) {
+      await loadFreelancers();
+    }
     return;
   }
 
-  try {
-    const profiles = await Promise.all(
-      visibleFreelancerIds.map(async (freelancerId) => {
-        const response = await api.get(`/freelancer/${freelancerId}/profile`);
-        return response.data as FreelancerProfileData;
-      })
-    );
+  const shouldTrackSearch = hasExplicitSearchIntent(query, categorySlug, subcategorySlug)
+    && filtersSignature !== lastTrackedSearchSignature.value;
+  lastTrackedSearchSignature.value = hasExplicitSearchIntent(query, categorySlug, subcategorySlug)
+    ? filtersSignature
+    : null;
 
-    freelancerProfiles.value = profiles.reduce<Record<number, FreelancerProfileData>>((acc, profile) => {
-      acc[profile.id] = profile;
-      return acc;
-    }, {});
-  } catch (err) {
-    console.error('Erro ao carregar perfis de freelancers:', err);
+  if (!servicesLoaded.value) {
+    await loadServices({ trackSearch: shouldTrackSearch });
   }
+};
+
+const scrollToTop = () => {
+  if (typeof window !== 'undefined') {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+};
+
+const goToServicesPage = async (page: number) => {
+  if (page === servicesPage.value) return;
+  servicesPage.value = page;
+  await loadServices();
+  scrollToTop();
+};
+
+const goToFreelancersPage = async (page: number) => {
+  if (page === freelancersPage.value) return;
+  freelancersPage.value = page;
+  await loadFreelancers();
+  scrollToTop();
+};
+
+const handleSortChange = (value: string) => {
+  if (value === sortBy.value) return;
+  sortBy.value = value;
+  servicesPage.value = 1;
+  void loadServices();
 };
 
 const handleSearch = () => {
@@ -289,66 +374,31 @@ const handleSubcategoryChange = (value: string) => {
   void syncFiltersToRoute();
 };
 
-const filteredServices = computed(() => {
-  let result = services.value.filter(
+const filteredServices = computed(() =>
+  services.value.filter(
     (service) => !isOwnFreelancerProfile(userStore.user, service.freelancerId),
-  );
-
-  switch (sortBy.value) {
-    case 'price-asc':
-      result.sort((a, b) => getServicePriceSortValue(a) - getServicePriceSortValue(b));
-      break;
-    case 'price-desc':
-      result.sort((a, b) => getServicePriceSortValue(b) - getServicePriceSortValue(a));
-      break;
-    case 'name-asc':
-      result.sort((a, b) => a.title.localeCompare(b.title));
-      break;
-    case 'recent':
-    default:
-      result.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-      break;
-  }
-
-  return result;
-});
-
-const freelancerGroups = computed(() => {
-  const groups: Record<number, { freelancerName: string; freelancerId: number; freelancerProfilePhoto?: string; services: ServiceItem[] }> = {};
-  for (const svc of filteredServices.value) {
-    if (!groups[svc.freelancerId]) {
-      groups[svc.freelancerId] = {
-        freelancerName: svc.freelancerName,
-        freelancerId: svc.freelancerId,
-        freelancerProfilePhoto: svc.freelancerProfilePhoto,
-        services: [],
-      };
-    }
-    groups[svc.freelancerId].services.push(svc);
-  }
-  return Object.values(groups);
-});
-
-const freelancerResults = computed(() =>
-  freelancerGroups.value.map((group) => {
-    const profile = freelancerProfiles.value[group.freelancerId];
-
-    return {
-      id: group.freelancerId,
-      name: group.freelancerName,
-      avatar: group.freelancerProfilePhoto,
-      location: profile?.location || undefined,
-      category: Array.from(new Set(group.services.map((s) => s.category))).join(', '),
-      categories: Array.from(new Set(group.services.map((s) => s.category))),
-      servicesCount: group.services.length,
-      rating: profile?.rating ?? 5.0,
-      reviewCount: profile?.totalReviews ?? 0,
-      isAvailable: profile?.available ?? true,
-    };
-  })
+  ),
 );
 
-const totalFreelancers = computed(() => freelancerResults.value.length);
+const freelancerResults = computed(() =>
+  freelancers.value
+    .filter((freelancer) => !isOwnFreelancerProfile(userStore.user, freelancer.id))
+    .map((freelancer) => ({
+      id: freelancer.id,
+      name: freelancer.name,
+      avatar: freelancer.avatar || undefined,
+      location: freelancer.location || undefined,
+      category: freelancer.categories[0] ?? '',
+      categories: freelancer.categories,
+      servicesCount: freelancer.servicesCount,
+      rating: freelancer.rating ?? 0,
+      reviewCount: freelancer.reviewCount,
+      isAvailable: true,
+    })),
+);
+
+const totalServices = computed(() => servicesTotalElements.value);
+const totalFreelancers = computed(() => freelancersTotalElements.value);
 
 const toggleFavoriteService = (id: number | string) => {
   favoritesStore.toggleFavoriteService(id);
@@ -426,14 +476,6 @@ watch(
   () => {
     void syncFiltersToRoute();
   }
-);
-
-watch(
-  freelancerGroups,
-  (groups) => {
-    loadFreelancerProfiles(groups.map((group) => group.freelancerId));
-  },
-  { immediate: true }
 );
 
 watch(
@@ -535,8 +577,8 @@ watch(
         </div>
 
         <!-- Sort -->
-        <div class="w-full md:w-48">
-          <Select :model-value="sortBy" @update:model-value="(val) => sortBy = val as string">
+        <div v-if="searchMode === 'services'" class="w-full md:w-48">
+          <Select :model-value="sortBy" @update:model-value="(val) => handleSortChange(val as string)">
             <SelectTrigger>
               <SelectValue :label="sortOptions.find(o => o.value === sortBy)?.label" />
             </SelectTrigger>
@@ -608,7 +650,7 @@ watch(
       <AlertCircle class="h-12 w-12 text-red-400 mx-auto mb-4" />
       <h3 class="text-lg font-semibold text-[#263238] mb-2">Ops, algo deu errado</h3>
       <p class="text-[#435574] mb-4">{{ error }}</p>
-      <Button @click="loadServices">
+      <Button @click="retryLoad">
         <RefreshCw class="h-4 w-4 mr-2" /> Tentar novamente
       </Button>
     </div>
@@ -712,13 +754,19 @@ watch(
           </div>
         </Card>
       </div>
+
+      <PaginationBar
+        :current-page="freelancersPage"
+        :total-pages="freelancersTotalPages"
+        @change="goToFreelancersPage"
+      />
     </template>
 
     <template v-else>
       <div class="flex items-center justify-between text-sm mb-4">
         <p class="text-[#435574]">
-          <span class="font-semibold text-[#263238]">{{ filteredServices.length }}</span>
-          {{ filteredServices.length === 1 ? 'serviço encontrado' : 'serviços encontrados' }}
+          <span class="font-semibold text-[#263238]">{{ totalServices }}</span>
+          {{ totalServices === 1 ? 'serviço encontrado' : 'serviços encontrados' }}
         </p>
       </div>
 
@@ -829,6 +877,12 @@ watch(
           </div>
         </Card>
       </div>
+
+      <PaginationBar
+        :current-page="servicesPage"
+        :total-pages="servicesTotalPages"
+        @change="goToServicesPage"
+      />
     </template>
   </div>
 </template>
