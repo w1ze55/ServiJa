@@ -107,7 +107,7 @@ const handleFavoriteClick = (e: MouseEvent) => {
       <!-- Freelancer -->
       <div class="flex items-center justify-between gap-3 mb-3">
         <div class="flex items-center gap-2 min-w-0">
-          <div class="w-6 h-6 rounded-full bg-[#286AD8]/10 overflow-hidden flex items-center justify-center text-[10px] font-semibold text-[#286AD8]">
+          <div class="w-6 h-6 rounded-full bg-[#286AD8]/10 overflow-hidden flex items-center justify-center text-[0.625rem] font-semibold text-[#286AD8]">
             <img
               v-if="service.freelancerProfilePhoto"
               :src="service.freelancerProfilePhoto"

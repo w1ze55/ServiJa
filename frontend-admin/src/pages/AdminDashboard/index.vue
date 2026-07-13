@@ -556,20 +556,20 @@ onMounted(() => {
                 <template #actions>
                   <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
                     <div class="rounded-2xl border border-white/70 bg-white/85 px-4 py-3 shadow-sm">
-                      <p class="text-[11px] font-medium uppercase tracking-[0.14em] text-[#6B7A90]">Total</p>
+                      <p class="text-[0.6875rem] font-medium uppercase tracking-[0.14em] text-[#6B7A90]">Total</p>
                       <p class="mt-1 text-lg font-semibold text-[#263238]">
                         {{ formatCurrency(revenueSummary.total) }}
                       </p>
                     </div>
                     <div class="rounded-2xl border border-white/70 bg-white/85 px-4 py-3 shadow-sm">
-                      <p class="text-[11px] font-medium uppercase tracking-[0.14em] text-[#6B7A90]">Maior ponto</p>
+                      <p class="text-[0.6875rem] font-medium uppercase tracking-[0.14em] text-[#6B7A90]">Maior ponto</p>
                       <p class="mt-1 text-lg font-semibold text-[#263238]">
                         {{ formatCurrency(revenueSummary.peakAmount) }}
                       </p>
                       <p class="text-xs text-[#6B7A90]">{{ revenueSummary.peakLabel }}</p>
                     </div>
                     <div class="rounded-2xl border border-white/70 bg-white/85 px-4 py-3 shadow-sm">
-                      <p class="text-[11px] font-medium uppercase tracking-[0.14em] text-[#6B7A90]">
+                      <p class="text-[0.6875rem] font-medium uppercase tracking-[0.14em] text-[#6B7A90]">
                         Média por {{ dashboard.period.granularity === 'DAILY' ? 'dia' : 'mês' }}
                       </p>
                       <p class="mt-1 text-lg font-semibold text-[#263238]">
@@ -620,7 +620,7 @@ onMounted(() => {
                   <Doughnut :data="paymentChartData" :options="paymentChartOptions" />
                   <div class="pointer-events-none absolute inset-0 flex items-center justify-center">
                     <div class="text-center">
-                      <p class="text-[11px] font-medium uppercase tracking-[0.14em] text-[#6B7A90]">Pagamentos</p>
+                      <p class="text-[0.6875rem] font-medium uppercase tracking-[0.14em] text-[#6B7A90]">Pagamentos</p>
                       <p class="mt-1 text-lg font-semibold text-[#263238]">
                         {{ formatNumber(paymentStatusItems.reduce((sum, item) => sum + item.count, 0)) }}
                       </p>

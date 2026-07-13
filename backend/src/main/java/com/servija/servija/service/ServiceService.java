@@ -3,6 +3,9 @@ package com.servija.servija.service;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.servija.servija.dto.FreelancerCardResponse;
+import com.servija.servija.dto.PageResponse;
+import com.servija.servija.dto.ServiceCardResponse;
 import com.servija.servija.dto.ServiceRequest;
 import com.servija.servija.dto.ServiceResponse;
 import com.servija.servija.exception.ResourceNotFoundException;
@@ -19,6 +22,9 @@ import com.servija.servija.repository.UserRepository;
 import com.servija.servija.util.PublicVisibilityRules;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
@@ -29,6 +35,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.stream.Collectors;
@@ -436,6 +443,133 @@ public class ServiceService {
         }
 
         return publicResponses;
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponse<ServiceCardResponse> getActiveServicesPage(
+            String categorySlug,
+            String subcategorySlug,
+            String query,
+            String sort,
+            int page,
+            int size,
+            boolean trackSearch) {
+        String categoryFilter = StringUtils.hasText(categorySlug) ? categorySlug.trim() : null;
+        String subcategoryFilter = StringUtils.hasText(subcategorySlug) ? subcategorySlug.trim() : null;
+        String queryFilter = StringUtils.hasText(query) ? query.trim() : null;
+        String normalizedSort = normalizeServiceSort(sort);
+        Long excludeFreelancerId = resolveExcludeFreelancerId();
+
+        Pageable pageable = PageRequest.of(page, size);
+        Page<Service> servicePage = serviceRepository.findPublicServicesPage(
+                categoryFilter, subcategoryFilter, queryFilter, excludeFreelancerId, normalizedSort, pageable);
+
+        List<ServiceCardResponse> content = servicePage.getContent().stream()
+                .map(this::toCardResponse)
+                .collect(Collectors.toList());
+
+        if (trackSearch && page == 0 && hasExplicitSearchIntent(categoryFilter, subcategoryFilter, queryFilter)) {
+            serviceSearchWeeklyMetricService.trackSearchResults(
+                    content.stream().map(ServiceCardResponse::getId).toList());
+        }
+
+        return PageResponse.of(servicePage, content);
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponse<FreelancerCardResponse> getPublicFreelancerCardsPage(
+            String categorySlug,
+            String subcategorySlug,
+            String query,
+            int page,
+            int size) {
+        String categoryFilter = StringUtils.hasText(categorySlug) ? categorySlug.trim() : null;
+        String subcategoryFilter = StringUtils.hasText(subcategorySlug) ? subcategorySlug.trim() : null;
+        String queryFilter = StringUtils.hasText(query) ? query.trim() : null;
+        Long excludeFreelancerId = resolveExcludeFreelancerId();
+
+        Pageable pageable = PageRequest.of(page, size);
+        Page<ServiceRepository.FreelancerCardProjection> cardsPage =
+                serviceRepository.findPublicFreelancerCardsPage(
+                        categoryFilter, subcategoryFilter, queryFilter, excludeFreelancerId, pageable);
+
+        List<FreelancerCardResponse> content = cardsPage.getContent().stream()
+                .map(this::toFreelancerCardResponse)
+                .collect(Collectors.toList());
+
+        return PageResponse.of(cardsPage, content);
+    }
+
+    private String normalizeServiceSort(String sort) {
+        if (sort == null) {
+            return "recent";
+        }
+        return switch (sort) {
+            case "name-asc", "price-asc", "price-desc" -> sort;
+            default -> "recent";
+        };
+    }
+
+    // No contexto de cliente, os próprios serviços do usuário não aparecem no marketplace (ver toPublicResponses)
+    private Long resolveExcludeFreelancerId() {
+        return currentUserContextService.getOptionalAuthenticatedUser()
+                .filter(user -> user.getUserType() == User.UserType.CONTRACTOR)
+                .map(User::getId)
+                .orElse(null);
+    }
+
+    private ServiceCardResponse toCardResponse(Service service) {
+        ServiceResponse enriched = toPublicResponse(service);
+        return ServiceCardResponse.builder()
+                .id(enriched.getId())
+                .freelancerId(enriched.getFreelancerId())
+                .freelancerName(enriched.getFreelancerName())
+                .freelancerProfilePhoto(enriched.getFreelancerProfilePhoto())
+                .title(enriched.getTitle())
+                .category(enriched.getCategory())
+                .description(enriched.getDescription())
+                .deliveryTime(enriched.getDeliveryTime())
+                .deliveryUnit(enriched.getDeliveryUnit())
+                .workModel(enriched.getWorkModel())
+                .images(enriched.getImages())
+                .price(enriched.getPrice())
+                .priceType(enriched.getPriceType())
+                .completedServicesCount(enriched.getCompletedServicesCount())
+                .averagePriceMin(enriched.getAveragePriceMin())
+                .averagePriceMax(enriched.getAveragePriceMax())
+                .serviceRating(enriched.getServiceRating())
+                .serviceReviewCount(enriched.getServiceReviewCount())
+                .build();
+    }
+
+    private FreelancerCardResponse toFreelancerCardResponse(ServiceRepository.FreelancerCardProjection projection) {
+        BigDecimal rating = projection.getRating() != null
+                ? projection.getRating().setScale(1, RoundingMode.HALF_UP)
+                : null;
+        int reviewCount = projection.getReviewCount() != null ? projection.getReviewCount().intValue() : 0;
+        int servicesCount = projection.getServicesCount() != null ? projection.getServicesCount().intValue() : 0;
+
+        return FreelancerCardResponse.builder()
+                .id(projection.getId())
+                .name(projection.getName())
+                .avatar(projection.getAvatar())
+                .location(projection.getLocation())
+                .categories(splitConcatenatedCategories(projection.getCategories()))
+                .servicesCount(servicesCount)
+                .rating(rating)
+                .reviewCount(reviewCount)
+                .build();
+    }
+
+    private List<String> splitConcatenatedCategories(String concatenated) {
+        if (!StringUtils.hasText(concatenated)) {
+            return List.of();
+        }
+        return Arrays.stream(concatenated.split("\\|\\|"))
+                .map(String::trim)
+                .filter(StringUtils::hasText)
+                .distinct()
+                .collect(Collectors.toList());
     }
 
     /**

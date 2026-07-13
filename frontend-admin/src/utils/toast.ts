@@ -35,7 +35,7 @@ const showToast = ({ message, type, duration = 4000 }: ToastOptions) => {
     padding: 14px 20px;
     border-radius: 8px;
     color: white;
-    font-size: 14px;
+    font-size: 0.875rem;
     font-weight: 500;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     display: flex;
@@ -71,7 +71,7 @@ const showToast = ({ message, type, duration = 4000 }: ToastOptions) => {
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 12px;
+    font-size: 0.75rem;
     flex-shrink: 0;
   `;
   iconSpan.textContent = icon;
@@ -89,7 +89,7 @@ const showToast = ({ message, type, duration = 4000 }: ToastOptions) => {
     color: white;
     cursor: pointer;
     padding: 0;
-    font-size: 16px;
+    font-size: 1rem;
     opacity: 0.7;
     transition: opacity 0.2s;
     flex-shrink: 0;

@@ -542,6 +542,7 @@ onUnmounted(() => {
 .pol-content :deep(a) {
   color: var(--primary);
   font-weight: 500;
+  overflow-wrap: anywhere;
   text-decoration: underline;
   text-decoration-color: rgba(40, 106, 216, 0.35);
   text-underline-offset: 3px;

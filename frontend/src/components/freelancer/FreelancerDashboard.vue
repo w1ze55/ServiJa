@@ -1278,18 +1278,18 @@ onUnmounted(() => {
 
               <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <div class="rounded-2xl border border-white/70 bg-white/85 px-4 py-3 shadow-sm">
-                  <p class="text-[11px] font-medium uppercase tracking-[0.14em] text-[#6B7A90]">Total</p>
+                  <p class="text-[0.6875rem] font-medium uppercase tracking-[0.14em] text-[#6B7A90]">Total</p>
                   <p class="mt-1 text-lg font-semibold text-[#263238]">{{ formatCurrency(revenueChartSummary.total) }}</p>
                 </div>
 
                 <div class="rounded-2xl border border-white/70 bg-white/85 px-4 py-3 shadow-sm">
-                  <p class="text-[11px] font-medium uppercase tracking-[0.14em] text-[#6B7A90]">Maior ponto</p>
+                  <p class="text-[0.6875rem] font-medium uppercase tracking-[0.14em] text-[#6B7A90]">Maior ponto</p>
                   <p class="mt-1 text-lg font-semibold text-[#263238]">{{ formatCurrency(revenueChartSummary.peakValue) }}</p>
                   <p class="text-xs text-[#6B7A90]">{{ revenueChartSummary.peakLabel }}</p>
                 </div>
 
                 <div class="rounded-2xl border border-white/70 bg-white/85 px-4 py-3 shadow-sm">
-                  <p class="text-[11px] font-medium uppercase tracking-[0.14em] text-[#6B7A90]">{{ revenueChartSummary.averageLabel }}</p>
+                  <p class="text-[0.6875rem] font-medium uppercase tracking-[0.14em] text-[#6B7A90]">{{ revenueChartSummary.averageLabel }}</p>
                   <p class="mt-1 text-lg font-semibold text-[#263238]">{{ formatCurrency(revenueChartSummary.average) }}</p>
                   <p class="text-xs text-[#6B7A90]">Comparativo: {{ comparisonLabel }}</p>
                 </div>
@@ -1347,7 +1347,7 @@ onUnmounted(() => {
                 <Doughnut :data="doughnutChartData" :options="doughnutOptions" />
                 <div class="pointer-events-none absolute inset-0 flex items-center justify-center">
                   <div class="text-center">
-                    <p class="text-[11px] font-medium uppercase tracking-[0.14em] text-[#6B7A90]">Total</p>
+                    <p class="text-[0.6875rem] font-medium uppercase tracking-[0.14em] text-[#6B7A90]">Total</p>
                     <p class="mt-1 text-lg font-semibold text-[#263238]">{{ formatCurrency(serviceRevenueSummary.total) }}</p>
                   </div>
                 </div>

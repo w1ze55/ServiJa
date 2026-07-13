@@ -723,16 +723,20 @@ async function runPreflight(context, profileName) {
     measure: false
   });
   assertPreflight(servicesResponse.ok, "GET /api/services/public/all must return 200.");
-  assertPreflight(Array.isArray(servicesResponse.data) && servicesResponse.data.length > 0, "GET /api/services/public/all must return at least one service.");
+  assertPreflight(
+    Array.isArray(servicesResponse.data?.content) && servicesResponse.data.content.length > 0,
+    "GET /api/services/public/all must return a paginated page with at least one service."
+  );
   checks.push({
     name: "GET /api/services/public/all",
     ok: true,
     status: servicesResponse.status,
     durationMs: servicesResponse.durationMs,
-    count: servicesResponse.data.length
+    count: servicesResponse.data.content.length,
+    totalElements: servicesResponse.data.totalElements
   });
 
-  const firstService = servicesResponse.data[0];
+  const firstService = servicesResponse.data.content[0];
   assertPreflight(firstService?.id && firstService?.freelancerId, "The first public service must expose id and freelancerId.");
 
   const serviceDetailResponse = await performRequest(context, `/api/services/public/${firstService.id}`, {

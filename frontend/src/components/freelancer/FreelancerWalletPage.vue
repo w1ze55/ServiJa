@@ -1322,7 +1322,7 @@ onMounted(() => {
                           <p class="text-sm text-[#263238] font-medium">
                             {{ account.bankName || 'Conta bancária' }}
                           </p>
-                          <Badge v-if="account.isDefault" class="bg-[#286AD8] text-white text-[10px] hover:bg-[#286AD8]">
+                          <Badge v-if="account.isDefault" class="bg-[#286AD8] text-white text-[0.625rem] hover:bg-[#286AD8]">
                             Padrão
                           </Badge>
                         </div>

@@ -382,7 +382,7 @@ const handleRemovedImage = async (imageUrl: string) => {
               :class="['h-14 pr-28', errors.title ? 'border-red-500' : '']"
               maxlength="50"
             />
-            <span class="pointer-events-none absolute bottom-1.5 right-3 text-[11px] text-gray-400">
+            <span class="pointer-events-none absolute bottom-1.5 right-3 text-[0.6875rem] text-gray-400">
               {{ formData.title.length }}/50
             </span>
           </div>
@@ -459,7 +459,7 @@ const handleRemovedImage = async (imageUrl: string) => {
               maxlength="500"
               :class="['resize-none pb-8 pr-24', errors.description ? 'border-red-500' : '']"
             />
-            <span class="pointer-events-none absolute bottom-2 right-3 text-[11px] text-gray-400">
+            <span class="pointer-events-none absolute bottom-2 right-3 text-[0.6875rem] text-gray-400">
               {{ formData.description.length }}/500
             </span>
           </div>

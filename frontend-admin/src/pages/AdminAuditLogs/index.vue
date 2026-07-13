@@ -1309,7 +1309,7 @@ onMounted(() => onFilterChange());
                         <span
                           v-if="log.actorType"
                           :class="[
-                            'inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium',
+                            'inline-flex items-center rounded-full px-1.5 py-0.5 text-[0.625rem] font-medium',
                             ACTOR_TYPE_META[log.actorType].cls,
                           ]"
                         >

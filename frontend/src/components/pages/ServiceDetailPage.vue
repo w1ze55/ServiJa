@@ -536,7 +536,7 @@ onMounted(() => {
             <!-- Title & Badges -->
             <div>
               <div class="flex flex-wrap items-center gap-2 mb-3">
-                <Badge class="bg-blue-50 text-[#286AD8] border-none font-semibold uppercase tracking-wide text-[10px]">
+                <Badge class="bg-blue-50 text-[#286AD8] border-none font-semibold uppercase tracking-wide text-[0.625rem]">
                   {{ service.category }}
                 </Badge>
               </div>
@@ -550,7 +550,7 @@ onMounted(() => {
                   <CheckCircle class="h-5 w-5" />
                 </div>
                 <div>
-                  <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Experiência neste serviço</p>
+                  <p class="text-[0.625rem] font-bold text-gray-400 uppercase tracking-wider">Experiência neste serviço</p>
                   <p class="text-base font-bold leading-tight text-[#263238]">{{ serviceExperienceLabel }}</p>
                 </div>
               </div>
@@ -560,7 +560,7 @@ onMounted(() => {
                   <Briefcase class="h-5 w-5" />
                 </div>
                 <div>
-                  <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Modalidade</p>
+                  <p class="text-[0.625rem] font-bold text-gray-400 uppercase tracking-wider">Modalidade</p>
                   <p class="text-base font-bold text-[#263238]">{{ serviceWorkModelLabel }}</p>
                 </div>
               </div>
@@ -570,7 +570,7 @@ onMounted(() => {
                   <Star class="h-5 w-5 fill-yellow-400" />
                 </div>
                 <div>
-                  <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Avaliação</p>
+                  <p class="text-[0.625rem] font-bold text-gray-400 uppercase tracking-wider">Avaliação</p>
                   <p class="text-base font-bold text-[#263238]">{{ averageRating?.toFixed(1) }} <span class="text-xs font-normal text-gray-400">({{ reviews.length }})</span></p>
                 </div>
               </div>
@@ -628,7 +628,7 @@ onMounted(() => {
               <!-- Price CTA card -->
               <Card class="p-6 border-2 border-[#286AD8]/20">
                 <div class="mb-1">
-                  <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">{{ servicePriceLabel }}</p>
+                  <p class="text-[0.625rem] font-bold text-gray-400 uppercase tracking-wider mb-1">{{ servicePriceLabel }}</p>
                   <p class="text-3xl font-black leading-tight text-[#263238]">{{ servicePriceDisplay }}</p>
                   <p v-if="hasAveragePriceRange" class="mt-2 text-xs text-[#435574]">
                     Faixa calculada com base nos serviços concluídos.
@@ -740,10 +740,10 @@ onMounted(() => {
                   }"
                 />
               </div>
-              <p v-if="quoteBudget && Number(quoteBudget) < 20" class="text-[11px] text-red-500 font-medium mt-1">
+              <p v-if="quoteBudget && Number(quoteBudget) < 20" class="text-[0.6875rem] text-red-500 font-medium mt-1">
                 O orçamento mínimo é R$ 20,00
               </p>
-              <p v-else-if="Number(quoteBudget) >= 1000000" class="text-[11px] text-amber-600 font-medium mt-1">
+              <p v-else-if="Number(quoteBudget) >= 1000000" class="text-[0.6875rem] text-amber-600 font-medium mt-1">
                 Valor máximo atingido: R$ 1.000.000,00
               </p>
             </div>
@@ -783,7 +783,7 @@ onMounted(() => {
                   />
                   <div class="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2 pointer-events-none">
                     <span class="text-xs text-gray-400 font-medium">dia(s)</span>
-                    <Badge v-if="getDeadlineApproximation(quoteDeadline)" variant="secondary" class="bg-blue-50 text-[#286AD8] border-[#286AD8]/20 px-2 h-6 text-[10px]">
+                    <Badge v-if="getDeadlineApproximation(quoteDeadline)" variant="secondary" class="bg-blue-50 text-[#286AD8] border-[#286AD8]/20 px-2 h-6 text-[0.625rem]">
                       {{ getDeadlineApproximation(quoteDeadline) }}
                     </Badge>
                   </div>
@@ -834,7 +834,7 @@ onMounted(() => {
                     <Loader2 class="h-4 w-4 animate-spin text-[#286AD8]" />
                   </div>
                 </div>
-                <p v-if="quoteAddressErrors.zipCode" class="text-[11px] text-red-500">{{ quoteAddressErrors.zipCode }}</p>
+                <p v-if="quoteAddressErrors.zipCode" class="text-[0.6875rem] text-red-500">{{ quoteAddressErrors.zipCode }}</p>
               </div>
               <!-- Street + Number -->
               <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -846,7 +846,7 @@ onMounted(() => {
                     placeholder="Nome da rua"
                     :class="{ 'border-red-500 focus-visible:ring-red-500': quoteAddressErrors.street }"
                   />
-                  <p v-if="quoteAddressErrors.street" class="text-[11px] text-red-500">{{ quoteAddressErrors.street }}</p>
+                  <p v-if="quoteAddressErrors.street" class="text-[0.6875rem] text-red-500">{{ quoteAddressErrors.street }}</p>
                 </div>
                 <div class="space-y-1">
                   <Label class="text-sm text-[#435574]">Número *</Label>
@@ -856,7 +856,7 @@ onMounted(() => {
                     placeholder="123"
                     :class="{ 'border-red-500 focus-visible:ring-red-500': quoteAddressErrors.number }"
                   />
-                  <p v-if="quoteAddressErrors.number" class="text-[11px] text-red-500">{{ quoteAddressErrors.number }}</p>
+                  <p v-if="quoteAddressErrors.number" class="text-[0.6875rem] text-red-500">{{ quoteAddressErrors.number }}</p>
                 </div>
               </div>
               <!-- Complement -->
@@ -877,7 +877,7 @@ onMounted(() => {
                   placeholder="Nome do bairro"
                   :class="{ 'border-red-500 focus-visible:ring-red-500': quoteAddressErrors.neighborhood }"
                 />
-                <p v-if="quoteAddressErrors.neighborhood" class="text-[11px] text-red-500">{{ quoteAddressErrors.neighborhood }}</p>
+                <p v-if="quoteAddressErrors.neighborhood" class="text-[0.6875rem] text-red-500">{{ quoteAddressErrors.neighborhood }}</p>
               </div>
               <!-- City + State -->
               <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -889,7 +889,7 @@ onMounted(() => {
                     placeholder="Cidade"
                     :class="{ 'border-red-500 focus-visible:ring-red-500': quoteAddressErrors.city }"
                   />
-                  <p v-if="quoteAddressErrors.city" class="text-[11px] text-red-500">{{ quoteAddressErrors.city }}</p>
+                  <p v-if="quoteAddressErrors.city" class="text-[0.6875rem] text-red-500">{{ quoteAddressErrors.city }}</p>
                 </div>
                 <div class="space-y-1">
                   <Label class="text-sm text-[#435574]">Estado *</Label>
@@ -900,7 +900,7 @@ onMounted(() => {
                     maxlength="2"
                     :class="{ 'border-red-500 focus-visible:ring-red-500': quoteAddressErrors.state }"
                   />
-                  <p v-if="quoteAddressErrors.state" class="text-[11px] text-red-500">{{ quoteAddressErrors.state }}</p>
+                  <p v-if="quoteAddressErrors.state" class="text-[0.6875rem] text-red-500">{{ quoteAddressErrors.state }}</p>
                 </div>
               </div>
             </div>
