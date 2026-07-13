@@ -70,7 +70,7 @@ onMounted(async () => {
 
     <DropdownMenuContent
       align="end"
-      class="w-[380px] space-y-4 p-4 z-[70]"
+      class="w-[23.75rem] space-y-4 p-4 z-[70]"
       @mouseenter="emit('content-enter')"
       @mouseleave="emit('content-leave')"
     >
@@ -94,7 +94,7 @@ onMounted(async () => {
         </Button>
       </div>
 
-      <div class="max-h-[420px] overflow-y-auto pr-1">
+      <div class="max-h-[26.25rem] overflow-y-auto pr-1">
         <NotificationSkeleton v-if="isInitialLoading" compact />
 
         <NotificationEmptyState

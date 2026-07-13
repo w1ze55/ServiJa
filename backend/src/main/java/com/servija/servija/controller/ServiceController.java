@@ -1,5 +1,8 @@
 package com.servija.servija.controller;
 
+import com.servija.servija.dto.FreelancerCardResponse;
+import com.servija.servija.dto.PageResponse;
+import com.servija.servija.dto.ServiceCardResponse;
 import com.servija.servija.dto.ServiceRequest;
 import com.servija.servija.dto.ServiceResponse;
 import com.servija.servija.service.ServiceService;
@@ -160,23 +163,31 @@ public class ServiceController {
 
     // ==================== ENDPOINTS PÚBLICOS ====================
 
+    private static final int MAX_PAGE_SIZE = 20;
+
     @GetMapping("/public/all")
-    @Operation(summary = "Listar todos os serviços ativos (público)", 
-                description = "Retorna todos os serviços ativos disponíveis na plataforma")
+    @Operation(summary = "Listar serviços ativos paginados (público)",
+                description = "Retorna uma página (até 20) de serviços ativos disponíveis na plataforma")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Lista de serviços retornada com sucesso", 
-            content = @Content(array = @ArraySchema(schema = @Schema(implementation = ServiceResponse.class))))
+            @ApiResponse(responseCode = "200", description = "Página de serviços retornada com sucesso",
+            content = @Content(schema = @Schema(implementation = PageResponse.class)))
     })
-    public ResponseEntity<List<ServiceResponse>> getAllActiveServices(
+    public ResponseEntity<PageResponse<ServiceCardResponse>> getAllActiveServices(
             @RequestParam(required = false) String categorySlug,
             @RequestParam(required = false) String subcategorySlug,
             @RequestParam(required = false, name = "q") String query,
+            @RequestParam(required = false, defaultValue = "recent") String sort,
+            @RequestParam(required = false, defaultValue = "0") int page,
+            @RequestParam(required = false, defaultValue = "20") int size,
             @RequestParam(required = false, defaultValue = "false") boolean trackSearch) {
         try {
-            List<ServiceResponse> services = serviceService.getActiveServices(
+            PageResponse<ServiceCardResponse> services = serviceService.getActiveServicesPage(
                     categorySlug,
                     subcategorySlug,
                     query,
+                    sort,
+                    normalizePage(page),
+                    normalizeSize(size),
                     trackSearch);
             return ResponseEntity.ok(services);
         } catch (AccessDeniedException e) {
@@ -184,6 +195,45 @@ public class ServiceController {
         } catch (Exception e) {
             return ResponseEntity.internalServerError().build();
         }
+    }
+
+    @GetMapping("/public/freelancers")
+    @Operation(summary = "Listar profissionais paginados (público)",
+                description = "Retorna uma página (até 20) de profissionais com serviços públicos, com os dados de card")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Página de profissionais retornada com sucesso",
+            content = @Content(schema = @Schema(implementation = PageResponse.class)))
+    })
+    public ResponseEntity<PageResponse<FreelancerCardResponse>> getPublicFreelancerCards(
+            @RequestParam(required = false) String categorySlug,
+            @RequestParam(required = false) String subcategorySlug,
+            @RequestParam(required = false, name = "q") String query,
+            @RequestParam(required = false, defaultValue = "0") int page,
+            @RequestParam(required = false, defaultValue = "20") int size) {
+        try {
+            PageResponse<FreelancerCardResponse> freelancers = serviceService.getPublicFreelancerCardsPage(
+                    categorySlug,
+                    subcategorySlug,
+                    query,
+                    normalizePage(page),
+                    normalizeSize(size));
+            return ResponseEntity.ok(freelancers);
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(403).build();
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    private int normalizePage(int page) {
+        return Math.max(page, 0);
+    }
+
+    private int normalizeSize(int size) {
+        if (size < 1) {
+            return MAX_PAGE_SIZE;
+        }
+        return Math.min(size, MAX_PAGE_SIZE);
     }
 
     @GetMapping("/public/category/{category}")

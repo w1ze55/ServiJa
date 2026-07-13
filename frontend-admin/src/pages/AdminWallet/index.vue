@@ -829,7 +829,7 @@ onMounted(() => {
                       </p>
                       <span
                         v-if="account.isDefault"
-                        class="rounded-full bg-[#286AD8] px-2.5 py-1 text-[11px] font-semibold text-white"
+                        class="rounded-full bg-[#286AD8] px-2.5 py-1 text-[0.6875rem] font-semibold text-white"
                       >
                         Padrão
                       </span>
@@ -981,7 +981,7 @@ onMounted(() => {
                     {{ transaction.description }}
                   </p>
                   <span
-                    class="rounded-full px-2.5 py-1 text-[11px] font-semibold"
+                    class="rounded-full px-2.5 py-1 text-[0.6875rem] font-semibold"
                     :class="getStatusClasses(transaction.status)"
                   >
                     {{ formatStatusLabel(transaction.status) }}
@@ -1117,7 +1117,7 @@ onMounted(() => {
                         </p>
                         <span
                           v-if="account.isDefault"
-                          class="rounded-full bg-[#286AD8] px-2 py-0.5 text-[10px] font-semibold text-white"
+                          class="rounded-full bg-[#286AD8] px-2 py-0.5 text-[0.625rem] font-semibold text-white"
                         >
                           Padrão
                         </span>

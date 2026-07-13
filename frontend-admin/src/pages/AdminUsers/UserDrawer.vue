@@ -442,7 +442,7 @@ const handleResetPassword = async () => {
                         ? 'bg-emerald-50 text-emerald-700'
                         : 'bg-slate-100 text-slate-500'
                     "
-                    class="rounded-full px-2 py-0.5 text-[10px] font-medium"
+                    class="rounded-full px-2 py-0.5 text-[0.625rem] font-medium"
                   >
                     {{ svc.isActive ? "Ativo" : "Inativo" }}
                   </span>

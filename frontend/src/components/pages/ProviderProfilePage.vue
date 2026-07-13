@@ -1228,7 +1228,7 @@ onMounted(() => {
                       </div>
                       <Badge
                         v-if="project.featured"
-                        class="absolute top-2 left-2 bg-yellow-500 hover:bg-yellow-600 text-white border-none text-[10px] px-1.5"
+                        class="absolute top-2 left-2 bg-yellow-500 hover:bg-yellow-600 text-white border-none text-[0.625rem] px-1.5"
                       >
                         <Sparkles class="h-3 w-3 mr-1" />
                         Destaque
@@ -1242,10 +1242,10 @@ onMounted(() => {
 
                       <!-- Project Links on Card -->
                       <div v-if="project.projectUrl || project.videoUrl" class="flex gap-2 mb-3">
-                        <Badge v-if="project.projectUrl" variant="outline" class="text-[10px] text-[#286AD8] border-[#286AD8]/20 bg-blue-50/50">
+                        <Badge v-if="project.projectUrl" variant="outline" class="text-[0.625rem] text-[#286AD8] border-[#286AD8]/20 bg-blue-50/50">
                           <Link2 class="h-3 w-3 mr-1" /> Link
                         </Badge>
-                        <Badge v-if="project.videoUrl" variant="outline" class="text-[10px] text-red-600 border-red-200 bg-red-50/50">
+                        <Badge v-if="project.videoUrl" variant="outline" class="text-[0.625rem] text-red-600 border-red-200 bg-red-50/50">
                           <Youtube class="h-3 w-3 mr-1" /> Vídeo
                         </Badge>
                       </div>
@@ -1255,14 +1255,14 @@ onMounted(() => {
                           v-for="(tag, index) in project.tags.slice(0, 2)"
                           :key="index"
                           variant="secondary"
-                          class="bg-blue-50 text-[#286AD8] text-[10px] px-1.5 py-0"
+                          class="bg-blue-50 text-[#286AD8] text-[0.625rem] px-1.5 py-0"
                         >
                           {{ tag }}
                         </Badge>
                         <Badge
                           v-if="project.tags.length > 2"
                           variant="secondary"
-                          class="bg-gray-50 text-[#435574] text-[10px] px-1.5 py-0"
+                          class="bg-gray-50 text-[#435574] text-[0.625rem] px-1.5 py-0"
                         >
                           +{{ project.tags.length - 2 }}
                         </Badge>
@@ -1307,7 +1307,7 @@ onMounted(() => {
                       v-for="subcategory in (freelancer.subcategoryLabels?.length ? freelancer.subcategoryLabels : [freelancer.subcategory])"
                       :key="subcategory"
                       variant="outline"
-                      class="text-[10px] bg-white text-gray-600"
+                      class="text-[0.625rem] bg-white text-gray-600"
                     >
                       {{ subcategory }}
                     </Badge>
@@ -1317,10 +1317,10 @@ onMounted(() => {
                 <div v-if="hasOnsiteServices && freelancer.serviceCities?.length" class="border-t pt-3">
                   <p class="text-sm text-[#435574] mb-2">Cidades atendidas:</p>
                   <div class="flex flex-wrap gap-1">
-                    <Badge v-for="city in freelancer.serviceCities.slice(0, 3)" :key="city.id" variant="outline" class="text-[10px] bg-white text-gray-600">
+                    <Badge v-for="city in freelancer.serviceCities.slice(0, 3)" :key="city.id" variant="outline" class="text-[0.625rem] bg-white text-gray-600">
                       {{ city.city }}
                     </Badge>
-                    <span v-if="freelancer.serviceCities.length > 3" class="text-[10px] text-gray-400 self-center ml-1">
+                    <span v-if="freelancer.serviceCities.length > 3" class="text-[0.625rem] text-gray-400 self-center ml-1">
                       +{{ freelancer.serviceCities.length - 3 }}
                     </span>
                   </div>
@@ -1447,7 +1447,7 @@ onMounted(() => {
                       <Calendar class="h-4 w-4 text-[#286AD8]" />
                     </div>
                     <div>
-                      <p class="text-[10px] uppercase font-semibold text-gray-400">Concluído em</p>
+                      <p class="text-[0.625rem] uppercase font-semibold text-gray-400">Concluído em</p>
                       <p class="font-medium">
                         {{ selectedProject?.completedDate ? new Date(selectedProject.completedDate).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }) : 'Data não informada' }}
                       </p>
@@ -1459,7 +1459,7 @@ onMounted(() => {
                       <Sparkles class="h-4 w-4 text-[#286AD8]" />
                     </div>
                     <div>
-                      <p class="text-[10px] uppercase font-semibold text-gray-400">Cliente</p>
+                      <p class="text-[0.625rem] uppercase font-semibold text-gray-400">Cliente</p>
                       <p class="font-medium">{{ selectedProject.client }}</p>
                     </div>
                   </div>
@@ -1530,10 +1530,10 @@ onMounted(() => {
                 }"
               />
             </div>
-            <p v-if="quoteBudget && Number(quoteBudget) < 20" class="text-[11px] text-red-500 font-medium mt-1">
+            <p v-if="quoteBudget && Number(quoteBudget) < 20" class="text-[0.6875rem] text-red-500 font-medium mt-1">
               O orçamento mínimo é R$ 20,00
             </p>
-            <p v-else-if="Number(quoteBudget) >= 1000000" class="text-[11px] text-amber-600 font-medium mt-1">
+            <p v-else-if="Number(quoteBudget) >= 1000000" class="text-[0.6875rem] text-amber-600 font-medium mt-1">
               Valor máximo atingido: R$ 1.000.000,00
             </p>
           </div>
@@ -1584,7 +1584,7 @@ onMounted(() => {
                 />
                 <div class="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2 pointer-events-none">
                   <span class="text-xs text-gray-400 font-medium">dia(s)</span>
-                  <Badge v-if="getDeadlineApproximation(quoteDeadline)" variant="secondary" class="bg-blue-50 text-[#286AD8] border-[#286AD8]/20 px-2 h-6 text-[10px]">
+                  <Badge v-if="getDeadlineApproximation(quoteDeadline)" variant="secondary" class="bg-blue-50 text-[#286AD8] border-[#286AD8]/20 px-2 h-6 text-[0.625rem]">
                     {{ getDeadlineApproximation(quoteDeadline) }}
                   </Badge>
                 </div>
@@ -1642,7 +1642,7 @@ onMounted(() => {
                   <Loader2 class="h-4 w-4 animate-spin text-[#286AD8]" />
                 </div>
               </div>
-              <p v-if="quoteAddressErrors.zipCode" class="text-[11px] text-red-500">
+              <p v-if="quoteAddressErrors.zipCode" class="text-[0.6875rem] text-red-500">
                 {{ quoteAddressErrors.zipCode }}
               </p>
             </div>
@@ -1657,7 +1657,7 @@ onMounted(() => {
                   placeholder="Nome da rua"
                   :class="{ 'border-red-500 focus-visible:ring-red-500': quoteAddressErrors.street }"
                 />
-                <p v-if="quoteAddressErrors.street" class="text-[11px] text-red-500">
+                <p v-if="quoteAddressErrors.street" class="text-[0.6875rem] text-red-500">
                   {{ quoteAddressErrors.street }}
                 </p>
               </div>
@@ -1671,7 +1671,7 @@ onMounted(() => {
                   placeholder="123"
                   :class="{ 'border-red-500 focus-visible:ring-red-500': quoteAddressErrors.number }"
                 />
-                <p v-if="quoteAddressErrors.number" class="text-[11px] text-red-500">
+                <p v-if="quoteAddressErrors.number" class="text-[0.6875rem] text-red-500">
                   {{ quoteAddressErrors.number }}
                 </p>
               </div>
@@ -1696,7 +1696,7 @@ onMounted(() => {
                 placeholder="Nome do bairro"
                 :class="{ 'border-red-500 focus-visible:ring-red-500': quoteAddressErrors.neighborhood }"
               />
-              <p v-if="quoteAddressErrors.neighborhood" class="text-[11px] text-red-500">
+              <p v-if="quoteAddressErrors.neighborhood" class="text-[0.6875rem] text-red-500">
                 {{ quoteAddressErrors.neighborhood }}
               </p>
             </div>
@@ -1711,7 +1711,7 @@ onMounted(() => {
                   placeholder="Cidade"
                   :class="{ 'border-red-500 focus-visible:ring-red-500': quoteAddressErrors.city }"
                 />
-                <p v-if="quoteAddressErrors.city" class="text-[11px] text-red-500">
+                <p v-if="quoteAddressErrors.city" class="text-[0.6875rem] text-red-500">
                   {{ quoteAddressErrors.city }}
                 </p>
               </div>
@@ -1726,7 +1726,7 @@ onMounted(() => {
                   maxlength="2"
                   :class="{ 'border-red-500 focus-visible:ring-red-500': quoteAddressErrors.state }"
                 />
-                <p v-if="quoteAddressErrors.state" class="text-[11px] text-red-500">
+                <p v-if="quoteAddressErrors.state" class="text-[0.6875rem] text-red-500">
                   {{ quoteAddressErrors.state }}
                 </p>
               </div>

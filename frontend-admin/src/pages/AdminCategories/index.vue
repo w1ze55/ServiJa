@@ -261,7 +261,7 @@ onMounted(() => {
                   <div class="flex flex-wrap items-center gap-2">
                     <p class="font-medium text-slate-900">{{ subcategory.name }}</p>
                     <span
-                      class="rounded-full px-2 py-0.5 text-[11px] font-semibold"
+                      class="rounded-full px-2 py-0.5 text-[0.6875rem] font-semibold"
                       :class="
                         subcategory.active
                           ? 'bg-emerald-50 text-emerald-700'
@@ -270,7 +270,7 @@ onMounted(() => {
                     >
                       {{ subcategory.active ? 'Ativa' : 'Arquivada' }}
                     </span>
-                    <span class="text-[11px] text-slate-500">slug: {{ subcategory.slug }}</span>
+                    <span class="text-[0.6875rem] text-slate-500">slug: {{ subcategory.slug }}</span>
                   </div>
                   <p class="mt-1 text-xs text-slate-500">Ordem: {{ subcategory.sortOrder }}</p>
                 </div>

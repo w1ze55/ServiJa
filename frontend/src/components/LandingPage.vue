@@ -1023,7 +1023,8 @@ const faqItems = [
   .b-timeline { padding-left: 4rem; }
   .b-step-num { left: -4rem; width: 3.5rem; height: 3.5rem; font-size: 1.1rem; }
   .b-timeline-line { left: 1.75rem; }
-  .b-panel { padding: 2rem 1.5rem; }
+  .b-panel { padding: 2rem 1.5rem; min-width: 0; }
+  .b-panel-btn { white-space: normal; max-width: 100%; }
   .b-final { padding: 5rem 1.5rem; }
   .footer-grid { grid-template-columns: 1fr 1fr; }
 }

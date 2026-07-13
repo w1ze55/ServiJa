@@ -1177,7 +1177,7 @@ const getStatusBadge = (currentProposal: Proposal) => {
                 />
                 <div class="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2 pointer-events-none">
                   <span class="text-xs text-gray-400 font-medium">dia(s)</span>
-                  <Badge v-if="executionTimeLabel" variant="secondary" class="bg-blue-50 text-[#286AD8] border-[#286AD8]/20 px-2 h-6 text-[10px]">
+                  <Badge v-if="executionTimeLabel" variant="secondary" class="bg-blue-50 text-[#286AD8] border-[#286AD8]/20 px-2 h-6 text-[0.625rem]">
                     {{ executionTimeLabel }}
                   </Badge>
                 </div>

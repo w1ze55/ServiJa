@@ -1295,7 +1295,7 @@ onUnmounted(() => {
                       : "-"
                   }}</span>
                 </div>
-                <p class="mt-1 text-[11px] leading-tight text-gray-400">
+                <p class="mt-1 text-[0.6875rem] leading-tight text-gray-400">
                   {{ selectedProvider.totalReviews }} avaliações
                 </p>
               </div>
@@ -1306,7 +1306,7 @@ onUnmounted(() => {
                     formatDistance(selectedProvider.distance)
                   }}</span>
                 </div>
-                <p class="mt-1 text-[11px] leading-tight text-gray-400">
+                <p class="mt-1 text-[0.6875rem] leading-tight text-gray-400">
                   distancia
                 </p>
               </div>
@@ -1317,7 +1317,7 @@ onUnmounted(() => {
                     selectedProvider.completedJobs ?? "-"
                   }}</span>
                 </div>
-                <p class="mt-1 text-[11px] leading-tight text-gray-400">
+                <p class="mt-1 text-[0.6875rem] leading-tight text-gray-400">
                   trabalhos
                 </p>
               </div>
@@ -1379,9 +1379,9 @@ onUnmounted(() => {
 }
 
 .sidebar-desktop {
-  top: 100px;
-  width: 300px;
-  max-height: calc(100dvh - 144px);
+  top: 6.25rem;
+  width: 18.75rem;
+  max-height: calc(100dvh - 9rem);
 }
 
 .mobile-sheet {
@@ -1389,11 +1389,11 @@ onUnmounted(() => {
 }
 
 .mobile-list {
-  max-height: calc(48dvh - 68px);
+  max-height: calc(48dvh - 4.25rem);
 }
 
 .location-button {
-  bottom: calc(48dvh + 16px);
+  bottom: calc(48dvh + 1rem);
 }
 
 .custom-provider-marker,
@@ -1569,16 +1569,16 @@ onUnmounted(() => {
     height: 100vh;
   }
   .sidebar-desktop {
-    max-height: calc(100vh - 96px);
+    max-height: calc(100vh - 6rem);
   }
   .mobile-sheet {
     max-height: 48vh;
   }
   .mobile-list {
-    max-height: calc(48vh - 68px);
+    max-height: calc(48vh - 4.25rem);
   }
   .location-button {
-    bottom: calc(48vh + 16px);
+    bottom: calc(48vh + 1rem);
   }
   .leaflet-bottom.leaflet-right {
     bottom: calc(48vh + 76px);

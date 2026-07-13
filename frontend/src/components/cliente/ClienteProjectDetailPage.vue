@@ -574,7 +574,7 @@ const getStatusColor = (status: string) => {
                   <Star class="h-3 w-3 fill-yellow-400 text-yellow-400" />
                   <span class="font-bold">{{ freelancerRating!.toFixed(1) }}</span>
                 </div>
-                <p class="text-[10px] text-gray-400">{{ freelancerTotalReviews }} {{ freelancerTotalReviews === 1 ? 'avaliação' : 'avaliações' }}</p>
+                <p class="text-[0.625rem] text-gray-400">{{ freelancerTotalReviews }} {{ freelancerTotalReviews === 1 ? 'avaliação' : 'avaliações' }}</p>
               </template>
               <p v-else class="text-xs text-gray-400">Sem avaliações</p>
             </div>
@@ -610,7 +610,7 @@ const getStatusColor = (status: string) => {
 
           <div class="mt-6 p-4 bg-gray-50 rounded-lg flex items-start gap-2">
             <Lock class="h-4 w-4 text-amber-500 mt-1 shrink-0" />
-            <p class="text-[10px] text-[#435574]">
+            <p class="text-[0.625rem] text-[#435574]">
               Seu pagamento está seguro. O valor só será liberado ao profissional após sua confirmação final de entrega.
             </p>
           </div>

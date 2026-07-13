@@ -849,7 +849,7 @@ const handleSearch = (query: string) => router.push({ path: '/search', query: { 
                         <span class="font-medium text-sm text-gray-900 truncate capitalize">
                           {{ otherPartyName(conv) }}
                         </span>
-                        <span class="text-[10px] text-gray-400 flex-shrink-0">
+                        <span class="text-[0.625rem] text-gray-400 flex-shrink-0">
                           {{ formatTime(conv.lastMessage?.sentAt) }}
                         </span>
                       </div>
@@ -859,12 +859,12 @@ const handleSearch = (query: string) => router.push({ path: '/search', query: { 
                         </p>
                         <span
                           v-if="unreadForMe(conv) > 0"
-                          class="flex-shrink-0 h-5 min-w-5 px-1.5 rounded-full bg-blue-600 text-white text-[10px] font-semibold flex items-center justify-center"
+                          class="flex-shrink-0 h-5 min-w-5 px-1.5 rounded-full bg-blue-600 text-white text-[0.625rem] font-semibold flex items-center justify-center"
                         >
                           {{ unreadForMe(conv) > 9 ? '9+' : unreadForMe(conv) }}
                         </span>
                       </div>
-                      <p class="text-[10px] text-gray-400 mt-0.5">
+                      <p class="text-[0.625rem] text-gray-400 mt-0.5">
                         Solicitação #{{ conv.serviceRequestId }}
                       </p>
                     </div>
@@ -887,7 +887,7 @@ const handleSearch = (query: string) => router.push({ path: '/search', query: { 
                   <span class="text-xs font-semibold text-gray-600 uppercase tracking-wide">
                     Atendimentos resolvidos
                   </span>
-                  <span class="ml-auto text-[10px] text-gray-400">
+                  <span class="ml-auto text-[0.625rem] text-gray-400">
                     {{ resolvedConversations.length }}
                   </span>
                 </button>
@@ -916,7 +916,7 @@ const handleSearch = (query: string) => router.push({ path: '/search', query: { 
                           <span class="font-medium text-sm text-gray-700 truncate capitalize">
                             {{ otherPartyName(conv) }}
                           </span>
-                          <span class="text-[10px] text-gray-400 flex-shrink-0">
+                          <span class="text-[0.625rem] text-gray-400 flex-shrink-0">
                             {{ formatTime(conv.lastMessage?.sentAt) }}
                           </span>
                         </div>
@@ -925,7 +925,7 @@ const handleSearch = (query: string) => router.push({ path: '/search', query: { 
                             {{ conv.lastMessage?.content || 'Conversa iniciada' }}
                           </p>
                         </div>
-                        <p class="text-[10px] text-gray-400 mt-0.5">
+                        <p class="text-[0.625rem] text-gray-400 mt-0.5">
                           Solicitação #{{ conv.serviceRequestId }} · Encerrada
                         </p>
                       </div>
@@ -1040,7 +1040,7 @@ const handleSearch = (query: string) => router.push({ path: '/search', query: { 
                 <!-- Divisor de dia -->
                 <div class="flex justify-center">
                   <span
-                    class="text-[11px] font-medium text-gray-600 bg-white border border-gray-200 px-3 py-1 rounded-full shadow-sm"
+                    class="text-[0.6875rem] font-medium text-gray-600 bg-white border border-gray-200 px-3 py-1 rounded-full shadow-sm"
                   >
                     {{ group.label }}
                   </span>
@@ -1061,7 +1061,7 @@ const handleSearch = (query: string) => router.push({ path: '/search', query: { 
                   >
                     <p
                       v-if="!msg.isOwn"
-                      class="text-[11px] font-semibold mb-0.5 text-blue-600 capitalize"
+                      class="text-[0.6875rem] font-semibold mb-0.5 text-blue-600 capitalize"
                     >
                       {{ msg.senderName }}
                     </p>
@@ -1106,7 +1106,7 @@ const handleSearch = (query: string) => router.push({ path: '/search', query: { 
                     </div>
                     <div
                       :class="[
-                        'text-[10px] mt-1 flex items-center justify-end gap-1',
+                        'text-[0.625rem] mt-1 flex items-center justify-end gap-1',
                         msg.isOwn ? 'text-white/70' : 'text-gray-400',
                       ]"
                     >

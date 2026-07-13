@@ -18,12 +18,12 @@ const classes = computed(() =>
 
 <template>
   <PaginationLink
-    aria-label="Go to next page"
+    aria-label="Ir para a próxima página"
     size="default"
     :class="classes"
     v-bind="$attrs"
   >
-    <span class="hidden sm:block">Next</span>
+    <span class="hidden sm:block">Próxima</span>
     <ChevronRightIcon />
   </PaginationLink>
 </template>
