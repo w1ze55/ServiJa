@@ -824,7 +824,7 @@ watch(
                   </h3>
                   <div class="flex items-center gap-3 mb-2">
                     <div class="flex items-center gap-1.5">
-                      <div class="w-5 h-5 rounded-full bg-[#286AD8]/10 overflow-hidden flex items-center justify-center text-[8px] font-semibold text-[#286AD8]">
+                      <div class="w-5 h-5 rounded-full bg-[#286AD8]/10 overflow-hidden flex items-center justify-center text-[0.5rem] font-semibold text-[#286AD8]">
                         <img
                           v-if="service.freelancerProfilePhoto"
                           :src="service.freelancerProfilePhoto"

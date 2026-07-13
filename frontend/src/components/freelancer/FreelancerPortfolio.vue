@@ -242,7 +242,7 @@ const formatCompletedDate = (value?: string) =>
                       <Calendar class="h-4 w-4 text-[#286AD8]" />
                     </div>
                     <div>
-                      <p class="text-[10px] uppercase font-semibold text-gray-400">Concluído em</p>
+                      <p class="text-[0.625rem] uppercase font-semibold text-gray-400">Concluído em</p>
                       <p class="font-medium">
                         {{ formatCompletedDate(selectedItem?.date) }}
                       </p>
@@ -254,7 +254,7 @@ const formatCompletedDate = (value?: string) =>
                       <Sparkles class="h-4 w-4 text-[#286AD8]" />
                     </div>
                     <div>
-                      <p class="text-[10px] uppercase font-semibold text-gray-400">Cliente</p>
+                      <p class="text-[0.625rem] uppercase font-semibold text-gray-400">Cliente</p>
                       <p class="font-medium">{{ selectedItem.client }}</p>
                     </div>
                   </div>

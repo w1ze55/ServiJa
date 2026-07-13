@@ -124,14 +124,14 @@ const handleToggleFavorite = (e: MouseEvent) => {
       
       <div class="flex flex-wrap gap-2 py-1 min-h-[28px]">
         <template v-if="freelancer.categories">
-          <Badge v-for="cat in freelancer.categories.slice(0, 2)" :key="cat" variant="outline" class="text-[10px] bg-blue-50/30 text-[#286AD8] border-none">
+          <Badge v-for="cat in freelancer.categories.slice(0, 2)" :key="cat" variant="outline" class="text-[0.625rem] bg-blue-50/30 text-[#286AD8] border-none">
             {{ cat }}
           </Badge>
-          <span v-if="freelancer.categories.length > 2" class="text-[10px] text-gray-400 self-center">
+          <span v-if="freelancer.categories.length > 2" class="text-[0.625rem] text-gray-400 self-center">
             +{{ freelancer.categories.length - 2 }}
           </span>
         </template>
-        <Badge v-else variant="outline" class="text-[10px] bg-blue-50/30 text-[#286AD8] border-none">
+        <Badge v-else variant="outline" class="text-[0.625rem] bg-blue-50/30 text-[#286AD8] border-none">
           {{ freelancer.category }}
         </Badge>
       </div>

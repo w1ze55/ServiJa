@@ -797,7 +797,7 @@ const handleUploadFiles = async () => {
 
             <div class="p-4 bg-gray-50 rounded-lg flex items-start gap-2">
               <DollarSign class="h-4 w-4 text-green-500 mt-1 shrink-0" />
-              <p class="text-[10px] text-[#435574]">
+              <p class="text-[0.625rem] text-[#435574]">
                 O valor será liberado para pagamento assim que o projeto for marcado como concluído e aprovado pelo cliente.
               </p>
             </div>

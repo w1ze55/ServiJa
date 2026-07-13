@@ -986,7 +986,7 @@ const handleTagKeyPress = (e: KeyboardEvent) => {
                         <Calendar class="h-4 w-4 text-[#286AD8]" />
                       </div>
                       <div>
-                        <p class="text-[10px] uppercase font-semibold text-gray-400">Concluído em</p>
+                        <p class="text-[0.625rem] uppercase font-semibold text-gray-400">Concluído em</p>
                         <p class="font-medium">
                           {{ viewingProject.completedDate ? new Date(viewingProject.completedDate).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }) : 'Data não informada' }}
                         </p>
@@ -998,7 +998,7 @@ const handleTagKeyPress = (e: KeyboardEvent) => {
                         <Sparkles class="h-4 w-4 text-[#286AD8]" />
                       </div>
                       <div>
-                        <p class="text-[10px] uppercase font-semibold text-gray-400">Cliente</p>
+                        <p class="text-[0.625rem] uppercase font-semibold text-gray-400">Cliente</p>
                         <p class="font-medium">{{ viewingProject.client }}</p>
                       </div>
                     </div>

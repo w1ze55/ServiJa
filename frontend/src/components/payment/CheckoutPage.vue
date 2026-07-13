@@ -1140,7 +1140,7 @@ const onLeave = (el: Element, done: () => void) => {
 
                               <Transition :css="false" @before-enter="onBeforeEnter" @enter="onEnter" @before-leave="onBeforeLeave" @leave="onLeave">
                                 <div v-if="isInstallmentSelectorOpen" class="border-t border-slate-200">
-                                  <div class="grid grid-cols-[minmax(0,1fr)_auto] gap-4 bg-slate-50 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                  <div class="grid grid-cols-[minmax(0,1fr)_auto] gap-4 bg-slate-50 px-4 py-3 text-[0.6875rem] font-semibold uppercase tracking-[0.18em] text-slate-500">
                                     <span>Prazo</span>
                                     <span>Total (R$)</span>
                                   </div>

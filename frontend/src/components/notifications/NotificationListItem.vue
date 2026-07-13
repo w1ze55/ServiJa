@@ -178,7 +178,7 @@ const description = computed(() => getNotificationDescription(props.notification
             <div class="flex flex-wrap items-center gap-2">
               <p
                 :class="[
-                  'truncate text-[15px]',
+                  'truncate text-[0.9375rem]',
                   notification.isRead ? 'text-[#435574]' : 'font-semibold text-[#263238]',
                 ]"
               >
